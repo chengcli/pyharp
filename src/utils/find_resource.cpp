@@ -1,7 +1,10 @@
 // C/C++
+#include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 
 // harp
 #include <configure.h>

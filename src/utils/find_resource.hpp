@@ -2,6 +2,7 @@
 
 // C/C++
 #include <string>
+#include <vector>
 
 namespace harp {
 extern char search_paths[65536];
