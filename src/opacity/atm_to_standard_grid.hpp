@@ -1,14 +1,18 @@
 #pragma once
 
 // torch
-#include <configure.h>  //! NOLINT
 #include <torch/nn/cloneable.h>
+#include <torch/nn/functional.h>
 #include <torch/nn/module.h>
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
 // harp
+// clang-format off
+#include <configure.h>
 #include <add_arg.h>
+#include <index.h>
+// clang-format on
 
 namespace harp {
 struct AtmToStandardGridOptions {
@@ -20,8 +24,8 @@ struct AtmToStandardGridOptions {
 class AtmToStandardGridImpl
     : public torch::nn::Cloneable<AtmToStandardGridImpl> {
  public:
-  //! options with which this `Attenuator` was constructed
-  AtmToStandardGridImpl options;
+  //! options with which this `AtmToStandardGrid` was constructed
+  AtmToStandardGridOptions options;
 
   //! 1D composition scale grid
   torch::Tensor xgrid;
@@ -39,8 +43,9 @@ class AtmToStandardGridImpl
   torch::Tensor refatm;
 
   //! constructor to initialize the layer
-  AtmToStandardGridImpl(AtmToStandardGridOptionis const& options_)
-      : : options(options_) {
+  AtmToStandardGridImpl() = default;
+  explicit AtmToStandardGridImpl(AtmToStandardGridOptions const& options_)
+      : options(options_) {
     reset();
   }
   void reset() override;
@@ -55,4 +60,5 @@ class AtmToStandardGridImpl
    */
   torch::Tensor forward(torch::Tensor var_x, int ix);
 };
+TORCH_MODULE(AtmToStandardGrid);
 }  // namespace harp

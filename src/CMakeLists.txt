@@ -47,8 +47,8 @@ set_target_properties(${namel}_${buildl}
     COMPILE_FLAGS "${CMAKE_CXX_FLAGS_${buildu}}"
     )
 
-#add_subdirectory(opacity)
-#add_subdirectory(radiation)
+add_subdirectory(opacity)
+add_subdirectory(radiation)
 #add_subdirectory(rtsolver)
 add_subdirectory(utils)
 

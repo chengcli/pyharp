@@ -1,15 +1,18 @@
 #pragma once
 
 // torch
-#include <configure.h>  //! NOLINT
 #include <torch/nn/cloneable.h>
+#include <torch/nn/functional.h>
 #include <torch/nn/module.h>
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
 // harp
+// clang-format off
+#include <configure.h>
 #include <add_arg.h>
 #include <index.h>
+// clang-format on
 
 #include "atm_to_standard_grid.hpp"
 
@@ -17,28 +20,28 @@ namespace harp {
 struct AttenuatorOptions {
   ADD_ARG(int, npmom) = 0;
   ADD_ARG(int, nspec) = 1;
-  ADD_ARG(int, ntemp) = 1;
-  ADD_ARG(int, npres) = 1;
-  ADD_ARG(int, ncomp) = 1;
   ADD_ARG(bool, spectral_bin) = false;
+  ADD_ARG(AtmToStandardGridOptions, atm);
 
   ADD_ARG(std::string, name) = "";
   ADD_ARG(std::string, band_name) = "";
   ADD_ARG(std::string, model_name) = "";
   ADD_ARG(std::string, opacity_file) = "";
-  ADD_ARG(std::map<std::string, float>, rpar) = {};
-  ADD_ARG(std::map<std::string, int>, ipar) = {};
   ADD_ARG(std::vector<int>, var_id) = {0};
 };
 
 //! \brief base class of all attenuators
 class AttenuatorImpl {
  public:
+  //! parameters for the model
+  std::map<std::string, torch::Tensor> par;
+
   //! options with which this `Attenuator` was constructed
   AttenuatorOptions options;
 
   //! constructor to initialize the layer
-  AttenuatorImpl(AttenuatorOptions const& options_) : options(options_) {}
+  explicit AttenuatorImpl(AttenuatorOptions const& options_)
+      : options(options_) {}
   virtual ~AttenuatorImpl() {}
 
   //! Get optical properties
@@ -72,7 +75,9 @@ class AbsorberRFMImpl : public AttenuatorImpl,
 
   //! Constructor to initialize the layer
   explicit AbsorberRFMImpl(AttenuatorOptions const& options_)
-      : AttenuatorImpl(options_) {}
+      : AttenuatorImpl(options_) {
+    reset();
+  }
   void reset() override;
 
   //! Load opacity from data file

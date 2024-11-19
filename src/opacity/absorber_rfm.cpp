@@ -13,22 +13,18 @@ extern "C" {
 #endif
 
 namespace harp {
-AbsorberRFMImpl(AttenuatorOptions const& options_) : options(options_) {
-  reset();
-}
-
 void AbsorberRFMImpl::reset() {
   kdata = register_buffer(
       "kdata",
-      torch::zeros({1 + options.npmom(), options.nspec(), options.ncomp(),
-                    options.nlevel(), options.ntemp()},
+      torch::zeros({1 + options.npmom(), options.nspec(), options.atm().ncomp(),
+                    options.atm().npres(), options.atm().ntemp()},
                    torch::kFloat));
-  scale_grid = register_module("scale_grid", AtmToStandardGrid(options));
+  scale_grid = register_module("scale_grid", AtmToStandardGrid(options.atm()));
   load();
 }
 
 void AbsorberRFMImpl::load() {
-  if (opttions.opacity_file().empty()) return;
+  if (options.opacity_file().empty()) return;
   std::string full_path = find_resource(options.opacity_file());
 
 #ifdef NETCDFOUTPUT
@@ -88,11 +84,15 @@ void AbsorberRFMImpl::load() {
 #endif
 }
 
-torch::Tensor AbsorberRFMImpl::forward(torch::Tensor var_x) const {
-  auto grid = scale_grid.forward(var_x, options.var_id()[0]);
+torch::Tensor AbsorberRFMImpl::forward(torch::Tensor var_x) {
+  namespace F = torch::nn::functional;
+  auto grid = scale_grid->forward(var_x, options.var_id()[0]);
 
   // interpolate to model grid
-  auto kcross = torch::grid_sample(kdata, grid, "bilinear", "border");
+  auto op = F::GridSampleFuncOptions()
+                .mode(torch::kBilinear)
+                .padding_mode(torch::kBorder);
+  auto kcross = F::grid_sample(kdata, grid, op);
 
   auto x0 = var_x[options.var_id()[0]];
   auto dens = x0 * var_x[index::IPR] / (constants::Rgas * var_x[index::ITM]);
