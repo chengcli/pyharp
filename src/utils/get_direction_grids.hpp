@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -9,6 +10,7 @@ bool real_close(T num1, T num2, T tolerance) {
   return std::fabs(num1 - num2) <= tolerance;
 }
 
+template <typename T>
 std::pair<std::vector<T>, std::vector<T>> get_direction_grids(
     std::vector<std::pair<T, T>> const &dirs) {
   std::vector<T> uphi;

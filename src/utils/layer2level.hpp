@@ -25,9 +25,11 @@ struct Layer2LevelOptions {
 /*!
  * The layer variables are defined at the cell center, while the level variables
  * are defined at the cell interface. The last dimension of the input tensor is
- * the layer dimension. \param var layer variables, shape (..., nlayer) \param
- * options options \return level variables, shape (..., nlevel = nlayer + 1)
+ * the layer dimension.
+ *
+ * \param var layer variables, shape (..., nlayer)
+ * \param options options
+ * \return level variables, shape (..., nlevel = nlayer + 1)
  */
 torch::Tensor layer2level(torch::Tensor var, Layer2LevelOptions const &options);
-
 }  // namespace harp
