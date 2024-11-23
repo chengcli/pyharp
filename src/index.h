@@ -15,6 +15,10 @@ enum index {
   // flux variables
   IUP = 0,  //! upward
   IDN = 1,  //! downward
+
+  // spectral variables
+  IWN = 0,  //! wavenumber(length)
+  IWT = 1,  //! weight
 };
 
 enum {

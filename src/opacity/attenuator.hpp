@@ -23,9 +23,8 @@ struct AttenuatorOptions {
   ADD_ARG(bool, spectral_bin) = false;
   ADD_ARG(AtmToStandardGridOptions, atm);
 
+  ADD_ARG(std::string, type) = "";
   ADD_ARG(std::string, name) = "";
-  ADD_ARG(std::string, band_name) = "";
-  ADD_ARG(std::string, model_name) = "";
   ADD_ARG(std::string, opacity_file) = "";
   ADD_ARG(std::vector<int>, var_id) = {0};
 };

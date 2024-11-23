@@ -15,18 +15,17 @@
 #include <add_arg.h>
 // clang-format on
 #include <opacity/attenuator.hpp>
+#include <utils/layer2level.hpp>
 
 namespace harp {
-
-using SharedData = std::shared_ptr<
-    std::unordered_map<std::string, std::shared_future<torch::Tensor>>>;
-
 struct RadiationBandOptions {
   ADD_ARG(std::string, name) = "B1";
   ADD_ARG(std::string, outdirs) = "";
   ADD_ARG(std::string, solver) = "lambert";
+
   ADD_ARG(std::vector<std::string>, attenuators) = {};
-  ADD_ARG(std::vector<AttenuatorOptions>, attenuator_options) = {};
+  ADD_ARG(std::vector<AttenuatorOptions>, attenuator_options);
+  ADD_ARG(Layer2LevelOptions, l2l_options);
   // ADD_ARG(SolverOptions, solver_options) = {};
 
   ADD_ARG(int, nstr) = 1;
@@ -41,9 +40,6 @@ struct RadiationBandOptions {
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
  public:
-  //! parameters for the model
-  std::map<std::string, torch::Tensor> par;
-
   //! options with which this `RadiationBandImpl` was constructed
   RadiationBandOptions options;
 
@@ -54,29 +50,27 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   std::map<std::string, Attenuator> attenuators;
 
   //! spectral grid and weights
-  //! (nspec, 2)
+  //! (2, nspec)
   torch::Tensor spec;
+
+  //! bin optical properties
+  //! 5D tensor with shape (tau + ssa + pmom, C, ..., nlayer)
+  torch::Tensor prop;
 
   //! outgoing rays (mu, phi)
   //! (nout, 2)
   torch::Tensor rayOutput;
 
-  //! band/bin optical data, 5D tensor with shape (3 + nstr, nc3, nc2, nc1)
-  //! (tau + ssa + pmom, C, ..., nlayer)
-  torch::Tensor opt;
-
   //! Constructor to initialize the layers
   RadiationBandImpl() = default;
   explicit RadiationBandImpl(RadiationBandOptions const &options_);
   void reset() override;
+  std::string to_string() const;
+  void load_opacity();
 
   //! \brief Calculate the radiance/radiative flux
   torch::Tensor forward(torch::Tensor x1f, torch::Tensor ftoa,
                         torch::Tensor var_x);
-
- protected:
-  SharedData shared_;
-  void set_temperature_level_(torch::Tensor hydro_x);
 };
 TORCH_MODULE(RadiationBand);
 

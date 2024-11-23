@@ -1,5 +1,8 @@
 #pragma once
 
+// C/C++
+#include <future>
+
 // torch
 #include <torch/nn/cloneable.h>
 #include <torch/nn/module.h>
@@ -14,6 +17,9 @@
 #include "radiation_band.hpp"
 
 namespace harp {
+extern std::unordered_map<std::string, std::shared_future<torch::Tensor>>
+    shared;
+
 struct RadiationOptions {
   RadiationOptions() = default;
 

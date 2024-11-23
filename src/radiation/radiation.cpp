@@ -6,13 +6,15 @@
 #include <utility>
 
 // harp
+#include <utils/parse_radiation_direction.hpp>
 #include <utils/vectorize.hpp>
 
 #include "radiation.hpp"
-#include "radiation_utils.hpp"
 // #include "rt_solvers.hpp"
 
 namespace harp {
+std::unordered_map<std::string, std::shared_future<torch::Tensor>> shared;
+
 void RadiationOptions::set_flags(std::string const& str) {
   std::vector<std::string> dstr = Vectorize<std::string>(str.c_str(), " ,");
 
