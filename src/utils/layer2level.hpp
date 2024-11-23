@@ -1,9 +1,15 @@
 #pragma once
 
+// torch
+#include <torch/torch.h>
+
 // clang-format off
 #include <configure.h>
 #include <add_arg.h>
 // clang-format on
+
+// harp
+#include <index.h>
 
 namespace harp {
 struct Layer2LevelOptions {
@@ -13,7 +19,7 @@ struct Layer2LevelOptions {
   ADD_ARG(int, blower) = kExtrapolate;
   ADD_ARG(int, bupper) = kConstant;
   ADD_ARG(bool, check_positivity) = true;
-}
+};
 
 //! Convert layer variables to level variables
 /*!
@@ -22,7 +28,6 @@ struct Layer2LevelOptions {
  * the layer dimension. \param var layer variables, shape (..., nlayer) \param
  * options options \return level variables, shape (..., nlevel = nlayer + 1)
  */
-torch::Tensor
-layer2level(torch::Tensor var, Layer2LevelOptions const &options);
+torch::Tensor layer2level(torch::Tensor var, Layer2LevelOptions const &options);
 
 }  // namespace harp

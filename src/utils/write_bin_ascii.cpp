@@ -3,6 +3,7 @@
 #include <iostream>
 
 // harp
+#include "parse_radiation_direction.hpp"  // rad2deg
 #include "write_bin_ascii.hpp"
 
 namespace harp {
@@ -13,7 +14,7 @@ void write_bin_ascii_header(RadiationBand const &band, std::string fname) {
           band->name().c_str(), band->options.wmin(), band->options.wmax());
   ;
   auto const &rayOutput = band->rayOutput;
-  fprintf(pfile, "# Ray output size: %lu\n", rayOutput.size(0));
+  fprintf(pfile, "# Ray output size: %lld\n", rayOutput.size(0));
 
   fprintf(pfile, "# Polar angles: ");
   for (int i = 0; i < rayOutput.size(0); ++i) {
@@ -29,7 +30,7 @@ void write_bin_ascii_header(RadiationBand const &band, std::string fname) {
 
   fprintf(pfile, "#%12s%12s", "Wave", "Weight");
   for (int i = 0; i < rayOutput.size(0); ++i) {
-    fprintf(pfile, "%12s%lu", "Radiance", j + 1);
+    fprintf(pfile, "%12s%d", "Radiance", i + 1);
   }
 
   fclose(pfile);
@@ -42,7 +43,7 @@ void write_bin_ascii_data(torch::Tensor rad, RadiationBand const &band,
   for (int i = 0; i < band->spec.size(0); ++i) {
     fprintf(pfile, "%13.3g%12.3g", band->spec[i][0].item().toFloat(),
             band->spec[i][1].item().toFloat());
-    for (int j = 0; j < rayOutput.size(0); ++j) {
+    for (int j = 0; j < band->rayOutput.size(0); ++j) {
       fprintf(pfile, "%12.3f", rad[j][i].item().toFloat());
     }
   }

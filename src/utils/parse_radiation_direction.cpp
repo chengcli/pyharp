@@ -11,7 +11,7 @@ torch::Tensor parse_radiation_direction(std::string const &str) {
   float mu = 0.;
   float phi = 0.;
 
-  sscanf(str.data(), "(%lf,%lf)", &mu, &phi);
+  sscanf(str.data(), "(%f,%f)", &mu, &phi);
   mu = cos(deg2rad(mu));
   phi = deg2rad(phi);
 

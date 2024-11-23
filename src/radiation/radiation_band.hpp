@@ -1,5 +1,8 @@
 #pragma once
 
+// C/C++
+#include <future>
+
 // torch
 #include <torch/nn/cloneable.h>
 #include <torch/nn/module.h>

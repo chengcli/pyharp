@@ -7,7 +7,7 @@ namespace harp {
 torch::Tensor layer2level(torch::Tensor var,
                           Layer2LevelOptions const &options) {
   // increase the last dimension by 1
-  std::vector<int> shape = var.sizes().vec();
+  auto shape = var.sizes().vec();
   shape.back() += 1;
   torch::Tensor out = torch::zeros(shape, var.options());
 
@@ -23,10 +23,10 @@ torch::Tensor layer2level(torch::Tensor var,
   // interior
   if (options.order() == k4thOrder) {
     Center4Interp interp_cp4;
-    interp_cp4.to(var.device());
+    interp_cp4->to(var.device());
 
     out.select(-1, 1) = (var.select(-1, 0) + var.select(-1, 1)) / 2.;
-    out.slice(-1, 2, -2) = interp_cp4.forward(var);
+    out.slice(-1, 2, -2) = interp_cp4->forward(var);
     out.slice(-1, -2) = (var.select(-1, -1) + var.select(-1, -2)) / 2.;
   } else if (options.order() == k2ndOrder) {
     out.slice(-1, 1, -1) = (var.slice(-1, 0, -2) + var.slice(-1, 1, -1)) / 2.;
@@ -53,5 +53,7 @@ torch::Tensor layer2level(torch::Tensor var,
       throw std::runtime_error("layer2level check failed");
     }
   }
+
+  return out;
 }
 }  // namespace harp
