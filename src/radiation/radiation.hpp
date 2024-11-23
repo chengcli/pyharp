@@ -7,8 +7,10 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include "add_arg.h"
-#include "configure.h"
+// clang-format off
+#include <configure.h>
+#include <add_arg.h>
+// clang-format on
 #include "radiation_band.hpp"
 
 namespace harp {
@@ -29,7 +31,7 @@ struct RadiationOptions {
   ADD_ARG(std::string, indirs) = "(0.,0.)";
   ADD_ARG(std::string, outdirs) = "";
   ADD_ARG(std::vector<std::string>, bands) = {};
-  ADD_ARG(std::map<std::string, RadiationBandOptions>, band_options) = {};
+  ADD_ARG(std::vector<RadiationBandOptions>, band_options) = {};
 
   void set_flags(std::string const& str);
 };

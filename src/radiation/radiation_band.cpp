@@ -4,101 +4,36 @@
 #include <type_traits>
 #include <vector>
 
-// external
-#include <yaml-cpp/yaml.h>
-
-// athena
-#include <athena/mesh/mesh.hpp>
-#include <athena/outputs/outputs.hpp>
-#include <athena/parameter_input.hpp>
-#include <athena/utils/utils.hpp>
-
-// canoe
-#include <configure.hpp>
-
-// climath
-#include <climath/core.h>
-
-// utils
-#include <utils/extract_substring.hpp>
-#include <utils/fileio.hpp>
-#include <utils/ndarrays.hpp>
-
 // opacity
-#include <opacity/absorber.hpp>
 
 // harp
+#include <opacity/attenuator.hpp>
+#include <opacity/parse_radiation_direction.hpp>
+
 #include "radiation.hpp"
 #include "radiation_band.hpp"
-#include "rt_solvers.hpp"
+// #include "rt_solvers.hpp"
 
-RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const &options)
-    : options(options) {
+namespace harp {
+RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const &options_)
+    : options(options_) {
   reset();
 }
 
-RadiationBandImpl::reset() {
-  auto my = rad[myname];
+void RadiationBandImpl::reset() {
+  wgt =
+      register_buffer("wgt", torch::tensor({options.nspec()}, torch::kFloat32));
 
-  spec = register_buffer("spec",
-                         torch::tensor({options.nspec()}, torch::kFloat32));
-
-  btau = register_buffer(
-      "btau", torch::zeros({options.nc3(), options.nc2(), options.nc1()},
-                           torch::kFloat32));
-
-  tau = register_buffer(
-      "tau", torch::zeros({options.nc2(), options.nc1(), options.nspec()},
-                          torch::kFloat32));
-
-  bssa = register_buffer(
-      "bssa", torch::zeros({options.nc3(), options.nc2(), options.nc1()},
-                           torch::kFloat32));
-
-  ssa = register_buffer(
-      "ssa", torch::zeros({options.nc2(), options.nc1(), options.nspec()},
-                          torch::kFloat32));
-
-  bpmom =
-      register_buffer("bpmom", torch::zeros({options.nc3(), options.nc2(),
-                                             options.nc1(), 1 + options.nstr()},
+  opt = register_buffer("opt", torch::zeros({3 + options.nstr(), options.nc3(),
+                                             options.nc2(), options.nc1()},
                                             torch::kFloat32));
-
-  pmom = register_buffer(
-      "pmom", torch::zeros({options.nc2(), options.nc1(), options.nspec(),
-                            1 + options.nstr()},
-                           torch::kFloat32));
-
-  bflxup = register_buffer(
-      "bflxup", torch::zeros({options.nc3(), options.nc2(), options.nc1() + 1},
-                             torch::kFloat32));
-
-  flxup = register_buffer(
-      "flxup", torch::zeros({options.nc2(), options.nc1(), options.nspec()},
-                            torch::kFloat32));
-
-  bflxdn = register_buffer(
-      "bflxdn", torch::zeros({options.nc3(), options.nc2(), options.nc1() + 1},
-                             torch::kFloat32));
-
-  flxdn = register_buffer(
-      "flxdn", torch::zeros({options.nc2(), options.nc1(), options.nspec()},
-                            torch::kFloat32));
-
-  btoa = register_buffer(
-      "btoa", torch::zeros({options.nc3(), options.nc2()}, torch::kFloat32));
-
-  toa = register_buffer(
-      "toa", torch::zeros({options.nc3(), options.nc2(), options.nspec()},
-                          torch::kFloat32));
 
   auto str = options.outdirs();
   if (!str.empty()) {
-    band.rayOutput = parse_radiation_directions(str);
-    register_buffer("rayOutput", band.rayOutput);
+    rayOutput = register_buffer("rayOutput", parse_radiation_directions(str));
   }
 
-  // set absorbers
+  // set attenuators
   for (auto name : options.absorbers()) {
     absorbers[name] = Absorber(options.absorber_options().at(name));
   }
@@ -302,38 +237,4 @@ std::shared_ptr<RadiationBand::RTSolver> RadiationBand::CreateRTSolverFrom(
   return psolver;
 }
 
-void RadiationBand::set_temperature_level(torch::Tensor hydro_x) {
-  tem_ = hydro_w[0];
-
-  // set temperature at cell interface
-  int il = NGHOST, iu = ac.size() - 1 - NGHOST;
-  temf_[il] = (3. * tem_[il] - tem_[il + 1]) / 2.;
-  temf_[il + 1] = (tem_[il] + tem_[il + 1]) / 2.;
-  for (int i = il + 2; i <= iu - 1; ++i)
-    temf_[i] = interp_cp4(tem_[i - 2], tem_[i - 1], tem_[i], tem_[i + 1]);
-  temf_[iu] = (tem_[iu] + tem_[iu - 1]) / 2.;
-  // temf_[iu + 1] = (3. * tem_[iu] - tem_[iu - 1]) / 2.;
-  temf_[iu + 1] = tem_[iu];  // isothermal top boundary
-
-  for (int i = 0; i < il; ++i) temf_[i] = tem_[il];
-  for (int i = iu + 2; i < ac.size(); ++i) temf_[i] = tem_[iu + 1];
-
-  bool error = false;
-  for (int i = 0; i < ac.size(); ++i) {
-    if (temf_[i] < 0.) {
-      temf_[i] = tem_[i];
-      // error = true;
-    }
-  }
-  for (int i = il; i <= iu; ++i) {
-    if (tem_[i] < 0.) error = true;
-  }
-  if (error) {
-    for (int i = il; i <= iu; ++i) {
-      std::cout << "--- temf[" << i << "] = " << temf_[i] << std::endl;
-      std::cout << "tem[" << i << "] = " << tem_[i] << std::endl;
-    }
-    std::cout << "--- temf[" << iu + 1 << "] = " << temf_[iu + 1] << std::endl;
-    throw std::runtime_error("Negative temperature at cell interface");
-  }
-}
+}  // namespace harp

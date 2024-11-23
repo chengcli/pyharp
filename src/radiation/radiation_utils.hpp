@@ -40,11 +40,11 @@ torch::Tensor get_phase_moment(std::string const& phase_func, int npmom,
 //! \brief Parse the unit of the spectral grid
 //!
 //! \return [wavenumber, wavelength, frequency]
-std::string parse_unit_with_default(YAML::Node const& my);
+// std::string parse_unit_with_default(YAML::Node const& my);
 
 //! \brief Parse the spectral range from a YAML node
 //!
 //! \return [wave min, wave max]
-std::pair<float, float> parse_wave_range(YAML::Node const& my);
+// std::pair<float, float> parse_wave_range(YAML::Node const& my);
 
 }  // namespace harp

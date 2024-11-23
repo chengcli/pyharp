@@ -7,18 +7,23 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include "absorber.hpp"
-#include "add_arg.h"
-#include "configure.h"
+// clang-format off
+#include <configure.h>
+#include <add_arg.h>
+// clang-format on
+#include <opacity/attenuator.hpp>
 
 namespace harp {
+
+using SharedData = std::shared_ptr<
+    std::unordered_map<std::string, std::shared_future<torch::Tensor>>>;
+
 struct RadiationBandOptions {
   ADD_ARG(std::string, name) = "B1";
   ADD_ARG(std::string, outdirs) = "";
-  ADD_ARG(std::vector<std::string>, absorbers) = {};
   ADD_ARG(std::string, solver) = "lambert";
-  ADD_ARG(std::map<std::string, float>, parameters) = {};
-  ADD_ARG(std::map<std::string, AbsorberOptions>, absorber_options) = {};
+  ADD_ARG(std::vector<std::string>, attenuators) = {};
+  ADD_ARG(std::vector<AttenuatorOptions>, attenuator_options) = {};
   // ADD_ARG(SolverOptions, solver_options) = {};
 
   ADD_ARG(int, nstr) = 1;
@@ -32,24 +37,28 @@ struct RadiationBandOptions {
 };
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
- public:  // public access data
+ public:
+  //! parameters for the model
+  std::map<std::string, torch::Tensor> par;
+
   //! options with which this `RadiationBandImpl` was constructed
-  RadiationOptions options;
+  RadiationBandOptions options;
 
   //! radiative transfer solver
-  RTSolver rt_solver;
+  // RTSolver rt_solver;
 
-  //! all absorbers
-  std::map<std::string, Absorber> attenuators;
+  //! all attenuators
+  std::map<std::string, Attenuator> attenuators;
 
   //! spectral grid weights (nspec)
-  torch::Tensor weight;
+  torch::Tensor wgt;
 
   //! outgoing rays
   //! (nout, 2)
-  tourch::Tensor rayOutput;
+  torch::Tensor rayOutput;
 
-  //! band/bin optical data, (tau + ssa + pmom, C, ..., nlayer)
+  //! band/bin optical data, 5D tensor with shape (3 + nstr, nc3, nc2, nc1)
+  //! (tau + ssa + pmom, C, ..., nlayer)
   torch::Tensor opt;
 
   //! Constructor to initialize the layers
@@ -62,11 +71,12 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
                         torch::Tensor var_x);
 
  protected:
+  SharedData shared_;
   void set_temperature_level_(torch::Tensor hydro_x);
 };
-TORCH_MODULE(RadiationBandImpl);
+TORCH_MODULE(RadiationBand);
 
-class RadiationBandsFactory {
+/*class RadiationBandsFactory {
  public:
   static RadiationBandContainer CreateFrom(ParameterInput *pin,
                                            std::string key);
@@ -82,6 +92,6 @@ class RadiationBandsFactory {
  protected:
   static std::map<std::string, int> band_id_;
   static int next_band_id_;
-};
+};*/
 
 }  // namespace harp

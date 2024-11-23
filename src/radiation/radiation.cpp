@@ -5,14 +5,12 @@
 #include <stdexcept>
 #include <utility>
 
-// external
-#include <yaml-cpp/yaml.h>
-
 // harp
+#include <utils/vectorize.hpp>
+
 #include "radiation.hpp"
 #include "radiation_utils.hpp"
-#include "rt_solvers.hpp"
-#include "vectorize.hpp"
+// #include "rt_solvers.hpp"
 
 namespace harp {
 void RadiationOptions::set_flags(std::string const& str) {
@@ -45,11 +43,9 @@ RadiationImpl::RadiationImpl(RadiationOptions const& options_)
 }
 
 void RadiationImpl::reset() {
-  // radiation bands
-  bands_ = RadiationBandsFactory::CreateFrom(pin, input_key);
-
-  for (auto name : options.bands()) {
-    bands[name] = RadiationBand(options.band_options().at(name));
+  for (int i = 0; i < options.bands().size(); ++i) {
+    auto name = options.bands()[i];
+    bands[name] = RadiationBand(options.band_options()[i]);
     register_module(name, bands[name]);
   }
 
@@ -61,25 +57,24 @@ void RadiationImpl::reset() {
   if (!options.outdirs().empty()) {
     for (auto& [name, band] : bands) {
       // outgoing radiation direction (mu,phi) in degrees
-      if (band.rayOutput.empty()) {
+      if (band->rayOutput.numel() == 0) {
         auto str = options.outdirs();
-        band.rayOutput = parse_radiation_directions(str);
+        band->rayOutput = parse_radiation_directions(str);
       }
     }
   }
 }
 
-torch::Tensor RadiationImpl::forward(torch::Tensor ftoa, torch::Tensor hydro_x,
-                                     torch::Tensor scalar_x) {
+torch::Tensor RadiationImpl::forward(torch::Tensor ftoa, torch::Tensor var_x) {
   torch::Tensor out = torch::zeros_like(ftoa);
 
   if (options.flux_flag()) {
     for (auto& [name, band] : bands) {
-      out += band.forward(x1f, ftoa * hydro_x, hydro_x, scalar_x);
+      out += band->forward(x1f, ftoa, var_x);
     }
   } else {
     for (auto& [name, band] : bands) {
-      band.forward(x1f, ftoa, hydro_x, scalar_x);
+      band->forward(x1f, ftoa, var_x);
     }
   }
 
