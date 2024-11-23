@@ -1,44 +1,57 @@
+// harp
+#include "layer2level.hpp"
+
+#include "interp.hpp"
 
 namespace harp {
-struct Layer2LevelOptions {
-  ADD_ARG(int, k4thOrder) = 0;
-  ADD_ARG(bool, use_log) = false;
-}
+torch::Tensor layer2level(torch::Tensor var,
+                          Layer2LevelOptions const &options) {
+  // increase the last dimension by 1
+  std::vector<int> shape = var.sizes().vec();
+  shape.back() += 1;
+  torch::Tensor out = torch::zeros(shape, var.options());
 
-torch::Tensor
-layer2level(torch::Tensor var, Layer2LevelOptions const &options) {
-  tem_ = hydro_w[0];
-
-  // set temperature at cell interface
-  int il = NGHOST, iu = ac.size() - 1 - NGHOST;
-  temf_[il] = (3. * tem_[il] - tem_[il + 1]) / 2.;
-  temf_[il + 1] = (tem_[il] + tem_[il + 1]) / 2.;
-  for (int i = il + 2; i <= iu - 1; ++i)
-    temf_[i] = interp_cp4(tem_[i - 2], tem_[i - 1], tem_[i], tem_[i + 1]);
-  temf_[iu] = (tem_[iu] + tem_[iu - 1]) / 2.;
-  // temf_[iu + 1] = (3. * tem_[iu] - tem_[iu - 1]) / 2.;
-  temf_[iu + 1] = tem_[iu];  // isothermal top boundary
-
-  for (int i = 0; i < il; ++i) temf_[i] = tem_[il];
-  for (int i = iu + 2; i < ac.size(); ++i) temf_[i] = tem_[iu + 1];
-
-  bool error = false;
-  for (int i = 0; i < ac.size(); ++i) {
-    if (temf_[i] < 0.) {
-      temf_[i] = tem_[i];
-      // error = true;
-    }
+  // lower boundary
+  if (options.blower() == kExtrapolate) {
+    out.select(-1, 0) = (3. * var.select(-1, 0) - var.select(-1, 1)) / 2.;
+  } else if (options.blower() == kConstant) {
+    out.select(-1, 0) = var.select(-1, 0);
+  } else {
+    throw std::runtime_error("Unsupported boundary condition");
   }
-  for (int i = il; i <= iu; ++i) {
-    if (tem_[i] < 0.) error = true;
+
+  // interior
+  if (options.order() == k4thOrder) {
+    Center4Interp interp_cp4;
+    interp_cp4.to(var.device());
+
+    out.select(-1, 1) = (var.select(-1, 0) + var.select(-1, 1)) / 2.;
+    out.slice(-1, 2, -2) = interp_cp4.forward(var);
+    out.slice(-1, -2) = (var.select(-1, -1) + var.select(-1, -2)) / 2.;
+  } else if (options.order() == k2ndOrder) {
+    out.slice(-1, 1, -1) = (var.slice(-1, 0, -2) + var.slice(-1, 1, -1)) / 2.;
+  } else {
+    throw std::runtime_error("Unsupported interpolation order");
   }
-  if (error) {
-    for (int i = il; i <= iu; ++i) {
-      std::cout << "--- temf[" << i << "] = " << temf_[i] << std::endl;
-      std::cout << "tem[" << i << "] = " << tem_[i] << std::endl;
+
+  // upper boundary
+  if (options.bupper() == kExtrapolate) {
+    out.select(-1, -1) = (3. * var.select(-1, -1) - var.select(-1, -2)) / 2.;
+  } else if (options.bupper() == kConstant) {
+    out.select(-1, -1) = var.select(-1, -1);
+  } else {
+    throw std::runtime_error("Unsupported boundary condition");
+  }
+
+  // checks
+  if (options.check_positivity()) {
+    auto error = torch::nonzero(out < 0);
+
+    if (error.size(0) > 0) {
+      std::cout << "Negative values found at cell interface: ";
+      std::cout << "indices = " << error << std::endl;
+      throw std::runtime_error("layer2level check failed");
     }
-    std::cout << "--- temf[" << iu + 1 << "] = " << temf_[iu + 1] << std::endl;
-    throw std::runtime_error("Negative temperature at cell interface");
   }
 }
 }  // namespace harp

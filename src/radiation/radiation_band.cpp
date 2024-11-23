@@ -149,74 +149,14 @@ RadiationBand const *RadiationBand::CalBandRadiance(MeshBlock const *pmb, int k,
   return this;
 }
 
-void RadiationBand::WriteAsciiHeader(OutputParameters const *pout) const {
-  if (!TestFlag(RadiationFlags::WriteBinRadiance)) return;
-
-  char fname[80], number[6];
-  snprintf(number, sizeof(number), "%05d", pout->file_number);
-  snprintf(fname, sizeof(fname), "%s.radiance.%s.txt", GetName().c_str(),
-           number);
-  FILE *pfile = fopen(fname, "w");
-
-  fprintf(pfile, "# Bin Radiances of Band %s: %.3g - %.3g\n", GetName().c_str(),
-          wrange_.first, wrange_.second);
-  fprintf(pfile, "# Ray output size: %lu\n", rayOutput_.size());
-
-  fprintf(pfile, "# Polar angles: ");
-  for (auto &ray : rayOutput_) {
-    fprintf(pfile, "%.3f", rad2deg(acos(ray.mu)));
-  }
-  fprintf(pfile, "\n");
-
-  fprintf(pfile, "# Azimuthal angles: ");
-  for (auto &ray : rayOutput_) {
-    fprintf(pfile, "%.3f", rad2deg(ray.phi));
-  }
-  fprintf(pfile, "\n");
-
-  fprintf(pfile, "#%12s%12s", "wave1", "wave2");
-  for (size_t j = 0; j < rayOutput_.size(); ++j) {
-    fprintf(pfile, "%12s%lu", "Radiance", j + 1);
-  }
-  fprintf(pfile, "%12s\n", "weight");
-
-  fclose(pfile);
-}
-
-void RadiationBand::WriteAsciiData(OutputParameters const *pout) const {
-  if (!TestFlag(RadiationFlags::WriteBinRadiance)) return;
-
-  char fname[80], number[6];
-  snprintf(number, sizeof(number), "%05d", pout->file_number);
-  snprintf(fname, sizeof(fname), "%s.radiance.%s.txt", GetName().c_str(),
-           number);
-  FILE *pfile = fopen(fname, "w");
-
-  for (size_t i = 0; i < pgrid_->spec.size(); ++i) {
-    fprintf(pfile, "%13.3g%12.3g", pgrid_->spec[i].wav1, pgrid_->spec[i].wav2);
-    for (size_t j = 0; j < rayOutput_.size(); ++j) {
-      fprintf(pfile, "%12.3f", toa_(i, j));
-    }
-    if (TestFlag(RadiationFlags::Normalize) &&
-        (wrange_.first != wrange_.second)) {
-      fprintf(pfile, "%12.3g\n",
-              pgrid_->spec[i].wght / (wrange_.second - wrange_.first));
-    } else {
-      fprintf(pfile, "%12.3g\n", pgrid_->spec[i].wght);
-    }
-  }
-
-  fclose(pfile);
-}
-
-std::string RadiationBand::ToString() const {
+std::string RadiationBand::to_string() const {
   std::stringstream ss;
-  ss << "RadiationBand: " << GetName() << std::endl;
+  ss << "RadiationBand: " << name() << std::endl;
   ss << "Absorbers: ";
-  for (auto &ab : absorbers_) {
-    ss << ab->GetName() << ", ";
+  for (ab : absorbers_) {
+    ss << ab->name() << ", ";
   }
-  ss << std::endl << "RT-Solver: " << psolver_->GetName();
+  // ss << std::endl << "RT-Solver: " << psolver_->GetName();
   return ss.str();
 }
 

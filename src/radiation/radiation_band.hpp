@@ -50,10 +50,11 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   //! all attenuators
   std::map<std::string, Attenuator> attenuators;
 
-  //! spectral grid weights (nspec)
-  torch::Tensor wgt;
+  //! spectral grid and weights
+  //! (nspec, 2)
+  torch::Tensor spec;
 
-  //! outgoing rays
+  //! outgoing rays (mu, phi)
   //! (nout, 2)
   torch::Tensor rayOutput;
 

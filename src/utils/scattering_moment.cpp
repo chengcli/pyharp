@@ -1,3 +1,7 @@
+// C/C++
+#include <cmath>
+
+// harp
 #include "scattering_moment.hpp"
 
 namespace harp {
