@@ -7,6 +7,10 @@
 #
 #   rtsolver_debug
 #   rtsolver_release
+#
+# Compile the following submodules
+#
+#   cdisort : Discrete Ordinate Method solver, cdisort-2.1.3
 
 string(TOLOWER ${CMAKE_BUILD_TYPE} buildl)
 string(TOUPPER ${CMAKE_BUILD_TYPE} buildu)
@@ -25,3 +29,5 @@ set_target_properties(${namel}_${buildl}
     PROPERTIES
     COMPILE_FLAGS "${CMAKE_CXX_FLAGS_${buildu}}"
     )
+
+add_subdirectory(cdisort213)

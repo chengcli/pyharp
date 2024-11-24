@@ -28,11 +28,8 @@ struct RadiationOptions {
   ADD_ARG(bool, flux_flag) = false;
   ADD_ARG(bool, time_dependent) = false;
   ADD_ARG(bool, broad_band) = false;
-  ADD_ARG(bool, thermal_emission) = false;
   ADD_ARG(bool, stellar_beam) = false;
-  ADD_ARG(bool, normalize) = false;
   ADD_ARG(bool, write_bin_radiance) = false;
-  ADD_ARG(bool, spectral_bin) = false;
 
   ADD_ARG(std::string, indirs) = "(0.,0.)";
   ADD_ARG(std::string, outdirs) = "";
@@ -50,10 +47,6 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
   //! vertical coordinate
   torch::Tensor x1f;
 
-  //! incomming rays
-  //! (nray, 2)
-  torch::Tensor rayInput;
-
   //! RadiationBands
   std::map<std::string, RadiationBand> bands;
 
@@ -63,7 +56,7 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
   void reset() override;
 
   //! \brief Calculate the radiance/radiative flux
-  torch::Tensor forward(torch::Tensor ftoa, torch::Tensor var_x);
+  torch::Tensor forward(torch::Tensor ftoa, torch::Tensor var_x, float ray[2]);
 };
 TORCH_MODULE(Radiation);
 

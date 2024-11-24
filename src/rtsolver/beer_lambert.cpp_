@@ -16,8 +16,8 @@
 #include "radiation.hpp"
 #include "rt_solvers.hpp"
 
-void RadiationBand::RTSolverLambert::CalBandRadiance(MeshBlock const *pmb,
-                                                     int k, int j) {
+void BeerLambert::forward(MeshBlock const *pmb,
+                          int k, int j) {
   RadiationBand *pband = pmy_band_;
 
   auto &rayOutput = pband->rayOutput_;
@@ -27,14 +27,13 @@ void RadiationBand::RTSolverLambert::CalBandRadiance(MeshBlock const *pmb,
   auto &spec = pband->pgrid_->spec;
 
   auto &btoa = pband->btoa;
-  //! \note $T ~ Ts*(\tau/\tau_s)^\alpha$ at lower boundary
-  Real alpha = pband->HasPar("alpha") ? pband->GetPar<Real>("alpha") : 0.;
 
   Real il = pmb->is;
   Real iu = pmb->ie + 1;
 
   std::vector<Real> taut(iu + 1);
 
+  auto alpha = options.alpha();
   // integrate from top to bottom
   for (int m = 0; m < pband->GetNumOutgoingRays(); ++m) {
     btoa(m, k, j) = 0.;

@@ -25,16 +25,12 @@ void RadiationOptions::set_flags(std::string const& str) {
       broad_band(true);
     } else if (dstr[i] == "stellar_beam") {
       stellar_beam(true);
-    } else if (dstr[i] == "thermal_emission") {
-      thermal_emission(true);
-    } else if (dstr[i] == "normalize") {
-      normalize(true);
     } else if (dstr[i] == "write_bin_radiance") {
       write_bin_radiance(true);
     } else {
       std::stringstream msg;
       msg << "flag: '" << dstr[i] << "' unrecognized" << std::endl;
-      throw std::runtime_error("parse_radiation_flags::" + msg.str());
+      throw std::runtime_error("RadiationOptions::set_flags: " + msg.str());
     }
   }
 }
@@ -47,36 +43,37 @@ RadiationImpl::RadiationImpl(RadiationOptions const& options_)
 void RadiationImpl::reset() {
   for (int i = 0; i < options.bands().size(); ++i) {
     auto name = options.bands()[i];
+    // set default outgoing radiation directions
+    if (!options.outdirs().empty()) {
+      options.band_options()[i].outdirs(options.outdirs());
+    }
     bands[name] = RadiationBand(options.band_options()[i]);
     register_module(name, bands[name]);
   }
-
-  // incoming radiation direction (mu, phi) in degrees
-  rayInput = parse_radiation_directions(options.indirs());
-  register_buffer("rayInput", rayInput);
-
-  // set default outgoing radiation directions
-  if (!options.outdirs().empty()) {
-    for (auto& [name, band] : bands) {
-      // outgoing radiation direction (mu,phi) in degrees
-      if (band->rayOutput.numel() == 0) {
-        auto str = options.outdirs();
-        band->rayOutput = parse_radiation_directions(str);
-      }
-    }
-  }
 }
 
-torch::Tensor RadiationImpl::forward(torch::Tensor ftoa, torch::Tensor var_x) {
+torch::Tensor RadiationImpl::forward(torch::Tensor ftoa, torch::Tensor var_x,
+                                     float ray[2]) {
   torch::Tensor out = torch::zeros_like(ftoa);
+
+  torch::optional<torch::Tensor> area1 = torch::nullopt;
+  torch::optional<torch::Tensor> vol = torch::nullopt;
+
+  if (shared.find("coordinate/area1") != shared.end()) {
+    area1 = shared["coordinate/area1"].get();
+  }
+
+  if (shared.find("coordinate/vol") != shared.end()) {
+    vol = shared["coordinate/vol"].get();
+  }
 
   if (options.flux_flag()) {
     for (auto& [name, band] : bands) {
-      out += band->forward(x1f, ftoa, var_x);
+      out += band->forward(x1f, ftoa, var_x, ray, area1, vol);
     }
   } else {
     for (auto& [name, band] : bands) {
-      band->forward(x1f, ftoa, var_x);
+      band->forward(x1f, ftoa, var_x, ray, area1, vol);
     }
   }
 

@@ -26,6 +26,8 @@ enum {
   kRayleigh = 0,
   kHenyeyGreenstein = 1,
   kDoubleHenyeyGreenstein = 2,
+  kHazeGarciaSiewert = 3,
+  kCloudGarciaSiewert = 4,
 
   // interpolation orders
   k2ndOrder = 2,

@@ -14,19 +14,23 @@
 #include <configure.h>
 #include <add_arg.h>
 // clang-format on
+
 #include <opacity/attenuator.hpp>
+#include <rtsolver/rtsolver.hpp>
 #include <utils/layer2level.hpp>
 
 namespace harp {
 struct RadiationBandOptions {
+  RadiationBandOptions() = default;
+
   ADD_ARG(std::string, name) = "B1";
   ADD_ARG(std::string, outdirs) = "";
-  ADD_ARG(std::string, solver) = "lambert";
+  ADD_ARG(std::string, solver_name) = "lambert";
 
   ADD_ARG(std::vector<std::string>, attenuators) = {};
-  ADD_ARG(std::vector<AttenuatorOptions>, attenuator_options);
+  ADD_ARG(std::vector<AttenuatorOptions>, attenuator_options) = {};
   ADD_ARG(Layer2LevelOptions, l2l_options);
-  // ADD_ARG(SolverOptions, solver_options) = {};
+  ADD_ARG(DisortOptions, disort_options);
 
   ADD_ARG(int, nstr) = 1;
   ADD_ARG(int, nspec) = 1;
@@ -44,7 +48,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   RadiationBandOptions options;
 
   //! radiative transfer solver
-  // RTSolver rt_solver;
+  RTSolver solver;
 
   //! all attenuators
   std::map<std::string, Attenuator> attenuators;
@@ -70,7 +74,9 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
 
   //! \brief Calculate the radiance/radiative flux
   torch::Tensor forward(torch::Tensor x1f, torch::Tensor ftoa,
-                        torch::Tensor var_x);
+                        torch::Tensor var_x, float ray[2],
+                        torch::optional<torch::Tensor> area = torch::nullopt,
+                        torch::optional<torch::Tensor> vol = torch::nullopt);
 };
 TORCH_MODULE(RadiationBand);
 

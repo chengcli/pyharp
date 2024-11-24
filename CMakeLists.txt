@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(pyharp
-  LANGUAGES CXX
+  LANGUAGES CXX C
   )
 
 # search for <Package>_ROOT

@@ -6,7 +6,9 @@
 # Define the following symbols
 #
 #   HARP_INCLUDE_DIR
+#   CDISORT_INCLUDE_DIR
 #   harp::harp
+#   harp::cdisort
 #
 # Normal usage would be:
 #
@@ -15,9 +17,9 @@
 #
 # Compile the following submodules
 #
+#   utils     : utility functions
 #   opacity   : opacity providers
 #   radiation : radiation and radiation bands
-#   utils     : utility functions
 #   rtsolver  : radiative transfer solvers
 
 include_directories(
@@ -47,18 +49,19 @@ set_target_properties(${namel}_${buildl}
     COMPILE_FLAGS "${CMAKE_CXX_FLAGS_${buildu}}"
     )
 
+add_subdirectory(utils)
 add_subdirectory(opacity)
 add_subdirectory(radiation)
-#add_subdirectory(rtsolver)
-add_subdirectory(utils)
+add_subdirectory(rtsolver)
 
 add_library(${namel}_${buildl}_final
   STATIC
   $<TARGET_OBJECTS:${namel}_${buildl}>
+  $<TARGET_OBJECTS:utils_${buildl}>
   $<TARGET_OBJECTS:opacity_${buildl}>
   $<TARGET_OBJECTS:radiation_${buildl}>
-  #$<TARGET_OBJECTS:rtsolver_${buildl}>
-  $<TARGET_OBJECTS:utils_${buildl}>
+  $<TARGET_OBJECTS:rtsolver_${buildl}>
+  $<TARGET_OBJECTS:cdisort_${buildl}>
   )
 
 add_library(harp::harp ALIAS ${namel}_${buildl}_final)

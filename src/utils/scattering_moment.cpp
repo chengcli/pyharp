@@ -1,12 +1,19 @@
 // C/C++
 #include <cmath>
 
+// cdisort
+#include <rtsolver/cdisort213/cdisort.h>  // c_getmom
+
+// conflict with torch
+#undef A
+#undef B
+
 // harp
 #include "scattering_moment.hpp"
 
 namespace harp {
 torch::Tensor scattering_moment(int npmom, PhaseMomentOptions const &options) {
-  torch::Tensor pmom = torch::zeros({1 + npmom}, torch::kFloat32);
+  torch::Tensor pmom = torch::zeros({1 + npmom}, torch::kDouble);
 
   if (options.phase_func() == kHenyeyGreenstein) {
     if (options.gg() <= -1. || options.gg() >= 1.) {
@@ -33,6 +40,11 @@ torch::Tensor scattering_moment(int npmom, PhaseMomentOptions const &options) {
       throw std::runtime_error("scattering_moment::npmom < 2");
     }
     pmom[2] = 0.1;
+  } else if (options.phase_func() == kHazeGarciaSiewert) {
+    c_getmom(HAZE_GARCIA_SIEWERT, options.gg(), npmom, pmom.data_ptr<double>());
+  } else if (options.phase_func() == kCloudGarciaSiewert) {
+    c_getmom(CLOUD_GARCIA_SIEWERT, options.gg(), npmom,
+             pmom.data_ptr<double>());
   } else {
     throw std::runtime_error("scattering_moment::unknown phase function");
   }
