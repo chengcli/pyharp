@@ -55,7 +55,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
 find_package(Torch REQUIRED)
-#include(${CMAKE_SOURCE_DIR}/cmake/gtest.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/gtest.cmake)
 #include(${CMAKE_SOURCE_DIR}/cmake/spdlog.cmake)
 #include(${CMAKE_SOURCE_DIR}/cmake/pybind11.cmake)
 
@@ -64,7 +64,7 @@ configure_file(${CMAKE_SOURCE_DIR}/configure.h.in configure.h @ONLY)
 add_subdirectory(src)
 
 message(STATUS "${Blue}${PROJECT_NAME}-5. Setting up unit tests ...${ColorReset}")
-#add_subdirectory(tests)
+add_subdirectory(tests)
 
 message(STATUS "${Blue}${PROJECT_NAME}-6. Setting up examples ...${ColorReset}")
 #add_subdirectory(example)

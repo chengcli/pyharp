@@ -25,7 +25,7 @@ struct AttenuatorOptions {
 
   ADD_ARG(std::string, type) = "";
   ADD_ARG(std::string, name) = "";
-  ADD_ARG(std::string, opacity_file) = "";
+  ADD_ARG(std::vector<std::string>, opacity_files) = {};
   ADD_ARG(std::vector<int>, var_id) = {0};
 };
 
@@ -39,6 +39,7 @@ class AttenuatorImpl {
   AttenuatorOptions options;
 
   //! constructor to initialize the layer
+  AttenuatorImpl() = default;
   explicit AttenuatorImpl(AttenuatorOptions const& options_)
       : options(options_) {}
   virtual ~AttenuatorImpl() {}
@@ -73,10 +74,8 @@ class AbsorberRFMImpl : public AttenuatorImpl,
   AtmToStandardGrid scale_grid;
 
   //! Constructor to initialize the layer
-  explicit AbsorberRFMImpl(AttenuatorOptions const& options_)
-      : AttenuatorImpl(options_) {
-    reset();
-  }
+  AbsorberRFMImpl() = default;
+  explicit AbsorberRFMImpl(AttenuatorOptions const& options_);
   void reset() override;
 
   //! Load opacity from data file
@@ -86,5 +85,28 @@ class AbsorberRFMImpl : public AttenuatorImpl,
   torch::Tensor forward(torch::Tensor var_x) override;
 };
 TORCH_MODULE(AbsorberRFM);
+
+class HydrogenCIAImpl : public AttenuatorImpl,
+                        public torch::nn::Cloneable<HydrogenCIAImpl> {
+  //! extinction x-section + single scattering albedo + phase function moments
+  //! (batch, specs, temps, levels, comps)
+  torch::Tensor kdata_h2h2;
+  torch::Tensor kdata_h2he;
+
+  //! scale the atmospheric variables to the standard grid
+  AtmToStandardGrid scale_grid;
+
+  //! Constructor to initialize the layer
+  HydrogenCIAImpl();
+  explicit HydrogenCIAImpl(AttenuatorOptions const& options_);
+  void reset() override;
+
+  //! Load opacity from data file
+  virtual void load();
+
+  //! Get optical properties
+  torch::Tensor forward(torch::Tensor var_x) override;
+};
+TORCH_MODULE(HydrogenCIA);
 
 }  // namespace harp

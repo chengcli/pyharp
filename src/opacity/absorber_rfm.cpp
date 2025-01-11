@@ -1,10 +1,3 @@
-// harp
-#include <constants.h>
-
-#include <utils/find_resource.hpp>
-
-#include "attenuator.hpp"
-
 // netcdf
 #ifdef NETCDFOUTPUT
 extern "C" {
@@ -12,7 +5,18 @@ extern "C" {
 }
 #endif
 
+// harp
+#include <constants.h>
+
+#include <utils/find_resource.hpp>
+
+#include "attenuator.hpp"
+
 namespace harp {
+AbsorberRFMImpl(AttenuatorOptions const& options_) : AttenuatorImpl(options_) {
+  reset();
+}
+
 void AbsorberRFMImpl::reset() {
   kdata = register_buffer(
       "kdata",
