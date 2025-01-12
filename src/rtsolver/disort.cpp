@@ -77,14 +77,42 @@ void DisortOptions::set_flags(std::string const& str) {
 }
 
 DisortImpl::DisortImpl(DisortOptions const& options_) : options(options_) {
-  options.set_header(options.header());
+  reset();
+}
+
+void DisortImpl::reset() {
+  TORCH_CHECK(options.nlyr() > 0, "DisortImpl: nlyr <= 0");
+  options.ds().nlyr = options.nlyr();
+
+  TORCH_CHECK(options.nmom() >= 0, "DisortImpl: nmom < 0");
+  options.ds().nmom = options.nmom();
+
+  TORCH_CHECK(options.nstr() > 0, "DisortImpl: nstr <= 0");
+  options.ds().nstr = options.nstr();
+
+  TORCH_CHECK(options.nphi() > 0, "DisortImpl: nphi <= 0");
+  options.ds().nphi = options.nphi();
+
+  TORCH_CHECK(options.numu() > 0, "DisortImpl: numu <= 0");
+  options.ds().numu = options.numu();
+
+  TORCH_CHECK(options.ntau() > 0, "DisortImpl: ntau <= 0");
+  options.ds().ntau = options.ntau();
+
+  if (allocated_) {
+    c_disort_state_free(&options.ds());
+    c_disort_out_free(&options.ds(), &options.ds_out());
+  }
+
   c_disort_state_alloc(&options.ds());
   c_disort_out_alloc(&options.ds(), &options.ds_out());
+  allocated_ = true;
 }
 
 DisortImpl::~DisortImpl() {
   c_disort_state_free(&options.ds());
   c_disort_out_free(&options.ds(), &options.ds_out());
+  allocated_ = false;
 }
 
 //! \note Counting Disort Index

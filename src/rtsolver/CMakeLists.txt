@@ -30,4 +30,11 @@ set_target_properties(${namel}_${buildl}
     COMPILE_FLAGS "${CMAKE_CXX_FLAGS_${buildu}}"
     )
 
+target_link_libraries(${namel}_${buildl}
+		PRIVATE
+    ${TORCH_LIBRARY}
+    ${TORCH_CPU_LIBRARY}
+    ${C10_LIBRARY}
+    )
+
 add_subdirectory(cdisort213)

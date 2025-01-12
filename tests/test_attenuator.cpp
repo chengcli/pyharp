@@ -7,7 +7,7 @@
 using namespace harp;
 
 TEST(TestAbsorber, Construct) {
-  harp::AttenuatorOptions op;
+  AttenuatorOptions op;
 
   op.name("dummy");
 };

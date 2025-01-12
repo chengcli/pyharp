@@ -17,9 +17,6 @@
 #
 # Compile the following submodules
 #
-#   utils     : utility functions
-#   opacity   : opacity providers
-#   radiation : radiation and radiation bands
 #   rtsolver  : radiative transfer solvers
 
 include_directories(
@@ -37,10 +34,15 @@ string(TOUPPER ${CMAKE_BUILD_TYPE} buildu)
 set(namel harp)
 string(TOUPPER ${namel} nameu)
 
-file(GLOB src_files *.cpp)
+file(GLOB src_files
+    *.cpp
+    utils/*.cpp
+    opacity/*.cpp
+    radiation/*.cpp
+    )
 
 add_library(${namel}_${buildl}
-    OBJECT
+    STATIC
     ${src_files}
     )
 
@@ -49,22 +51,23 @@ set_target_properties(${namel}_${buildl}
     COMPILE_FLAGS "${CMAKE_CXX_FLAGS_${buildu}}"
     )
 
-add_subdirectory(utils)
-add_subdirectory(opacity)
-add_subdirectory(radiation)
+target_link_libraries(${namel}_${buildl}
+		PRIVATE
+    ${TORCH_LIBRARY}
+    ${TORCH_CPU_LIBRARY}
+    ${C10_LIBRARY}
+    )
+
 add_subdirectory(rtsolver)
 
-add_library(${namel}_${buildl}_final
+add_library(${namel}_${buildl}_all
   STATIC
   $<TARGET_OBJECTS:${namel}_${buildl}>
-  $<TARGET_OBJECTS:utils_${buildl}>
-  $<TARGET_OBJECTS:opacity_${buildl}>
-  $<TARGET_OBJECTS:radiation_${buildl}>
   $<TARGET_OBJECTS:rtsolver_${buildl}>
-  $<TARGET_OBJECTS:cdisort_${buildl}>
+  $<TARGET_OBJECTS:harp::cdisort>
   )
 
-add_library(harp::harp ALIAS ${namel}_${buildl}_final)
+add_library(harp::harp ALIAS ${namel}_${buildl}_all)
 
 set(HARP_INCLUDE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}"

@@ -36,9 +36,18 @@ struct DisortOptions {
   void set_header(std::string const &header);
   void set_flags(std::string const &flags);
 
+  // atmosphere dimensions
+  ADD_ARG(int, nlyr) = 1;
+  ADD_ARG(int, nmom) = 0;
+  ADD_ARG(int, nstr) = 4;
+
+  // intensity dimensions
+  ADD_ARG(int, nphi) = 1;
+  ADD_ARG(int, numu) = 1;
+  ADD_ARG(int, ntau) = 1;
+
   ADD_ARG(disort_state, ds);
   ADD_ARG(disort_output, ds_out);
-  ADD_ARG(std::string, header) = "Disort running...";
 };
 
 class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
@@ -61,6 +70,9 @@ class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
    */
   torch::Tensor forward(torch::Tensor prop, torch::Tensor ftoa,
                         torch::Tensor temf) override;
+
+ private:
+  bool allocated_ = false;
 };
 TORCH_MODULE(Disort);
 

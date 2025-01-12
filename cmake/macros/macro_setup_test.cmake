@@ -21,7 +21,9 @@ macro(setup_test namel)
             SYSTEM
             ${TORCH_API_INCLUDE_DIR})
 
-  target_link_libraries(${namel}.${buildl} gtest_main harp::harp)
+  target_link_libraries(
+    ${namel}.${buildl} PRIVATE ${TORCH_LIBRARY} ${TORCH_CPU_LIBRARY}
+                               ${C10_LIBRARY} gtest_main harp::harp)
 
   add_test(NAME ${namel}.${buildl} COMMAND ${namel}.${buildl})
 endmacro()
