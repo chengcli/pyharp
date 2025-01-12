@@ -53,7 +53,7 @@ void RadiationImpl::reset() {
 }
 
 torch::Tensor RadiationImpl::forward(torch::Tensor ftoa, torch::Tensor var_x,
-                                     float ray[2]) {
+                                     double ray[2]) {
   torch::Tensor out = torch::zeros_like(ftoa);
 
   torch::optional<torch::Tensor> area1 = torch::nullopt;

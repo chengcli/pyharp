@@ -5,14 +5,19 @@
 #include <memory>
 #include <sstream>
 
-// harp
-#include <index.h>
+// torch
+#include <ATen/TensorIterator.h>
 
+// harp
 #include <utils/vectorize.hpp>
 
 #include "rtsolver.hpp"
 
 namespace harp {
+void call_disort_cpu(at::TensorIterator& iter, int rank_in_column,
+                     std::vector<disort_state> &ds,
+                     std::vector<disort_output> &ds_out);
+
 DisortOptions::DisortOptions() {
   ds().bc.btemp = 0.;
   ds().bc.ttemp = 0.;
@@ -81,38 +86,43 @@ DisortImpl::DisortImpl(DisortOptions const& options_) : options(options_) {
 }
 
 void DisortImpl::reset() {
-  TORCH_CHECK(options.nlyr() > 0, "DisortImpl: nlyr <= 0");
-  options.ds().nlyr = options.nlyr();
+  options.set_header(options.header());
+  options.set_flags(options.flags());
 
-  TORCH_CHECK(options.nmom() >= 0, "DisortImpl: nmom < 0");
-  options.ds().nmom = options.nmom();
-
-  TORCH_CHECK(options.nstr() > 0, "DisortImpl: nstr <= 0");
-  options.ds().nstr = options.nstr();
-
-  TORCH_CHECK(options.nphi() > 0, "DisortImpl: nphi <= 0");
-  options.ds().nphi = options.nphi();
-
-  TORCH_CHECK(options.numu() > 0, "DisortImpl: numu <= 0");
-  options.ds().numu = options.numu();
-
-  TORCH_CHECK(options.ntau() > 0, "DisortImpl: ntau <= 0");
-  options.ds().ntau = options.ntau();
+  TORCH_CHECK(options.ds().nlyr > 0, "DisortImpl: ds.nlyr <= 0");
+  TORCH_CHECK(options.ds().nmom >= 0, "DisortImpl: ds.nmom < 0");
+  TORCH_CHECK(options.ds().nstr > 0, "DisortImpl: ds.nstr <= 0");
+  TORCH_CHECK(options.ds().nphi > 0, "DisortImpl: ds.nphi <= 0");
+  TORCH_CHECK(options.ds().numu > 0, "DisortImpl: ds.numu <= 0");
+  TORCH_CHECK(options.ds().ntau > 0, "DisortImpl: ds.ntau <= 0");
 
   if (allocated_) {
-    c_disort_state_free(&options.ds());
-    c_disort_out_free(&options.ds(), &options.ds_out());
+    for (int i = 0; i < options.nwave(); ++i) {
+      c_disort_state_free(&ds[i]);
+      c_disort_out_free(&ds[i], &ds_out[i]);
+    }
   }
 
-  c_disort_state_alloc(&options.ds());
-  c_disort_out_alloc(&options.ds(), &options.ds_out());
+  ds.resize(options.nwave());
+  ds_out.resize(options.nwave());
+
+  for (int i = 0; i < options.nwave(); ++i) {
+    ds[i] = options.ds();
+    c_disort_state_alloc(&ds[i]);
+    c_disort_out_alloc(&ds[i], &ds_out[i]);
+  }
+
   allocated_ = true;
+  std::cout << "disort allocated = " << allocated_ << std::endl;
 }
 
 DisortImpl::~DisortImpl() {
-  c_disort_state_free(&options.ds());
-  c_disort_out_free(&options.ds(), &options.ds_out());
+  for (int i = 0; i < options.nwave(); ++i) {
+    c_disort_state_free(&ds[i]);
+    c_disort_out_free(&ds[i], &ds_out[i]);
+  }
   allocated_ = false;
+  std::cout << "disort allocated = " << allocated_ << std::endl;
 }
 
 //! \note Counting Disort Index
@@ -131,62 +141,39 @@ DisortImpl::~DisortImpl() {
 //! block r = 2 gets, 2 - 1 - 0
 torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
                                   torch::Tensor temf) {
-  auto& ds = options.ds();
-  auto& ds_out = options.ds_out();
+  TORCH_CHECK(options.ds().flag.ibcnd == 0, "DisortImpl::forward: ds.ibcnd != 0");
+  TORCH_CHECK(prop.dim() == 4, "DisortImpl::forward: prop.dim() != 4");
 
-  if (ds.flag.ibcnd != 0) {
-    throw std::runtime_error("DisortImpl::forward: ibcnd != 0");
-  }
+  int nwave = prop.size(0);
+  int ncol = prop.size(1);
+  int nlyr = prop.size(2);
 
-  int nwave = prop.size(1);
-  int nx3 = prop.size(2);
-  int nx2 = prop.size(3);
-  int nx1 = prop.size(4);
+  TORCH_CHECK(options.ds().nlyr == nlyr, "DisortImpl::forward: ds.nlyr != nlyr");
+  TORCH_CHECK(temf.size(0) == ncol, "DisortImpl::forward: temf.size(0) != ncol");
+  TORCH_CHECK(temf.size(1) == nlyr + 1, "DisortImpl::forward: temf.size(1) != nlyr + 1");
 
-  auto flx = torch::zeros({2, nwave, nx3, nx2, nx1}, torch::kDouble);
-
-  // tensor accessors
-  auto aprop = prop.accessor<double, 5>();
-  auto aftoa = ftoa.accessor<double, 3>();
-  auto atemf = temf.accessor<double, 3>();
-  auto aflx = flx.accessor<double, 5>();
-
-  // run disort
+  auto flx = torch::zeros({nwave, ncol, nlyr + 1, 2}, prop.options());
+  auto index = torch::range(0, nwave, 1).view({-1, 1}).expand({-1, ncol}).unsqueeze(-1).unsqueeze(-1);
   int rank_in_column = 0;
-  for (int k = 0; k < nx3; ++k)
-    for (int j = 0; j < nx2; ++j) {
-      if (ds.flag.planck) {
-        for (int i = 0; i <= ds.nlyr; ++i) {
-          ds.temper[ds.nlyr - i] = atemf[k][j][i];
-        }
-      }
 
-      for (int n = 0; n < nwave; ++n) {
-        // stellar source function
-        ds.bc.fbeam = aftoa[n][k][j];
+  auto iter =
+      at::TensorIteratorConfig()
+          .resize_outputs(false)
+          .declare_static_shape({nwave, ncol, nlyr + 1, 2}, /*squash_dims=*/{2, 3})
+          .add_output(flx)
+          .add_input(prop)
+          .add_owned_const_input(ftoa.unsqueeze(-1).unsqueeze(-1))
+          .add_owned_const_input(temf.unsqueeze(0).expand({nwave, ncol, nlyr + 1}).unsqueeze(-1))
+          .add_input(index)
+          .build();
 
-        for (int i = 0; i < ds.nlyr; ++i) {
-          // absorption
-          ds.dtauc[ds.nlyr - 1 - i] = aprop[IAB][n][k][j][i];
-
-          // single scatering albedo
-          ds.ssalb[ds.nlyr - 1 - i] = aprop[ISS][n][k][j][i];
-
-          // Legendre coefficients
-          for (int m = 0; m <= ds.nmom; ++m)
-            ds.pmom[(ds.nlyr - 1 - i) * (ds.nmom + 1) + m] =
-                aprop[IPM + m][n][k][j][i];
-        }
-
-        c_disort(&ds, &ds_out);
-
-        for (int i = 0; i <= ds.nlyr; ++i) {
-          int i1 = ds.nlyr - (rank_in_column * (ds.nlyr - 1) + i);
-          aflx[IUP][n][k][j][i] = ds_out.rad[i1].flup;
-          aflx[IDN][n][k][j][i] = ds_out.rad[i1].rfldir + ds_out.rad[i1].rfldn;
-        }
-      }
-    }
+  if (prop.is_cpu()) {
+    call_disort_cpu(iter, rank_in_column, ds, ds_out);
+  } else if (prop.is_cuda()) {
+    //call_disort_cuda(iter, rank_in_column, options.ds(), options.ds_out());
+  } else {
+    TORCH_CHECK(false, "DisortImpl::forward: unsupported device");
+  }
 
   return flx;
 }

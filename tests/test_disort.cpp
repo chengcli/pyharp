@@ -14,19 +14,19 @@ TEST(TestAbsorber, Construct) {
       "usrtau,usrang,lamber,quiet,intensity_correction,old_intensity_"
       "correction,print-input,print-phase-function");
 
-  op.nlyr(1);
-  op.nstr(16);
-  op.nmom(16);
+  op.ds().nlyr = 1;
+  op.ds().nstr = 16;
+  op.ds().nmom = 16;
 
-  op.nphi(1);
-  op.ntau(2);
-  op.numu(6);
+  op.ds().nphi = 1;
+  op.ds().ntau = 2;
+  op.ds().numu = 6;
+  op.nwave() = 1;
 
   Disort disort(op);
 };
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
-
   return RUN_ALL_TESTS();
 }

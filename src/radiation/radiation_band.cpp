@@ -23,12 +23,12 @@ RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const& options_)
 }
 
 void RadiationBandImpl::reset() {
-  spec = register_buffer("spec",
-                         torch::tensor({options.nspec(), 2}, torch::kFloat32));
+  wave = register_buffer("wave",
+                         torch::tensor({options.nwave(), 2}, torch::kFloat32));
 
   prop =
-      register_buffer("prop", torch::zeros({3 + options.nstr(), options.nc3(),
-                                            options.nc2(), options.nc1()},
+      register_buffer("prop", torch::zeros({3 + options.nstr(), options.nx3(),
+                                            options.nx2(), options.nx1()},
                                            torch::kFloat32));
 
   auto str = options.outdirs();
@@ -50,7 +50,7 @@ void RadiationBandImpl::reset() {
     options.disort_options().ds().nstr = options.nstr();
     options.disort_options().ds().nphase = options.nstr();
     options.disort_options().ds().nmom = options.nstr();
-    options.disort_options().ds().nlyr = options.nc1();
+    options.disort_options().ds().nlyr = options.nx1();
 
     auto [uphi, umu] = get_direction_grids<double>(rayOutput);
     options.disort_options().ds().nphi = std::max(1uL, uphi.size());
@@ -58,18 +58,20 @@ void RadiationBandImpl::reset() {
 
     solver = register_module_op(this, "solver", options.disort_options());
 
-    for (int i = 0; i < umu.size(); ++i) {
-      options.disort_options().ds().umu[i] = umu[i];
-    }
+    for (int n = 0; n < options.nwave(); ++n) {
+      for (int i = 0; i < umu.size(); ++i) {
+        std::dynamic_pointer_cast<DisortImpl>(solver)->ds[n].umu[i] = umu[i];
+      }
 
-    for (int i = 0; i < uphi.size(); ++i) {
-      options.disort_options().ds().phi[i] = uphi[i];
+      for (int i = 0; i < uphi.size(); ++i) {
+        std::dynamic_pointer_cast<DisortImpl>(solver)->ds[n].phi[i] = uphi[i];
+      }
     }
   }
 }
 
 torch::Tensor RadiationBandImpl::forward(torch::Tensor x1f, torch::Tensor ftoa,
-                                         torch::Tensor var_x, float ray[2],
+                                         torch::Tensor var_x, double ray[2],
                                          torch::optional<torch::Tensor> area,
                                          torch::optional<torch::Tensor> vol) {
   prop.fill_(0.);
@@ -90,7 +92,7 @@ torch::Tensor RadiationBandImpl::forward(torch::Tensor x1f, torch::Tensor ftoa,
   std::string name = "radiation/" + options.name() + "/optics";
   shared[name] =
       std::async(std::launch::async, [&]() {
-        return torch::sum(prop * spec[IWT].view({1, -1, 1, 1, 1}), 1);
+        return torch::sum(prop * wave[IWT].view({1, -1, 1, 1, 1}), 1);
       }).share();
 
   auto temf = layer2level(var_x[ITM], options.l2l_options());
@@ -106,7 +108,7 @@ torch::Tensor RadiationBandImpl::forward(torch::Tensor x1f, torch::Tensor ftoa,
   auto flx = solver->forward(prop, ftoa, temf);
 
   /// accumulate flux from spectral bins
-  auto bflx = torch::sum(flx * spec[IWT].view({1, -1, 1, 1, 1}), 0);
+  auto bflx = torch::sum(flx * wave[IWT].view({1, -1, 1, 1, 1}), 0);
 
   if (!area.has_value() || !vol.has_value()) {
     return bflx;

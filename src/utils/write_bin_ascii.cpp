@@ -40,9 +40,9 @@ void write_bin_ascii_data(torch::Tensor rad, RadiationBand const &band,
                           std::string fname) {
   FILE *pfile = fopen(fname.c_str(), "w");
 
-  for (int i = 0; i < band->spec.size(0); ++i) {
-    fprintf(pfile, "%13.3g%12.3g", band->spec[i][0].item().toFloat(),
-            band->spec[i][1].item().toFloat());
+  for (int i = 0; i < band->wave.size(0); ++i) {
+    fprintf(pfile, "%13.3g%12.3g", band->wave[i][0].item().toFloat(),
+            band->wave[i][1].item().toFloat());
     for (int j = 0; j < band->rayOutput.size(0); ++j) {
       fprintf(pfile, "%12.3f", rad[j][i].item().toFloat());
     }

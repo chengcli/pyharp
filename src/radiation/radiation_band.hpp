@@ -33,13 +33,15 @@ struct RadiationBandOptions {
   ADD_ARG(DisortOptions, disort_options);
 
   ADD_ARG(int, nstr) = 1;
-  ADD_ARG(int, nspec) = 1;
-  ADD_ARG(int, nc1) = 1;
-  ADD_ARG(int, nc2) = 1;
-  ADD_ARG(int, nc3) = 1;
+  ADD_ARG(int, nwave) = 1;
 
-  ADD_ARG(float, wmin) = 0.0;
-  ADD_ARG(float, wmax) = 1.0;
+  // atmosphere dimension
+  ADD_ARG(int, nx1) = 1;
+  ADD_ARG(int, nx2) = 1;
+  ADD_ARG(int, nx3) = 1;
+
+  ADD_ARG(double, wmin) = 0.0;
+  ADD_ARG(double, wmax) = 1.0;
 };
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
@@ -54,8 +56,8 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   std::map<std::string, Attenuator> attenuators;
 
   //! spectral grid and weights
-  //! (2, nspec)
-  torch::Tensor spec;
+  //! (2, nwave)
+  torch::Tensor wave;
 
   //! bin optical properties
   //! 5D tensor with shape (tau + ssa + pmom, C, ..., nlayer)
@@ -74,7 +76,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
 
   //! \brief Calculate the radiance/radiative flux
   torch::Tensor forward(torch::Tensor x1f, torch::Tensor ftoa,
-                        torch::Tensor var_x, float ray[2],
+                        torch::Tensor var_x, double ray[2],
                         torch::optional<torch::Tensor> area = torch::nullopt,
                         torch::optional<torch::Tensor> vol = torch::nullopt);
 };

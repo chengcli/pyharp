@@ -7,13 +7,15 @@
 #
 #   HARP_INCLUDE_DIR
 #   CDISORT_INCLUDE_DIR
-#   harp::harp
+#   HARP_LIBRARY_DEBUG
+#   HARP_LIBRARY_RELEASE
 #   harp::cdisort
 #
 # Normal usage would be:
 #
 #   include_directories(${HARP_INCLUDE_DIR})
-#   target_link_libraries(harp::harp)
+#   target_link_libraries(${HARP_LIBRARY_DEBUG})
+#   target_link_libraries(${HARP_LIBRARY_RELEASE})
 #
 # Compile the following submodules
 #
@@ -60,15 +62,12 @@ target_link_libraries(${namel}_${buildl}
 
 add_subdirectory(rtsolver)
 
-add_library(${namel}_${buildl}_all
-  STATIC
-  $<TARGET_OBJECTS:${namel}_${buildl}>
-  $<TARGET_OBJECTS:rtsolver_${buildl}>
-  $<TARGET_OBJECTS:harp::cdisort>
-  )
-
-add_library(harp::harp ALIAS ${namel}_${buildl}_all)
-
 set(HARP_INCLUDE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}"
   CACHE INTERNAL "harp include directory")
+
+set(HARP_LIBRARY_${buildu}
+  harp_${buildl}
+  rtsolver_${buildl}
+  harp::cdisort
+  CACHE INTERNAL "harp library")

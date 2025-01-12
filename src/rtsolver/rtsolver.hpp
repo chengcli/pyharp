@@ -32,22 +32,18 @@ using RTSolver = std::shared_ptr<RTSolverImpl>;
 
 struct DisortOptions {
   DisortOptions();
-
   void set_header(std::string const &header);
   void set_flags(std::string const &flags);
 
-  // atmosphere dimensions
-  ADD_ARG(int, nlyr) = 1;
-  ADD_ARG(int, nmom) = 0;
-  ADD_ARG(int, nstr) = 4;
+  // header
+  ADD_ARG(std::string, header) = "running disort ...";
+  ADD_ARG(std::string, flags) = "";
 
-  // intensity dimensions
-  ADD_ARG(int, nphi) = 1;
-  ADD_ARG(int, numu) = 1;
-  ADD_ARG(int, ntau) = 1;
+  // spectral dimensions
+  ADD_ARG(int, nwave) = 1;
 
+  // placeholder for disort state
   ADD_ARG(disort_state, ds);
-  ADD_ARG(disort_output, ds_out);
 };
 
 class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
@@ -55,6 +51,9 @@ class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
  public:
   //! options with which this `DisortImpl` was constructed
   DisortOptions options;
+
+  std::vector<disort_state> ds;
+  std::vector<disort_output> ds_out;
 
   //! Constructor to initialize the layers
   DisortImpl() = default;
@@ -64,9 +63,10 @@ class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
 
   //! Calculate radiative flux or intensity
   /*!
-   * \param prop properties at each level (..., layer)
-   * \param ftoa top of atmosphere flux
-   * \param temf temperature at each level (layer + 1)
+   * \param prop properties at each level (nwave, ncol, nlyr, nprop)
+   * \param ftoa top of atmosphere flux (nwave, ncol)
+   * \param temf temperature at each level (ncol, nlvl = nlyr + 1)
+   * \return radiative flux or intensity (nwave, ncol, nlvl, 2)
    */
   torch::Tensor forward(torch::Tensor prop, torch::Tensor ftoa,
                         torch::Tensor temf) override;

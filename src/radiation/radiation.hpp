@@ -56,7 +56,7 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
   void reset() override;
 
   //! \brief Calculate the radiance/radiative flux
-  torch::Tensor forward(torch::Tensor ftoa, torch::Tensor var_x, float ray[2]);
+  torch::Tensor forward(torch::Tensor ftoa, torch::Tensor var_x, double ray[2]);
 };
 TORCH_MODULE(Radiation);
 
