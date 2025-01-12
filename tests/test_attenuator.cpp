@@ -4,6 +4,8 @@
 // opacity
 #include <opacity/attenuator.hpp>
 
+using namespace harp;
+
 TEST(TestAbsorber, Construct) {
   harp::AttenuatorOptions op;
 
@@ -12,5 +14,6 @@ TEST(TestAbsorber, Construct) {
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
+
   return RUN_ALL_TESTS();
 }

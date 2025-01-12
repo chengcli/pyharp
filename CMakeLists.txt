@@ -11,6 +11,14 @@ project(pyharp
 # search for <Package>_ROOT
 cmake_policy(SET CMP0074 NEW)
 
+# Set the _GLIBCXX_USE_CXX11_ABI flag to 0 (use old ABI)
+add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+
+# Specify the CUDA toolkit location if necessary
+#set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.0)
+set(CMAKE_CUDA_ARCHITECTURES 61 86 89)
+set(BUILD_SHARED_LIBS OFF)
+
 # make colorful output
 string(ASCII 27 Esc)
 set(ColorReset "${Esc}[m")

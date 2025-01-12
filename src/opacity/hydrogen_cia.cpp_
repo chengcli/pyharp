@@ -5,7 +5,6 @@
 #include <stdexcept>
 
 // canoe
-#include <air_parcel.hpp>
 #include <constants.hpp>
 
 // climath
@@ -40,9 +39,7 @@ void HydrogenCIAImpl::reset() {
   op.ntemp(cols);
   op.npres(rows);
 
-  sc
-
-      kdata_h2h2 = register_buffer("kdata_h2h2",
+  kdata_h2h2 = register_buffer("kdata_h2h2",
                                    torch::zeros({cols, rows}, torch::kFloat));
   kdata_h2he =
       register_buffer("kdata_h2he", torch::zeros({cols, rows}, torch::kFloat));
