@@ -39,8 +39,9 @@ class H2SO4SimpleImpl : public torch::nn::Cloneable<H2SO4SimpleImpl> {
   //! \param temp temperature [K], (ncol, nlyr)
   //! \param pres pressure [Pa], (ncol, nlyr)
   //! \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
-  torch::Tensor forward(torch::Tensor temp, torch::Tensor pres,
-                        torch::Tensor conc);
+  torch::Tensor forward(torch::Tensor conc,
+                        torch::optional<torch::Tensor> pres = torch::nullopt,
+                        torch::optional<torch::Tensor> temp = torch::nullopt);
 };
 TORCH_MODULE(H2SO4Simple);
 

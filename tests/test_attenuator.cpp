@@ -2,14 +2,15 @@
 #include <gtest/gtest.h>
 
 // opacity
-#include <opacity/attenuator.hpp>
+#include <opacity/s8_fuller.hpp>
 
 using namespace harp;
 
-TEST(TestAbsorber, Construct) {
-  AttenuatorOptions op;
+TEST(TestAttenuation, s8_fuller) {
+  S8FullerOptions op;
+  op.species_id(0);
 
-  op.name("dummy");
+  S8Fuller s8(op);
 };
 
 int main(int argc, char **argv) {

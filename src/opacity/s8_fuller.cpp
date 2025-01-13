@@ -37,11 +37,12 @@ void S8FullerImpl::reset() {
   kdata = register_buffer("kdata", torch::zeros({rows, cols}, torch::kFloat64));
   std::stringstream inp2(str_file);
 
+  // Use an accessor for performance
+  auto kdata_accessor = kdata.accessor<double, 2>();
+
   for (int i = 0; i < rows; ++i)
     for (int j = 0; j < cols; ++j) {
-      double value;
-      inp2 >> value;
-      kdata.index_put_({i, j}, value);
+      inp2 >> kdata_accessor[i][j];
     }
 
   // change wavelength [um] to wavenumber [cm^-1]
@@ -51,14 +52,15 @@ void S8FullerImpl::reset() {
   kdata.select(1, 1) *= options.species_mu();
 }
 
-torch::Tensor S8FullerImpl::forward(torch::Tensor temp, torch::Tensor pres,
-                                    torch::Tensor conc) {
+torch::Tensor S8FullerImpl::forward(torch::Tensor conc,
+                                    torch::optional<torch::Tensor> pres,
+                                    torch::optional<torch::Tensor> temp) {
   int nwve = kdata.size(0);
-  int ncol = temp.size(0);
-  int nlyr = temp.size(1);
+  int ncol = conc.size(0);
+  int nlyr = conc.size(1);
   int nprop = 2;
 
-  auto result = torch::zeros({nwve, ncol, nlyr, nprop}, temp.options());
+  auto result = torch::zeros({nwve, ncol, nlyr, nprop}, conc.options());
 
   // attenuation [1/m]
   result.select(3, 0) = conc.select(2, options.species_id()).unsqueeze(0) *

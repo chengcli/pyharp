@@ -13,7 +13,7 @@
 
 namespace harp {
 // const char* search_paths = "";
-char search_paths[65536];
+char search_paths[65536] = ".";
 static std::mutex dir_mutex;
 
 #ifdef WINDOWS

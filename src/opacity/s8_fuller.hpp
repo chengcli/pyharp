@@ -36,11 +36,12 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
   void reset() override;
 
   //! Get optical properties
-  //! \param temp temperature [K], (ncol, nlyr)
-  //! \param pres pressure [Pa], (ncol, nlyr)
   //! \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
-  torch::Tensor forward(torch::Tensor temp, torch::Tensor pres,
-                        torch::Tensor conc);
+  //! \param pres pressure [Pa], (ncol, nlyr)
+  //! \param temp temperature [K], (ncol, nlyr)
+  torch::Tensor forward(torch::Tensor conc,
+                        torch::optional<torch::Tensor> pres = torch::nullopt,
+                        torch::optional<torch::Tensor> temp = torch::nullopt);
 };
 TORCH_MODULE(S8Fuller);
 
