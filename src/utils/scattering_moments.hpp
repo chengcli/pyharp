@@ -11,7 +11,7 @@
 
 namespace harp {
 struct PhaseMomentOptions {
-  ADD_ARG(int, phase_func) = kRayleigh;
+  ADD_ARG(int, type) = kRayleigh;
   ADD_ARG(float, gg) = 0.;
   ADD_ARG(float, gg1) = 0.;
   ADD_ARG(float, gg2) = 0.;
@@ -24,5 +24,5 @@ struct PhaseMomentOptions {
  * \param options Options for the phase function
  * \return 1D tensor of phase moments, size = (1 + npmom,)
  */
-torch::Tensor scattering_moment(int npmom, PhaseMomentOptions const &options);
+torch::Tensor scattering_moments(int npmom, PhaseMomentOptions const &options);
 }  // namespace harp

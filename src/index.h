@@ -23,11 +23,12 @@ enum index {
 
 enum {
   // phase functions
-  kRayleigh = 0,
-  kHenyeyGreenstein = 1,
-  kDoubleHenyeyGreenstein = 2,
-  kHazeGarciaSiewert = 3,
-  kCloudGarciaSiewert = 4,
+  kIsotropic = 0,
+  kRayleigh = 1,
+  kHenyeyGreenstein = 2,
+  kDoubleHenyeyGreenstein = 3,
+  kHazeGarciaSiewert = 4,
+  kCloudGarciaSiewert = 5,
 
   // interpolation orders
   k2ndOrder = 2,

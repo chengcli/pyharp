@@ -23,7 +23,7 @@ class RTSolverImpl {
   RTSolverImpl() = default;
   virtual ~RTSolverImpl() {}
   virtual torch::Tensor forward(torch::Tensor prop, torch::Tensor ftoa,
-                                torch::Tensor temf) {
+                                torch::optional<torch::Tensor> temf = torch::nullopt) {
     throw std::runtime_error("RTSolverImpl::forward: not implemented");
   }
 };
@@ -40,7 +40,10 @@ struct DisortOptions {
   ADD_ARG(std::string, flags) = "";
 
   // spectral dimensions
-  ADD_ARG(int, nwave) = 1;
+  ADD_ARG(int, nwve) = 1;
+
+  // spatial dimensions
+  ADD_ARG(int, ncol) = 1;
 
   // placeholder for disort state
   ADD_ARG(disort_state, ds);
@@ -52,14 +55,25 @@ class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
   //! options with which this `DisortImpl` was constructed
   DisortOptions options;
 
-  std::vector<disort_state> ds;
-  std::vector<disort_output> ds_out;
-
   //! Constructor to initialize the layers
   DisortImpl() = default;
   explicit DisortImpl(DisortOptions const &options);
   virtual ~DisortImpl();
   void reset() override;
+
+  disort_state const& ds(int n = 0, int j = 0) const { 
+    return ds_[n * options.ncol() + j]; 
+  }
+  disort_output const& ds_out(int n = 0, int j = 0) const { 
+    return ds_out_[n * options.ncol() + j];
+  }
+
+  disort_state& ds(int n = 0, int j = 0) {
+    return ds_[n * options.ncol() + j];
+  }
+  disort_output& ds_out(int n = 0, int j = 0) { 
+    return ds_out_[n * options.ncol() + j];
+  }
 
   //! Calculate radiative flux or intensity
   /*!
@@ -69,9 +83,11 @@ class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
    * \return radiative flux or intensity (nwave, ncol, nlvl, 2)
    */
   torch::Tensor forward(torch::Tensor prop, torch::Tensor ftoa,
-                        torch::Tensor temf) override;
+                        torch::optional<torch::Tensor> temf = torch::nullopt) override;
 
  private:
+  std::vector<disort_state> ds_;
+  std::vector<disort_output> ds_out_;
   bool allocated_ = false;
 };
 TORCH_MODULE(Disort);
@@ -103,7 +119,7 @@ class BeerLambertImpl : public torch::nn::Cloneable<BeerLambertImpl>,
    * \param temf temperature at each level (layer + 1)
    */
   torch::Tensor forward(torch::Tensor prop, torch::Tensor ftoa,
-                        torch::Tensor temf) override;
+                        torch::optional<torch::Tensor> temf = torch::nullopt) override;
 };
 TORCH_MODULE(BeerLambert);
 

@@ -22,8 +22,8 @@ void call_disort_cpu(at::TensorIterator& iter, int rank_in_column,
         auto prop = reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
         auto ftoa = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
         auto temf = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
-        auto iwave = reinterpret_cast<int64_t*>(data[4] + i * strides[4]);
-        disort_impl(out, prop, ftoa, temf, rank_in_column, ds[*iwave], ds_out[*iwave], nprop);
+        auto idx = reinterpret_cast<int64_t*>(data[4] + i * strides[4]);
+        disort_impl(out, prop, ftoa, temf, rank_in_column, ds[*idx], ds_out[*idx], nprop);
       }
     });
   });

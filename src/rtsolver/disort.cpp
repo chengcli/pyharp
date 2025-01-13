@@ -97,19 +97,19 @@ void DisortImpl::reset() {
   TORCH_CHECK(options.ds().ntau > 0, "DisortImpl: ds.ntau <= 0");
 
   if (allocated_) {
-    for (int i = 0; i < options.nwave(); ++i) {
-      c_disort_state_free(&ds[i]);
-      c_disort_out_free(&ds[i], &ds_out[i]);
+    for (int i = 0; i < options.nwve() * options.ncol(); ++i) {
+      c_disort_state_free(&ds_[i]);
+      c_disort_out_free(&ds_[i], &ds_out_[i]);
     }
   }
 
-  ds.resize(options.nwave());
-  ds_out.resize(options.nwave());
+  ds_.resize(options.nwve() * options.ncol());
+  ds_out_.resize(options.nwve() * options.ncol());
 
-  for (int i = 0; i < options.nwave(); ++i) {
-    ds[i] = options.ds();
-    c_disort_state_alloc(&ds[i]);
-    c_disort_out_alloc(&ds[i], &ds_out[i]);
+  for (int i = 0; i < options.nwve() * options.ncol(); ++i) {
+    ds_[i] = options.ds();
+    c_disort_state_alloc(&ds_[i]);
+    c_disort_out_alloc(&ds_[i], &ds_out_[i]);
   }
 
   allocated_ = true;
@@ -117,9 +117,9 @@ void DisortImpl::reset() {
 }
 
 DisortImpl::~DisortImpl() {
-  for (int i = 0; i < options.nwave(); ++i) {
-    c_disort_state_free(&ds[i]);
-    c_disort_out_free(&ds[i], &ds_out[i]);
+  for (int i = 0; i < options.nwve() * options.ncol(); ++i) {
+    c_disort_state_free(&ds_[i]);
+    c_disort_out_free(&ds_[i], &ds_out_[i]);
   }
   allocated_ = false;
   std::cout << "disort allocated = " << allocated_ << std::endl;
@@ -140,35 +140,44 @@ DisortImpl::~DisortImpl() {
 //! block r = 1 gets, 4 - 3 - 2
 //! block r = 2 gets, 2 - 1 - 0
 torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
-                                  torch::Tensor temf) {
+                                  torch::optional<torch::Tensor> temf) {
   TORCH_CHECK(options.ds().flag.ibcnd == 0, "DisortImpl::forward: ds.ibcnd != 0");
   TORCH_CHECK(prop.dim() == 4, "DisortImpl::forward: prop.dim() != 4");
 
-  int nwave = prop.size(0);
+  int nwve = prop.size(0);
   int ncol = prop.size(1);
   int nlyr = prop.size(2);
 
   TORCH_CHECK(options.ds().nlyr == nlyr, "DisortImpl::forward: ds.nlyr != nlyr");
-  TORCH_CHECK(temf.size(0) == ncol, "DisortImpl::forward: temf.size(0) != ncol");
-  TORCH_CHECK(temf.size(1) == nlyr + 1, "DisortImpl::forward: temf.size(1) != nlyr + 1");
 
-  auto flx = torch::zeros({nwave, ncol, nlyr + 1, 2}, prop.options());
-  auto index = torch::range(0, nwave, 1).view({-1, 1}).expand({-1, ncol}).unsqueeze(-1).unsqueeze(-1);
+  torch::Tensor tem;
+  if (temf.has_value()) {
+    TORCH_CHECK(temf.value().size(0) == ncol, "DisortImpl::forward: temf.size(0) != ncol");
+    TORCH_CHECK(temf.value().size(1) == nlyr + 1, "DisortImpl::forward: temf.size(1) != nlyr + 1");
+    tem = temf.value();
+  } else {
+    TORCH_CHECK(options.ds().flag.planck == 0, "DisortImpl::forward: ds.planck != 0");
+    // dummy
+    tem = torch::empty({1, 1}, prop.options());
+  }
+
+  auto flx = torch::zeros({nwve, ncol, nlyr + 1, 2}, prop.options());
+  auto index = torch::range(0, nwve * ncol, 1).view({nwve, ncol, 1, 1});
   int rank_in_column = 0;
 
   auto iter =
       at::TensorIteratorConfig()
           .resize_outputs(false)
-          .declare_static_shape({nwave, ncol, nlyr + 1, 2}, /*squash_dims=*/{2, 3})
+          .declare_static_shape({nwve, ncol, nlyr + 1, 2}, /*squash_dims=*/{2, 3})
           .add_output(flx)
           .add_input(prop)
           .add_owned_const_input(ftoa.unsqueeze(-1).unsqueeze(-1))
-          .add_owned_const_input(temf.unsqueeze(0).expand({nwave, ncol, nlyr + 1}).unsqueeze(-1))
+          .add_owned_const_input(tem.unsqueeze(0).expand({nwve, ncol, nlyr + 1}).unsqueeze(-1))
           .add_input(index)
           .build();
 
   if (prop.is_cpu()) {
-    call_disort_cpu(iter, rank_in_column, ds, ds_out);
+    call_disort_cpu(iter, rank_in_column, ds_, ds_out_);
   } else if (prop.is_cuda()) {
     //call_disort_cuda(iter, rank_in_column, options.ds(), options.ds_out());
   } else {

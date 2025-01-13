@@ -58,15 +58,14 @@ void RadiationBandImpl::reset() {
 
     solver = register_module_op(this, "solver", options.disort_options());
 
-    for (int n = 0; n < options.nwave(); ++n) {
-      for (int i = 0; i < umu.size(); ++i) {
-        std::dynamic_pointer_cast<DisortImpl>(solver)->ds[n].umu[i] = umu[i];
-      }
+    for (int n = 0; n < options.nwave(); ++n)
+      for (int j = 0; j < options.nx3() * options.nx2(); ++n) {
+        for (int i = 0; i < umu.size(); ++i)
+          std::dynamic_pointer_cast<DisortImpl>(solver)->ds(n,j).umu[i] = umu[i];
 
-      for (int i = 0; i < uphi.size(); ++i) {
-        std::dynamic_pointer_cast<DisortImpl>(solver)->ds[n].phi[i] = uphi[i];
+        for (int i = 0; i < uphi.size(); ++i)
+          std::dynamic_pointer_cast<DisortImpl>(solver)->ds(n,j).phi[i] = uphi[i];
       }
-    }
   }
 }
 
