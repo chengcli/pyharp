@@ -131,7 +131,6 @@ void DisortImpl::reset() {
   }
 
   allocated_ = true;
-  std::cout << "disort allocated = " << allocated_ << std::endl;
 }
 
 DisortImpl::~DisortImpl() {
@@ -140,7 +139,6 @@ DisortImpl::~DisortImpl() {
     c_disort_out_free(&ds_[i], &ds_out_[i]);
   }
   allocated_ = false;
-  std::cout << "disort allocated = " << allocated_ << std::endl;
 }
 
 //! \note Counting Disort Index
