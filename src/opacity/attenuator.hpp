@@ -46,12 +46,12 @@ class AttenuatorImpl {
 
   //! Get optical properties
   /*!
-   * \param var_x 4D tensor representation of atmospheric variables
-   *              with shape (C, D, W, H)
-   *              where C is the number of variables
-   *              and H is the number of vertical levels
-   * \return tensor of size (batch, specs, levels, temps, comps)
-   *         where the first index in batch dimension is the attenuation
+   * \param temp temperature at layer (ncol, nlyr)
+   * \param pres pressure at layer (ncol, nlyr)
+   * \param xfrac species mole fractions (ncol, nlyr, nspecies)
+   * \param dx1f layer thickness (ncol, nlyr)
+   * \return tensor of size (nwave, ncol, nlyr, nprop)
+   *         where the first index in nprop dimension is the attenuation
    *         coefficient and the second index is the single scattering albedo
    *         and the rest of the indices are the phase function moments
    *         (excluding the zeroth moment). The units of the attenuation
@@ -82,7 +82,7 @@ class AbsorberRFMImpl : public AttenuatorImpl,
   virtual void load();
 
   //! Get optical properties
-  torch::Tensor forward(torch::Tensor var_x) override;
+  torch::Tensor forward(torch::Tensor var_x);
 };
 TORCH_MODULE(AbsorberRFM);
 
@@ -105,7 +105,7 @@ class HydrogenCIAImpl : public AttenuatorImpl,
   virtual void load();
 
   //! Get optical properties
-  torch::Tensor forward(torch::Tensor var_x) override;
+  torch::Tensor forward(torch::Tensor var_x);
 };
 TORCH_MODULE(HydrogenCIA);
 
