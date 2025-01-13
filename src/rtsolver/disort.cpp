@@ -15,8 +15,8 @@
 
 namespace harp {
 void call_disort_cpu(at::TensorIterator& iter, int rank_in_column,
-                     std::vector<disort_state> &ds,
-                     std::vector<disort_output> &ds_out);
+                     std::vector<disort_state>& ds,
+                     std::vector<disort_output>& ds_out);
 
 DisortOptions::DisortOptions() {
   ds().bc.btemp = 0.;
@@ -141,22 +141,27 @@ DisortImpl::~DisortImpl() {
 //! block r = 2 gets, 2 - 1 - 0
 torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
                                   torch::optional<torch::Tensor> temf) {
-  TORCH_CHECK(options.ds().flag.ibcnd == 0, "DisortImpl::forward: ds.ibcnd != 0");
+  TORCH_CHECK(options.ds().flag.ibcnd == 0,
+              "DisortImpl::forward: ds.ibcnd != 0");
   TORCH_CHECK(prop.dim() == 4, "DisortImpl::forward: prop.dim() != 4");
 
   int nwve = prop.size(0);
   int ncol = prop.size(1);
   int nlyr = prop.size(2);
 
-  TORCH_CHECK(options.ds().nlyr == nlyr, "DisortImpl::forward: ds.nlyr != nlyr");
+  TORCH_CHECK(options.ds().nlyr == nlyr,
+              "DisortImpl::forward: ds.nlyr != nlyr");
 
   torch::Tensor tem;
   if (temf.has_value()) {
-    TORCH_CHECK(temf.value().size(0) == ncol, "DisortImpl::forward: temf.size(0) != ncol");
-    TORCH_CHECK(temf.value().size(1) == nlyr + 1, "DisortImpl::forward: temf.size(1) != nlyr + 1");
+    TORCH_CHECK(temf.value().size(0) == ncol,
+                "DisortImpl::forward: temf.size(0) != ncol");
+    TORCH_CHECK(temf.value().size(1) == nlyr + 1,
+                "DisortImpl::forward: temf.size(1) != nlyr + 1");
     tem = temf.value();
   } else {
-    TORCH_CHECK(options.ds().flag.planck == 0, "DisortImpl::forward: ds.planck != 0");
+    TORCH_CHECK(options.ds().flag.planck == 0,
+                "DisortImpl::forward: ds.planck != 0");
     // dummy
     tem = torch::empty({1, 1}, prop.options());
   }
@@ -168,18 +173,20 @@ torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
   auto iter =
       at::TensorIteratorConfig()
           .resize_outputs(false)
-          .declare_static_shape({nwve, ncol, nlyr + 1, 2}, /*squash_dims=*/{2, 3})
+          .declare_static_shape({nwve, ncol, nlyr + 1, 2},
+                                /*squash_dims=*/{2, 3})
           .add_output(flx)
           .add_input(prop)
           .add_owned_const_input(ftoa.unsqueeze(-1).unsqueeze(-1))
-          .add_owned_const_input(tem.unsqueeze(0).expand({nwve, ncol, nlyr + 1}).unsqueeze(-1))
+          .add_owned_const_input(
+              tem.unsqueeze(0).expand({nwve, ncol, nlyr + 1}).unsqueeze(-1))
           .add_input(index)
           .build();
 
   if (prop.is_cpu()) {
     call_disort_cpu(iter, rank_in_column, ds_, ds_out_);
   } else if (prop.is_cuda()) {
-    //call_disort_cuda(iter, rank_in_column, options.ds(), options.ds_out());
+    // call_disort_cuda(iter, rank_in_column, options.ds(), options.ds_out());
   } else {
     TORCH_CHECK(false, "DisortImpl::forward: unsupported device");
   }

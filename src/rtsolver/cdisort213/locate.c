@@ -59,7 +59,7 @@ int locate_disort(double *xx, int n, double x)
       jl = jm; /* and replace either the lower limit  */
     else
       ju = jm; /* or the upper limit, as appropriate. */
-  }            /* Repeat until the test condition is satisfied. */
+  } /* Repeat until the test condition is satisfied. */
 
   if (x == xx[1]) {
     j = 1; /* Then set the output */
@@ -110,7 +110,7 @@ int flocate_disort(float *xx, int n, float x)
       jl = jm; /* and replace either the lower limit  */
     else
       ju = jm; /* or the upper limit, as appropriate. */
-  }            /* Repeat until the test condition is satisfied. */
+  } /* Repeat until the test condition is satisfied. */
 
   if (x == xx[1]) {
     j = 1; /* Then set the output */

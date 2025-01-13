@@ -10,11 +10,12 @@ extern "C" {
 
 // harp
 #include <utils/find_resource.hpp>
+
 #include "attenuator.hpp"
 
 namespace harp {
-AbsorberRFMImpl::AbsorberRFMImpl(AttenuatorOptions const& options_) : 
-  AttenuatorImpl(options_) {
+AbsorberRFMImpl::AbsorberRFMImpl(AttenuatorOptions const& options_)
+    : AttenuatorImpl(options_) {
   reset();
 }
 

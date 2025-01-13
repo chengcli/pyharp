@@ -3,6 +3,7 @@
 
 // harp
 #include <index.h>
+
 #include <rtsolver/rtsolver.hpp>
 #include <utils/scattering_moments.hpp>
 
@@ -12,8 +13,9 @@ TEST(TestDisort, isotropic_scattering) {
   DisortOptions op;
 
   op.header("running disort example");
-  op.flags("usrtau,usrang,lamber,quiet,intensity_correction,"
-           "old_intensity_correction,print-input,print-phase-function");
+  op.flags(
+      "usrtau,usrang,lamber,quiet,intensity_correction,"
+      "old_intensity_correction,print-input,print-phase-function");
 
   op.ds().nlyr = 1;
   op.ds().nstr = 16;
@@ -43,16 +45,16 @@ TEST(TestDisort, isotropic_scattering) {
   disort->ds().utau[0] = 0.0;
   disort->ds().utau[1] = 0.03125;
 
-  auto prop = torch::zeros({disort->options.nwve(), disort->options.ncol(), 
-                            disort->ds().nlyr, 3 + disort->ds().nstr}, torch::kDouble);
+  auto prop = torch::zeros({disort->options.nwve(), disort->options.ncol(),
+                            disort->ds().nlyr, 3 + disort->ds().nstr},
+                           torch::kDouble);
   prop.select(3, index::IAB) = disort->ds().utau[1];
   prop.select(3, index::ISS) = 0.2;
   prop.narrow(3, index::IPM, 1 + disort->ds().nstr) = scattering_moments(
-      disort->ds().nstr,
-      PhaseMomentOptions().type(kIsotropic)
-      );
+      disort->ds().nstr, PhaseMomentOptions().type(kIsotropic));
 
-  auto ftoa = torch::zeros({disort->options.nwve(), disort->options.ncol()}, torch::kDouble);
+  auto ftoa = torch::zeros({disort->options.nwve(), disort->options.ncol()},
+                           torch::kDouble);
   ftoa.fill_(M_PI / disort->ds().bc.umu0);
 
   auto result = disort->forward(prop, ftoa);

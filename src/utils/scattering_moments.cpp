@@ -17,7 +17,7 @@ torch::Tensor scattering_moments(int npmom, PhaseMomentOptions const &options) {
 
   if (options.type() == kHenyeyGreenstein) {
     TORCH_CHECK(options.gg() > -1. && options.gg() < 1.,
-        "scattering_moments::bad input variable gg");
+                "scattering_moments::bad input variable gg");
     for (int k = 1; k <= npmom; k++) {
       pmom[k] = pow(options.gg(), (float)k);
     }
@@ -27,7 +27,7 @@ torch::Tensor scattering_moments(int npmom, PhaseMomentOptions const &options) {
     auto ff = options.ff();
 
     TORCH_CHECK(gg1 > -1. && gg1 < 1. && gg2 > -1. && gg2 < 1.,
-        "scattering_moments::bad input variable gg1 or gg2");
+                "scattering_moments::bad input variable gg1 or gg2");
 
     for (int k = 1; k <= npmom; k++) {
       pmom[k] = ff * pow(gg1, (float)k) + (1. - ff) * pow(gg2, (float)k);

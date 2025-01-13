@@ -2,6 +2,7 @@
 
 // harp
 #include <index.h>
+
 #include "cdisort213/cdisort.h"
 
 #define FLX(i, m) flx[(i) * 2 + (m)]
@@ -13,8 +14,7 @@ namespace harp {
 
 template <typename T>
 void disort_impl(T* flx, T* prop, T* ftoa, T* temf, int rank_in_column,
-                 disort_state &ds, disort_output &ds_out, int nprop)
-{
+                 disort_state& ds, disort_output& ds_out, int nprop) {
   // run disort
   if (ds.flag.planck) {
     for (int i = 0; i <= ds.nlyr; ++i) {
@@ -46,7 +46,7 @@ void disort_impl(T* flx, T* prop, T* ftoa, T* temf, int rank_in_column,
   }
 }
 
-} // namespace harp
+}  // namespace harp
 
 #undef FLX
 #undef PROP
