@@ -19,6 +19,24 @@ void call_disort_cpu(at::TensorIterator& iter, int rank_in_column,
                      std::vector<disort_output>& ds_out);
 
 DisortOptions::DisortOptions() {
+  // flags
+  ds().flag.ibcnd = false;
+  ds().flag.usrtau = false;
+  ds().flag.usrang = false;
+  ds().flag.lamber = false;
+  ds().flag.planck = false;
+  ds().flag.spher = false;
+  ds().flag.onlyfl = false;
+  ds().flag.quiet = false;
+  ds().flag.intensity_correction = false;
+  ds().flag.old_intensity_correction = false;
+  ds().flag.general_source = false;
+  ds().flag.output_uum = false;
+  for (int i = 0; i < 5; ++i) {
+    ds().flag.prnt[i] = false;
+  }
+
+  // bc
   ds().bc.btemp = 0.;
   ds().bc.ttemp = 0.;
   ds().bc.fluor = 0.;
@@ -167,12 +185,15 @@ torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
   }
 
   auto flx = torch::zeros({nwve, ncol, nlyr + 1, 2}, prop.options());
-  auto index = torch::range(0, nwve * ncol, 1).view({nwve, ncol, 1, 1});
+  auto index = torch::range(0, nwve * ncol - 1, 1)
+                   .to(torch::kInt)
+                   .view({nwve, ncol, 1, 1});
   int rank_in_column = 0;
 
   auto iter =
       at::TensorIteratorConfig()
           .resize_outputs(false)
+          .check_all_same_dtype(false)
           .declare_static_shape({nwve, ncol, nlyr + 1, 2},
                                 /*squash_dims=*/{2, 3})
           .add_output(flx)

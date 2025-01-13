@@ -53,9 +53,13 @@ TEST(TestDisort, isotropic_scattering) {
   prop.narrow(3, index::IPM, 1 + disort->ds().nstr) = scattering_moments(
       disort->ds().nstr, PhaseMomentOptions().type(kIsotropic));
 
+  std::cout << "prop: " << prop << std::endl;
+
   auto ftoa = torch::zeros({disort->options.nwve(), disort->options.ncol()},
                            torch::kDouble);
   ftoa.fill_(M_PI / disort->ds().bc.umu0);
+
+  std::cout << "ftoa: " << ftoa << std::endl;
 
   auto result = disort->forward(prop, ftoa);
   std::cout << "result: " << result << std::endl;
