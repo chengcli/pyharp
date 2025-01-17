@@ -17,6 +17,7 @@ TEST(TestDisort, isotropic_scattering) {
       "usrtau,usrang,lamber,quiet,intensity_correction,"
       "old_intensity_correction,print-input,print-phase-function");
 
+  op.nwve(10);
   op.ds().nlyr = 1;
   op.ds().nstr = 16;
   op.ds().nmom = 16;
@@ -27,30 +28,33 @@ TEST(TestDisort, isotropic_scattering) {
 
   Disort disort(op);
 
-  disort->ds().bc.umu0 = 0.1;
-  disort->ds().bc.phi0 = 0.0;
-  disort->ds().bc.albedo = 0.0;
-  disort->ds().bc.fluor = 0.0;
-  disort->ds().bc.fisot = 0.0;
+  for (int i = 0; i < 10; ++i) {
+    disort->ds(i).bc.umu0 = 0.1;
+    disort->ds(i).bc.phi0 = 0.0;
+    disort->ds(i).bc.albedo = 0.0;
+    disort->ds(i).bc.fluor = 0.0;
+    disort->ds(i).bc.fisot = 0.0;
 
-  disort->ds().umu[0] = -1.;
-  disort->ds().umu[1] = -0.5;
-  disort->ds().umu[2] = -0.1;
-  disort->ds().umu[3] = 0.1;
-  disort->ds().umu[4] = 0.5;
-  disort->ds().umu[5] = 1.;
+    disort->ds(i).umu[0] = -1.;
+    disort->ds(i).umu[1] = -0.5;
+    disort->ds(i).umu[2] = -0.1;
+    disort->ds(i).umu[3] = 0.1;
+    disort->ds(i).umu[4] = 0.5;
+    disort->ds(i).umu[5] = 1.;
 
-  disort->ds().phi[0] = 0.0;
+    disort->ds(i).phi[0] = 0.0;
 
-  disort->ds().utau[0] = 0.0;
-  disort->ds().utau[1] = 0.03125;
+    disort->ds(i).utau[0] = 0.0;
+    disort->ds(i).utau[1] = 0.03125;
+  }
 
   auto prop = torch::zeros({disort->options.nwve(), disort->options.ncol(),
-                            disort->ds().nlyr, 3 + disort->ds().nstr},
+                            disort->ds().nlyr, 2 + disort->ds().nstr},
                            torch::kDouble);
+
   prop.select(3, index::IAB) = disort->ds().utau[1];
   prop.select(3, index::ISS) = 0.2;
-  prop.narrow(3, index::IPM, 1 + disort->ds().nstr) = scattering_moments(
+  prop.narrow(3, index::IPM, disort->ds().nstr) = scattering_moments(
       disort->ds().nstr, PhaseMomentOptions().type(kIsotropic));
 
   auto ftoa = torch::zeros({disort->options.nwve(), disort->options.ncol()},

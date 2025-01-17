@@ -108,8 +108,9 @@ void DisortImpl::reset() {
   options.set_flags(options.flags());
 
   TORCH_CHECK(options.ds().nlyr > 0, "DisortImpl: ds.nlyr <= 0");
-  TORCH_CHECK(options.ds().nmom >= 0, "DisortImpl: ds.nmom < 0");
   TORCH_CHECK(options.ds().nstr > 0, "DisortImpl: ds.nstr <= 0");
+  TORCH_CHECK(options.ds().nmom >= options.ds().nstr,
+              "DisortImpl: ds.nmom < ds.nstr");
   TORCH_CHECK(options.ds().nphi > 0, "DisortImpl: ds.nphi <= 0");
   TORCH_CHECK(options.ds().numu > 0, "DisortImpl: ds.numu <= 0");
   TORCH_CHECK(options.ds().ntau > 0, "DisortImpl: ds.ntau <= 0");
@@ -186,12 +187,9 @@ torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
 
   auto flx = torch::zeros({nwve, ncol, nlyr + 1, 2}, prop.options());
   auto index = torch::range(0, nwve * ncol - 1, 1)
-                   .to(torch::kInt)
+                   .to(torch::kInt64)
                    .view({nwve, ncol, 1, 1});
   int rank_in_column = 0;
-
-  std::cout << "flx shape " << flx.sizes() << std::endl;
-  std::cout << "index shape " << prop.sizes() << std::endl;
 
   auto iter =
       at::TensorIteratorConfig()

@@ -46,6 +46,6 @@ torch::Tensor scattering_moments(int npmom, PhaseMomentOptions const &options) {
     throw std::runtime_error("scattering_moment::unknown phase function");
   }
 
-  return pmom;
+  return pmom.narrow(0, 1, npmom);
 }
 }  // namespace harp
