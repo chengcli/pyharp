@@ -38,6 +38,7 @@ string(TOUPPER ${namel} nameu)
 
 file(GLOB src_files
     *.cpp
+    math/*.cpp
     utils/*.cpp
     opacity/*.cpp
     radiation/*.cpp

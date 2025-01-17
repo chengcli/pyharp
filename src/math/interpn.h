@@ -12,15 +12,15 @@
 namespace harp {
 
 /*! Multidimensional linear interpolation
- * val[0..nval-1]   : output values
- * coor[0..ndim-1]  : coordinate of the interpolation point
- * data[...]        : points to the start position of a multidimensional data
- * table. len[0..ndim-1]   : length of each dimension axis[...]        :
- * coordinates of each dimesnion is placed sequentially in axis
+ * \param val output value array, length N
+ * \param coor coordinate of the interpolation point, length ndim
+ * \param data pointer to the start position of a multidimensional sample data
+ * table \param len length of each dimension axis, coordinates of each dimesnion
+ * is placed sequentially in axis, length ndim \param ndim number of dimensions
  */
 template <int N, typename T>
 DISPATCH_MACRO void interpn(T *val, T const *coor, T const *data, T const *axis,
-                            size_t const *len, int ndim) {
+                            int64_t const *len, int ndim) {
   int i1, i2;
   i1 = locate(axis, *coor, *len);
 
@@ -35,11 +35,11 @@ DISPATCH_MACRO void interpn(T *val, T const *coor, T const *data, T const *axis,
   } else
     i2 = i1 + 1;
 
-  double v1[N];
-  double v2[N];
+  T v1[N];
+  T v2[N];
 
-  double x1 = axis[i1];
-  double x2 = axis[i2];
+  auto x1 = axis[i1];
+  auto x2 = axis[i2];
 
   if (ndim == 1) {
     for (int j = 0; j < N; ++j) {
@@ -61,13 +61,14 @@ DISPATCH_MACRO void interpn(T *val, T const *coor, T const *data, T const *axis,
 }
 
 /*! A handy function for one dimensional interpolation
- * x              : interpolation point
- * data[0..len-1] : data array
- * axis[0..len-1] : coordinates
+ * \param x interpolation point
+ * \param data sample data array, length len
+ * \param axis sample data coordinates, length len
+ * \param len sample data length
  */
 template <typename T>
-T interp1(T x, T const *data, T const *axis, size_t len) {
-  double value;
+DISPATCH_MACRO T interp1(T x, T const *data, T const *axis, int64_t len) {
+  T value;
   interpn(&value, &x, data, axis, &len, 1, 1);
   return value;
 }

@@ -15,27 +15,31 @@
 
 namespace harp {
 
-struct S8FullerOptions {
+struct S8RTOptions {
   static constexpr int npmom = 0;
 
   ADD_ARG(std::string, opacity_file) = "s8_k_fuller.txt";
   ADD_ARG(double, species_mu) = 256.e-3;  // [kg/mol]
   ADD_ARG(int, species_id) = 0;
-  ADD_ARG(bool, to_wavenumber) = true;
+  ADD_ARG(bool, use_wavenumber) = true;
 };
 
 class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
  public:
-  //! extinction x-section + single scattering albedo + phase function moments
-  //! (nwave, nprop=3)
+  //! wavenumber [cm^-1] (default) or wavelength [um]
+  //! (nwave, 1)
+  torch::Tensor kwave;
+
+  //! extinction x-section [m^2/mol] + single scattering albedo
+  //! (nwave, nprop=2)
   torch::Tensor kdata;
 
   //! options with which this `S8FullerImpl` was constructed
-  S8FullerOptions options;
+  S8RTOptions options;
 
   //! Constructor to initialize the layer
   S8FullerImpl() = default;
-  explicit S8FullerImpl(S8FullerOptions const& options_);
+  explicit S8FullerImpl(S8RTOptions const& options_);
   void reset() override;
 
   //! Get optical properties
