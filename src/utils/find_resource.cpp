@@ -55,6 +55,16 @@ std::vector<std::string> deserialize_search_paths(char const* p) {
     end = s.find(pathsep, start);
   }
   dirs.push_back(s.substr(start, end));
+  bool found_root = false;
+  for (auto dir : dirs) {
+    if (dir.find(HARP_ROOT_DIR) != std::string::npos) {
+      found_root = true;
+      break;
+    }
+  }
+  if (!found_root) {
+    dirs.push_back(std::string(HARP_ROOT_DIR) + "/data");
+  }
   return dirs;
 }
 

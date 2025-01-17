@@ -17,3 +17,5 @@
 #else
   #define DISPATCH_MACRO
 #endif
+
+#define HARP_ROOT_DIR "@CMAKE_SOURCE_DIR@"

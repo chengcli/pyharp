@@ -75,4 +75,4 @@ message(STATUS "${Blue}${PROJECT_NAME}-5. Setting up unit tests ...${ColorReset}
 add_subdirectory(tests)
 
 message(STATUS "${Blue}${PROJECT_NAME}-6. Setting up examples ...${ColorReset}")
-#add_subdirectory(example)
+add_subdirectory(examples)
