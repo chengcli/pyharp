@@ -61,26 +61,23 @@ int main(int argc, char **argv) {
   harp::Disort disort(disort_options(nwave, ncol, nlyr));
   set_disort_bc(disort, nwave, ncol);
 
-  std::cout << "disort done" << std::endl;
-
   harp::S8Fuller s8(harp::S8RTOptions().species_id(0));
   harp::H2SO4Simple h2so4(harp::H2SO4RTOptions().species_id(1));
-
-  std::cout << "opacity done" << std::endl;
 
   auto wave = short_wavenumber_grid(nwave);
   std::cout << "wave = " << wave << std::endl;
   auto conc = atm_concentration(ncol, nlyr, nspecies);
 
-  // auto prop1 = s8->forward(wave, conc);
-  // auto prop2 = h2so4->forward(wave, conc);
+  auto prop1 = s8->forward(wave, conc);
+  auto prop2 = h2so4->forward(wave, conc);
 
-  // auto prop = prop1 + prop2;
+  auto prop = prop1 + prop2;
   auto ftoa = short_toa_flux(nwave, ncol);
 
-  auto prop = torch::ones({nwave, ncol, nlyr, 2}, torch::kFloat64);
+  // auto prop = torch::ones({nwave, ncol, nlyr, 2}, torch::kFloat64);
 
-  // std::cout << "prop = " << prop << std::endl;
+  std::cout << "prop1 = " << prop1 << std::endl;
+  std::cout << "prop2 = " << prop1 << std::endl;
 
   std::cout << "before running disort" << std::endl;
   auto result = disort->forward(prop, ftoa);
