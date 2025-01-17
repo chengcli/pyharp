@@ -109,4 +109,7 @@ class HydrogenCIAImpl : public AttenuatorImpl,
 };
 TORCH_MODULE(HydrogenCIA);
 
+void call_interpn_cpu(at::TensorIterator& iter, int dim, int nvapor);
+void call_interpn_cuda(at::TensorIterator& iter, int dim, int nvapor);
+
 }  // namespace harp

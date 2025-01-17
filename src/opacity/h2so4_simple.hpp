@@ -19,6 +19,7 @@ struct H2SO4SimpleOptions {
   ADD_ARG(std::string, opacity_file) = "h2so4.txt";
   ADD_ARG(double, species_mu) = 100.e-3;  // [kg/mol]
   ADD_ARG(int, species_id) = 0;
+  ADD_ARG(int, npmom) = 0;
 };
 
 class H2SO4SimpleImpl : public torch::nn::Cloneable<H2SO4SimpleImpl> {

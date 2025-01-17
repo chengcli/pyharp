@@ -66,7 +66,7 @@ torch::Tensor H2SO4SimpleImpl::forward(torch::Tensor conc,
   result.select(3, 0) = conc.select(2, options.species_id()).unsqueeze(0) *
                         kdata.select(1, 1).unsqueeze(-1).unsqueeze(-1);
 
-  // single scattering albedo
+  // attenuation weighted single scattering albedo [1/m]
   result.select(3, 1) =
       result.select(3, 0) * kdata.select(1, 2).unsqueeze(-1).unsqueeze(-1);
 
