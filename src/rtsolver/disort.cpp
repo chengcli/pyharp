@@ -131,8 +131,6 @@ void DisortImpl::reset() {
     c_disort_out_alloc(&ds_[i], &ds_out_[i]);
   }
 
-  std::cout << "ds size = " << ds_.size() << std::endl;
-
   allocated_ = true;
 }
 

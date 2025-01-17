@@ -85,14 +85,12 @@ torch::Tensor H2SO4SimpleImpl::forward(torch::Tensor wave, torch::Tensor conc,
                   .declare_static_shape(out.sizes(), /*squash_dims=*/3)
                   .add_output(out)
                   .add_owned_const_input(wave.view({-1, 1, 1, 1}))
-                  .add_owned_const_input(kdata.unsqueeze(1).unsqueeze(2))
-                  .add_owned_const_input(kwave.view({-1, 1, 1, 1}))
                   .build();
 
   if (conc.is_cpu()) {
-    call_interpn_cpu<nprop>(iter, dims, 1);
+    call_interpn_cpu<nprop>(iter, kdata, kwave, dims, 1);
   } else if (conc.is_cuda()) {
-    // call_interpn_cuda<nprop>(iter, dims, 1);
+    // call_interpn_cuda<nprop>(iter, kdata, kwave, dims, 1);
   } else {
     throw std::runtime_error("Unsupported device");
   }

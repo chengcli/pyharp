@@ -53,7 +53,7 @@ torch::Tensor short_toa_flux(int nwave, int ncol) {
 }
 
 int main(int argc, char **argv) {
-  int nwave = 2;
+  int nwave = 10;
   int ncol = 1;
   int nlyr = 10;
   int nspecies = 2;
@@ -65,21 +65,17 @@ int main(int argc, char **argv) {
   harp::H2SO4Simple h2so4(harp::H2SO4RTOptions().species_id(1));
 
   auto wave = short_wavenumber_grid(nwave);
-  std::cout << "wave = " << wave << std::endl;
   auto conc = atm_concentration(ncol, nlyr, nspecies);
 
   auto prop1 = s8->forward(wave, conc);
   auto prop2 = h2so4->forward(wave, conc);
 
   auto prop = prop1 + prop2;
+
+  // mean single scattering albedo
+  prop.select(3, 1) /= prop.select(3, 0);
+
   auto ftoa = short_toa_flux(nwave, ncol);
-
-  // auto prop = torch::ones({nwave, ncol, nlyr, 2}, torch::kFloat64);
-
-  std::cout << "prop1 = " << prop1 << std::endl;
-  std::cout << "prop2 = " << prop1 << std::endl;
-
-  std::cout << "before running disort" << std::endl;
   auto result = disort->forward(prop, ftoa);
   std::cout << result << std::endl;
 }
