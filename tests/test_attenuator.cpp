@@ -17,15 +17,17 @@ TEST(TestOpacity, s8_fuller) {
   S8Fuller s8(op1);
   H2SO4Simple h2so4(op2);
 
-  std::cout << "h2so4 wave = " << h2so4->kwave << std::endl;
+  // std::cout << "h2so4 wave = " << h2so4->kwave << std::endl;
+  // std::cout << "h2so4 data = " << h2so4->kdata << std::endl;
 
   int ncol = 1;
   int nlyr = 1;
   int nspecies = 2;
   auto conc = torch::ones({ncol, nlyr, nspecies}, torch::kFloat64);
-  auto result1 = s8->forward(s8->wave, conc);
-  auto result2 = h2so4->forward(h2so4->wave, conc);
+  auto result1 = s8->forward(s8->kwave, conc);
+  auto result2 = h2so4->forward(s8->kwave, conc);
   // std::cout << "result1 = " << result1 << std::endl;
+  // std::cout << "result2 = " << result2 << std::endl;
   // std::cout << result2.sizes() << std::endl;
 
   // attenuation [1/m]

@@ -40,7 +40,8 @@ void H2SO4SimpleImpl::reset() {
   TORCH_CHECK(cols == 3 + H2SO4RTOptions::npmom, "Invalid file: ", full_path);
 
   kwave = register_buffer("kwave", torch::zeros({rows}, torch::kFloat64));
-  kdata = register_buffer("kdata", torch::zeros({rows, cols}, torch::kFloat64));
+  kdata =
+      register_buffer("kdata", torch::zeros({rows, cols - 1}, torch::kFloat64));
 
   // read second time
   std::stringstream inp2(str_file);
@@ -51,8 +52,8 @@ void H2SO4SimpleImpl::reset() {
 
   for (int i = 0; i < rows; ++i) {
     inp2 >> kwave_accessor[i];
-    for (int j = 0; j < cols; ++j) {
-      inp2 >> kdata_accessor[i][j];
+    for (int j = 1; j < cols; ++j) {
+      inp2 >> kdata_accessor[i][j - 1];
     }
   }
 
