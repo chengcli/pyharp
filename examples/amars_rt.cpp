@@ -26,7 +26,7 @@ harp::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
   return op;
 }
 
-void set_disort_bc(harp::Disort &disort, int nwave, int ncol) {
+/*void set_disort_bc(harp::Disort &disort, int nwave, int ncol) {
   for (int i = 0; i < nwave; ++i)
     for (int j = 0; j < ncol; ++j) {
       disort->ds(i, j).bc.umu0 = 0.1;
@@ -35,7 +35,7 @@ void set_disort_bc(harp::Disort &disort, int nwave, int ncol) {
       disort->ds(i, j).bc.fluor = 0.0;
       disort->ds(i, j).bc.fisot = 0.0;
     }
-}
+}*/
 
 torch::Tensor atm_concentration(int ncol, int nlyr, int nspecies) {
   auto conc = torch::ones({ncol, nlyr, nspecies}, torch::kFloat64);
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
   int nspecies = 2;
 
   harp::Disort disort(disort_options(nwave, ncol, nlyr));
-  set_disort_bc(disort, nwave, ncol);
+  // set_disort_bc(disort, nwave, ncol);
 
   harp::S8Fuller s8(harp::S8RTOptions().species_id(0));
   harp::H2SO4Simple h2so4(harp::H2SO4RTOptions().species_id(1));
@@ -75,7 +75,10 @@ int main(int argc, char **argv) {
   // mean single scattering albedo
   prop.select(3, 1) /= prop.select(3, 0);
 
-  auto ftoa = short_toa_flux(nwave, ncol);
-  auto result = disort->forward(prop, ftoa);
+  std::map<std::string, torch::Tensor> bc;
+  bc["fbeam"] = short_toa_flux(nwave, ncol);
+  bc["umu0"] = 0.1 * torch::ones({nwave, ncol}, torch::kFloat64);
+
+  auto result = disort->forward(prop, bc);
   std::cout << result << std::endl;
 }

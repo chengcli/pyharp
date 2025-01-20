@@ -106,7 +106,7 @@ torch::Tensor RadiationBandImpl::forward(torch::Tensor x1f, torch::Tensor ftoa,
     options.disort_options().ds().bc.phi0 = ray[1];
   }
 
-  auto flx = solver->forward(prop, ftoa, temf);
+  /*auto flx = solver->forward(prop, ftoa, temf);
 
   /// accumulate flux from spectral bins
   auto bflx = torch::sum(flx * wave[IWT].view({1, -1, 1, 1, 1}), 0);
@@ -115,7 +115,7 @@ torch::Tensor RadiationBandImpl::forward(torch::Tensor x1f, torch::Tensor ftoa,
     return bflx;
   } else {
     return spherical_flux_correction(bflx, x1f, area.value(), vol.value());
-  }
+  }*/
 }
 
 std::string RadiationBandImpl::to_string() const {

@@ -7,13 +7,19 @@
 
 #define FLX(i, m) flx[(i) * 2 + (m)]
 #define PROP(i, m) prop[(i) * nprop + (m)]
-#define FTOA (*ftoa)
+#define FBEAM (*fbeam)
+#define UMU0 (*umu0)
+#define PHI0 (*phi0)
+#define ALBEDO (*albedo)
+#define FLUOR (*fluor)
+#define FISOT (*fisot)
 #define TEMF(i) temf[i]
 
 namespace harp {
 
 template <typename T>
-void disort_impl(T* flx, T* prop, T* ftoa, T* temf, int rank_in_column,
+void disort_impl(T* flx, T* prop, T* fbeam, T* umu0, T* phi0, T* albedo,
+                 T* fluor, T* fisot, T* temf, int rank_in_column,
                  disort_state& ds, disort_output& ds_out, int nprop) {
   // run disort
   if (ds.flag.planck) {
@@ -22,8 +28,13 @@ void disort_impl(T* flx, T* prop, T* ftoa, T* temf, int rank_in_column,
     }
   }
 
-  // stellar source function
-  ds.bc.fbeam = FTOA;
+  // bc
+  ds.bc.fbeam = FBEAM;
+  ds.bc.umu0 = UMU0;
+  ds.bc.phi0 = PHI0;
+  ds.bc.albedo = ALBEDO;
+  ds.bc.fluor = FLUOR;
+  ds.bc.fisot = FISOT;
 
   for (int i = 0; i < ds.nlyr; ++i) {
     // absorption
@@ -58,4 +69,10 @@ void disort_impl(T* flx, T* prop, T* ftoa, T* temf, int rank_in_column,
 #undef FLX
 #undef PROP
 #undef FTOA
+#undef FBEAM
+#undef UMU0
+#undef PHI0
+#undef ALBEDO
+#undef FLUOR
+#undef FISOT
 #undef TEMF

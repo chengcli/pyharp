@@ -23,7 +23,7 @@ class RTSolverImpl {
   RTSolverImpl() = default;
   virtual ~RTSolverImpl() {}
   virtual torch::Tensor forward(
-      torch::Tensor prop, torch::Tensor ftoa,
+      torch::Tensor prop, std::map<std::string, torch::Tensor>& bc,
       torch::optional<torch::Tensor> temf = torch::nullopt) {
     throw std::runtime_error("RTSolverImpl::forward: not implemented");
   }
@@ -82,7 +82,7 @@ class DisortImpl : public torch::nn::Cloneable<DisortImpl>,
    * \return radiative flux or intensity (nwave, ncol, nlvl, 2)
    */
   torch::Tensor forward(
-      torch::Tensor prop, torch::Tensor ftoa,
+      torch::Tensor prop, std::map<std::string, torch::Tensor>& bc,
       torch::optional<torch::Tensor> temf = torch::nullopt) override;
 
  private:
@@ -119,7 +119,7 @@ class BeerLambertImpl : public torch::nn::Cloneable<BeerLambertImpl>,
    * \param temf temperature at each level (layer + 1)
    */
   torch::Tensor forward(
-      torch::Tensor prop, torch::Tensor ftoa,
+      torch::Tensor prop, std::map<std::string, torch::Tensor>& bc,
       torch::optional<torch::Tensor> temf = torch::nullopt) override;
 };
 TORCH_MODULE(BeerLambert);
