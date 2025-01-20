@@ -17,7 +17,7 @@ TEST(TestDisort, isotropic_scattering) {
       "usrtau,usrang,lamber,quiet,intensity_correction,"
       "old_intensity_correction,print-input,print-phase-function");
 
-  op.nwve(10);
+  op.nwave(10);
   op.ds().nlyr = 1;
   op.ds().nstr = 16;
   op.ds().nmom = 16;
@@ -48,7 +48,7 @@ TEST(TestDisort, isotropic_scattering) {
     disort->ds(i).utau[1] = 0.03125;
   }
 
-  auto prop = torch::zeros({disort->options.nwve(), disort->options.ncol(),
+  auto prop = torch::zeros({disort->options.nwave(), disort->options.ncol(),
                             disort->ds().nlyr, 2 + disort->ds().nstr},
                            torch::kDouble);
 
@@ -57,7 +57,7 @@ TEST(TestDisort, isotropic_scattering) {
   prop.narrow(3, index::IPM, disort->ds().nstr) = scattering_moments(
       disort->ds().nstr, PhaseMomentOptions().type(kIsotropic));
 
-  auto ftoa = torch::zeros({disort->options.nwve(), disort->options.ncol()},
+  auto ftoa = torch::zeros({disort->options.nwave(), disort->options.ncol()},
                            torch::kDouble);
   ftoa.fill_(M_PI / disort->ds().bc.umu0);
 

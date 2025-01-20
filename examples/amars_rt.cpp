@@ -12,7 +12,7 @@ harp::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
       "intensity_correction,old_intensity_correction,"
       "print-input,print-phase-function");
 
-  op.nwve(nwave);
+  op.nwave(nwave);
   op.ncol(ncol);
 
   op.ds().nlyr = nlyr;

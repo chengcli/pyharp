@@ -41,7 +41,7 @@ struct DisortOptions {
   ADD_ARG(std::string, flags) = "";
 
   // spectral dimensions
-  ADD_ARG(int, nwve) = 1;
+  ADD_ARG(int, nwave) = 1;
 
   // spatial dimensions
   ADD_ARG(int, ncol) = 1;

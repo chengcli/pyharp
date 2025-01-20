@@ -116,16 +116,16 @@ void DisortImpl::reset() {
   TORCH_CHECK(options.ds().ntau > 0, "DisortImpl: ds.ntau <= 0");
 
   if (allocated_) {
-    for (int i = 0; i < options.nwve() * options.ncol(); ++i) {
+    for (int i = 0; i < options.nwave() * options.ncol(); ++i) {
       c_disort_state_free(&ds_[i]);
       c_disort_out_free(&ds_[i], &ds_out_[i]);
     }
   }
 
-  ds_.resize(options.nwve() * options.ncol());
-  ds_out_.resize(options.nwve() * options.ncol());
+  ds_.resize(options.nwave() * options.ncol());
+  ds_out_.resize(options.nwave() * options.ncol());
 
-  for (int i = 0; i < options.nwve() * options.ncol(); ++i) {
+  for (int i = 0; i < options.nwave() * options.ncol(); ++i) {
     ds_[i] = options.ds();
     c_disort_state_alloc(&ds_[i]);
     c_disort_out_alloc(&ds_[i], &ds_out_[i]);
@@ -135,7 +135,7 @@ void DisortImpl::reset() {
 }
 
 DisortImpl::~DisortImpl() {
-  for (int i = 0; i < options.nwve() * options.ncol(); ++i) {
+  for (int i = 0; i < options.nwave() * options.ncol(); ++i) {
     c_disort_state_free(&ds_[i]);
     c_disort_out_free(&ds_[i], &ds_out_[i]);
   }
@@ -162,7 +162,7 @@ torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
               "DisortImpl::forward: ds.ibcnd != 0");
   TORCH_CHECK(prop.dim() == 4, "DisortImpl::forward: prop.dim() != 4");
 
-  int nwve = prop.size(0);
+  int nwave = prop.size(0);
   int ncol = prop.size(1);
   int nlyr = prop.size(2);
 
@@ -183,23 +183,23 @@ torch::Tensor DisortImpl::forward(torch::Tensor prop, torch::Tensor ftoa,
     tem = torch::empty({1, 1}, prop.options());
   }
 
-  auto flx = torch::zeros({nwve, ncol, nlyr + 1, 2}, prop.options());
-  auto index = torch::range(0, nwve * ncol - 1, 1)
+  auto flx = torch::zeros({nwave, ncol, nlyr + 1, 2}, prop.options());
+  auto index = torch::range(0, nwave * ncol - 1, 1)
                    .to(torch::kInt64)
-                   .view({nwve, ncol, 1, 1});
+                   .view({nwave, ncol, 1, 1});
   int rank_in_column = 0;
 
   auto iter =
       at::TensorIteratorConfig()
           .resize_outputs(false)
           .check_all_same_dtype(false)
-          .declare_static_shape({nwve, ncol, nlyr + 1, 2},
+          .declare_static_shape({nwave, ncol, nlyr + 1, 2},
                                 /*squash_dims=*/{2, 3})
           .add_output(flx)
           .add_input(prop)
           .add_owned_const_input(ftoa.unsqueeze(-1).unsqueeze(-1))
           .add_owned_const_input(
-              tem.unsqueeze(0).expand({nwve, ncol, nlyr + 1}).unsqueeze(-1))
+              tem.unsqueeze(0).expand({nwave, ncol, nlyr + 1}).unsqueeze(-1))
           .add_input(index)
           .build();
 

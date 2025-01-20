@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.18)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,6 +17,7 @@ add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 # Specify the CUDA toolkit location if necessary
 #set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.0)
 set(CMAKE_CUDA_ARCHITECTURES 61 86 89)
+set(CMAKE_CUDA_STANDARD 17)
 set(BUILD_SHARED_LIBS OFF)
 
 # make colorful output
@@ -36,8 +37,6 @@ else()
   message(STATUS "Build Type = ${CMAKE_BUILD_TYPE}")
   message(STATUS "")
 endif()
-string(TOUPPER ${CMAKE_BUILD_TYPE} buildu)
-string(TOLOWER ${CMAKE_BUILD_TYPE} buildl)
 
 # load all modules
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/)
