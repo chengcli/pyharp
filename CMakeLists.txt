@@ -63,6 +63,8 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
 find_package(Torch REQUIRED)
 include(${CMAKE_SOURCE_DIR}/cmake/gtest.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/fmt.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/pydisort.cmake)
 #include(${CMAKE_SOURCE_DIR}/cmake/spdlog.cmake)
 #include(${CMAKE_SOURCE_DIR}/cmake/pybind11.cmake)
 

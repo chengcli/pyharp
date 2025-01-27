@@ -15,6 +15,7 @@
 #include <add_arg.h>
 // clang-format on
 
+#include <disort/disort.hpp>
 #include <opacity/attenuator.hpp>
 #include <rtsolver/rtsolver.hpp>
 #include <utils/layer2level.hpp>
@@ -29,19 +30,21 @@ struct RadiationBandOptions {
 
   ADD_ARG(std::vector<std::string>, attenuators) = {};
   ADD_ARG(std::vector<AttenuatorOptions>, attenuator_options) = {};
-  ADD_ARG(Layer2LevelOptions, l2l_options);
-  ADD_ARG(DisortOptions, disort_options);
+  ADD_ARG(Layer2LevelOptions, l2l);
+  ADD_ARG(disort::DisortOptions, disort);
 
-  ADD_ARG(int, nstr) = 1;
-  ADD_ARG(int, nwave) = 1;
+  // spectral dimension
+  ADD_ARG(int, nprop) = 1;
 
-  // atmosphere dimension
-  ADD_ARG(int, nx1) = 1;
-  ADD_ARG(int, nx2) = 1;
-  ADD_ARG(int, nx3) = 1;
+  // atmosphere dimensions
+  ADD_ARG(int, nlyr) = 1;
+  ADD_ARG(int, ncol) = 1;
 
-  ADD_ARG(double, wmin) = 0.0;
-  ADD_ARG(double, wmax) = 1.0;
+  //! set lower wavenumber(length) at each bin
+  ADD_ARG(std::vector<double>, wave_lower) = {};
+
+  //! set upper wavenumber(length) at each bin
+  ADD_ARG(std::vector<double>, wave_upper) = {};
 };
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
@@ -49,15 +52,12 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   //! options with which this `RadiationBandImpl` was constructed
   RadiationBandOptions options;
 
-  //! radiative transfer solver
-  RTSolver solver;
-
   //! all attenuators
   std::map<std::string, Attenuator> attenuators;
 
-  //! spectral grid and weights
-  //! (2, nwave)
-  torch::Tensor wave;
+  //! spectral grid weights
+  //! (nwave)
+  torch::Tensor weight;
 
   //! bin optical properties
   //! 5D tensor with shape (tau + ssa + pmom, C, ..., nlayer)

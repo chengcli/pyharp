@@ -15,11 +15,6 @@ std::shared_ptr<AttenuatorImpl> register_module_op(torch::nn::Module *p,
                                                    AttenuatorOptions const &op);
 
 class RTSolverImpl;
-class DisortOptions;
-std::shared_ptr<RTSolverImpl> register_module_op(torch::nn::Module *p,
-                                                 std::string name,
-                                                 DisortOptions const &op);
-
 class BeerLambertOptions;
 std::shared_ptr<RTSolverImpl> register_module_op(torch::nn::Module *p,
                                                  std::string name,

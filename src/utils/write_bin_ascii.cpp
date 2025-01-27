@@ -11,7 +11,8 @@ void write_bin_ascii_header(RadiationBand const &band, std::string fname) {
   FILE *pfile = fopen(fname.c_str(), "w");
 
   fprintf(pfile, "# Bin Radiances of Band %s: %.3g - %.3g\n",
-          band->name().c_str(), band->options.wmin(), band->options.wmax());
+          band->name().c_str(), band->options.wave_lower().front(),
+          band->options.wave_upper().back());
   ;
   auto const &rayOutput = band->rayOutput;
   fprintf(pfile, "# Ray output size: %lld\n", rayOutput.size(0));
@@ -40,9 +41,9 @@ void write_bin_ascii_data(torch::Tensor rad, RadiationBand const &band,
                           std::string fname) {
   FILE *pfile = fopen(fname.c_str(), "w");
 
-  for (int i = 0; i < band->wave.size(0); ++i) {
-    fprintf(pfile, "%13.3g%12.3g", band->wave[i][0].item().toFloat(),
-            band->wave[i][1].item().toFloat());
+  for (int i = 0; i < band->weight.size(0); ++i) {
+    fprintf(pfile, "%13.3g%13.3g%12.3g", band->options.wave_lower()[i],
+            band->options.wave_upper()[i], band->weight[i].item().toFloat());
     for (int j = 0; j < band->rayOutput.size(0); ++j) {
       fprintf(pfile, "%12.3f", rad[j][i].item().toFloat());
     }

@@ -7,10 +7,6 @@
 #
 #   rtsolver_debug
 #   rtsolver_release
-#
-# Compile the following submodules
-#
-#   cdisort : Discrete Ordinate Method solver, cdisort-2.1.3
 
 string(TOLOWER ${CMAKE_BUILD_TYPE} buildl)
 string(TOUPPER ${CMAKE_BUILD_TYPE} buildu)
@@ -31,10 +27,7 @@ set_target_properties(${namel}_${buildl}
     )
 
 target_link_libraries(${namel}_${buildl}
-		PRIVATE
-    ${TORCH_LIBRARY}
-    ${TORCH_CPU_LIBRARY}
-    ${C10_LIBRARY}
+		PUBLIC
+    pydisort::disort
+    fmt::fmt
     )
-
-add_subdirectory(cdisort213)

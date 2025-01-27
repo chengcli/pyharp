@@ -1,10 +1,12 @@
 // harp
 #include <opacity/h2so4_simple.hpp>
 #include <opacity/s8_fuller.hpp>
-#include <rtsolver/rtsolver.hpp>
 
-harp::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
-  harp::DisortOptions op;
+// disort
+#include <disort/disort.hpp>
+
+disort::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
+  disort::DisortOptions op;
 
   op.header("running amars RT");
   op.flags(
@@ -47,7 +49,7 @@ int main(int argc, char **argv) {
   int nlyr = 10;
   int nspecies = 2;
 
-  harp::Disort disort(disort_options(nwave, ncol, nlyr));
+  disort::Disort disort(disort_options(nwave, ncol, nlyr));
 
   harp::S8Fuller s8(harp::S8RTOptions().species_id(0));
   harp::H2SO4Simple h2so4(harp::H2SO4RTOptions().species_id(1));

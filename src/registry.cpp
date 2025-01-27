@@ -1,10 +1,3 @@
-// cdisort
-#include "rtsolver/cdisort213/cdisort.h"
-
-// conflict with torch
-#undef A
-#undef B
-
 // harp
 #include "opacity/attenuator.hpp"
 #include "rtsolver/rtsolver.hpp"
@@ -21,11 +14,6 @@ Attenuator register_module_op(torch::nn::Module *p, std::string name,
   }
 
   throw std::runtime_error("register_module: unknown type " + op.type());
-}
-
-RTSolver register_module_op(torch::nn::Module *p, std::string name,
-                            DisortOptions const &op) {
-  return p->register_module(name, Disort(op));
 }
 
 RTSolver register_module_op(torch::nn::Module *p, std::string name,

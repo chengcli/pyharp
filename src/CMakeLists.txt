@@ -6,10 +6,8 @@
 # Define the following symbols
 #
 #   HARP_INCLUDE_DIR
-#   CDISORT_INCLUDE_DIR
 #   HARP_LIBRARY_DEBUG
 #   HARP_LIBRARY_RELEASE
-#   harp::cdisort
 #
 # Normal usage would be:
 #
@@ -26,6 +24,7 @@ include_directories(
   ${CMAKE_BINARY_DIR}
   ${NETCDF_INCLUDES}
   ${PNETCDF_INCLUDE_DIR}
+  SYSTEM ${DISORT_INCLUDE_DIR}
   SYSTEM ${TORCH_API_INCLUDE_DIR}
   SYSTEM ${TORCH_INCLUDE_DIR}
   )
@@ -70,5 +69,4 @@ set(HARP_INCLUDE_DIR
 set(HARP_LIBRARY_${buildu}
   harp_${buildl}
   rtsolver_${buildl}
-  harp::cdisort
   CACHE INTERNAL "harp library")

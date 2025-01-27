@@ -23,13 +23,15 @@ RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const& options_)
 }
 
 void RadiationBandImpl::reset() {
-  wave = register_buffer("wave",
-                         torch::tensor({options.nwave(), 2}, torch::kFloat32));
+  TORCH_CHECK(options.wave_lower().size() == options.wave_upper().size(),
+              "wave_lower and wave_upper must have the same size");
+  int nwave = options.wave_lower().size();
 
-  prop =
-      register_buffer("prop", torch::zeros({3 + options.nstr(), options.nx3(),
-                                            options.nx2(), options.nx1()},
-                                           torch::kFloat32));
+  weight = register_buffer("weight", torch::tensor({nwave}, torch::kFloat64));
+
+  prop = register_buffer(
+      "prop", torch::zeros({options.nprop(), options.ncol(), options.nlyr()},
+                           torch::kFloat64));
 
   auto str = options.outdirs();
   if (!str.empty()) {
@@ -43,31 +45,20 @@ void RadiationBandImpl::reset() {
         register_module_op(this, name, options.attenuator_options()[i]);
   }
 
-  // create rt solver
+  // create rtsolver
+  auto [uphi, umu] = get_direction_grids<double>(rayOutput);
   if (options.solver_name() == "Disort") {
-    options.disort_options().ds().wvnmlo = options.wmin();
-    options.disort_options().ds().wvnmhi = options.wmax();
-    options.disort_options().ds().nstr = options.nstr();
-    options.disort_options().ds().nphase = options.nstr();
-    options.disort_options().ds().nmom = options.nstr();
-    options.disort_options().ds().nlyr = options.nx1();
+    options.disort().ds().nlyr = options.nlyr();
 
-    auto [uphi, umu] = get_direction_grids<double>(rayOutput);
-    options.disort_options().ds().nphi = std::max(1uL, uphi.size());
-    options.disort_options().ds().numu = std::max(1uL, umu.size());
+    options.disort().nwave(nwave);
+    options.disort().ncol(options.ncol());
 
-    solver = register_module_op(this, "solver", options.disort_options());
+    options.disort().user_phi(uphi);
+    options.disort().user_mu(umu);
+    options.disort().wave_lower(options.wave_lower());
+    options.disort().wave_upper(options.wave_upper());
 
-    for (int n = 0; n < options.nwave(); ++n)
-      for (int j = 0; j < options.nx3() * options.nx2(); ++n) {
-        for (int i = 0; i < umu.size(); ++i)
-          std::dynamic_pointer_cast<DisortImpl>(solver)->ds(n, j).umu[i] =
-              umu[i];
-
-        for (int i = 0; i < uphi.size(); ++i)
-          std::dynamic_pointer_cast<DisortImpl>(solver)->ds(n, j).phi[i] =
-              uphi[i];
-      }
+    register_module("solver", disort::Disort(options.disort()));
   }
 }
 
@@ -91,20 +82,12 @@ torch::Tensor RadiationBandImpl::forward(torch::Tensor x1f, torch::Tensor ftoa,
 
   // export aggregated band properties
   std::string name = "radiation/" + options.name() + "/optics";
-  shared[name] =
-      std::async(std::launch::async, [&]() {
-        return torch::sum(prop * wave[IWT].view({1, -1, 1, 1, 1}), 1);
-      }).share();
+  shared[name] = std::async(std::launch::async, [&]() {
+                   return torch::sum(
+                       prop * weight.view({/*nwave=*/-1, /*ncol=*/1, 1, 1}), 1);
+                 }).share();
 
-  auto temf = layer2level(var_x[ITM], options.l2l_options());
-
-  if (options.solver_name() == "Disort") {
-    // mu
-    options.disort_options().ds().bc.umu0 = ray[0] > 1.E-3 ? ray[0] : 1.E-3;
-
-    // phi
-    options.disort_options().ds().bc.phi0 = ray[1];
-  }
+  auto temf = layer2level(var_x[ITM], options.l2l());
 
   /*auto flx = solver->forward(prop, ftoa, temf);
 

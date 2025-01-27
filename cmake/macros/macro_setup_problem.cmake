@@ -17,6 +17,7 @@ macro(setup_problem namel)
     ${namel}.${buildl}
     PRIVATE ${CMAKE_BINARY_DIR}
             ${HARP_INCLUDE_DIR}
+            ${DISORT_INCLUDE_DIR}
             SYSTEM
             ${NETCDF_INCLUDES}
             SYSTEM
