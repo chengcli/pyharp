@@ -69,7 +69,8 @@ DISPATCH_MACRO void interpn(T *val, T const *coor, T const *data, T const *axis,
 template <typename T>
 DISPATCH_MACRO T interp1(T x, T const *data, T const *axis, int64_t len) {
   T value;
-  interpn(&value, &x, data, axis, &len, 1, 1);
+  //interpn(&value, &x, data, axis, &len, 1, 1);
+  interpn<1>(&value, &x, data, axis, &len, 1);
   return value;
 }
 
