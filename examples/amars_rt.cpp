@@ -40,9 +40,9 @@ disort::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
   op.header("running amars RT");
   op.flags(
       "lamber,quiet,onlyfl,"
-      "intensity_correction,old_intensity_correction");
-      //"intensity_correction,old_intensity_correction,"
-      //"print-input,print-phase-function");
+      //"intensity_correction,old_intensity_correction");
+      "intensity_correction,old_intensity_correction,"
+      "print-input,print-phase-function");
 
   op.nwave(nwave);
   op.ncol(ncol);
@@ -67,11 +67,7 @@ torch::Tensor atm_concentration(int ncol, int nlyr, int nspecies) {
 // unit = [cm^-1]
 torch::Tensor short_wavenumber_grid(int nwave) {
   int wmin = 2000; // 5 um
-  //int wmax = 31000; // 322 nm  note that this shorts us 20 W/m^2 at the TOA, 
-  //int wmin = 1600; // 5 um
   int wmax = 50000; // 200 nm this gets us within 2 W/m^2 of the correct 410 value. this is where rayleigh attenuates all intensity
-  //int wmin = 1000; // 5 um
-  //int wmax = 100000; // 322 nm
   return torch::linspace(wmin, wmax, nwave, torch::kFloat64);
 }
 
@@ -100,7 +96,7 @@ int main(int argc, char **argv) {
   int nwave = 5000; //near exact at TOA, and within 3 W/m^2 at surf from my initial test
   //int nwave = 15000; essentially the exact value of the integral over the chosen wavelength bounds
   int ncol = 1;
-  int nlyr = 20;
+  int nlyr = 100; //100 layers is 3 W/m^2 away from the exact value when using 200 layers
   int nspecies = 2;
   double g = 3.711;
   double mean_mol_weight = 0.044; //CO2
@@ -147,7 +143,6 @@ int main(int argc, char **argv) {
   }
 
   auto wave = short_wavenumber_grid(nwave);
-  //std::cout << "wave = " << wave << std::endl;
   auto conc = atm_concentration(ncol, nlyr, nspecies);
   
   // Define the new pressure levels for interpolation
@@ -174,8 +169,8 @@ int main(int argc, char **argv) {
   }
 
   for (int k = 0; k < nlyr; ++k) {
-    conc[0][k][0] = (new_mr[1][k] * new_p[k]) / (R * new_T[k]); //s8 comes second in the file that we read in
-    conc[0][k][1] = (new_mr[0][k] * new_p[k]) / (R * new_T[k]); //h2so4 comes first in the file that we read in
+    conc[0][k][0] = (new_mr[1][k] * new_p[k]) / (R * new_T[k]); //s8 comes second in the file that we read in. but we need it to be index 0 in conc bc of how it was initialized above
+    conc[0][k][1] = (new_mr[0][k] * new_p[k]) / (R * new_T[k]); //h2so4 comes first in the file that we read in. but it needs to be index 1 in conc.
     new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
   }
 
@@ -183,7 +178,6 @@ int main(int argc, char **argv) {
   auto prop2 = h2so4->forward(wave, conc);
 
   auto prop = prop1 + prop2;
-
   // dz
   auto dz = torch::ones({nlyr, 1}, prop.options()); // prop: (nwave, ncol, nlyr, nprop)
   for (int i = 0; i < nlyr - 1; ++i) {

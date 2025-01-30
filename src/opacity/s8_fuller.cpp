@@ -80,7 +80,7 @@ torch::Tensor S8FullerImpl::forward(torch::Tensor wave, torch::Tensor conc,
                   .check_all_same_dtype(true)
                   .declare_static_shape(out.sizes(), /*squash_dims=*/3)
                   .add_output(out)
-                  .add_owned_const_input(wave.view({-1, 1, 1, 1}))
+                  .add_owned_const_input(wave.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nprop}))
                   .build();
 
   if (conc.is_cpu()) {

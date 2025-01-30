@@ -24,7 +24,7 @@ DISPATCH_MACRO int locate(T const *xx, T x, int n) {
   ascnd = (xx[n] >= xx[1]);
   while (ju - jl > 1) {
     jm = (ju + jl) >> 1;
-    if (x >= xx[jm] == ascnd)
+    if ((x >= xx[jm]) == ascnd)
       jl = jm;
     else
       ju = jm;
@@ -32,7 +32,8 @@ DISPATCH_MACRO int locate(T const *xx, T x, int n) {
   if (x == xx[1])
     j = 1;
   else if (x == xx[n])
-    j = n - 1;
+    //j = n - 1;
+    j = n;
   else
     j = jl;
 

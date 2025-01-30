@@ -19,7 +19,7 @@ struct H2SO4RTOptions {
   static constexpr int npmom = 0;
 
   ADD_ARG(std::string, opacity_file) = "h2so4.txt";
-  ADD_ARG(double, species_mu) = 100.e-3;  // [kg/mol]
+  ADD_ARG(double, species_mu) = 98.e-3;  // [kg/mol]
   ADD_ARG(int, species_id) = 0;
   ADD_ARG(bool, use_wavenumber) = true;
 };
