@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
   int nwave = 500; //50 bins gets you within ~1 W/m^2 fldn at TOA, but we want to be sure to resolve spectral info
   //int nwave = 15000; //essentially the exact value of the integral over the chosen wavelength bounds
   int ncol = 1;
-  int nlyr = 40; //3 layers is 1 W/m^2 away from the exact value of fldn_surf when using 200 layers. however, we want some more layers to resolve heating
+  int nlyr = 30; //3 layers is 1 W/m^2 away from the exact value of fldn_surf when using 200 layers. however, we want some more layers to resolve heating
   int nspecies = 2;
   double g = 3.711;
   double mean_mol_weight = 0.044; //CO2
