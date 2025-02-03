@@ -3,3 +3,7 @@ build*/
 
 # cache
 .cache/
+
+# problem data file
+examples/*.nc
+examples/*/*.nc
