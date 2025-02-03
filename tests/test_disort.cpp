@@ -1,16 +1,16 @@
 // external
 #include <gtest/gtest.h>
 
-// harp
-#include <index.h>
+// fmt
+#include <fmt/format.h>
 
-#include <rtsolver/rtsolver.hpp>
-#include <utils/scattering_moments.hpp>
+// disort
+#include <disort/disort.hpp>
+#include <disort/disort_formatter.hpp>
+#include <disort/scattering_moments.hpp>
 
-using namespace harp;
-
-TEST(TestDisort, isotropic_scattering) {
-  DisortOptions op;
+TEST(TestDisort, scattering) {
+  disort::DisortOptions op;
 
   op.header("running disort example");
   op.flags(
@@ -22,49 +22,38 @@ TEST(TestDisort, isotropic_scattering) {
   op.ds().nstr = 16;
   op.ds().nmom = 16;
 
-  op.ds().nphi = 1;
-  op.ds().ntau = 2;
-  op.ds().numu = 6;
+  op.user_mu({-1, -0.5, -0.1, 0.1, 0.5, 1});
+  op.user_phi({0});
+  op.user_tau({0, 0.03125});
 
-  Disort disort(op);
-
-  for (int i = 0; i < 10; ++i) {
-    disort->ds(i).bc.umu0 = 0.1;
-    disort->ds(i).bc.phi0 = 0.0;
-    disort->ds(i).bc.albedo = 0.0;
-    disort->ds(i).bc.fluor = 0.0;
-    disort->ds(i).bc.fisot = 0.0;
-
-    disort->ds(i).umu[0] = -1.;
-    disort->ds(i).umu[1] = -0.5;
-    disort->ds(i).umu[2] = -0.1;
-    disort->ds(i).umu[3] = 0.1;
-    disort->ds(i).umu[4] = 0.5;
-    disort->ds(i).umu[5] = 1.;
-
-    disort->ds(i).phi[0] = 0.0;
-
-    disort->ds(i).utau[0] = 0.0;
-    disort->ds(i).utau[1] = 0.03125;
-  }
+  disort::Disort disort(op);
 
   auto prop = torch::zeros({disort->options.nwave(), disort->options.ncol(),
                             disort->ds().nlyr, 2 + disort->ds().nstr},
                            torch::kDouble);
 
-  prop.select(3, index::IAB) = disort->ds().utau[1];
-  prop.select(3, index::ISS) = 0.2;
-  prop.narrow(3, index::IPM, disort->ds().nstr) = scattering_moments(
-      disort->ds().nstr, PhaseMomentOptions().type(kIsotropic));
+  prop.select(3, disort::index::IAB) = disort->ds().utau[1];
+  prop.select(3, disort::index::ISS) = 0.2;
+  prop.narrow(3, disort::index::IPM, disort->ds().nstr) =
+      disort::scattering_moments(
+          disort->ds().nstr,
+          disort::PhaseMomentOptions().type(disort::kIsotropic));
 
   std::map<std::string, torch::Tensor> bc;
-  bc["fbeam"] = torch::zeros({disort->options.nwave(), disort->options.ncol()},
-                             torch::kDouble);
-  bc["fbeam"].fill_(M_PI / disort->ds().bc.umu0);
+
+  bc["umu0"] =
+      0.1 * torch::ones({disort->options.nwave(), disort->options.ncol()},
+                        torch::kDouble);
+  bc["fbeam"] = M_PI / bc["umu0"];
 
   auto result = disort->forward(prop, bc);
   std::cout << "result: " << result << std::endl;
-};
+
+  auto rad = disort->get_rad(prop.options());
+  std::cout << "rad = " << rad << std::endl;
+
+  std::cout << "options = " << fmt::format("{}", disort->options) << std::endl;
+}
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
