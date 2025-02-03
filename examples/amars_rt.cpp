@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
   // int nwave = 15000; //essentially the exact value of the integral over the
   // chosen wavelength bounds
   int ncol = 1;
-  int nlyr = 30;  // 3 layers is 1 W/m^2 away from the exact value of fldn_surf
+  int nlyr = 40;  // 3 layers is 1 W/m^2 away from the exact value of fldn_surf
                   // when using 200 layers. however, we want some more layers to
                   // resolve heating
   int nspecies = 2;
