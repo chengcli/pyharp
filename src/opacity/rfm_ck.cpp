@@ -1,14 +1,9 @@
-// C/C++
-#include <algorithm>
-#include <cstring>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
-#include <string>
+// harp
+#include "rfm_ck.hpp"
 
-// canoe
-#include <air_parcel.hpp>
-#include <constants.hpp>
+#include <math/interpolation.hpp>
+#include <utils/fileio.hpp>
+#include <utils/find_resource.hpp>
 
 // netcdf
 #ifdef NETCDFOUTPUT
@@ -17,16 +12,23 @@ extern "C" {
 }
 #endif
 
-// climath
-#include <climath/interpolation.h>
+namespace harp {
 
-// harp
-#include <harp/spectral_grid.hpp>
+RFMCKImpl::RFMCKImpl(AttenuatorOptionis const& options_) : options(options_) {
+  TORCH_CHECK(options.opacity_file().size() == 1,
+              "Only one opacity file is allowed");
 
-// opacity
-#include "absorber_ck.hpp"
+  TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
 
-void AbsorberCK::LoadCoefficient(std::string fname, int bid) {
+  TORCH_CHECK(options.species_ids()[0] > 0,
+              "Invalid species_id: ", options.species_ids()[0]);
+
+  TORCH_CHECK(options.type() == "rfm_ck", "Invalid type: ", options.type());
+
+  reset();
+}
+
+void RFMCKImpl::reset() {
 #ifdef NETCDFOUTPUT
   int fileid, dimid, varid, err;
   len_[0] = 22;  // number of pressure
@@ -54,10 +56,15 @@ void AbsorberCK::LoadCoefficient(std::string fname, int bid) {
 #endif
 }
 
-Real AbsorberCK::GetAttenuation(Real g1, Real g2, AirParcel const& var) const {
+torch::Tensor RFMCKImpl::forward(torch::Tensor xfrac, torch::Tensor pres,
+                                 torch::Tensor temp) {
+  int nwve = wave.size(0);
   // first axis is wavenumber, second is pressure, third is temperature anomaly
   Real val, coord[3] = {log(var.q[IPR]), var.q[IDN], g1};
   interpn(&val, coord, kcoeff_.data(), axis_.data(), len_, 3, 1);
-  Real dens = var.q[IPR] / (Constants::kBoltz * var.q[IDN]);
+
+  auto dens = pres / (Constants::kBoltz * temp);
   return exp(val) * dens;  // ln(m*2/kmol) -> 1/m
 }
+
+}  // namespace harp

@@ -8,25 +8,20 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-// clang-format off
-#include <configure.h>
 #include <add_arg.h>
-#include <index.h>
-// clang-format on
 
 #include "atm_to_standard_grid.hpp"
 
 namespace harp {
 struct AttenuatorOptions {
-  ADD_ARG(int, npmom) = 0;
-  ADD_ARG(int, nspec) = 1;
-  ADD_ARG(bool, spectral_bin) = false;
   ADD_ARG(AtmToStandardGridOptions, atm);
 
   ADD_ARG(std::string, type) = "";
-  ADD_ARG(std::string, name) = "";
   ADD_ARG(std::vector<std::string>, opacity_files) = {};
-  ADD_ARG(std::vector<int>, var_id) = {0};
+  ADD_ARG(std::vector<int>, species_ids) = {0};
+
+  ADD_ARG(double, species_mu) = 18.e-3;  // [kg/mol]
+  ADD_ARG(bool, use_wavenumber) = true;
 };
 
 //! \brief base class of all attenuators
