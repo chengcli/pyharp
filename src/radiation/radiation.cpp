@@ -13,7 +13,7 @@
 // #include "rt_solvers.hpp"
 
 namespace harp {
-std::unordered_map<std::string, std::shared_future<torch::Tensor>> shared;
+std::unordered_map<std::string, torch::Tensor> shared;
 
 void RadiationOptions::set_flags(std::string const& str) {
   std::vector<std::string> dstr = Vectorize<std::string>(str.c_str(), " ,");
@@ -60,14 +60,14 @@ torch::Tensor RadiationImpl::forward(torch::Tensor ftoa, torch::Tensor var_x,
   torch::optional<torch::Tensor> vol = torch::nullopt;
 
   if (shared.find("coordinate/area1") != shared.end()) {
-    area1 = shared["coordinate/area1"].get();
+    area1 = shared["coordinate/area1"];
   }
 
   if (shared.find("coordinate/vol") != shared.end()) {
-    vol = shared["coordinate/vol"].get();
+    vol = shared["coordinate/vol"];
   }
 
-  if (options.flux_flag()) {
+  /*if (options.flux_flag()) {
     for (auto& [name, band] : bands) {
       out += band->forward(x1f, ftoa, var_x, ray, area1, vol);
     }
@@ -75,7 +75,7 @@ torch::Tensor RadiationImpl::forward(torch::Tensor ftoa, torch::Tensor var_x,
     for (auto& [name, band] : bands) {
       band->forward(x1f, ftoa, var_x, ray, area1, vol);
     }
-  }
+  }*/
 
   return out;
 }

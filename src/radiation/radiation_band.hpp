@@ -21,20 +21,18 @@
 #include <utils/layer2level.hpp>
 
 namespace harp {
+using AttenuatorDict = std::map<std::string, AttenuatorOptions>;
+
 struct RadiationBandOptions {
   RadiationBandOptions() = default;
 
   ADD_ARG(std::string, name) = "B1";
   ADD_ARG(std::string, outdirs) = "";
-  ADD_ARG(std::string, solver_name) = "lambert";
+  ADD_ARG(std::string, solver_name) = "disort";
 
-  ADD_ARG(std::vector<std::string>, attenuators) = {};
-  ADD_ARG(std::vector<AttenuatorOptions>, attenuator_options) = {};
+  ADD_ARG(AttenuatorDict, attenuators) = {};
   ADD_ARG(Layer2LevelOptions, l2l);
   ADD_ARG(disort::DisortOptions, disort);
-
-  // spectral dimension
-  ADD_ARG(int, nprop) = 1;
 
   // atmosphere dimensions
   ADD_ARG(int, nlyr) = 1;
@@ -53,14 +51,21 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   RadiationBandOptions options;
 
   //! all attenuators
-  std::map<std::string, Attenuator> attenuators;
+  std::map<std::string, torch::nn::AnyModule> attenuators;
+
+  //! rt-solver
+  torch::nn::AnyModule rtsolver;
+
+  //! spectral grid waves
+  //! (nwave)
+  torch::Tensor wave;
 
   //! spectral grid weights
   //! (nwave)
   torch::Tensor weight;
 
   //! bin optical properties
-  //! 5D tensor with shape (tau + ssa + pmom, C, ..., nlayer)
+  //! 5D tensor with shape (nwave, ncol, nlyr, nprop)
   torch::Tensor prop;
 
   //! outgoing rays (mu, phi)
@@ -69,14 +74,24 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
 
   //! Constructor to initialize the layers
   RadiationBandImpl() = default;
-  explicit RadiationBandImpl(RadiationBandOptions const &options_);
+  explicit RadiationBandImpl(RadiationBandOptions const& options_);
   void reset() override;
   std::string to_string() const;
   void load_opacity();
 
   //! \brief Calculate the radiance/radiative flux
-  torch::Tensor forward(torch::Tensor x1f, torch::Tensor ftoa,
-                        torch::Tensor var_x, double ray[2],
+  /* \param x1f vertical coordinate at levels
+   * \param conc concentration of species (ncol, nlyr, nspecies)
+   * \param bc boundary conditions
+   * \param pres pressure (ncol, nlyr)
+   * \param temp temperature (ncol, nlyr)
+   * \param area area (ncol, nlyr)
+   * \param vol volume (ncol, nlyr)
+   */
+  torch::Tensor forward(torch::Tensor x1f, torch::Tensor conc,
+                        std::map<std::string, torch::Tensor>& bc,
+                        torch::optional<torch::Tensor> pres = torch::nullopt,
+                        torch::optional<torch::Tensor> temp = torch::nullopt,
                         torch::optional<torch::Tensor> area = torch::nullopt,
                         torch::optional<torch::Tensor> vol = torch::nullopt);
 };

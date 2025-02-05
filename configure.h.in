@@ -19,3 +19,9 @@
 #endif
 
 #define HARP_ROOT_DIR "@CMAKE_SOURCE_DIR@"
+
+namespace harp {
+
+constexpr int NMAX_RT_PROPR = @NMAX_RT_PROPR@;
+
+}  // namespace harp

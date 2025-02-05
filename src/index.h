@@ -1,35 +1,23 @@
 #pragma once
 
 namespace harp {
-enum index {
-  // hydro variables
-  ITM = 0,  //! temperature
-  IPR = 1,  //! pressure
-  ICX = 2,  //! mole fractions
+namespace index {
+// atm (legacy)
+constexpr int ITM = 0;
+constexpr int IPR = 1;
+constexpr int ICX = 2;
 
-  // optical variables
-  IAB = 0,  //! absorption
-  ISS = 1,  //! single scattering albedo
-  IPM = 2,  //! phase moments
+// optical variables
+constexpr int IEX = 0;  //! extinction cross section
+constexpr int ISS = 1;  //! single scattering albedo
+constexpr int IPM = 2;  //! phase moments
 
-  // flux variables
-  IUP = 0,  //! upward
-  IDN = 1,  //! downward
-
-  // spectral variables
-  IWN = 0,  //! wavenumber(length)
-  IWT = 1,  //! weight
-};
+// flux variables
+constexpr int IUP = 0;  //! upward
+constexpr int IDN = 1;  //! downward
+};                      // namespace index
 
 enum {
-  // phase functions
-  kIsotropic = 0,
-  kRayleigh = 1,
-  kHenyeyGreenstein = 2,
-  kDoubleHenyeyGreenstein = 3,
-  kHazeGarciaSiewert = 4,
-  kCloudGarciaSiewert = 5,
-
   // interpolation orders
   k2ndOrder = 2,
   k4thOrder = 4,

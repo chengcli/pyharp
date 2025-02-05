@@ -8,21 +8,11 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-// clang-format off
-#include <configure.h>
 #include <add_arg.h>
-// clang-format on
+
+#include "attenuator.hpp"
 
 namespace harp {
-
-struct S8RTOptions {
-  static constexpr int npmom = 0;
-
-  ADD_ARG(std::string, opacity_file) = "s8_k_fuller.txt";
-  ADD_ARG(double, species_mu) = 256.e-3;  // [kg/mol]
-  ADD_ARG(int, species_id) = 0;
-  ADD_ARG(bool, use_wavenumber) = true;
-};
 
 class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
  public:
@@ -35,11 +25,11 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
   torch::Tensor kdata;
 
   //! options with which this `S8FullerImpl` was constructed
-  S8RTOptions options;
+  AttenuatorOptions options;
 
   //! Constructor to initialize the layer
   S8FullerImpl() = default;
-  explicit S8FullerImpl(S8RTOptions const& options_);
+  explicit S8FullerImpl(AttenuatorOptions const& options_);
   void reset() override;
 
   //! Get optical properties

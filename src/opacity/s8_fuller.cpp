@@ -6,12 +6,27 @@
 #include <utils/find_resource.hpp>
 
 namespace harp {
-S8FullerImpl::S8FullerImpl(S8RTOptions const& options_) : options(options_) {
+
+S8FullerImpl::S8FullerImpl(AttenuatorOptions const& options_)
+    : options(options_) {
+  TORCH_CHECK(options.opacity_file().size() == 1,
+              "Only one opacity file is allowed");
+
+  TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
+
+  TORCH_CHECK(options.species_ids()[0] > 0,
+              "Invalid species_id: ", options.species_ids()[0]);
+
+  TORCH_CHECK(options.species_mu() > 0,
+              "Invalid species_mu: ", options.species_mu());
+
+  TORCH_CHECK(options.type() == "s8_fuller", "Invalid type: ", options.type());
+
   reset();
 }
 
 void S8FullerImpl::reset() {
-  auto full_path = find_resource(options.opacity_file());
+  auto full_path = find_resource(options.opacity_file()[0]);
 
   // remove comment
   std::string str_file = decomment_file(full_path);
@@ -80,7 +95,8 @@ torch::Tensor S8FullerImpl::forward(torch::Tensor wave, torch::Tensor conc,
                   .check_all_same_dtype(true)
                   .declare_static_shape(out.sizes(), /*squash_dims=*/3)
                   .add_output(out)
-                  .add_owned_const_input(wave.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nprop}))
+                  .add_owned_const_input(
+                      wave.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nprop}))
                   .build();
 
   if (conc.is_cpu()) {
@@ -92,7 +108,7 @@ torch::Tensor S8FullerImpl::forward(torch::Tensor wave, torch::Tensor conc,
   }
 
   // attenuation [1/m]
-  out.select(3, 0) *= conc.select(2, options.species_id()).unsqueeze(0);
+  out.select(3, 0) *= conc.select(2, options.species_ids()[0]).unsqueeze(0);
 
   // attenuation weighted single scattering albedo [1/m]
   out.select(3, 1) *= out.select(3, 0);
