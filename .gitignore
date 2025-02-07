@@ -7,3 +7,6 @@ build*/
 # problem data file
 examples/*.nc
 examples/*/*.nc
+
+# data
+data/*.nc
