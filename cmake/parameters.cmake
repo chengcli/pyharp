@@ -1,19 +1,7 @@
 # define default parameters
 
-# precision options
-set_if_empty(PRECISION float)
-if(${PRECISION} STREQUAL "float")
-  set(PRECISION_FLOAT float)
-  set(PRECISION_INT int32_t)
-elseif(${PRECISION} STREQUAL "double")
-  set(PRECISION_FLOAT double)
-  set(PRECISION_INT int64_t)
-else()
-  message(FATAL_ERROR "PRECISION must be either float or double")
-endif()
-
-# logger options
-set(LOGGER_LEVEL INFO)
+# maximum number of radiation properties
+set(NMAX_RT_PROP 3)
 
 # netcdf options
 if(NOT NETCDF OR NOT DEFINED NETCDF)

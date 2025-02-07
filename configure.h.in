@@ -22,6 +22,6 @@
 
 namespace harp {
 
-constexpr int NMAX_RT_PROPR = @NMAX_RT_PROPR@;
+constexpr int NMAX_RT_PROP = @NMAX_RT_PROP@;
 
 }  // namespace harp

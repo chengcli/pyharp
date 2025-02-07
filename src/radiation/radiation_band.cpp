@@ -36,7 +36,7 @@ void RadiationBandImpl::reset() {
   weight /= nwave;
 
   prop = register_buffer(
-      "prop", torch::zeros({NMAX_RT_PROPR, options.ncol(), options.nlyr()},
+      "prop", torch::zeros({NMAX_RT_PROP, options.ncol(), options.nlyr()},
                            torch::kFloat64));
 
   auto str = options.outdirs();

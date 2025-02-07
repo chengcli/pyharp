@@ -16,20 +16,27 @@ namespace harp {
 
 class RFMCKImpl : public torch::nn::Cloneable<RFMCKImpl> {
  public:
-  //! shape of interpolation axes, ntemp, npres, ngpoints
-  size_t len[3];
+  constexpr static int IPR = 0;
+  constexpr static int ITM = 1;
+
+  //! ck table shape (nwave, npres, ntemp)
+  size_t kshape[3];
 
   //! ck weights
   //! (nwave, 1)
   torch::Tensor kweight;
 
   //! ck table interpolation axis
-  //! (nwave, 1)
+  //! (nwave + npres + ntemp, 1)
   torch::Tensor kaxis;
 
   //! absorption x-section [m^2/mol]
   //! (nwave, nprop=1)
   torch::Tensor kdata;
+
+  //! reference TP profile
+  //! (2, npres)
+  torch::Tensor krefatm;
 
   //! options with which this `RFMCKImpl` was constructed
   AttenuatorOptions options;
@@ -48,5 +55,7 @@ class RFMCKImpl : public torch::nn::Cloneable<RFMCKImpl> {
                         torch::Tensor temp);
 };
 TORCH_MODULE(RFMCK);
+
+torch::Tensor get_reftemp(torch::Tensor refatm, torch::Tensor lnp);
 
 }  // namespace harp

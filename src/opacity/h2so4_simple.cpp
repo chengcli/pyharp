@@ -7,18 +7,14 @@
 
 namespace harp {
 
-H2SO4SimpleImpl::H2SO4SimpleImpl(H2SO4RTOptions const& options_)
+H2SO4SimpleImpl::H2SO4SimpleImpl(AttenuatorOptions const& options_)
     : options(options_) {
-  TORCH_CHECK(options.opacity_file().size() == 1,
+  TORCH_CHECK(options.opacity_files().size() == 1,
               "Only one opacity file is allowed");
 
-  TORCH_CHECK(options.species_id().size() == 1, "Only one species is allowed");
-
-  TORCH_CHECK(options.species_id()[0] > 0,
-              "Invalid species_id: ", options.species_id()[0]);
-
-  TORCH_CHECK(options.species_mu() > 0,
-              "Invalid species_mu: ", options.species_mu());
+  TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
+  TORCH_CHECK(options.species_ids()[0] > 0,
+              "Invalid species_id: ", options.species_ids()[0]);
 
   TORCH_CHECK(options.type() == "h2so4_simple",
               "Invalid type: ", options.type());
@@ -27,7 +23,7 @@ H2SO4SimpleImpl::H2SO4SimpleImpl(H2SO4RTOptions const& options_)
 }
 
 void H2SO4SimpleImpl::reset() {
-  auto full_path = find_resource(options.opacity_file()[0]);
+  auto full_path = find_resource(options.opacity_files()[0]);
 
   // remove comment
   std::string str_file = decomment_file(full_path);
@@ -49,7 +45,7 @@ void H2SO4SimpleImpl::reset() {
   rows--;
 
   TORCH_CHECK(rows > 0, "Empty file: ", full_path);
-  TORCH_CHECK(cols == 3 + H2SO4RTOptions::npmom, "Invalid file: ", full_path);
+  TORCH_CHECK(cols == 3, "Invalid file: ", full_path);
 
   kwave = register_buffer("kwave", torch::zeros({rows}, torch::kFloat64));
   kdata =
@@ -75,7 +71,7 @@ void H2SO4SimpleImpl::reset() {
   }
 
   // change extinction x-section [m^2/kg] to [m^2/mol]
-  kdata.select(1, 0) *= options.species_mu();
+  kdata.select(1, 0) *= options.species_weights()[options.species_ids()[0]];
 }
 
 torch::Tensor H2SO4SimpleImpl::forward(torch::Tensor wave, torch::Tensor conc,
@@ -84,7 +80,7 @@ torch::Tensor H2SO4SimpleImpl::forward(torch::Tensor wave, torch::Tensor conc,
   int nwve = wave.size(0);
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
-  constexpr int nprop = 2 + H2SO4RTOptions::npmom;
+  constexpr int nprop = 2;
 
   auto out = torch::zeros({nwve, ncol, nlyr, nprop}, conc.options());
   auto dims = torch::tensor(
@@ -101,7 +97,7 @@ torch::Tensor H2SO4SimpleImpl::forward(torch::Tensor wave, torch::Tensor conc,
                   .build();
 
   if (conc.is_cpu()) {
-    call_interpn_cpu<nprop>(iter, kdata, kwave, dims, 1);
+    call_interpn_cpu<nprop>(iter, kdata, kwave, dims, /*nval=*/nprop);
   } else if (conc.is_cuda()) {
     // call_interpn_cuda<nprop>(iter, kdata, kwave, dims, 1);
   } else {

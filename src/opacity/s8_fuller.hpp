@@ -8,9 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include <add_arg.h>
-
-#include "attenuator.hpp"
+#include "attenuator_options.hpp"
 
 namespace harp {
 

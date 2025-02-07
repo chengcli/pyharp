@@ -1,9 +1,12 @@
-// harp
-#include "rfm_ck.hpp"
+// base
+#include <configure.h>
 
+// harp
 #include <math/interpolation.hpp>
 #include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
+
+#include "rfm_ck.hpp"
 
 // netcdf
 #ifdef NETCDFOUTPUT
@@ -29,42 +32,142 @@ RFMCKImpl::RFMCKImpl(AttenuatorOptionis const& options_) : options(options_) {
 }
 
 void RFMCKImpl::reset() {
+  auto full_path = find_resource(options.opacity_file()[0]);
+
 #ifdef NETCDFOUTPUT
   int fileid, dimid, varid, err;
-  len_[0] = 22;  // number of pressure
-  len_[1] = 27;  // number of temperature
-  // len_[2] = 26; // number of bands
-  len_[2] = 8;  // number of guass points
+  nc_open(full_path.c_str(), NC_NETCDF4, &fileid);
 
-  nc_open(fname.c_str(), NC_NETCDF4, &fileid);
+  nc_inq_dimid(fileid, "Wavenumber", &dimid);
+  nc_inq_dimlen(fileid, dimid, kshape);
+  nc_inq_dimid(fileid, "Pressure", &dimid);
+  nc_inq_dimlen(fileid, dimid, kshape + 1);
+  nc_inq_dimid(fileid, "TempGrid", &dimid);
+  nc_inq_dimlen(fileid, dimid, kshape + 2);
 
-  axis_.resize(len_[0] + len_[1] + len_[2]);
+  kaxis = torch::empty({kshape[0] + kshape[1] + kshape[2]}, torch::kFloat64);
 
-  nc_inq_varid(fileid, "p", &varid);
-  nc_get_var_double(fileid, varid, axis_.data());
-  nc_inq_varid(fileid, "t", &varid);
-  nc_get_var_double(fileid, varid, axis_.data() + len_[0]);
-  nc_inq_varid(fileid, "samples", &varid);
-  nc_get_var_double(fileid, varid, axis_.data() + len_[0] + len_[1]);
+  // (wavenumber)g-grid
+  nc_inq_varid(fileid, "Wavenumber", &varid);
+  nc_get_var_double(fileid, varid, kaxis.data_ptr<double>());
 
-  kcoeff_.resize(len_[0] * len_[1] * len_[2]);
-  nc_inq_varid(fileid, GetName().c_str(), &varid);
-  size_t start[4] = {0, 0, (size_t)bid, 0};
-  size_t count[4] = {len_[0], len_[1], 1, len_[2]};
-  nc_get_vara_double(fileid, varid, start, count, kcoeff_.data());
+  // pressure grid
+  err = nc_inq_varid(fileid, "Pressure", &varid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_get_var_double(fileid, varid, kaxis.data_ptr<double>() + kshape[0]);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  // temperature grid
+  err = nc_inq_varid(fileid, "TempGrid", &varid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_get_var_double(fileid, varid,
+                          kaxis.data_ptr<double>() + kshape[0] + kshape[1]);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  // reference atmosphere
+  double* temp = new double[kshape[1]];
+  nc_inq_varid(fileid, "Temperature", &varid);
+  err = nc_get_var_double(fileid, varid, temp);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  krefatm = torch::empty({2, kshape[1]}, torch::kFloat64);
+  for (int i = 0; i < kshape[1]; i++) {
+    krefatm[IPR][i] = kaxis[kshape[0] + i];
+    krefatm[IDN][i] = temp[i];
+  }
+  delete[] temp;
+
+  // ck data
+  kdata = torch::empty({kshape[0], kshape[1], kshape[2]}, torch::kFloat64);
+  auto name = options.species_names()[options.species_ids()[0]];
+
+  err = nc_inq_varid(fileid, name.c_str(), &varid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_get_var_double(fileid, varid, kdata.data_ptr<double>());
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  // ck weights
+  kweight = torch::empty({kshape[0]}, torch::kFloat64);
+
+  err = nc_inq_varid(fileid, "weights", &varid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_get_var_double(fileid, varid, kweight.data_ptr<double>());
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
   nc_close(fileid);
 #endif
 }
 
 torch::Tensor RFMCKImpl::forward(torch::Tensor xfrac, torch::Tensor pres,
                                  torch::Tensor temp) {
-  int nwve = wave.size(0);
-  // first axis is wavenumber, second is pressure, third is temperature anomaly
-  Real val, coord[3] = {log(var.q[IPR]), var.q[IDN], g1};
-  interpn(&val, coord, kcoeff_.data(), axis_.data(), len_, 3, 1);
+  int nwave = kshape[0];
+  int ncol = xfrac.size(0);
+  int nlyr = xfrac.size(1);
 
-  auto dens = pres / (Constants::kBoltz * temp);
-  return exp(val) * dens;  // ln(m*2/kmol) -> 1/m
+  // get temperature anomaly
+  auto tempa = temp - get_reftemp(krefatm, pres.log());
+
+  auto out = torch::zeros({nwave, ncol, nlyr}, xfrac.options());
+  auto dims = torch::tensor(
+      {kshape[1], kshape[2]},
+      torch::TensorOptions().dtype(torch::kInt64).device(xfrac.device()));
+  auto axis = torch::empty({ncol, nlyr, 2}, torch::kFloat64);
+
+  // first axis is pressure, second is temperature anomaly
+  axis.select(2, IPR).copy_(pres);
+  axis.select(2, IDN).copy_(tempa);
+
+  auto iter = at::TensorIteratorConfig()
+                  .resize_outputs(false)
+                  .check_all_same_dtype(true)
+                  .declare_static_shape(out.sizes(), /*squash_dims=*/0)
+                  .add_output(out)
+                  .add_owned_const_input(
+                      axis.unsqueeze(0).expand({nwave, ncol, nlyr, 2}))
+                  .build();
+
+  if (xfrac.is_cpu()) {
+    call_interpn_cpu<1>(iter, kdata, axis, dims, /*nval=*/1);
+  } else if (xfrac.is_cuda()) {
+    // call_interpn_cuda<1>(iter, kdata, kwave, dims, 1);
+  } else {
+    throw std::runtime_error("Unsupported device");
+  }
+
+  auto dens = pres / (Constants::Rgas * temp);
+  return 1.E-3 * out.exp() * dens * xfrac;  // ln(m*2/kmol) -> 1/m
+}
+
+torch::Tensor get_reftemp(torch::Tensor refatm, torch::Tensor lnp) {
+  int ncol = lnp.size(0);
+  int nlyr = lnp.size(1);
+
+  auto out = torch::zeros({ncol, nlyr}, xfrac.options());
+  auto dims = torch::tensor(
+      {lyr}, torch::TensorOptions().dtype(torch::kInt64).device(lnp.device()));
+
+  auto iter =
+      at::TensorIteratorConfig()
+          .resize_outputs(false)
+          .check_all_same_dtype(true)
+          .declare_static_shape(out.sizes(), /*squash_dims=*/1)
+          .add_output(out)
+          .add_owned_const_input(refatm[IPR].unsqueeze(0).expand({ncol, -1}))
+          .build();
+
+  if (xfrac.is_cpu()) {
+    call_interpn_cpu<1>(iter, krefatm[ITM], refatm[IPR], dims, /*nval=*/1);
+  } else if (xfrac.is_cuda()) {
+    // call_interpn_cuda<1>(iter, kdata, kwave, dims, 1);
+  } else {
+    throw std::runtime_error("Unsupported device");
+  }
+
+  return out;
 }
 
 }  // namespace harp
