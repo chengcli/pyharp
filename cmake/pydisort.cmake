@@ -7,5 +7,5 @@ set_if_empty(TOKEN $ENV{GH_TOKEN})
 
 set(PACKAGE_NAME disort)
 set(REPO_URL "https://${ACCOUNT}:${TOKEN}@github.com/zoeyzyhu/pydisort")
-set(REPO_TAG "f21df1458f2ad4c")
+set(REPO_TAG "49e86dc62975aa")
 add_package(${PACKAGE_NAME} ${REPO_URL} ${REPO_TAG} "" ON)
