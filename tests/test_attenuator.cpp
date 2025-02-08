@@ -3,11 +3,12 @@
 
 // opacity
 #include <opacity/h2so4_simple.hpp>
+#include <opacity/rfm.hpp>
 #include <opacity/s8_fuller.hpp>
 
 using namespace harp;
 
-TEST(TestOpacity, s8_fuller) {
+TEST(TestOpacity, sw) {
   AttenuatorOptions op;
   op.species_names({"S8", "H2SO4"});
   op.species_weights({256.0e-3, 98.0e-3});
@@ -42,6 +43,18 @@ TEST(TestOpacity, s8_fuller) {
 
   std::cout << "result = " << result << std::endl;
 };
+
+TEST(TestOpacity, lw) {
+  AttenuatorOptions op;
+  op.species_names({"CO2", "H2O"});
+  op.species_weights({44.0e-3, 18.0e-3});
+
+  op.species_ids({0}).opacity_files({"amarsw-ck-B1.nc"});
+  RFM co2(op);
+
+  op.species_ids({1}).opacity_files({"amarsw-ck-B1.nc"});
+  RFM h2o(op);
+}
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

@@ -39,18 +39,32 @@ void RFMImpl::reset() {
   int fileid, dimid, varid, err;
   nc_open(full_path.c_str(), NC_NETCDF4, &fileid);
 
-  nc_inq_dimid(fileid, "Wavenumber", &dimid);
-  nc_inq_dimlen(fileid, dimid, kshape);
-  nc_inq_dimid(fileid, "Pressure", &dimid);
-  nc_inq_dimlen(fileid, dimid, kshape + 1);
-  nc_inq_dimid(fileid, "TempGrid", &dimid);
-  nc_inq_dimlen(fileid, dimid, kshape + 2);
+  err = nc_inq_dimid(fileid, "Wavenumber", &dimid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_inq_dimlen(fileid, dimid, kshape);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_inq_dimid(fileid, "Pressure", &dimid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_inq_dimlen(fileid, dimid, kshape + 1);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_inq_dimid(fileid, "TempGrid", &dimid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_inq_dimlen(fileid, dimid, kshape + 2);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
   kaxis = torch::empty({kshape[0] + kshape[1] + kshape[2]}, torch::kFloat64);
 
-  // wavenumber(g)-grid
-  nc_inq_varid(fileid, "Wavenumber", &varid);
-  nc_get_var_double(fileid, varid, kaxis.data_ptr<double>());
+  // wave grid
+  err = nc_inq_varid(fileid, "Wavenumber", &varid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
+  err = nc_get_var_double(fileid, varid, kaxis.data_ptr<double>());
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
   // pressure grid
   err = nc_inq_varid(fileid, "Pressure", &varid);
@@ -72,7 +86,9 @@ void RFMImpl::reset() {
 
   // reference atmosphere
   double* temp = new double[kshape[1]];
-  nc_inq_varid(fileid, "Temperature", &varid);
+  err = nc_inq_varid(fileid, "Temperature", &varid);
+  TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+
   err = nc_get_var_double(fileid, varid, temp);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
