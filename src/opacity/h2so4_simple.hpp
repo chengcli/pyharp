@@ -14,7 +14,7 @@ namespace harp {
 
 class H2SO4SimpleImpl : public torch::nn::Cloneable<H2SO4SimpleImpl> {
  public:
-  //! wavenumber [cm^-1] (default) or wavelength [um]
+  //! wavelength [um]
   //! (nwave, 1)
   torch::Tensor kwave;
 
@@ -27,18 +27,19 @@ class H2SO4SimpleImpl : public torch::nn::Cloneable<H2SO4SimpleImpl> {
 
   //! Constructor to initialize the layer
   H2SO4SimpleImpl() = default;
-  explicit H2SO4SimpleImpl(H2SO4RTOptions const& options_);
+  explicit H2SO4SimpleImpl(AttenuatorOptions const& options_);
   void reset() override;
 
   //! Get optical properties
-  //! \param wave wavenumber [cm^-1], (nwave)
-  //! \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
-  //! \param pres pressure [Pa], (ncol, nlyr)
-  //! \param temp temperature [K], (ncol, nlyr)
-  //! \return optical properties, (nwave, ncol, nlyr, nprop)
-  torch::Tensor forward(torch::Tensor wave, torch::Tensor conc,
-                        torch::optional<torch::Tensor> pres = torch::nullopt,
-                        torch::optional<torch::Tensor> temp = torch::nullopt);
+  /* \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
+   *
+   * \param kwargs arguments for opacity calculation, must contain:
+   *        "wavelength": wavelength [um], (nwave)
+   *
+   * \return optical properties, (nwave, ncol, nlyr, nprop=2)
+   */
+  torch::Tensor forward(torch::Tensor conc,
+                        std::map<std::string, torch::Tensor> const& kwargs);
 };
 TORCH_MODULE(H2SO4Simple);
 

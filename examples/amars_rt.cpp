@@ -215,8 +215,14 @@ int main(int argc, char** argv) {
 
   disort::Disort disort(disort_options(nwave, ncol, nlyr));
 
-  harp::S8Fuller s8(harp::S8RTOptions().species_id(0));
-  harp::H2SO4Simple h2so4(harp::H2SO4RTOptions().species_id(1));
+  harp::AttenuatorOptions op1;
+  op1.species_ids({0});
+  harp::S8Fuller s8(op1);
+
+  harp::AttenuatorOptions op2;
+  op2.species_ids({1});
+  harp::H2SO4Simple h2so4(op2);
+
   auto wave = short_wavenumber_grid(nwave);
   auto conc = atm_concentration(ncol, nlyr, nspecies);
 
@@ -251,8 +257,11 @@ int main(int argc, char** argv) {
     new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
   }
 
-  auto prop1 = s8->forward(wave, conc);
-  auto prop2 = h2so4->forward(wave, conc);
+  std::map<std::string, torch::Tensor> params;
+  params["wavelength"] = wave;
+
+  auto prop1 = s8->forward(conc, params);
+  auto prop2 = h2so4->forward(conc, params);
   auto prop = prop1 + prop2;
 
   auto dz = calc_dz(nlyr, prop, new_p, new_rho, g);
@@ -266,7 +275,7 @@ int main(int argc, char** argv) {
   bc["umu0"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
   bc["albedo"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
 
-  auto result = disort->forward(prop, bc);
+  auto result = disort->forward(prop, &bc);
 
   auto [integrated_flux, tot_flux_down_surf, tot_flux_down_toa] =
       integrate_result(result, wave, nlyr, nwave);

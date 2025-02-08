@@ -16,7 +16,7 @@
 // clang-format on
 
 #include <disort/disort.hpp>
-#include <opacity/attenuator.hpp>
+#include <opacity/attenuator_options.hpp>
 #include <rtsolver/rtsolver.hpp>
 #include <utils/layer2level.hpp>
 
@@ -34,9 +34,14 @@ struct RadiationBandOptions {
   ADD_ARG(Layer2LevelOptions, l2l);
   ADD_ARG(disort::DisortOptions, disort);
 
-  // atmosphere dimensions
+  //! atmospheric layers
   ADD_ARG(int, nlyr) = 1;
+
+  //! atmospheric columns
   ADD_ARG(int, ncol) = 1;
+
+  //! optical dimension
+  ADD_ARG(int64_t, nmax_prop) = 1;
 
   //! set lower wavenumber(length) at each bin
   ADD_ARG(std::vector<double>, wave_lower) = {};
@@ -47,72 +52,40 @@ struct RadiationBandOptions {
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
  public:
-  //! options with which this `RadiationBandImpl` was constructed
-  RadiationBandOptions options;
-
   //! all attenuators
   std::map<std::string, torch::nn::AnyModule> attenuators;
 
   //! rt-solver
   torch::nn::AnyModule rtsolver;
 
-  //! spectral grid waves
-  //! (nwave)
-  torch::Tensor wave;
-
-  //! spectral grid weights
-  //! (nwave)
-  torch::Tensor weight;
-
-  //! bin optical properties
-  //! 5D tensor with shape (nwave, ncol, nlyr, nprop)
-  torch::Tensor prop;
-
-  //! outgoing rays (mu, phi)
-  //! (nout, 2)
-  torch::Tensor rayOutput;
+  //! options with which this `RadiationBandImpl` was constructed
+  RadiationBandOptions options;
 
   //! Constructor to initialize the layers
   RadiationBandImpl() = default;
   explicit RadiationBandImpl(RadiationBandOptions const& options_);
   void reset() override;
-  std::string to_string() const;
-  void load_opacity();
+  void pretty_print(std::ostream& out) const override;
 
-  //! \brief Calculate the radiance/radiative flux
-  /* \param x1f vertical coordinate at levels
-   * \param conc concentration of species (ncol, nlyr, nspecies)
-   * \param bc boundary conditions
-   * \param pres pressure (ncol, nlyr)
-   * \param temp temperature (ncol, nlyr)
-   * \param area area (ncol, nlyr)
-   * \param vol volume (ncol, nlyr)
+  //! \brief Calculate the radiative flux
+  /* \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
+   * \param dz layer thickness (nlyr)
+   *
+   * \param bc boundary conditions, may contain the following fields:
+   *        "fbeam": solar beam irradiance [W/m^2], (nwave, ncol)
+   *        "umu0": cosine of the solar zenith angle, (nwave, ncol)
+   *        "albedo": surface albedo, (nwave, ncol)
+   *
+   * \param op optics properties, may contain the following fields:
+   *        "wavelength": wavelength [um], (nwave)
+   *        "wavenumber": wavenumber [cm^-1], (nwave)
+   *        "pres": pressure (ncol, nlyr)
+   *        "temp": temperature (ncol, nlyr)
    */
-  torch::Tensor forward(torch::Tensor x1f, torch::Tensor conc,
+  torch::Tensor forward(torch::Tensor conc, torch::Tensor dz,
                         std::map<std::string, torch::Tensor>& bc,
-                        torch::optional<torch::Tensor> pres = torch::nullopt,
-                        torch::optional<torch::Tensor> temp = torch::nullopt,
-                        torch::optional<torch::Tensor> area = torch::nullopt,
-                        torch::optional<torch::Tensor> vol = torch::nullopt);
+                        std::map<std::string, torch::Tensor> const& op);
 };
 TORCH_MODULE(RadiationBand);
-
-/*class RadiationBandsFactory {
- public:
-  static RadiationBandContainer CreateFrom(ParameterInput *pin,
-                                           std::string key);
-  static RadiationBandContainer CreateFrom(std::string filename);
-
-  static int GetBandId(std::string const &bname) {
-    if (band_id_.find(bname) == band_id_.end()) {
-      return -1;
-    }
-    return band_id_.at(bname);
-  }
-
- protected:
-  static std::map<std::string, int> band_id_;
-  static int next_band_id_;
-};*/
 
 }  // namespace harp

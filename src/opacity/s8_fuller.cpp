@@ -64,24 +64,22 @@ void S8FullerImpl::reset() {
     }
   }
 
-  // change wavelength [um] to wavenumber [cm^-1]
-  if (options.use_wavenumber()) {
-    kwave = 1.e4 / kwave;
-  }
-
   // change extinction x-section [m^2/kg] to [m^2/mol]
   kdata.select(1, 0) *= options.species_weights()[options.species_ids()[0]];
 }
 
-torch::Tensor S8FullerImpl::forward(torch::Tensor wave, torch::Tensor conc,
-                                    torch::optional<torch::Tensor> pres,
-                                    torch::optional<torch::Tensor> temp) {
-  int nwve = wave.size(0);
+torch::Tensor S8FullerImpl::forward(
+    torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
   constexpr int nprop = 2;
 
-  auto out = torch::zeros({nwve, ncol, nlyr, nprop}, conc.options());
+  TORCH_CHECK(kwargs.count("wavelength") > 0,
+              "wavelength is required in kwargs");
+  auto const& wave = kwargs.at("wavelength");
+  int nwave = wave.size(0);
+
+  auto out = torch::zeros({nwave, ncol, nlyr, nprop}, conc.options());
   auto dims = torch::tensor(
       {kwave.size(0)},
       torch::TensorOptions().dtype(torch::kInt64).device(conc.device()));
@@ -100,7 +98,7 @@ torch::Tensor S8FullerImpl::forward(torch::Tensor wave, torch::Tensor conc,
   } else if (conc.is_cuda()) {
     // call_interpn_cuda<nprop>(iter, kdata, kwave, dims, nprop);
   } else {
-    throw std::runtime_error("Unsupported device");
+    TORCH_CHECK(false, "Unsupported device");
   }
 
   // attenuation [1/m]

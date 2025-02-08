@@ -1,8 +1,5 @@
 # define default parameters
 
-# maximum number of radiation properties
-set(NMAX_RT_PROP 3)
-
 # netcdf options
 if(NOT NETCDF OR NOT DEFINED NETCDF)
   set(NETCDF_OPTION "NO_NETCDFOUTPUT")

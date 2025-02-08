@@ -8,11 +8,11 @@
 using namespace harp;
 
 TEST(TestOpacity, s8_fuller) {
-  S8RTOptions op1;
-  op1.species_id(0);
+  AttenuatorOptions op1;
+  op1.species_ids({0});
 
-  H2SO4RTOptions op2;
-  op2.species_id(1);
+  AttenuatorOptions op2;
+  op2.species_ids({1});
 
   S8Fuller s8(op1);
   H2SO4Simple h2so4(op2);
@@ -24,8 +24,10 @@ TEST(TestOpacity, s8_fuller) {
   int nlyr = 1;
   int nspecies = 2;
   auto conc = torch::ones({ncol, nlyr, nspecies}, torch::kFloat64);
-  auto result1 = s8->forward(s8->kwave, conc);
-  auto result2 = h2so4->forward(s8->kwave, conc);
+  std::map<std::string, torch::Tensor> params;
+  params["wavelength"] = s8->kwave;
+  auto result1 = s8->forward(conc, params);
+  auto result2 = h2so4->forward(conc, params);
   // std::cout << "result1 = " << result1 << std::endl;
   // std::cout << "result2 = " << result2 << std::endl;
   // std::cout << result2.sizes() << std::endl;

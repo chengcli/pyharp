@@ -14,7 +14,7 @@ namespace harp {
 
 class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
  public:
-  //! wavenumber [cm^-1] (default) or wavelength [um]
+  //! wavelength [um]
   //! (nwave, 1)
   torch::Tensor kwave;
 
@@ -31,14 +31,15 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
   void reset() override;
 
   //! Get optical properties
-  //! \param wave wavenumber [cm^-1], (nwave)
-  //! \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
-  //! \param pres pressure [Pa], (ncol, nlyr)
-  //! \param temp temperature [K], (ncol, nlyr)
-  //! \return optical properties, (nwave, ncol, nlyr, nprop)
-  torch::Tensor forward(torch::Tensor wave, torch::Tensor conc,
-                        torch::optional<torch::Tensor> pres = torch::nullopt,
-                        torch::optional<torch::Tensor> temp = torch::nullopt);
+  /* \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
+   *
+   * \param kwargs arguments for opacity calculation, must contain:
+   *        "wavelength": wavelength [um], (nwave)
+   *
+   * \return optical properties, (nwave, ncol, nlyr, nprop=2)
+   */
+  torch::Tensor forward(torch::Tensor conc,
+                        std::map<std::string, torch::Tensor> const& kwargs);
 };
 TORCH_MODULE(S8Fuller);
 
