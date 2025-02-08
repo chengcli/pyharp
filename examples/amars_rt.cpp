@@ -215,13 +215,15 @@ int main(int argc, char** argv) {
 
   disort::Disort disort(disort_options(nwave, ncol, nlyr));
 
-  harp::AttenuatorOptions op1;
-  op1.species_ids({0});
-  harp::S8Fuller s8(op1);
+  harp::AttenuatorOptions op;
+  op.species_names({"S8", "H2SO4"});
+  op.species_weights({256.e-3, 98.e-3});
 
-  harp::AttenuatorOptions op2;
-  op2.species_ids({1});
-  harp::H2SO4Simple h2so4(op2);
+  op.species_ids({0}).opacity_files({"s8_k_fuller.txt"});
+  harp::S8Fuller s8(op);
+
+  op.species_ids({1}).opacity_files({"h2so4.txt"});
+  harp::H2SO4Simple h2so4(op);
 
   auto wave = short_wavenumber_grid(nwave);
   auto conc = atm_concentration(ncol, nlyr, nspecies);
@@ -257,11 +259,11 @@ int main(int argc, char** argv) {
     new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
   }
 
-  std::map<std::string, torch::Tensor> params;
-  params["wavelength"] = wave;
+  std::map<std::string, torch::Tensor> kwargs;
+  kwargs["wavenumber"] = wave;
 
-  auto prop1 = s8->forward(conc, params);
-  auto prop2 = h2so4->forward(conc, params);
+  auto prop1 = s8->forward(conc, kwargs);
+  auto prop2 = h2so4->forward(conc, kwargs);
   auto prop = prop1 + prop2;
 
   auto dz = calc_dz(nlyr, prop, new_p, new_rho, g);

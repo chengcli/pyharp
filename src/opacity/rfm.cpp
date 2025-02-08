@@ -23,10 +23,11 @@ RFMImpl::RFMImpl(AttenuatorOptions const& options_) : options(options_) {
 
   TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
 
-  TORCH_CHECK(options.species_ids()[0] > 0,
+  TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type() == "rfm", "Invalid type: ", options.type());
+  TORCH_CHECK(options.type().empty() || (options.type() == "rfm"),
+              "Mismatch type: ", options.type());
 
   reset();
 }
@@ -106,6 +107,7 @@ torch::Tensor RFMImpl::forward(
   int nwave = kshape[0];
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
+  constexpr int nprop = 1;
 
   TORCH_CHECK(kwargs.count("pres") > 0, "pressure is required in kwargs");
   TORCH_CHECK(kwargs.count("temp") > 0, "temperature is required in kwargs");
@@ -137,7 +139,7 @@ torch::Tensor RFMImpl::forward(
                   .build();
 
   if (conc.is_cpu()) {
-    call_interpn_cpu<1>(iter, kdata, axis, dims, /*nval=*/1);
+    call_interpn_cpu<nprop>(iter, kdata, axis, dims, /*nval=*/nprop);
   } else if (conc.is_cuda()) {
     // call_interpn_cuda<1>(iter, kdata, kwave, dims, 1);
   } else {

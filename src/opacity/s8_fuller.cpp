@@ -13,10 +13,11 @@ S8FullerImpl::S8FullerImpl(AttenuatorOptions const& options_)
               "Only one opacity file is allowed");
 
   TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
-  TORCH_CHECK(options.species_ids()[0] > 0,
+  TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type() == "s8_fuller", "Invalid type: ", options.type());
+  TORCH_CHECK(options.type().empty() || (options.type() == "s8_fuller"),
+              "Mismatch type: ", options.type());
 
   reset();
 }
@@ -74,9 +75,14 @@ torch::Tensor S8FullerImpl::forward(
   int nlyr = conc.size(1);
   constexpr int nprop = 2;
 
-  TORCH_CHECK(kwargs.count("wavelength") > 0,
-              "wavelength is required in kwargs");
-  auto const& wave = kwargs.at("wavelength");
+  torch::Tensor wave;
+  if (kwargs.count("wavelength") > 0) {
+    wave = kwargs.at("wavelength");
+  } else if (kwargs.count("wavenumber") > 0) {
+    wave = 1.e4 / kwargs.at("wavenumber");
+  } else {
+    TORCH_CHECK(false, "wavelength or wavenumber is required in kwargs");
+  }
   int nwave = wave.size(0);
 
   auto out = torch::zeros({nwave, ncol, nlyr, nprop}, conc.options());

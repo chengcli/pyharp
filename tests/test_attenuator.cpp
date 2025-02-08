@@ -8,14 +8,15 @@
 using namespace harp;
 
 TEST(TestOpacity, s8_fuller) {
-  AttenuatorOptions op1;
-  op1.species_ids({0});
+  AttenuatorOptions op;
+  op.species_names({"S8", "H2SO4"});
+  op.species_weights({256.0e-3, 98.0e-3});
 
-  AttenuatorOptions op2;
-  op2.species_ids({1});
+  op.species_ids({0}).opacity_files({"s8_k_fuller.txt"});
+  S8Fuller s8(op);
 
-  S8Fuller s8(op1);
-  H2SO4Simple h2so4(op2);
+  op.species_ids({1}).opacity_files({"h2so4.txt"});
+  H2SO4Simple h2so4(op);
 
   // std::cout << "h2so4 wave = " << h2so4->kwave << std::endl;
   // std::cout << "h2so4 data = " << h2so4->kdata << std::endl;
@@ -24,10 +25,11 @@ TEST(TestOpacity, s8_fuller) {
   int nlyr = 1;
   int nspecies = 2;
   auto conc = torch::ones({ncol, nlyr, nspecies}, torch::kFloat64);
-  std::map<std::string, torch::Tensor> params;
-  params["wavelength"] = s8->kwave;
-  auto result1 = s8->forward(conc, params);
-  auto result2 = h2so4->forward(conc, params);
+  std::map<std::string, torch::Tensor> kwargs;
+  kwargs["wavelength"] = s8->kwave;
+
+  auto result1 = s8->forward(conc, kwargs);
+  auto result2 = h2so4->forward(conc, kwargs);
   // std::cout << "result1 = " << result1 << std::endl;
   // std::cout << "result2 = " << result2 << std::endl;
   // std::cout << result2.sizes() << std::endl;
