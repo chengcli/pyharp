@@ -52,6 +52,10 @@ TEST(TestOpacity, lw) {
   op.species_ids({0}).opacity_files({"amarsw-ck-B1.nc"});
   RFM co2(op);
 
+  std::cout << "co2 = " << co2->kdata << std::endl;
+  std::cout << "pres = " << exp(co2->krefatm[RFMImpl::IPR]) << std::endl;
+  std::cout << "temp = " << co2->krefatm[RFMImpl::ITM] << std::endl;
+
   op.species_ids({1}).opacity_files({"amarsw-ck-B1.nc"});
   RFM h2o(op);
 }

@@ -57,7 +57,8 @@ void RFMImpl::reset() {
   err = nc_inq_dimlen(fileid, dimid, kshape + 2);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  kaxis = torch::empty({kshape[0] + kshape[1] + kshape[2]}, torch::kFloat64);
+  kaxis = torch::empty({(int)kshape[0] + (int)kshape[1] + (int)kshape[2]},
+                       torch::kFloat64);
 
   // wave grid
   err = nc_inq_varid(fileid, "Wavenumber", &varid);
@@ -92,7 +93,7 @@ void RFMImpl::reset() {
   err = nc_get_var_double(fileid, varid, temp);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  krefatm = torch::empty({2, kshape[1]}, torch::kFloat64);
+  krefatm = torch::empty({2, (int)kshape[1]}, torch::kFloat64);
   for (int i = 0; i < kshape[1]; i++) {
     krefatm[IPR][i] = kaxis[kshape[0] + i];
     krefatm[ITM][i] = temp[i];
@@ -100,7 +101,8 @@ void RFMImpl::reset() {
   delete[] temp;
 
   // data
-  kdata = torch::empty({kshape[0], kshape[1], kshape[2]}, torch::kFloat64);
+  kdata = torch::empty({(int)kshape[0], (int)kshape[1], (int)kshape[2]},
+                       torch::kFloat64);
   auto name = options.species_names()[options.species_ids()[0]];
 
   err = nc_inq_varid(fileid, name.c_str(), &varid);
