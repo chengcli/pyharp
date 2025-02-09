@@ -75,15 +75,15 @@ torch::Tensor H2SO4SimpleImpl::forward(
   int nlyr = conc.size(1);
   constexpr int nprop = 2;
 
-  torch::Tensor wave;
+  torch::Tensor coord;
   if (kwargs.count("wavelength") > 0) {
-    wave = kwargs.at("wavelength");
+    coord = kwargs.at("wavelength");
   } else if (kwargs.count("wavenumber") > 0) {
-    wave = 1.e4 / kwargs.at("wavenumber");
+    coord = 1.e4 / kwargs.at("wavenumber");
   } else {
     TORCH_CHECK(false, "wavelength or wavenumber is required in kwargs");
   }
-  int nwave = wave.size(0);
+  int nwave = coord.size(0);
 
   auto out = torch::zeros({nwave, ncol, nlyr, nprop}, conc.options());
   auto dims = torch::tensor(
@@ -96,7 +96,7 @@ torch::Tensor H2SO4SimpleImpl::forward(
                   .declare_static_shape(out.sizes(), /*squash_dims=*/3)
                   .add_output(out)
                   .add_owned_const_input(
-                      wave.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nprop}))
+                      coord.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nprop}))
                   .build();
 
   if (conc.is_cpu()) {
