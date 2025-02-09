@@ -6,10 +6,12 @@
 namespace harp {
 torch::Tensor layer2level(torch::Tensor var,
                           Layer2LevelOptions const &options) {
-  // increase the last dimension by 1
+  // increase the last dimension by 1 (lyr -> lvl)
   auto shape = var.sizes().vec();
   shape.back() += 1;
   torch::Tensor out = torch::zeros(shape, var.options());
+
+  int nlyr = var.size(-1);
 
   // lower boundary
   if (options.blower() == kExtrapolate) {
@@ -17,7 +19,7 @@ torch::Tensor layer2level(torch::Tensor var,
   } else if (options.blower() == kConstant) {
     out.select(-1, 0) = var.select(-1, 0);
   } else {
-    throw std::runtime_error("Unsupported boundary condition");
+    TORCH_CHECK(false, "Unsupported boundary condition");
   }
 
   // interior
@@ -26,21 +28,24 @@ torch::Tensor layer2level(torch::Tensor var,
     interp_cp4->to(var.device());
 
     out.select(-1, 1) = (var.select(-1, 0) + var.select(-1, 1)) / 2.;
-    out.slice(-1, 2, -2) = interp_cp4->forward(var);
-    out.slice(-1, -2) = (var.select(-1, -1) + var.select(-1, -2)) / 2.;
+    out.slice(-1, 2, nlyr - 1) = interp_cp4->forward(var.unfold(-1, 4, 1));
+    out.select(-1, nlyr - 1) =
+        (var.select(-1, nlyr - 1) + var.select(-1, nlyr - 2)) / 2.;
   } else if (options.order() == k2ndOrder) {
-    out.slice(-1, 1, -1) = (var.slice(-1, 0, -2) + var.slice(-1, 1, -1)) / 2.;
+    out.slice(-1, 1, nlyr - 1) =
+        (var.slice(-1, 0, nlyr - 1) + var.slice(-1, 1, nlyr - 2)) / 2.;
   } else {
-    throw std::runtime_error("Unsupported interpolation order");
+    TORCH_CHECK(false, "Unsupported interpolation order");
   }
 
   // upper boundary
   if (options.bupper() == kExtrapolate) {
-    out.select(-1, -1) = (3. * var.select(-1, -1) - var.select(-1, -2)) / 2.;
+    out.select(-1, nlyr) =
+        (3. * var.select(-1, nlyr - 1) - var.select(-1, nlyr - 2)) / 2.;
   } else if (options.bupper() == kConstant) {
-    out.select(-1, -1) = var.select(-1, -1);
+    out.select(-1, nlyr) = var.select(-1, nlyr - 1);
   } else {
-    throw std::runtime_error("Unsupported boundary condition");
+    TORCH_CHECK(false, "Unsupported boundary condition");
   }
 
   // checks
@@ -50,7 +55,7 @@ torch::Tensor layer2level(torch::Tensor var,
     if (error.size(0) > 0) {
       std::cout << "Negative values found at cell interface: ";
       std::cout << "indices = " << error << std::endl;
-      throw std::runtime_error("layer2level check failed");
+      TORCH_CHECK(false, "layer2level check failed");
     }
   }
 

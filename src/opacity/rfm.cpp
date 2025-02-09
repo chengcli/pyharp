@@ -3,7 +3,6 @@
 
 // harp
 #include <math/interpolation.hpp>
-#include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
 
 #include "rfm.hpp"

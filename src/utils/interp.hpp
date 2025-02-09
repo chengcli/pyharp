@@ -13,7 +13,8 @@ class Center4InterpImpl : public torch::nn::Cloneable<Center4InterpImpl> {
   explicit Center4InterpImpl() { reset(); }
   void reset() override {
     cm = register_buffer(
-        "cm", torch::tensor({-1. / 12., 7. / 12., 7. / 12., -1. / 12.}));
+        "cm", torch::tensor({-1. / 12., 7. / 12., 7. / 12., -1. / 12.},
+                            torch::kFloat64));
   }
 
   torch::Tensor forward(torch::Tensor w) { return matmul(w, cm); }

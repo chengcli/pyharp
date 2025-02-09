@@ -1,6 +1,7 @@
 #pragma once
 
 namespace harp {
+
 namespace index {
 // atm (legacy)
 constexpr int ITM = 0;
@@ -17,13 +18,4 @@ constexpr int IUP = 0;  //! upward
 constexpr int IDN = 1;  //! downward
 };                      // namespace index
 
-enum {
-  // interpolation orders
-  k2ndOrder = 2,
-  k4thOrder = 4,
-
-  // boundary conditions
-  kExtrapolate = 0,
-  kConstant = 1,
-};
 }  // namespace harp

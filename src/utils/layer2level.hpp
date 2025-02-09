@@ -12,6 +12,13 @@
 #include <index.h>
 
 namespace harp {
+
+constexpr int k2ndOrder = 2;
+constexpr int k4thOrder = 4;
+
+constexpr int kExtrapolate = 0;
+constexpr int kConstant = 1;
+
 struct Layer2LevelOptions {
   ADD_ARG(int, order) = k4thOrder;
   ADD_ARG(bool, logx) = false;
