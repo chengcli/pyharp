@@ -165,7 +165,7 @@ torch::Tensor RFMImpl::forward(
 
   // ln(m*2/kmol) -> 1/m
   return 1.E-3 * out.exp() *
-         conc.select(2, options.species_ids()[0]).unsqueeze(0);
+         conc.select(2, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);
 }
 
 torch::Tensor get_reftemp(torch::Tensor lnp, torch::Tensor klnp,

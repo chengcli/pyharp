@@ -1,5 +1,5 @@
 
-setup_problem(amars_rt)
+setup_problem(amars_sw)
 setup_problem(amars_lw)
 
 # 4. Copy input files to run directory

@@ -13,13 +13,16 @@ torch::Tensor layer2level(torch::Tensor var,
 
   int nlyr = var.size(-1);
 
-  // lower boundary
-  if (options.blower() == kExtrapolate) {
-    out.select(-1, 0) = (3. * var.select(-1, 0) - var.select(-1, 1)) / 2.;
-  } else if (options.blower() == kConstant) {
+  if (nlyr == 1) {  // use constant extrapolation
     out.select(-1, 0) = var.select(-1, 0);
-  } else {
-    TORCH_CHECK(false, "Unsupported boundary condition");
+  } else {  // lower boundary
+    if (options.blower() == kExtrapolate) {
+      out.select(-1, 0) = (3. * var.select(-1, 0) - var.select(-1, 1)) / 2.;
+    } else if (options.blower() == kConstant) {
+      out.select(-1, 0) = var.select(-1, 0);
+    } else {
+      TORCH_CHECK(false, "Unsupported boundary condition");
+    }
   }
 
   // interior
@@ -27,25 +30,38 @@ torch::Tensor layer2level(torch::Tensor var,
     Center4Interp interp_cp4;
     interp_cp4->to(var.device());
 
-    out.select(-1, 1) = (var.select(-1, 0) + var.select(-1, 1)) / 2.;
-    out.slice(-1, 2, nlyr - 1) = interp_cp4->forward(var.unfold(-1, 4, 1));
-    out.select(-1, nlyr - 1) =
-        (var.select(-1, nlyr - 1) + var.select(-1, nlyr - 2)) / 2.;
+    if (nlyr > 1) {
+      out.select(-1, 1) = (var.select(-1, 0) + var.select(-1, 1)) / 2.;
+    }
+
+    if (nlyr > 2) {
+      out.select(-1, nlyr - 1) =
+          (var.select(-1, nlyr - 1) + var.select(-1, nlyr - 2)) / 2.;
+    }
+
+    if (nlyr > 3) {
+      out.slice(-1, 2, nlyr - 1) = interp_cp4->forward(var.unfold(-1, 4, 1));
+    }
   } else if (options.order() == k2ndOrder) {
-    out.slice(-1, 1, nlyr - 1) =
-        (var.slice(-1, 0, nlyr - 1) + var.slice(-1, 1, nlyr - 2)) / 2.;
+    if (nlyr > 1) {
+      out.slice(-1, 1, nlyr) =
+          (var.slice(-1, 0, nlyr - 1) + var.slice(-1, 1, nlyr)) / 2.;
+    }
   } else {
     TORCH_CHECK(false, "Unsupported interpolation order");
   }
 
-  // upper boundary
-  if (options.bupper() == kExtrapolate) {
-    out.select(-1, nlyr) =
-        (3. * var.select(-1, nlyr - 1) - var.select(-1, nlyr - 2)) / 2.;
-  } else if (options.bupper() == kConstant) {
+  if (nlyr == 1) {  // use constant extrapolation
     out.select(-1, nlyr) = var.select(-1, nlyr - 1);
-  } else {
-    TORCH_CHECK(false, "Unsupported boundary condition");
+  } else {  // upper boundary
+    if (options.bupper() == kExtrapolate) {
+      out.select(-1, nlyr) =
+          (3. * var.select(-1, nlyr - 1) - var.select(-1, nlyr - 2)) / 2.;
+    } else if (options.bupper() == kConstant) {
+      out.select(-1, nlyr) = var.select(-1, nlyr - 1);
+    } else {
+      TORCH_CHECK(false, "Unsupported boundary condition");
+    }
   }
 
   // checks

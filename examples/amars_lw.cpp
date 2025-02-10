@@ -7,6 +7,7 @@
 // harp
 #include <opacity/rfm.hpp>
 #include <utils/layer2level.hpp>
+#include <utils/read_weights.hpp>
 
 // unit = [mol/m^3]
 torch::Tensor atm_concentration(int ncol, int nlyr, int nspecies) {
@@ -22,7 +23,7 @@ disort::DisortOptions disort_options_lw(double wmin, double wmax, int nwave,
   op.flags(
       "lamber,quiet,onlyfl,planck,"
       "intensity_correction,old_intensity_correction,"
-      "print-input,print-phase-function");
+      "print-input,print-phase-function,print-fluxes");
 
   op.nwave(nwave);
   op.ncol(ncol);
@@ -66,16 +67,24 @@ int main(int argc, char** argv) {
   auto prop2 = h2o->forward(conc, kwargs);
 
   auto prop = prop1 + prop2;
-  std::cout << "prop = " << prop << std::endl;
+  std::cout << "prop shape = " << prop.sizes() << std::endl;
 
   std::map<std::string, torch::Tensor> bc;
   bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64);
+  bc["btemp"] = torch::ones({nwave, ncol}, torch::kFloat64) * 300.0;
 
-  std::cout << "tem = " << kwargs["temp"] << std::endl;
   auto temf = harp::layer2level(kwargs["temp"], harp::Layer2LevelOptions());
   std::cout << "tempf = " << temf << std::endl;
 
   // assuming dz = 1
-  auto result = disort->forward(prop, &bc, temf);
-  std::cout << "result = " << result << std::endl;
+  auto flux = disort->forward(prop, &bc, temf);
+  std::cout << "flux = " << flux << std::endl;
+
+  // ck weights
+  auto weights = harp::read_weights_rfm("amarsw-ck-B1.nc");
+  std::cout << "weights = " << weights << std::endl;
+
+  // band flux
+  auto bflx = (flux * weights.view({-1, 1, 1, 1})).sum(0);
+  std::cout << "bflx = " << bflx << std::endl;
 }
