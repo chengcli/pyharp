@@ -19,6 +19,9 @@
 #include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
 
+// disort
+#include <disort/disort.hpp>
+
 namespace harp {
 
 void interpolate_mixing_ratios(const std::vector<double>& dense_grid,
@@ -36,9 +39,6 @@ void interpolate_mixing_ratios(const std::vector<double>& dense_grid,
 }
 
 }  // namespace harp
-
-// disort
-#include <disort/disort.hpp>
 
 disort::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
   disort::DisortOptions op;
