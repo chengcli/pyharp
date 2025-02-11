@@ -442,7 +442,6 @@ int main(int argc, char** argv) {
   AtmosphericData atm_data = read_atmospheric_data("/home/cometz/Desktop/rce/build-rt/bin/rfm.atm");
   int nlyr_lw = atm_data.n_layers;
   int nspecies_lw = 2;
-  //you must pass the index of the species of the associated ck band
   //CO2 is idx 0, H2O is idx 1
   auto tot_flux = calc_flux_1band_init(ncol, nspecies_lw, 1., 150., atm_data, "amarsw-ck-B1.nc", 0, btemp);
   tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 150., 500., atm_data, "amarsw-ck-B2.nc", 1, btemp);
