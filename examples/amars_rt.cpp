@@ -131,6 +131,22 @@ std::vector<std::vector<double>> read_4width_array_from_file(
   return array_to_get;
 }
 
+std::vector<double> read_values_from_file(const std::string& filename) {
+  std::ifstream file(filename);
+  if (!file.is_open()) {
+      throw std::runtime_error("Could not open file: " + filename);
+  }
+
+  std::vector<double> values;
+  double value;
+  while (file >> value) {
+      values.push_back(value);
+  }
+
+  file.close();
+  return values;
+}
+
 std::tuple<std::vector<double>, std::vector<double>,
            std::vector<std::vector<double>>>
 regrid_ptx(int nlyr, int nspecies, std::vector<double> p, std::vector<double> T,
@@ -143,11 +159,18 @@ regrid_ptx(int nlyr, int nspecies, std::vector<double> p, std::vector<double> T,
   double T_max = *std::max_element(T.begin(), T.end());
   double T_step = (T_max - T_min) / (nlyr - 1);
 
-  std::vector<double> new_p(nlyr);
-  std::vector<double> new_T(nlyr);
+  //std::vector<double> new_p(nlyr);
+  //std::vector<double> new_T(nlyr);
+  //for (int i = 0; i < nlyr; ++i) {
+  //  new_p[nlyr - 1 - i] = p_min + i * p_step;
+  //  new_T[nlyr - 1 - i] = T_min + i * T_step;
+  //}
+
+  //just copy the p and T vals from what we put into RFM, so that the SW and LW are on the same grid
+  std::vector<double> new_T = read_values_from_file("TVals.txt");
+  std::vector<double> new_p = read_values_from_file("pVals.txt");
   for (int i = 0; i < nlyr; ++i) {
-    new_p[nlyr - 1 - i] = p_min + i * p_step;
-    new_T[nlyr - 1 - i] = T_min + i * T_step;
+    new_p[i] *= 100.0;  // convert mbar to Pa
   }
 
   std::vector<std::vector<double>> new_mr(nspecies, std::vector<double>(nlyr));
@@ -270,6 +293,7 @@ torch::Tensor read_atm_concentration(int ncol, int nlyr, int nspecies, Atmospher
     tem = atm_data.data["TEM [K]"][i];
     conc[0][i][0] = (atm_data.data["CO2 [ppmv]"][i] * 1e-6) * (pre / (R * tem));
     conc[0][i][1] = atm_data.data["H2O [ppmv]"][i] * 1e-6 * (pre / (R * tem));
+    conc[0][i][2] = atm_data.data["SO2 [ppmv]"][i] * 1e-6 * (pre / (R * tem));
   }
   return conc;
 }
@@ -299,14 +323,17 @@ return op;
 
 torch::Tensor calc_flux_1band_init(int ncol, int nspecies, double wmin, double wmax, AtmosphericData atm_data, std::string filename, int idx, double btemp) {
   harp::AttenuatorOptions op;
-  op.species_names({"CO2", "H2O"});
-  op.species_weights({44.0e-3, 18.0e-3});
+  op.species_names({"CO2", "H2O", "SO2"});
+  op.species_weights({44.0e-3, 18.0e-3, 64.0e-3});
 
   op.species_ids({0}).opacity_files({filename});
   harp::RFM co2(op);
 
   op.species_ids({1}).opacity_files({filename});
   harp::RFM h2o(op);
+
+  op.species_ids({2}).opacity_files({filename});
+  harp::RFM so2(op);
 
   int nwave = co2->kdata.size(0);
   int nlyr = atm_data.n_layers;
@@ -326,6 +353,7 @@ torch::Tensor calc_flux_1band_init(int ncol, int nspecies, double wmin, double w
   torch::Tensor prop;
   if (idx == 0) prop = co2->forward(conc, kwargs);
   if (idx == 1) prop = h2o->forward(conc, kwargs);
+  if (idx == 2) prop = so2->forward(conc, kwargs);
   auto dz = calc_dz_from_file(nlyr, prop, atm_data);
 
   prop *= dz;
@@ -438,17 +466,20 @@ int main(int argc, char** argv) {
   
   
 
-  double btemp = 210;
+  double btemp =210;
   AtmosphericData atm_data = read_atmospheric_data("/home/cometz/Desktop/rce/build-rt/bin/rfm.atm");
   int nlyr_lw = atm_data.n_layers;
-  int nspecies_lw = 2;
+  int nspecies_lw = 3;
   //you must pass the index of the species of the associated ck band
-  //CO2 is idx 0, H2O is idx 1
-  auto tot_flux = calc_flux_1band_init(ncol, nspecies_lw, 1., 150., atm_data, "amarsw-ck-B1.nc", 0, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 150., 500., atm_data, "amarsw-ck-B2.nc", 1, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 500., 1450., atm_data, "amarsw-ck-B3.nc", 0, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1450., 1850., atm_data, "amarsw-ck-B4.nc", 1, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1850., 3000., atm_data, "amarsw-ck-B5.nc", 0, btemp);
+  //CO2 is idx 0, H2O is idx 1, SO2 idx is 2
+  auto tot_flux = calc_flux_1band_init(ncol, nspecies_lw, 1., 250., atm_data, "amars-ck-B1.nc", 0, btemp);
+  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 250., 438., atm_data, "amars-ck-B2.nc", 1, btemp);
+  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 438., 675., atm_data, "amars-ck-B3.nc", 2, btemp);
+  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 675., 1062., atm_data, "amars-ck-B4.nc", 0, btemp);
+  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1062., 1200., atm_data, "amars-ck-B5.nc", 2, btemp);
+  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1200., 1600., atm_data, "amars-ck-B6.nc", 0, btemp);
+  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1600., 1900., atm_data, "amars-ck-B7.nc", 2, btemp);
+  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1900., 2000., atm_data, "amars-ck-B8.nc", 0, btemp);
   std::cout << "tot_flux = " << tot_flux << std::endl;
 
 
@@ -462,8 +493,8 @@ int main(int argc, char** argv) {
   std::ofstream outputFile("dT_ds.txt");
   outputFile << "#p[Pa] dT_ds[K/s]" << std::endl;
   for (int k = 0; k < nlyr; ++k) {
-    df = integrated_flux[k][0] - integrated_flux[k][1];
-    df_iplus1 = integrated_flux[k + 1][0] - integrated_flux[k + 1][1];
+    df = integrated_flux[k][0] - integrated_flux[k][1] + tot_flux[0][k][0].item<double>() - tot_flux[0][k][1].item<double>();
+    df_iplus1 = integrated_flux[k + 1][0] - integrated_flux[k + 1][1] + tot_flux[0][k + 1][0].item<double>() - tot_flux[0][k + 1][1].item<double>();
     dT_ds[k] =
         -(1 / (new_rho[k] * cp)) * (df_iplus1 - df) / dz[k][0].item<double>();
     outputFile << new_p[k] << " " << dT_ds[k] << std::endl;
