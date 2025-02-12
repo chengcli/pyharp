@@ -458,15 +458,15 @@ int main(int argc, char** argv) {
   auto [integrated_flux, tot_flux_down_surf, tot_flux_down_toa] =
       integrate_result(result, wave, nlyr, nwave);
 
-  std::cout << "tot_flux_down_surf: " << tot_flux_down_surf << " W/m^2"
-            << std::endl;
-  std::cout << "tot_flux_down_toa: " << tot_flux_down_toa << " W/m^2"
-            << std::endl;
+  //std::cout << "tot_flux_down_surf: " << tot_flux_down_surf << " W/m^2"
+  //          << std::endl;
+  //std::cout << "tot_flux_down_toa: " << tot_flux_down_toa << " W/m^2"
+  //          << std::endl;
 
   
   
 
-  double btemp =210;
+  double btemp = 210;
   AtmosphericData atm_data = read_atmospheric_data("/home/cometz/Desktop/rce/build-rt/bin/rfm.atm");
   int nlyr_lw = atm_data.n_layers;
   int nspecies_lw = 3;
@@ -480,7 +480,7 @@ int main(int argc, char** argv) {
   tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1200., 1600., atm_data, "amars-ck-B6.nc", 0, btemp);
   tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1600., 1900., atm_data, "amars-ck-B7.nc", 2, btemp);
   tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1900., 2000., atm_data, "amars-ck-B8.nc", 0, btemp);
-  std::cout << "tot_flux = " << tot_flux << std::endl;
+  //std::cout << "tot_flux = " << tot_flux << std::endl;
 
 
 
@@ -493,6 +493,7 @@ int main(int argc, char** argv) {
   std::ofstream outputFile("dT_ds.txt");
   outputFile << "#p[Pa] dT_ds[K/s]" << std::endl;
   for (int k = 0; k < nlyr; ++k) {
+    //add SW fluxes up/down to the LW fluxes up/down
     df = integrated_flux[k][0] - integrated_flux[k][1] + tot_flux[0][k][0].item<double>() - tot_flux[0][k][1].item<double>();
     df_iplus1 = integrated_flux[k + 1][0] - integrated_flux[k + 1][1] + tot_flux[0][k + 1][0].item<double>() - tot_flux[0][k + 1][1].item<double>();
     dT_ds[k] =
@@ -501,18 +502,4 @@ int main(int argc, char** argv) {
   }
   outputFile.close();
 
-  // make sure the mixing ratio interpolation is working fine
-  std::ofstream outputFile2("mix.txt");
-  outputFile2 << "#p_new[Pa] mr(new)(0) mr(new)(1) p_atmos[Pa] mr(atmos)(0) "
-                 "mr(atmos)(1)"
-              << std::endl;
-  for (int k = 0; k < nlyr; ++k) {
-    outputFile2 << new_p[k] << " " << new_mr[0][k] << " " << new_mr[1][k] << " "
-                << p[k] << " " << mr[0][k] << " " << mr[1][k] << std::endl;
-  }
-  for (int k = nlyr; k < 200; ++k) {
-    outputFile2 << 0 << " " << 0 << " " << 0 << " " << p[k] << " " << mr[0][k]
-                << " " << mr[1][k] << std::endl;
-  }
-  outputFile2.close();
 }
