@@ -298,6 +298,7 @@ torch::Tensor read_atm_concentration(int ncol, int nlyr, int nspecies, Atmospher
   return conc;
 }
 
+
 disort::DisortOptions disort_options_lw(double wmin, double wmax, int nwave,
   int ncol, int nlyr) {
 disort::DisortOptions op;
@@ -369,6 +370,64 @@ torch::Tensor calc_flux_1band_init(int ncol, int nspecies, double wmin, double w
   return (flux * weights.view({-1, 1, 1, 1})).sum(0);
 }
 
+
+torch::Tensor calc_flux_1band_loop(int ncol, int nspecies, double wmin, double wmax, AtmosphericData atm_data, std::string filename, int idx, double btemp
+  , std::vector<double> new_T, std::vector<double> new_p, torch::Tensor dz) {
+  harp::AttenuatorOptions op;
+  op.species_names({"CO2", "H2O", "SO2"});
+  op.species_weights({44.0e-3, 18.0e-3, 64.0e-3});
+
+  op.species_ids({0}).opacity_files({filename});
+  harp::RFM co2(op);
+
+  op.species_ids({1}).opacity_files({filename});
+  harp::RFM h2o(op);
+
+  op.species_ids({2}).opacity_files({filename});
+  harp::RFM so2(op);
+
+  int nwave = co2->kdata.size(0);
+  int nlyr = atm_data.n_layers;
+
+  auto conc = torch::ones({ncol, nlyr, nspecies}, torch::kFloat64);
+  double pre = 0;
+  double tem = 0;
+  double R = 8.314472;
+  for (int i = 0; i < nlyr; ++i) {
+    pre = new_p[i];
+    tem = new_T[i];
+    conc[0][i][0] = (atm_data.data["CO2 [ppmv]"][i] * 1e-6) * (pre / (R * tem));
+    conc[0][i][1] = atm_data.data["H2O [ppmv]"][i] * 1e-6 * (pre / (R * tem));
+    conc[0][i][2] = atm_data.data["SO2 [ppmv]"][i] * 1e-6 * (pre / (R * tem));
+  }
+
+  disort::Disort disort(disort_options_lw(wmin, wmax, nwave, ncol, nlyr));
+
+  std::map<std::string, torch::Tensor> kwargs;
+  kwargs["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64);
+  kwargs["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64);
+  for (int i = 0; i < nlyr; ++i) {
+    kwargs["pres"][0][i] = new_p[i];
+    kwargs["temp"][0][i] = new_T[i];
+  }
+
+  torch::Tensor prop;
+  if (idx == 0) prop = co2->forward(conc, kwargs);
+  if (idx == 1) prop = h2o->forward(conc, kwargs);
+  if (idx == 2) prop = so2->forward(conc, kwargs);
+
+  prop *= dz;
+
+  std::map<std::string, torch::Tensor> bc;
+  bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64) * 0.0; //leave emissivity at 1
+  bc["btemp"] = torch::ones({nwave, ncol}, torch::kFloat64) * btemp;
+
+  auto temf = harp::layer2level(kwargs["temp"], harp::Layer2LevelOptions());
+  auto flux = disort->forward(prop, &bc, temf);
+  auto weights = harp::read_weights_rfm(filename);
+
+  return (flux * weights.view({-1, 1, 1, 1})).sum(0);
+}
 
 
 int main(int argc, char** argv) {
@@ -451,7 +510,7 @@ int main(int argc, char** argv) {
   std::map<std::string, torch::Tensor> bc;
   bc["fbeam"] = bb_toa_flux(wave, ncol, solar_temp, lum_scale);
   bc["umu0"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
-  bc["albedo"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
+  bc["albedo"] = 0.3 * torch::ones({nwave, ncol}, torch::kFloat64);
 
   auto result = disort->forward(prop, &bc);
 
@@ -493,7 +552,7 @@ int main(int argc, char** argv) {
   std::ofstream outputFile("dT_ds.txt");
   outputFile << "#p[Pa] dT_ds[K/s]" << std::endl;
   for (int k = 0; k < nlyr; ++k) {
-    //add SW fluxes up/down to the LW fluxes up/down
+    //add SW fluxes up/down to the LW fluxes up/down. 0 is up, 1 is down
     df = integrated_flux[k][0] - integrated_flux[k][1] + tot_flux[0][k][0].item<double>() - tot_flux[0][k][1].item<double>();
     df_iplus1 = integrated_flux[k + 1][0] - integrated_flux[k + 1][1] + tot_flux[0][k + 1][0].item<double>() - tot_flux[0][k + 1][1].item<double>();
     dT_ds[k] =
@@ -502,4 +561,110 @@ int main(int argc, char** argv) {
   }
   outputFile.close();
 
+
+
+
+  std::ostringstream filename;
+  filename << "tp_result" << 0 << ".txt";
+
+  // Open the file and write the data
+  std::ofstream outputFile_init(filename.str());
+  outputFile_init << "#p[Pa] T[K]" << std::endl;
+  for (int k = 0; k < nlyr; ++k) {
+      outputFile_init << new_p[k] << " " << new_T[k] << std::endl;
+  }
+  outputFile_init.close();
+
+
+
+
+  //CALC THE RAD EQUIL
+  int t_lim = 10000; //10000 = 6 yr
+  double tstep = 86400/4; //step is 6hrs
+  double cSurf = 200000; //thermal inertia of the surface, assuming half ocean half land
+  double current_time = 0;
+  std::ofstream outputFile2("btemp_t.txt");
+  outputFile2 << "#t[s] btemp[K]" << std::endl;
+  outputFile2 << current_time << " " << btemp << std::endl;
+
+  //start the time loop
+  for (int t_ind = 0; t_ind < t_lim; ++t_ind) {
+
+    current_time += tstep;
+    //sw + lw flux down - surf emission
+    double surf_forcing = integrated_flux[0][1] + tot_flux[0][0][1].item<double>() - 5.67e-8 * std::pow(btemp, 4);
+    btemp += surf_forcing * (tstep / cSurf);
+
+    for (int k =0; k < nlyr; ++k) {
+      new_T[k] += dT_ds[k] * tstep;
+      if (new_T[k] < 20) new_T[k] = 20;
+
+      //PRESSURE GRID IS FIXED
+      conc[0][k][0] = (new_mr[1][k] * new_p[k]) /
+                      (R * new_T[k]);  // s8 comes second in the file that we read
+                                      // in. but we need it to be index 0 in conc
+                                      // bc of how it was initialized above
+      conc[0][k][1] =
+          (new_mr[0][k] * new_p[k]) /
+          (R * new_T[k]);  // h2so4 comes first in the file that we read in. but
+                          // it needs to be index 1 in conc.
+      new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
+    }
+
+    auto prop1 = s8->forward(conc, kwargs);
+    auto prop2 = h2so4->forward(conc, kwargs);
+    auto prop = prop1 + prop2;
+
+    auto dz = calc_dz(nlyr, prop, new_p, new_rho, g);
+    prop *= dz;
+
+    // mean single scattering albedo
+    prop.select(3, 1) /= prop.select(3, 0);
+
+    auto result = disort->forward(prop, &bc);
+
+    auto [integrated_flux, tot_flux_down_surf, tot_flux_down_toa] =
+        integrate_result(result, wave, nlyr, nwave);
+
+
+    auto tot_flux = calc_flux_1band_loop(ncol, nspecies_lw, 1., 250., atm_data, "amars-ck-B1.nc", 0, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 250., 438., atm_data, "amars-ck-B2.nc", 1, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 438., 675., atm_data, "amars-ck-B3.nc", 2, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 675., 1062., atm_data, "amars-ck-B4.nc", 0, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1062., 1200., atm_data, "amars-ck-B5.nc", 2, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1200., 1600., atm_data, "amars-ck-B6.nc", 0, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1600., 1900., atm_data, "amars-ck-B7.nc", 2, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1900., 2000., atm_data, "amars-ck-B8.nc", 0, btemp, new_T, new_p, dz);
+
+
+    // calculate heating rates
+    double df = 0;
+    double df_iplus1 = 0;
+    for (int k = 0; k < nlyr; ++k) {
+      //add SW fluxes up/down to the LW fluxes up/down. 0 is up, 1 is down
+      df = integrated_flux[k][0] - integrated_flux[k][1] + tot_flux[0][k][0].item<double>() - tot_flux[0][k][1].item<double>();
+      df_iplus1 = integrated_flux[k + 1][0] - integrated_flux[k + 1][1] + tot_flux[0][k + 1][0].item<double>() - tot_flux[0][k + 1][1].item<double>();
+      dT_ds[k] =
+          -(1 / (new_rho[k] * cp)) * (df_iplus1 - df) / dz[k][0].item<double>();
+    }
+    outputFile2 << current_time << " " << btemp << std::endl;
+
+    std::ostringstream filename;
+    filename << "tp_result" << t_ind + 1 << ".txt";
+
+    // Open the file and write the data
+    std::ofstream outputFile3(filename.str());
+    outputFile3 << "#p[Pa] T[K]" << std::endl;
+    for (int k = 0; k < nlyr; ++k) {
+        outputFile3 << new_p[k] << " " << new_T[k] << std::endl;
+    }
+    outputFile3.close();
+  }
+
+  std::ofstream outputFile4("final_tp_result.txt");
+  outputFile4 << "#p[Pa] T[K]" << std::endl;
+  for (int k = 0; k < nlyr; ++k) {
+    outputFile4 << new_p[k] << " " << new_T[k] << std::endl;
+  }
+  outputFile4.close();
 }
