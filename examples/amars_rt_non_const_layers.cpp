@@ -159,19 +159,19 @@ regrid_ptx(int nlyr, int nspecies, std::vector<double> p, std::vector<double> T,
   double T_max = *std::max_element(T.begin(), T.end());
   double T_step = (T_max - T_min) / (nlyr - 1);
 
-  //std::vector<double> new_p(nlyr);
-  //std::vector<double> new_T(nlyr);
-  //for (int i = 0; i < nlyr; ++i) {
-  //  new_p[nlyr - 1 - i] = p_min + i * p_step;
-  //  new_T[nlyr - 1 - i] = T_min + i * T_step;
-  //}
+  std::vector<double> new_p(nlyr);
+  std::vector<double> new_T(nlyr);
+  for (int i = 0; i < nlyr; ++i) {
+    new_p[nlyr - 1 - i] = p_min + i * p_step;
+    new_T[nlyr - 1 - i] = T_min + i * T_step;
+  }
 
   //just copy the p and T vals from what we put into RFM, so that the SW and LW are on the same grid
-  std::vector<double> new_T = read_values_from_file("TVals.txt");
-  std::vector<double> new_p = read_values_from_file("pVals.txt");
-  for (int i = 0; i < nlyr; ++i) {
-    new_p[i] *= 100.0;  // convert mbar to Pa
-  }
+  //std::vector<double> new_T = read_values_from_file("TVals.txt");
+  //std::vector<double> new_p = read_values_from_file("pVals.txt");
+  //for (int i = 0; i < nlyr; ++i) {
+  //  new_p[i] *= 100.0;  // convert mbar to Pa
+  //}
 
   std::vector<std::vector<double>> new_mr(nspecies, std::vector<double>(nlyr));
   for (int j = 0; j < nspecies; ++j) {
@@ -430,91 +430,6 @@ torch::Tensor calc_flux_1band_loop(int ncol, int nspecies, double wmin, double w
   return (flux * weights.view({-1, 1, 1, 1})).sum(0);
 }
 
-
-
-
-std::tuple<torch::Tensor, torch::Tensor> calc_flux_1band_loop_with_prop(int ncol, int nspecies, double wmin, double wmax, AtmosphericData atm_data, std::string filename, int idx, double btemp
-  , std::vector<double> new_T, std::vector<double> new_p, torch::Tensor dz, int t_ind, int print_freq) {
-  harp::AttenuatorOptions op;
-  op.species_names({"CO2", "H2O", "SO2"});
-  op.species_weights({44.0e-3, 18.0e-3, 64.0e-3});
-
-  op.species_ids({0}).opacity_files({filename});
-  harp::RFM co2(op);
-
-  op.species_ids({1}).opacity_files({filename});
-  harp::RFM h2o(op);
-
-  op.species_ids({2}).opacity_files({filename});
-  harp::RFM so2(op);
-
-  int nwave = co2->kdata.size(0);
-  int nlyr = atm_data.n_layers;
-
-  auto conc = torch::ones({ncol, nlyr, nspecies}, torch::kFloat64);
-  double pre = 0;
-  double tem = 0;
-  double R = 8.314472;
-  for (int i = 0; i < nlyr; ++i) {
-    pre = new_p[i];
-    tem = new_T[i];
-    conc[0][i][0] = atm_data.data["CO2 [ppmv]"][i] * 1e-6 * (pre / (R * tem));
-    conc[0][i][1] = atm_data.data["H2O [ppmv]"][i] * 1e-6 * (pre / (R * tem));
-    conc[0][i][2] = atm_data.data["SO2 [ppmv]"][i] * 1e-6 * (pre / (R * tem));
-  }
-
-  disort::Disort disort(disort_options_lw(wmin, wmax, nwave, ncol, nlyr));
-
-  std::map<std::string, torch::Tensor> kwargs;
-  kwargs["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64);
-  kwargs["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64);
-  for (int i = 0; i < nlyr; ++i) {
-    kwargs["pres"][0][i] = new_p[i];
-    kwargs["temp"][0][i] = new_T[i];
-  }
-
-  torch::Tensor prop;
-  if (idx == 0) prop = co2->forward(conc, kwargs);
-  if (idx == 1) prop = h2o->forward(conc, kwargs);
-  if (idx == 2) prop = so2->forward(conc, kwargs);
-
-  prop *= dz;
-
-  std::map<std::string, torch::Tensor> bc;
-  bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64) * 0.0; //leave emissivity at 1
-  bc["btemp"] = torch::ones({nwave, ncol}, torch::kFloat64) * btemp;
-
-  auto temf = harp::layer2level(kwargs["temp"], harp::Layer2LevelOptions());
-  auto flux = disort->forward(prop, &bc, temf);
-  auto weights = harp::read_weights_rfm(filename);
-
-  auto flux_result = (flux * weights.view({-1, 1, 1, 1})).sum(0);
-
-
-  if (t_ind%print_freq == 0){
-    std::ostringstream filename3;
-    filename3 << "conc_result_lw" << t_ind + 1 << ".txt";
-    std::ofstream outputFile6(filename3.str());
-    outputFile6 << "#p[Pa] conc_co2 conc_h2o conc_so2" << std::endl;
-    for (int k = 0; k < nlyr; ++k) {
-      outputFile6 << new_p[k] << " ";
-      outputFile6 << conc[0][k][0].item<double>() << " ";
-      outputFile6 << conc[0][k][1].item<double>() << " ";
-      outputFile6 << conc[0][k][2].item<double>() << std::endl;
-    }
-    outputFile6 << std::endl;
-    outputFile6.close();
- }
-
-
-  return std::make_tuple(flux_result, prop);
-}
-
-
-
-
-
-
 double calculate_dynamic_timestep(const std::vector<double>& new_T, const std::vector<double>& dT_ds, int nlyr, double safety_factor) {
   double min_time_to_zero = std::numeric_limits<double>::max();
   bool found_negative = false;
@@ -544,7 +459,7 @@ int main(int argc, char** argv) {
   // int nwave = 15000; //essentially the exact value of the integral over the
   // chosen wavelength bounds
   int ncol = 1;
-  int nlyr = 40;  // 3 layers is 1 W/m^2 away from the exact value of fldn_surf
+  int nlyr = 100;  // 3 layers is 1 W/m^2 away from the exact value of fldn_surf
                   // when using 200 layers. however, we want some more layers to
                   // resolve heating
   int nspecies = 2;
@@ -555,8 +470,6 @@ int main(int argc, char** argv) {
   double solar_temp = 5772;
   double lum_scale = 0.7;
   double surf_sw_albedo = 0.3;
-  //double aero_scale = 1e-6;
-  double aero_scale = 1;
 
   disort::Disort disort(disort_options(nwave, ncol, nlyr));
 
@@ -593,12 +506,12 @@ int main(int argc, char** argv) {
   std::vector<double> dT_ds(nlyr);
 
   for (int k = 0; k < nlyr; ++k) {
-    conc[0][k][0] = (aero_scale * new_mr[1][k] * new_p[k]) /
+    conc[0][k][0] = (new_mr[1][k] * new_p[k]) /
                     (R * new_T[k]);  // s8 comes second in the file that we read
                                      // in. but we need it to be index 0 in conc
                                      // bc of how it was initialized above
     conc[0][k][1] =
-        (aero_scale * new_mr[0][k] * new_p[k]) /
+        (new_mr[0][k] * new_p[k]) /
         (R * new_T[k]);  // h2so4 comes first in the file that we read in. but
                          // it needs to be index 1 in conc.
     new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
@@ -707,17 +620,17 @@ int main(int argc, char** argv) {
     double surf_forcing = (1 - surf_sw_albedo) * integrated_flux[0][1] + tot_flux[0][0][1].item<double>() - 5.67e-8 * std::pow(btemp, 4);
     btemp += surf_forcing * (tstep / cSurf);
 
-    for (int k = 0; k < nlyr; ++k) {
+    for (int k =0; k < nlyr; ++k) {
       new_T[k] += dT_ds[k] * tstep;
       if (new_T[k] < 20) new_T[k] = 20;
 
       //PRESSURE GRID IS FIXED
-      conc[0][k][0] = (aero_scale * new_mr[1][k] * new_p[k]) /
+      conc[0][k][0] = (new_mr[1][k] * new_p[k]) /
                       (R * new_T[k]);  // s8 comes second in the file that we read
                                       // in. but we need it to be index 0 in conc
                                       // bc of how it was initialized above
       conc[0][k][1] =
-          (aero_scale * new_mr[0][k] * new_p[k]) /
+          (new_mr[0][k] * new_p[k]) /
           (R * new_T[k]);  // h2so4 comes first in the file that we read in. but
                           // it needs to be index 1 in conc.
       new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
@@ -739,56 +652,14 @@ int main(int argc, char** argv) {
         integrate_result(result, wave, nlyr, nwave);
 
 
-    if (t_ind%print_freq == 0){
-      std::ostringstream filename3;
-      filename3 << "conc_result_sw" << t_ind + 1 << ".txt";
-      std::ofstream outputFile6(filename3.str());
-      outputFile6 << "#p[Pa] conc_s8 conc_h2so4" << std::endl;
-      for (int k = 0; k < nlyr; ++k) {
-        outputFile6 << new_p[k] << " ";
-        outputFile6 << conc[0][k][0].item<double>() << " ";
-        outputFile6 << conc[0][k][1].item<double>() << " ";
-      }
-      outputFile6 << std::endl;
-      outputFile6.close();
-   }
-
-    std::vector<torch::Tensor> prop_results;
-    torch::Tensor tot_flux;
-    torch::Tensor flux_result, prop_result;
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 1., 250., atm_data, "amars-ck-B1.nc", 0, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux = flux_result;
-    prop_results.push_back(prop_result);
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 250., 438., atm_data, "amars-ck-B2.nc", 1, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux += flux_result;
-    prop_results.push_back(prop_result);
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 438., 675., atm_data, "amars-ck-B3.nc", 2, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux += flux_result;
-    prop_results.push_back(prop_result);
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 675., 1062., atm_data, "amars-ck-B4.nc", 0, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux += flux_result;
-    prop_results.push_back(prop_result);
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 1062., 1200., atm_data, "amars-ck-B5.nc", 2, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux += flux_result;
-    prop_results.push_back(prop_result);
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 1200., 1600., atm_data, "amars-ck-B6.nc", 0, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux += flux_result;
-    prop_results.push_back(prop_result);
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 1600., 1900., atm_data, "amars-ck-B7.nc", 2, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux += flux_result;
-    prop_results.push_back(prop_result);
-  
-    std::tie(flux_result, prop_result) = calc_flux_1band_loop_with_prop(ncol, nspecies_lw, 1900., 2000., atm_data, "amars-ck-B8.nc", 0, btemp, new_T, new_p, dz, t_ind, print_freq);
-    tot_flux += flux_result;
-    prop_results.push_back(prop_result);
-
+    auto tot_flux = calc_flux_1band_loop(ncol, nspecies_lw, 1., 250., atm_data, "amars-ck-B1.nc", 0, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 250., 438., atm_data, "amars-ck-B2.nc", 1, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 438., 675., atm_data, "amars-ck-B3.nc", 2, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 675., 1062., atm_data, "amars-ck-B4.nc", 0, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1062., 1200., atm_data, "amars-ck-B5.nc", 2, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1200., 1600., atm_data, "amars-ck-B6.nc", 0, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1600., 1900., atm_data, "amars-ck-B7.nc", 2, btemp, new_T, new_p, dz);
+    tot_flux += calc_flux_1band_loop(ncol, nspecies_lw, 1900., 2000., atm_data, "amars-ck-B8.nc", 0, btemp, new_T, new_p, dz);
 
     // calculate heating rates
     double df = 0;
@@ -813,24 +684,8 @@ int main(int argc, char** argv) {
           outputFile3 << new_p[k] << " " << new_T[k] << " " << dT_ds[k] << std::endl;
       }
       outputFile3.close();
-
-      std::ostringstream filename2;
-      filename2 << "tau_result" << t_ind + 1 << ".txt";
-      std::ofstream outputFile5(filename2.str());
-      outputFile5 << "#p[Pa] tau_sw ssa_sw tau_b1 tau_b2 tau_b3 tau_b4 tau_b5 tau_b6 tau_b7 tau_b8" << std::endl;
-      for (int k = 0; k < nlyr; ++k) {
-        outputFile5 << new_p[k] << " ";
-        outputFile5 << prop.select(3, 0)[0][0][k].item<double>() << " ";
-        outputFile5 << prop.select(3, 1)[0][0][k].item<double>() << " ";
-        for (int i = 0; i < 8; ++i) {
-          outputFile5 << prop_results[i].select(3, 0)[0][0][k].item<double>() << " ";
-        }
-        outputFile5 << std::endl;
-      }
-      outputFile5.close();
     }
   }
-  outputFile2.close();
 
   std::ofstream outputFile4("final_tp_result.txt");
   outputFile4 << "#p[Pa] T[K]" << std::endl;

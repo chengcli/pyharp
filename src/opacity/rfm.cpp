@@ -74,7 +74,7 @@ void RFMImpl::reset() {
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
   // change pressure to ln-pressure
-  kaxis.slice(0, kshape[0], kshape[0] + kshape[1]).log_();
+  kaxis.slice(0, kshape[0], kshape[0] + kshape[1]).div_(100).log_();
 
   // temperature grid
   err = nc_inq_varid(fileid, "TempGrid", &varid);

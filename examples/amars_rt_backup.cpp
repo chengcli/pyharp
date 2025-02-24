@@ -430,6 +430,73 @@ torch::Tensor calc_flux_1band_loop(int ncol, int nspecies, double wmin, double w
   return (flux * weights.view({-1, 1, 1, 1})).sum(0);
 }
 
+
+
+
+std::tuple<torch::Tensor, torch::Tensor> calc_flux_1band_loop_with_prop(int ncol, int nspecies, double wmin, double wmax, AtmosphericData atm_data, std::string filename, int idx, double btemp
+  , std::vector<double> new_T, std::vector<double> new_p, torch::Tensor dz) {
+  harp::AttenuatorOptions op;
+  op.species_names({"CO2", "H2O", "SO2"});
+  op.species_weights({44.0e-3, 18.0e-3, 64.0e-3});
+
+  op.species_ids({0}).opacity_files({filename});
+  harp::RFM co2(op);
+
+  op.species_ids({1}).opacity_files({filename});
+  harp::RFM h2o(op);
+
+  op.species_ids({2}).opacity_files({filename});
+  harp::RFM so2(op);
+
+  int nwave = co2->kdata.size(0);
+  int nlyr = atm_data.n_layers;
+
+  auto conc = torch::ones({ncol, nlyr, nspecies}, torch::kFloat64);
+  double pre = 0;
+  double tem = 0;
+  double R = 8.314472;
+  for (int i = 0; i < nlyr; ++i) {
+    pre = new_p[i];
+    tem = new_T[i];
+    conc[0][i][0] = (atm_data.data["CO2 [ppmv]"][i] * 1e-6) * (pre / (R * tem));
+    conc[0][i][1] = atm_data.data["H2O [ppmv]"][i] * 1e-6 * (pre / (R * tem));
+    conc[0][i][2] = atm_data.data["SO2 [ppmv]"][i] * 1e-6 * (pre / (R * tem));
+  }
+
+  disort::Disort disort(disort_options_lw(wmin, wmax, nwave, ncol, nlyr));
+
+  std::map<std::string, torch::Tensor> kwargs;
+  kwargs["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64);
+  kwargs["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64);
+  for (int i = 0; i < nlyr; ++i) {
+    kwargs["pres"][0][i] = new_p[i];
+    kwargs["temp"][0][i] = new_T[i];
+  }
+
+  torch::Tensor prop;
+  if (idx == 0) prop = co2->forward(conc, kwargs);
+  if (idx == 1) prop = h2o->forward(conc, kwargs);
+  if (idx == 2) prop = so2->forward(conc, kwargs);
+
+  prop *= dz;
+
+  std::map<std::string, torch::Tensor> bc;
+  bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64) * 0.0; //leave emissivity at 1
+  bc["btemp"] = torch::ones({nwave, ncol}, torch::kFloat64) * btemp;
+
+  auto temf = harp::layer2level(kwargs["temp"], harp::Layer2LevelOptions());
+  auto flux = disort->forward(prop, &bc, temf);
+  auto weights = harp::read_weights_rfm(filename);
+
+  auto flux_result = (flux * weights.view({-1, 1, 1, 1})).sum(0);
+  return std::make_tuple(flux_result, prop);
+}
+
+
+
+
+
+
 double calculate_dynamic_timestep(const std::vector<double>& new_T, const std::vector<double>& dT_ds, int nlyr, double safety_factor) {
   double min_time_to_zero = std::numeric_limits<double>::max();
   bool found_negative = false;
@@ -470,6 +537,7 @@ int main(int argc, char** argv) {
   double solar_temp = 5772;
   double lum_scale = 0.7;
   double surf_sw_albedo = 0.3;
+  double aero_scale = 1e-6;
 
   disort::Disort disort(disort_options(nwave, ncol, nlyr));
 
@@ -506,12 +574,12 @@ int main(int argc, char** argv) {
   std::vector<double> dT_ds(nlyr);
 
   for (int k = 0; k < nlyr; ++k) {
-    conc[0][k][0] = (new_mr[1][k] * new_p[k]) /
+    conc[0][k][0] = (aero_scale * new_mr[1][k] * new_p[k]) /
                     (R * new_T[k]);  // s8 comes second in the file that we read
                                      // in. but we need it to be index 0 in conc
                                      // bc of how it was initialized above
     conc[0][k][1] =
-        (new_mr[0][k] * new_p[k]) /
+        (aero_scale * new_mr[0][k] * new_p[k]) /
         (R * new_T[k]);  // h2so4 comes first in the file that we read in. but
                          // it needs to be index 1 in conc.
     new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
@@ -625,12 +693,12 @@ int main(int argc, char** argv) {
       if (new_T[k] < 20) new_T[k] = 20;
 
       //PRESSURE GRID IS FIXED
-      conc[0][k][0] = (new_mr[1][k] * new_p[k]) /
+      conc[0][k][0] = (aero_scale * new_mr[1][k] * new_p[k]) /
                       (R * new_T[k]);  // s8 comes second in the file that we read
                                       // in. but we need it to be index 0 in conc
                                       // bc of how it was initialized above
       conc[0][k][1] =
-          (new_mr[0][k] * new_p[k]) /
+          (aero_scale * new_mr[0][k] * new_p[k]) /
           (R * new_T[k]);  // h2so4 comes first in the file that we read in. but
                           // it needs to be index 1 in conc.
       new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
