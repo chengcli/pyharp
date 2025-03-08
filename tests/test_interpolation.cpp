@@ -21,7 +21,7 @@ TEST(TestInterpolation, test) {
                      {{4.0, 40.0}, {5.0, 50.0}, {6.0, 60.0}},
                      {{7.0, 70.0}, {8.0, 80.0}, {9.0, 90.0}}});
 
-  // Query coordinates (1, 2, 2) representing (x,y) coordinates to interpolate
+  // Query coordinates (2, 2, 2) representing (x,y) coordinates to interpolate
   std::vector<torch::Tensor> query_coords = {
       torch::tensor({{2.5, 3.5}, {0., -1.}}),    // X-coordinates
       torch::tensor({{15.0, 25.0}, {0., -10.}})  // Y-coordinates
