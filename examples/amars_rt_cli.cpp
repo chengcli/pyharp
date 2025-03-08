@@ -11,21 +11,18 @@
 // harp
 #include <add_arg.h>
 #include <configure.h>
-#include <math/interpn.h>
 
 #include <math/interpolation.hpp>
 #include <opacity/h2so4_simple.hpp>
 #include <opacity/rfm.hpp>
 #include <opacity/s8_fuller.hpp>
-#include <radiation/calc_dz.hpp>
+#include <radiation/calc_dz_hypsometric.hpp>
+#include <radiation/disort_options_flux.hpp>
 #include <rtsolver/rtsolver.hpp>
 #include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
 #include <utils/layer2level.hpp>
 #include <utils/read_weights.hpp>
-
-// disort
-#include <disort/disort.hpp>
 
 namespace harp {
 
@@ -44,13 +41,6 @@ torch::Tensor interpolate_mixing_ratios(torch::Tensor dense_grid,
 }
 
 }  // namespace harp
-
-disort::DisortOptions disort_options_sw(int nwave, int ncol, int nlyr);
-
-// unit = [w/(m^2 cm^-1)]
-torch::Tensor short_toa_flux(int nwave, int ncol) {
-  return torch::ones({nwave, ncol}, torch::kFloat64);
-}
 
 std::vector<std::vector<double>> read_4width_array_from_file(
     std::string fpath) {
@@ -91,37 +81,6 @@ std::vector<double> read_values_from_file(const std::string& filename) {
 
   file.close();
   return values;
-}
-
-torch::Tensor regrid_px(torch::Tensor P, torch::Tensor X, torch::Tensor newP) {
-  double p_min = *std::min_element(p.begin(), p.end());
-  double p_max = *std::max_element(p.begin(), p.end());
-  double p_step = (p_max - p_min) / (nlyr - 1);
-
-  double T_min = *std::min_element(T.begin(), T.end());
-  double T_max = *std::max_element(T.begin(), T.end());
-  double T_step = (T_max - T_min) / (nlyr - 1);
-
-  // std::vector<double> new_p(nlyr);
-  // std::vector<double> new_T(nlyr);
-  // for (int i = 0; i < nlyr; ++i) {
-  //   new_p[nlyr - 1 - i] = p_min + i * p_step;
-  //   new_T[nlyr - 1 - i] = T_min + i * T_step;
-  // }
-
-  // just copy the p and T vals from what we put into RFM, so that the SW and LW
-  // are on the same grid
-  auto new_p = read_data_tensor("pVals.txt");
-  for (int i = 0; i < nlyr; ++i) {
-    new_p[i] *= 100.0;  // convert mbar to Pa
-  }
-
-  std::vector<std::vector<double>> new_mr(nspecies, std::vector<double>(nlyr));
-  for (int j = 0; j < nspecies; ++j) {
-    harp::interpolate_mixing_ratios(p, mr[j], new_p, new_mr[j]);
-  }
-
-  return std::make_tuple(new_p, new_T, new_mr);
 }
 
 std::tuple<std::vector<std::vector<double>>, double, double> integrate_result(
@@ -225,9 +184,6 @@ torch::Tensor read_atm_concentration(int ncol, int nlyr, int nspecies,
   }
   return conc;
 }
-
-disort::DisortOptions disort_options_lw(double wmin, double wmax, int nwave,
-                                        int ncol, int nlyr);
 
 torch::Tensor calc_flux_1band_init(int ncol, int nspecies, double wmin,
                                    double wmax, AtmosphericData atm_data,
@@ -466,8 +422,10 @@ int main(int argc, char** argv) {
   double aero_scale = 1;
   double sr_sun = 2.92842e-5;  // angular size of the sun at mars
 
-  disort::Disort disort(disort_options_sw(nwave, ncol, nlyr));
+  // shortwave solver
+  disort::Disort disort_sw(disort_flux_sw(nwave, ncol, nlyr));
 
+  // shortwave opacities
   harp::AttenuatorOptions op;
   op.species_names({"H2SO4", "S8"});
   op.species_weights({98.e-3, 256.e-3});
@@ -478,7 +436,7 @@ int main(int argc, char** argv) {
   op.species_ids({1}).opacity_files({"s8_k_fuller.txt"});
   harp::S8Fuller s8(op);
 
-  // from 0.2um to 5um (2000 cm^-1 to 50000 cm^-1)
+  // shortwave grid from 0.2um to 5um (2000 cm^-1 to 50000 cm^-1)
   auto wave = torch::linspace(2000, 50000, nwave, torch::kFloat64);
 
   // read in the atmos output, and extract pressure and mixing ratios
@@ -486,7 +444,7 @@ int main(int argc, char** argv) {
   //    read_4width_array_from_file("aerosol_output_data.txt");
 
   auto aero_mr_p = harp::read_data_tensor("aerosol_output_data.txt");
-  aeros_mwr_p.select(1, 0) *= 1e5;  // convert bar to Pa
+  aeros_mr_p.select(1, 0) *= 1e5;  // convert bar to Pa
 
   /*std::vector<double> p(aero_mr_p.size());
   std::vector<double> T(aero_mr_p.size());
@@ -508,8 +466,8 @@ int main(int argc, char** argv) {
   auto new_T = harp::read_data_tensor("TVals.txt");
 
   // unit = [mol/mol]
-  auto new_X = harp::regrid_xp(aero_mr_p.select(1, 0),
-                               aero_mr_p.narrow(1, 2, nspecies), new_P);
+  auto new_X = harp::interpn({new_P.log()}, {aero_mr_p.select(1, 0).log()},
+                             aero_mr_p.narrow(1, 2, nspecies));
 
   // unit = [mol/m^3]
   auto conc = aero_scale * new_X * new_P / (R * new_T);
@@ -520,26 +478,14 @@ int main(int argc, char** argv) {
   // unit = [K/s]
   auto dTdt = torch::zeros({nlyr}, torch::kFloat64);
 
-  for (int k = 0; k < nlyr; ++k) {
-    conc[0][k][0] = (aero_scale * new_mr[1][k] * new_p[k]) /
-                    (R * new_T[k]);  // s8 comes second in the file that we read
-                                     // in. but we need it to be index 0 in conc
-                                     // bc of how it was initialized above
-    conc[0][k][1] =
-        (aero_scale * new_mr[0][k] * new_p[k]) /
-        (R * new_T[k]);  // h2so4 comes first in the file that we read in. but
-                         // it needs to be index 1 in conc.
-    new_rho[k] = (new_p[k] * mean_mol_weight) / (R * new_T[k]);
-  }
-
   std::map<std::string, torch::Tensor> kwargs;
   kwargs["wavenumber"] = wave;
 
-  auto prop1 = s8->forward(conc, kwargs);
-  auto prop2 = h2so4->forward(conc, kwargs);
+  auto prop1 = h2so4->forward(conc, kwargs);
+  auto prop2 = s8->forward(conc, kwargs);
   auto prop = prop1 + prop2;
 
-  auto dz = calc_dz(new_p, new_T, torch::tensor({g / R}));
+  auto dz = calc_dz_hypsometric(new_p, new_T, torch::tensor({g / R}));
   prop *= dz;
 
   // mean single scattering albedo

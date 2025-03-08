@@ -7,6 +7,7 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol) {
   // Check if wave is a 1D tensor
   TORCH_CHECK(wave.dim() == 1, "wavenumber must be a 1D tensor");
 
+  // Physical constants
   constexpr double c1 = 1.19144e-5 * 1e-3;
   constexpr double c2 = 1.4388;
 
