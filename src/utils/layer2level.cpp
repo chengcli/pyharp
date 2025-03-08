@@ -16,9 +16,9 @@ torch::Tensor layer2level(torch::Tensor var,
   if (nlyr == 1) {  // use constant extrapolation
     out.select(-1, 0) = var.select(-1, 0);
   } else {  // lower boundary
-    if (options.blower() == kExtrapolate) {
+    if (options.lower() == kExtrapolate) {
       out.select(-1, 0) = (3. * var.select(-1, 0) - var.select(-1, 1)) / 2.;
-    } else if (options.blower() == kConstant) {
+    } else if (options.lower() == kConstant) {
       out.select(-1, 0) = var.select(-1, 0);
     } else {
       TORCH_CHECK(false, "Unsupported boundary condition");
@@ -54,10 +54,10 @@ torch::Tensor layer2level(torch::Tensor var,
   if (nlyr == 1) {  // use constant extrapolation
     out.select(-1, nlyr) = var.select(-1, nlyr - 1);
   } else {  // upper boundary
-    if (options.bupper() == kExtrapolate) {
+    if (options.upper() == kExtrapolate) {
       out.select(-1, nlyr) =
           (3. * var.select(-1, nlyr - 1) - var.select(-1, nlyr - 2)) / 2.;
-    } else if (options.bupper() == kConstant) {
+    } else if (options.upper() == kConstant) {
       out.select(-1, nlyr) = var.select(-1, nlyr - 1);
     } else {
       TORCH_CHECK(false, "Unsupported boundary condition");

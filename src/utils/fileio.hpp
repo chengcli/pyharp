@@ -19,8 +19,14 @@ std::string decomment_file(std::string fname);
 //! get number of columns in a data table
 int get_num_cols(std::string fname, char c = ' ');
 
+//! get number of columns in a data table
+int get_num_cols_str(std::string str, char c = ' ');
+
 //! get number of rows in a data table
 int get_num_rows(std::string fname);
+
+//! get number of rows in a data table
+int get_num_rows_str(std::string str);
 
 //! replace a character in a string
 void replace_char(char* buf, char c_old, char c_new);

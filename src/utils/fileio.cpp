@@ -57,12 +57,33 @@ int get_num_cols(std::string fname, char c) {
   return cols;
 }
 
+int get_num_cols_str(std::string str, char c) {
+  std::string line;
+  std::stringstream ss(str);
+  std::getline(ss, line);
+  if (line.empty()) return 0;
+  int cols = line[0] == c ? 0 : 1;
+
+  for (int i = 1; i < line.length(); ++i)
+    if (line[i - 1] == c && line[i] != c) cols++;
+  return cols;
+}
+
 int get_num_rows(std::string fname) {
   std::ifstream inp(fname.c_str(), std::ios::in);
   std::string line;
   int rows = 0;
 
   while (std::getline(inp, line)) ++rows;
+  return rows;
+}
+
+int get_num_rows_str(std::string str) {
+  std::string line;
+  int rows = 0;
+  std::stringstream ss(str);
+
+  while (std::getline(ss, line)) ++rows;
   return rows;
 }
 
