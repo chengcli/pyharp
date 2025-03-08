@@ -45,59 +45,11 @@ torch::Tensor interpolate_mixing_ratios(torch::Tensor dense_grid,
 
 }  // namespace harp
 
-disort::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
-  disort::DisortOptions op;
-
-  op.header("running amars RT");
-  op.flags(
-      "lamber,quiet,onlyfl,"
-      "intensity_correction,old_intensity_correction");
-  //"intensity_correction,old_intensity_correction,"
-  //"print-input,print-phase-function");
-
-  op.nwave(nwave);
-  op.ncol(ncol);
-
-  op.ds().nlyr = nlyr;
-  op.ds().nstr = 8;
-  op.ds().nmom = 8;
-
-  op.ds().nphi = 1;
-  op.ds().ntau = 1;
-  op.ds().numu = 1;
-
-  return op;
-}
-
-// unit = [cm^-1]
-torch::Tensor short_wavenumber_grid(int nwave) {
-  int wmin = 2000;   // 5 um
-  int wmax = 50000;  // 200 nm this gets us within 2 W/m^2 of the correct 410
-                     // value. this is where rayleigh attenuates all intensity
-  return torch::linspace(wmin, wmax, nwave, torch::kFloat64);
-}
+disort::DisortOptions disort_options_sw(int nwave, int ncol, int nlyr);
 
 // unit = [w/(m^2 cm^-1)]
 torch::Tensor short_toa_flux(int nwave, int ncol) {
   return torch::ones({nwave, ncol}, torch::kFloat64);
-}
-
-// unit = [w/(m^2 cm^-1)]
-torch::Tensor bb_toa_flux(torch::Tensor wave, int ncol, double temp,
-                          double fscale) {
-  double c1 = 1.19144e-5 * 1e-3;
-  double c2 = 1.4388;
-  double sr_sun = 2.92842e-5;  // angular size of the sun at mars
-
-  int nwave = wave.size(0);
-  torch::Tensor bb_flux = torch::ones({nwave, ncol}, torch::kFloat64);
-  for (int i = 0; i < nwave; ++i) {
-    for (int j = 0; j < ncol; ++j) {
-      bb_flux[i][j] = fscale * sr_sun * c1 * pow(wave[i], 3) /
-                      (exp(c2 * wave[i] / temp) - 1);
-    }
-  }
-  return bb_flux;
 }
 
 std::vector<std::vector<double>> read_4width_array_from_file(
@@ -275,27 +227,7 @@ torch::Tensor read_atm_concentration(int ncol, int nlyr, int nspecies,
 }
 
 disort::DisortOptions disort_options_lw(double wmin, double wmax, int nwave,
-                                        int ncol, int nlyr) {
-  disort::DisortOptions op;
-
-  op.header("running amars lw");
-  op.flags(
-      "lamber,quiet,onlyfl,planck,"
-      "intensity_correction,old_intensity_correction");
-  //"intensity_correction,old_intensity_correction,"
-  //"print-input,print-phase-function,print-fluxes");
-
-  op.nwave(nwave);
-  op.ncol(ncol);
-  op.wave_lower(std::vector<double>(nwave, wmin));
-  op.wave_upper(std::vector<double>(nwave, wmax));
-
-  op.ds().nlyr = nlyr;
-  op.ds().nstr = 8;
-  op.ds().nmom = 8;
-
-  return op;
-}
+                                        int ncol, int nlyr);
 
 torch::Tensor calc_flux_1band_init(int ncol, int nspecies, double wmin,
                                    double wmax, AtmosphericData atm_data,
@@ -532,8 +464,9 @@ int main(int argc, char** argv) {
   double surf_sw_albedo = 0.3;
   // double aero_scale = 1e-6;
   double aero_scale = 1;
+  double sr_sun = 2.92842e-5;  // angular size of the sun at mars
 
-  disort::Disort disort(disort_options(nwave, ncol, nlyr));
+  disort::Disort disort(disort_options_sw(nwave, ncol, nlyr));
 
   harp::AttenuatorOptions op;
   op.species_names({"H2SO4", "S8"});
@@ -545,14 +478,14 @@ int main(int argc, char** argv) {
   op.species_ids({1}).opacity_files({"s8_k_fuller.txt"});
   harp::S8Fuller s8(op);
 
-  auto wave = short_wavenumber_grid(nwave);
-  auto conc = atm_concentration(ncol, nlyr, nspecies);
+  // from 0.2um to 5um (2000 cm^-1 to 50000 cm^-1)
+  auto wave = torch::linspace(2000, 50000, nwave, torch::kFloat64);
 
   // read in the atmos output, and extract pressure and mixing ratios
   // std::vector<std::vector<double>> aero_mr_p =
   //    read_4width_array_from_file("aerosol_output_data.txt");
 
-  auto aero_mr_p = read_data_tensor("aerosol_output_data.txt");
+  auto aero_mr_p = harp::read_data_tensor("aerosol_output_data.txt");
   aeros_mwr_p.select(1, 0) *= 1e5;  // convert bar to Pa
 
   /*std::vector<double> p(aero_mr_p.size());
@@ -613,7 +546,7 @@ int main(int argc, char** argv) {
   prop.select(3, 1) /= prop.select(3, 0);
 
   std::map<std::string, torch::Tensor> bc;
-  bc["fbeam"] = bb_toa_flux(wave, ncol, solar_temp, lum_scale);
+  bc["fbeam"] = lum_scale * sr_sun * bb_flux(wave, solar_temp, ncol);
   bc["umu0"] = 0.707 * torch::ones({nwave, ncol}, torch::kFloat64);
   bc["albedo"] = surf_sw_albedo * torch::ones({nwave, ncol}, torch::kFloat64);
 
