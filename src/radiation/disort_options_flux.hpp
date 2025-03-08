@@ -23,7 +23,7 @@ namespace harp {
  * Example:
  *
  * ```cpp
- * auto op = disort_options_sw(nwave, ncol, nlyr);
+ * auto op = disort_flux_sw(nwave, ncol, nlyr);
  * op.flags("print-input,print-phase-function");
  * ```
  *
@@ -33,8 +33,8 @@ namespace harp {
  * \param nstr number of streams
  * \return disort options
  */
-disort::DisortOptions disort_options_sw(int nwave, int ncol, int nlyr,
-                                        int nstr = 8);
+disort::DisortOptions disort_flux_sw(int nwave, int ncol, int nlyr,
+                                     int nstr = 8);
 
 //! \brief create disort options for longwave grid
 /*!
@@ -54,7 +54,7 @@ disort::DisortOptions disort_options_sw(int nwave, int ncol, int nlyr,
  * Example:
  *
  * ```cpp
- * auto op = disort_options_sw(nwave, ncol, nlyr);
+ * auto op = disort_flux_lw(nwave, ncol, nlyr);
  * op.flags("print-input,print-phase-function");
  * ```
  *
@@ -65,7 +65,7 @@ disort::DisortOptions disort_options_sw(int nwave, int ncol, int nlyr,
  * \param nlyr number of layers
  * \return disort options
  */
-disort::DisortOptions disort_options_lw(double wmin, double wmax, int nwave,
-                                        int ncol, int nlyr, int nstr = 8);
+disort::DisortOptions disort_flux_lw(double wmin, double wmax, int nwave,
+                                     int ncol, int nlyr, int nstr = 8);
 
 }  // namespace harp

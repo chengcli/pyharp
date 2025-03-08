@@ -1,10 +1,9 @@
 // harp
-#include "disort_options.hpp"
+#include "disort_options_flux.hpp"
 
 namespace harp {
 
-disort::DisortOptions disort_options_sw(int nwave, int ncol, int nlyr,
-                                        int nstr) {
+disort::DisortOptions disort_flux_sw(int nwave, int ncol, int nlyr, int nstr) {
   disort::DisortOptions op;
 
   op.header("running disort shortwave");
@@ -22,8 +21,8 @@ disort::DisortOptions disort_options_sw(int nwave, int ncol, int nlyr,
   return op;
 }
 
-disort::DisortOptions disort_options_lw(double wmin, double wmax, int nwave,
-                                        int ncol, int nlyr, int nstr) {
+disort::DisortOptions disort_flux_lw(double wmin, double wmax, int nwave,
+                                     int ncol, int nlyr, int nstr) {
   disort::DisortOptions op;
 
   op.header("running disort longwave");
