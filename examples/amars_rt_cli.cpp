@@ -1,17 +1,4 @@
-#include <torch/torch.h>
-
-#include <fstream>
-#include <iostream>
-#include <map>
-#include <sstream>
-#include <string>
-#include <tuple>
-#include <vector>
-
 // harp
-#include <add_arg.h>
-#include <configure.h>
-
 #include <math/interpolation.hpp>
 #include <opacity/h2so4_simple.hpp>
 #include <opacity/rfm.hpp>
@@ -81,30 +68,6 @@ std::vector<double> read_values_from_file(const std::string& filename) {
 
   file.close();
   return values;
-}
-
-std::tuple<std::vector<std::vector<double>>, double, double> integrate_result(
-    const torch::Tensor& result, const torch::Tensor& wave, int nlyr,
-    int nwave) {
-  std::vector<std::vector<double>> integrated_flux(nlyr + 1,
-                                                   std::vector<double>(2, 0.0));
-  // assume a constant wavenumber grid
-  double d_lambda = wave[1].item<double>() - wave[0].item<double>();
-  double tot_flux_down_surf = 0;
-  double tot_flux_down_toa = 0;
-  for (int i = 0; i < nwave; ++i) {
-    for (int k = 0; k <= nlyr; ++k) {
-      integrated_flux[k][0] += result[i][0][k][0].item<double>() *
-                               d_lambda;  // result(x,x,x,0) is flux_up
-      integrated_flux[k][1] +=
-          result[i][0][k][1].item<double>() * d_lambda;  // 1 is down
-    }
-    tot_flux_down_surf += result[i][0][0][1].item<double>() * d_lambda;
-    tot_flux_down_toa += result[i][0][nlyr][1].item<double>() * d_lambda;
-  }
-
-  return std::make_tuple(integrated_flux, tot_flux_down_surf,
-                         tot_flux_down_toa);
 }
 
 struct AtmosphericData {
@@ -496,6 +459,7 @@ int main(int argc, char** argv) {
   bc["umu0"] = 0.707 * torch::ones({nwave, ncol}, torch::kFloat64);
   bc["albedo"] = surf_sw_albedo * torch::ones({nwave, ncol}, torch::kFloat64);
 
+  // shortwave flux at each wavenumber/level
   auto result = disort->forward(prop, &bc);
 
   auto [integrated_flux, tot_flux_down_surf, tot_flux_down_toa] =
