@@ -107,6 +107,8 @@ torch::Tensor RadiationBandImpl::forward(
   // bin optical properties
   auto prop = torch::zeros({nmax_prop_, ncol, nlyr}, conc.options());
 
+  std::cout << "nmax_prop: " << nmax_prop_ << std::endl;
+
   for (auto& [_, a] : opacities) {
     auto kdata = a.forward(conc, *kwargs);
     int nprop = kdata.size(0);

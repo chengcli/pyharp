@@ -25,8 +25,9 @@ RFMImpl::RFMImpl(AttenuatorOptions const& options_) : options(options_) {
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "rfm"),
-              "Mismatch type: ", options.type());
+  TORCH_CHECK(
+      options.type().empty() || (options.type().compare(0, 3, "rfm") == 0),
+      "Mismatch opacity type: ", options.type());
 
   reset();
 }
