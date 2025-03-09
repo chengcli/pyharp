@@ -11,7 +11,7 @@ TEST(FluxUtilsTest, CalTotalFluxWave) {
   torch::Tensor wave = torch::rand({5});
 
   // Calculate the total flux using the wave grid
-  torch::Tensor total_flux = harp::cal_total_flux(flux, wave, "wave");
+  torch::Tensor total_flux = harp::cal_total_flux(flux, wave, "wavenumber");
 
   std::cout << "total_flux: " << total_flux << std::endl;
 

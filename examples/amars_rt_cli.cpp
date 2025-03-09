@@ -11,24 +11,6 @@
 #include <utils/layer2level.hpp>
 #include <utils/read_weights.hpp>
 
-namespace harp {
-
-torch::Tensor interpolate_mixing_ratios(torch::Tensor dense_grid,
-                                        torch::Tensor mixing_ratios,
-                                        torch::Tensor thinned_grid) {
-  auto result = torch::zeros({thinned_grid.size()}, mixing_ratios.options());
-
-  // Perform 1D interpolation for each point in the thinned grid
-  for (size_t i = 0; i < thinned_grid.size(); ++i) {
-    result[i] = interp1(thinned_grid[i], mixing_ratios.data(),
-                        dense_grid.data(), dense_grid.size());
-    interpolated_ratios[i] = interp1(thinned_grid[i], mixing_ratios.data(),
-                                     dense_grid.data(), dense_grid.size());
-  }
-}
-
-}  // namespace harp
-
 std::vector<std::vector<double>> read_4width_array_from_file(
     std::string fpath) {
   std::ifstream file(fpath);
@@ -363,6 +345,77 @@ double calculate_dynamic_timestep(const std::vector<double>& new_T,
   return (timestep > 1e6) ? 1e6 : timestep;
 }
 
+//// ------- shortwave ------- ////
+void calc_shortwave(double wmin, double wmax, int nwave, int nlyr) {
+  double solar_temp = 5772;
+  double lum_scale = 0.7;
+  int ncol = 1;
+  int nwave = wave.size(0);
+
+  // shortwave grid from 0.2um to 5um (2000 cm^-1 to 50000 cm^-1)
+  auto wave = torch::linspace(2000, 50000, nwave, torch::kFloat64);
+
+  RadiationBandOptions rt_sw_op;
+  rt_sw_op.name() = "sw";
+  rt_sw_op.solver_name() = "disort";
+  rt_sw_op.opacity() = {
+      {"h2so4",
+       op.species_ids({0}).opacity_files({"h2so4.txt"}).type("h2so4_simple")},
+      {"s8", op.species_ids({1})
+                 .opacity_files({"s8_k_fuller.txt"})
+                 .type("s8_fuller")}};
+  rt_sw_op.disort() = disort(disort_flux_sw(nwave, ncol, nlyr));
+
+  RadiationBand rt_sw(rt_sw_op);
+  std::map<std::string, torch::Tensor> other;
+  other["wavenumber"] = wave;
+
+  std::map<std::string, torch::Tensor> bc;
+  bc["fbeam"] = lum_scale * sr_sun * bb_flux(wave, solar_temp, ncol);
+  bc["umu0"] = 0.707 * torch::ones({nwave, ncol}, torch::kFloat64);
+  bc["albedo"] = surf_sw_albedo * torch::ones({nwave, ncol}, torch::kFloat64);
+
+  // shortwave flux at each wavenumber/level
+  return rt_sw->forward(conc, dz, bc, other);
+}
+
+//// ------- longwave ------- ////
+void calc_longwave_1band(std::string filename, double wmin, double wmax,
+                         int nlyr) {
+  RadiationBandOptions rt_lw_op;
+  rt_lw_op.name() = "lw";
+  rt_lw_op.solver_name() = "disort";
+  rt_lw_op.opacity() = {
+      {"CO2", op.species_ids({0}).opacity_files({filename}).type("rfm")},
+      {"H2O", op.species_ids({1}).opacity_files({filename}).type("rfm")},
+      {"SO2", op.species_ids({2}).opacity_files({filename}).type("rfm")}};
+  rt_lw_op.disort() = disort_flux_lw(wmin, wmax, nwave, ncol, nlyr);
+
+  RadiationBand rt_lw(rt_lw_op);
+
+  // longwave flux at each wavenumber/level
+  return rt_lw->forward(conc, dz, bc, other);
+}
+
+void calc_longwave(std::string filename, int nlyr) {
+  auto tot_flux =
+      calc_longwave_1band(1., 250., atm_data, "amars-ck-B1.nc", 0, btemp);
+  tot_flux +=
+      calc_flux_1band_init(250., 438., atm_data, "amars-ck-B2.nc", 1, btemp);
+  tot_flux +=
+      calc_flux_1band_init(438., 675., atm_data, "amars-ck-B3.nc", 2, btemp);
+  tot_flux +=
+      calc_flux_1band_init(675., 1062., atm_data, "amars-ck-B4.nc", 0, btemp);
+  tot_flux +=
+      calc_flux_1band_init(1062., 1200., atm_data, "amars-ck-B5.nc", 2, btemp);
+  tot_flux +=
+      calc_flux_1band_init(1200., 1600., atm_data, "amars-ck-B6.nc", 0, btemp);
+  tot_flux +=
+      calc_flux_1band_init(1600., 1900., atm_data, "amars-ck-B7.nc", 2, btemp);
+  tot_flux +=
+      calc_flux_1band_init(1900., 2000., atm_data, "amars-ck-B8.nc", 0, btemp);
+}
+
 int main(int argc, char** argv) {
   // int nwave = 48;
   int nwave = 500;  // 50 bins gets you within ~1 W/m^2 fldn at TOA, but we want
@@ -378,29 +431,15 @@ int main(int argc, char** argv) {
   double mean_mol_weight = 0.044;  // CO2
   double R = 8.314472;
   double cp = 844;  // J/(kg K) for CO2
-  double solar_temp = 5772;
-  double lum_scale = 0.7;
   double surf_sw_albedo = 0.3;
   // double aero_scale = 1e-6;
   double aero_scale = 1;
   double sr_sun = 2.92842e-5;  // angular size of the sun at mars
 
-  // shortwave solver
-  disort::Disort disort_sw(disort_flux_sw(nwave, ncol, nlyr));
-
-  // shortwave opacities
+  //// ------- species ------- ////
   harp::AttenuatorOptions op;
-  op.species_names({"H2SO4", "S8"});
-  op.species_weights({98.e-3, 256.e-3});
-
-  op.species_ids({0}).opacity_files({"h2so4.txt"});
-  harp::H2SO4Simple h2so4(op);
-
-  op.species_ids({1}).opacity_files({"s8_k_fuller.txt"});
-  harp::S8Fuller s8(op);
-
-  // shortwave grid from 0.2um to 5um (2000 cm^-1 to 50000 cm^-1)
-  auto wave = torch::linspace(2000, 50000, nwave, torch::kFloat64);
+  op.species_names({"H2SO4", "S8", "CO2", "H2O", "SO2"});
+  op.species_weights({98.e-3, 256.e-3, 44.0e-3, 18.0e-3, 64.0e-3});
 
   // read in the atmos output, and extract pressure and mixing ratios
   // std::vector<std::vector<double>> aero_mr_p =
@@ -438,29 +477,7 @@ int main(int argc, char** argv) {
   // unit = [kg/m^3]
   auto new_rho = (new_P * mean_mol_weight) / (R * new_T);
 
-  // unit = [K/s]
-  auto dTdt = torch::zeros({nlyr}, torch::kFloat64);
-
-  std::map<std::string, torch::Tensor> kwargs;
-  kwargs["wavenumber"] = wave;
-
-  auto prop1 = h2so4->forward(conc, kwargs);
-  auto prop2 = s8->forward(conc, kwargs);
-  auto prop = prop1 + prop2;
-
   auto dz = calc_dz_hypsometric(new_p, new_T, torch::tensor({g / R}));
-  prop *= dz;
-
-  // mean single scattering albedo
-  prop.select(3, 1) /= prop.select(3, 0);
-
-  std::map<std::string, torch::Tensor> bc;
-  bc["fbeam"] = lum_scale * sr_sun * bb_flux(wave, solar_temp, ncol);
-  bc["umu0"] = 0.707 * torch::ones({nwave, ncol}, torch::kFloat64);
-  bc["albedo"] = surf_sw_albedo * torch::ones({nwave, ncol}, torch::kFloat64);
-
-  // shortwave flux at each wavenumber/level
-  auto flux_sw = disort->forward(prop, &bc);
 
   auto total_flux_sw = harp::cal_total_flux(flux_sw, wave, "wave");
   auto surf_flux_sw = harp::cal_surface_flux(total_flux_sw);
@@ -471,31 +488,20 @@ int main(int argc, char** argv) {
   // std::cout << "tot_flux_down_toa: " << tot_flux_down_toa << " W/m^2"
   //           << std::endl;
 
+  //// ------- longwave ------- ////
+
   double btemp = 210;
   AtmosphericData atm_data = read_atmospheric_data("rfm.atm");
   int nlyr_lw = atm_data.n_layers;
   int nspecies_lw = 3;
   // you must pass the index of the species of the associated ck band
   // CO2 is idx 0, H2O is idx 1, SO2 idx is 2
-  auto tot_flux = calc_flux_1band_init(ncol, nspecies_lw, 1., 250., atm_data,
-                                       "amars-ck-B1.nc", 0, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 250., 438., atm_data,
-                                   "amars-ck-B2.nc", 1, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 438., 675., atm_data,
-                                   "amars-ck-B3.nc", 2, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 675., 1062., atm_data,
-                                   "amars-ck-B4.nc", 0, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1062., 1200., atm_data,
-                                   "amars-ck-B5.nc", 2, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1200., 1600., atm_data,
-                                   "amars-ck-B6.nc", 0, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1600., 1900., atm_data,
-                                   "amars-ck-B7.nc", 2, btemp);
-  tot_flux += calc_flux_1band_init(ncol, nspecies_lw, 1900., 2000., atm_data,
-                                   "amars-ck-B8.nc", 0, btemp);
   // std::cout << "tot_flux = " << tot_flux << std::endl;
 
   // calculate heating rates and write to file
+  // unit = [K/s]
+  auto dTdt = torch::zeros({nlyr}, torch::kFloat64);
+
   double df = 0;
   double df_iplus1 = 0;
   std::ofstream outputFile("dT_ds.txt");

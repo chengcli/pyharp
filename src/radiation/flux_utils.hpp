@@ -26,8 +26,8 @@ namespace harp {
  * It can be either the wavelength(number) grid or a 1D weight tensor.
  *
  * The third argument is a string that specifies the type of the second
- * argument. It can be either "wave" or "weight". An error will be raised if the
- * input is not one of these two.
+ * argument. It can be either "wavelength", "wavenumber" or "weight".
+ * An error will be raised if the input is not one of these.
  *
  * \param flux The flux tensor
  * \param wave_or_weight The wavelength or weight tensor
@@ -91,5 +91,50 @@ torch::Tensor cal_surface_flux(torch::Tensor flux);
  * \return The top of atmosphere flux
  */
 torch::Tensor cal_toa_flux(torch::Tensor flux);
+
+//! \brief Spherical correction by XIZ
+/*!
+ * Formula 1:
+ * \f[
+ *    H_i = \frac{F_{i+1/2} - F_{i-1/2}}{\Delta z_i} V_i
+ * \f]
+ *
+ * Formula 2:
+ * \f[
+ *   k_{i+1/2} F_{i+1/2} A_{i+1/2} - k_{i-1/2} F_{i-1/2} A_{i-1/2} = H_i
+ * \f]
+ *
+ * Formula 3:
+ * \f[
+ *   k_{i-1/2} = \frac{k_{i+1/2} F_{i+1/2} A_{i+1/2} - H_i}{F_{i-1/2} A_{i-1/2}}
+ * \f]
+ *
+ * Formula 4:
+ * \f[
+ *   k_{n+1/2} = 1.
+ * \f]
+ *
+ * xiz 2022 flux scaling so that the heating rate is the same as the
+ * plane-parallel scheme volheating scaling.
+ *
+ * First calculate flux divergence from DISORT using Plane-parallel in a cell
+ * to get the volume heating rate (Formula 1).
+ * Assume the heating rate is the same as the plane-parallel scheme (Formula 2).
+ * Solve for kappa level by level from top down (Formula 3).
+ * The boundary condition assumes that the top flux is the same as the
+ * plane-parallel scheme (Formula 4).
+ *
+ * The input flux tensor is the net flux tensor at each level
+ * For all variables, the last dimension is the layer/level dimension.
+ * The other dimensions are batched.
+ *
+ * \param flx flux, shape (..., nlayer + 1, 2)
+ * \param dz cell height, shape (..., nlayer)
+ * \param area cell area, shape (..., nlayer)
+ * \param vol cell volume, shape (..., nlayer)
+ * \return the flux scaling factor, shape (..., nlayer)
+ */
+torch::Tensor spherical_flux_scaling(torch::Tensor flx, torch::Tensor dz,
+                                     torch::Tensor area, torch::Tensor vol);
 
 }  // namespace harp

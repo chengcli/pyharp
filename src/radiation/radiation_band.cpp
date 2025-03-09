@@ -12,6 +12,7 @@
 #include <utils/parse_radiation_direction.hpp>
 #include <utils/spherical_flux_correction.hpp>
 
+#include "flux_utils.hpp"
 #include "radiation.hpp"
 #include "radiation_band.hpp"
 
@@ -22,49 +23,38 @@ RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const& options_)
 }
 
 void RadiationBandImpl::reset() {
-  TORCH_CHECK(options.wave_lower().size() == options.wave_upper().size(),
-              "wave_lower and wave_upper must have the same size");
-  int nwave = options.wave_lower().size();
-
   auto str = options.outdirs();
   torch::Tensor ray_out;
   if (!str.empty()) {
     ray_out = parse_radiation_directions(str);
   }
 
-  // create attenuators
-  for (auto const& [name, op] : options.attenuators()) {
+  // create spectral grid
+  ww = register_buffer("ww", torch::tensor(options.ww()));
+
+  // create opacities
+  for (auto const& [name, op] : options.opacities()) {
     if (op.type() == "rfm") {
       auto a = RFM(op);
-      options.nmax_prop() = std::max(options.nmax_prop(), a->kdata.size(1));
-      attenuators[name] = torch::nn::AnyModule(a);
+      nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
+      opacity[name] = torch::nn::AnyModule(a);
     } else if (op.type() == "s8_fuller") {
       auto a = S8Fuller(op);
-      options.nmax_prop() = std::max(options.nmax_prop(), a->kdata.size(1));
-      attenuators[name] = torch::nn::AnyModule(a);
+      nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
+      opacity[name] = torch::nn::AnyModule(a);
     } else if (op.type() == "h2sO4_simple") {
       auto a = H2SO4Simple(op);
-      options.nmax_prop() = std::max(options.nmax_prop(), a->kdata.size(1));
-      attenuators[name] = torch::nn::AnyModule(a);
+      nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
+      opacity[name] = torch::nn::AnyModule(a);
     } else {
       TORCH_CHECK(false, "Unknown attenuator type: ", op.type());
     }
-    register_module(name, attenuators[name].ptr());
+    register_module(name, opacity[name].ptr());
   }
 
   // create rtsolver
   auto [uphi, umu] = get_direction_grids<double>(ray_out);
   if (options.solver_name() == "disort") {
-    options.disort().ds().nlyr = options.nlyr();
-
-    options.disort().nwave(nwave);
-    options.disort().ncol(options.ncol());
-
-    options.disort().user_phi(uphi);
-    options.disort().user_mu(umu);
-    options.disort().wave_lower(options.wave_lower());
-    options.disort().wave_upper(options.wave_upper());
-
     rtsolver = torch::nn::AnyModule(disort::Disort(options.disort()));
     register_module("solver", rtsolver.ptr());
   } else {
@@ -74,17 +64,25 @@ void RadiationBandImpl::reset() {
 
 torch::Tensor RadiationBandImpl::forward(
     torch::Tensor conc, torch::Tensor dz,
-    std::map<std::string, torch::Tensor>& bc,
-    std::map<std::string, torch::Tensor> const& op) {
+    std::map<std::string, torch::Tensor>* bc,
+    std::map<std::string, torch::Tensor>* kwargs) {
+  int ncol = conc.size(0);
+  int nlyr = conc.size(1);
+
+  // add wavelength or wavenumber to kwargs, may overwrite existing values
+  if (options.input() == "wavenumber") {
+    kwargs["wavenumber"] = ww;
+    kwargs["wavelength"] = 1.e4 / ww;
+  } else if (options.input() == "wavelength") {
+    kwargs["wavenumber"] = 1.e4 / ww;
+    kwargs["wavelength"] = ww;
+  }
+
   // bin optical properties
-  TORCH_CHECK(conc.size(0) == options.ncol());
-  TORCH_CHECK(conc.size(1) == options.nlyr());
+  auto prop = torch::zeros({nmax_prop_, ncol, nlyr}, conc.options());
 
-  auto prop = torch::zeros(
-      {options.nmax_prop(), options.ncol(), options.nlyr()}, conc.options());
-
-  for (auto& [_, a] : attenuators) {
-    auto kdata = a.forward(conc, op);
+  for (auto& [_, a] : opacity) {
+    auto kdata = a.forward(conc, *kwargs);
     int nprop = kdata.size(0);
 
     // total extinction
@@ -120,28 +118,22 @@ torch::Tensor RadiationBandImpl::forward(
   shared[name] = prop;
 
   // run rt solver
-  if (op.count("temp") > 0) {
-    return rtsolver.forward(prop, &bc,
-                            layer2level(op.at("temp"), options.l2l()));
+  if (kwargs.count("temp") > 0) {
+    Layer2LevelOptions l2l;
+    l2l.order(k4thOrder).lower(kExtrapolate).upper(kConstant);
+    spectra_ = rtsolver.forward(prop, bc, layer2level(kwargs.at("temp"), l2l));
   } else {
-    return rtsolver.forward(prop, &bc);
+    spectra_ = rtsolver.forward(prop, bc);
   }
 
-  /* accumulate flux from spectral bins
-  auto bflx = (flx * weight.view({-1, 1, 1, 1})).sum(0);
-
-  if (coord.count("area") == 0) {
-    return bflx;
-  } else {
-    return spherical_flux_correction(bflx, x1f, coord.at("area"),
-  coord.at("vol"));
-  }*/
+  // accumulate flux from flux spectra
+  return cal_total_flux(spectra_, ww, options.input());
 }
 
 void RadiationBandImpl::pretty_print(std::ostream& out) const {
   out << "RadiationBand: " << options.name() << std::endl;
   out << "Absorbers: (";
-  for (auto const& [name, _] : attenuators) {
+  for (auto const& [name, _] : opacities) {
     out << name << ", ";
   }
   out << ")" << std::endl;

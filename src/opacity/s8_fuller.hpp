@@ -31,7 +31,8 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
   void reset() override;
 
   //! Get optical properties
-  /* \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
+  /*!
+   * \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
    *
    * \param kwargs arguments for opacity calculation, must contain:
    *        "wavelength": wavelength [um], (nwave)
