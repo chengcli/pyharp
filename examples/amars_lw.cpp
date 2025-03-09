@@ -23,17 +23,19 @@ int main(int argc, char** argv) {
   double wmin = 1.;
   double wmax = 150.;
 
-  RadiationBandOptions lw_op;
+  harp::RadiationBandOptions lw_op;
   lw_op.name() = "lw";
   lw_op.solver_name() = "disort";
-  lw_op.opacity() = {
+  lw_op.opacities() = {
       {"CO2",
-       op.species_ids({0}).opacity_files({"amarsw-ck-B1.nc"}).type("rfm")},
+       op.species_ids({0}).opacity_files({"amarsw-ck-B1.nc"}).type("rfm-ck")},
       {"H2O",
-       op.species_ids({1}).opacity_files({"amarsw-ck-B1.nc"}).type("rfm")},
+       op.species_ids({1}).opacity_files({"amarsw-ck-B1.nc"}).type("rfm-ck")},
   };
-  lw_op.disort() = disort_flux_lw(wmin, wmax, nwave, ncol, nlyr);
-  RadiationBand lw(lw_op);
+
+  int nwave = lw_op.get_num_waves();
+  lw_op.disort() = harp::disort_flux_lw(wmin, wmax, nwave, ncol, nlyr);
+  harp::RadiationBand lw(lw_op);
 
   auto conc = atm_concentration(ncol, nlyr, op.species_ids().size());
 

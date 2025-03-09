@@ -1,8 +1,5 @@
 #pragma once
 
-// C/C++
-#include <future>
-
 // torch
 #include <torch/nn/cloneable.h>
 #include <torch/nn/module.h>
@@ -10,19 +7,30 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-// clang-format off
-#include <configure.h>
 #include <add_arg.h>
-// clang-format on
 
 #include <disort/disort.hpp>
 #include <opacity/attenuator_options.hpp>
 #include <rtsolver/rtsolver.hpp>
-#include <utils/layer2level.hpp>
 
 namespace harp {
+
 using AttenuatorDict = std::map<std::string, AttenuatorOptions>;
 
+//! \brief Options for initializing a `RadiationBand` object
+/*!
+ * This class defines opacity sources and a radiative transfer solver
+ * for a spectral band.
+ *
+ * It is used to initialize a `RadiationBand` object, which is a module
+ * that calculates the cumulative radiative flux in the band.
+ *
+ * The `RadiationBand` object recognizes the following opacity source types:
+ *  - "rfm-lbl": line-by-line opacity defined on wavenumber grid
+ *  - "rfm-ck": correlated-k opacity table built from rfm line-by-line table
+ *  - "s8_fuller": shortwave optical properties of S8
+ *  - "h2sO4_simple": shortwave optical properties of H2SO4
+ */
 struct RadiationBandOptions {
   RadiationBandOptions() = default;
 
@@ -30,11 +38,21 @@ struct RadiationBandOptions {
   ADD_ARG(std::string, outdirs) = "";
   ADD_ARG(std::string, solver_name) = "disort";
 
-  ADD_ARG(AttenuatorDict, opacity) = {};
+  ADD_ARG(AttenuatorDict, opacities) = {};
   ADD_ARG(disort::DisortOptions, disort);
 
-  ADD_ARG(std::vector<double>, ww) = { 1.0 };
+  ADD_ARG(std::vector<double>, ww) = {};
   ADD_ARG(std::string, input) = "wavenumber";
+
+  //! \brief query the number of spectral grids
+  /*!
+   * This function queries the number of spectral grids
+   * in the following precedence order:
+   *
+   * 1. user specified wave grid
+   * 2. number of tabuled spectral grids in the first opacity
+   */
+  int get_num_waves() const;
 };
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
@@ -43,7 +61,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   torch::Tensor ww;
 
   //! all opacities
-  std::map<std::string, torch::nn::AnyModule> opacity;
+  std::map<std::string, torch::nn::AnyModule> opacities;
 
   //! rt-solver
   torch::nn::AnyModule rtsolver;
@@ -75,7 +93,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
    * element is the upward flux and the second element is the downward flux.
    *
    * This function modifies the input `kwargs` by adding/modifiying the
-   * wavelength or wavenumber grid to it.
+   * wavelength and wavenumber grid to it.
    *
    * \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
    * \param path layer pathlength (nlyr) or (ncol, nlyr)
@@ -93,7 +111,6 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
    * \return cumulative radiative flux [W/m^2] (ncol, nlyr+1, 2)
    */
   torch::Tensor forward(torch::Tensor conc, torch::Tensor path,
-                        torch::Tensor wave_or_weight, std::string input,
                         std::map<std::string, torch::Tensor>* bc,
                         std::map<std::string, torch::Tensor>* kwargs);
 

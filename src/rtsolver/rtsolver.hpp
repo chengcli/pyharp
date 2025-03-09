@@ -7,29 +7,12 @@
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
-// clang-format off
-#include <configure.h>
-#include <add_arg.h>
-// clang-format on
-
 // harp
+#include <add_arg.h>
+
 #include "cdisort213/cdisort.h"
 
 namespace harp {
-
-//! \brief Common base class for all RT solvers
-class RTSolverImpl {
- public:
-  RTSolverImpl() = default;
-  virtual ~RTSolverImpl() {}
-  virtual torch::Tensor forward(
-      torch::Tensor prop, std::map<std::string, torch::Tensor>& bc,
-      torch::optional<torch::Tensor> temf = torch::nullopt) {
-    throw std::runtime_error("RTSolverImpl::forward: not implemented");
-  }
-};
-
-using RTSolver = std::shared_ptr<RTSolverImpl>;
 
 struct BeerLambertOptions {
   BeerLambertOptions() = default;
@@ -38,8 +21,7 @@ struct BeerLambertOptions {
   ADD_ARG(float, alpha);
 };
 
-class BeerLambertImpl : public torch::nn::Cloneable<BeerLambertImpl>,
-                        public RTSolverImpl {
+class BeerLambertImpl : public torch::nn::Cloneable<BeerLambertImpl> {
  public:
   //! options with which this `BeerLambertImpl` was constructed
   BeerLambertOptions options;
@@ -53,13 +35,13 @@ class BeerLambertImpl : public torch::nn::Cloneable<BeerLambertImpl>,
   /*!
    * \note export shared variable `radiation/<band_name>/optics`
    *
-   * \param prop properties at each level (..., layer)
+   * \param prop properties at each level (..., nlyr)
    * \param ftoa top of atmosphere flux
-   * \param temf temperature at each level (layer + 1)
+   * \param temf temperature at each level (..., nlyr+1)
    */
-  torch::Tensor forward(
-      torch::Tensor prop, std::map<std::string, torch::Tensor>& bc,
-      torch::optional<torch::Tensor> temf = torch::nullopt) override;
+  torch::Tensor forward(torch::Tensor prop,
+                        std::map<std::string, torch::Tensor>* bc,
+                        torch::optional<torch::Tensor> temf = torch::nullopt);
 };
 TORCH_MODULE(BeerLambert);
 

@@ -32,12 +32,17 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
 
   //! Get optical properties
   /*!
-   * \param conc mole concentration [mol/m^3], (ncol, nlyr, nspecies)
+   * This function calculates the shortwave optical properties of S8
+   * In the returned tensor, the first dimension is the wavelength
+   * and the last dimension is the optical properties.
+   * The first element of the last dimension is the extinction x-section.
+   * The second element of the last dimension is the single scattering albedo.
+   * \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
    *
    * \param kwargs arguments for opacity calculation, must contain:
-   *        "wavelength": wavelength [um], (nwave)
+   *        "wavelength": wavelength [um] (nwave)
    *
-   * \return optical properties, (nwave, ncol, nlyr, nprop=2)
+   * \return optical properties (nwave, ncol, nlyr, nprop=2)
    */
   torch::Tensor forward(torch::Tensor conc,
                         std::map<std::string, torch::Tensor> const& kwargs);

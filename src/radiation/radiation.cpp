@@ -1,19 +1,9 @@
-// C/C++ headers
-#include <algorithm>
-#include <fstream>
-#include <sstream>
-#include <stdexcept>
-#include <utility>
-
 // harp
-#include <utils/parse_radiation_direction.hpp>
-#include <utils/vectorize.hpp>
-
 #include "radiation.hpp"
-// #include "rt_solvers.hpp"
+
+#include "flux_utils.hpp"
 
 namespace harp {
-std::unordered_map<std::string, torch::Tensor> shared;
 
 RadiationImpl::RadiationImpl(RadiationOptions const& options_)
     : options(options_) {
@@ -50,7 +40,8 @@ torch::Tensor RadiationImpl::forward(
 
   auto net_flux = cal_net_flux(total_flux);
 
-  if (kwargs->find("area") != kargs.end()) {
+  // doing spherical scaling
+  if (kwargs->find("area") != kwargs->end()) {
     auto kappa = spherical_flux_scaling(net_flux, kwargs->at("dz"),
                                         kwargs->at("area"), kwargs->at("vol"));
     total_flux *= kappa.unsqueeze(-1);

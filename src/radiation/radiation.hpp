@@ -7,25 +7,21 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-// clang-format off
-#include <configure.h>
 #include <add_arg.h>
-// clang-format on
+
 #include "radiation_band.hpp"
 
 namespace harp {
 
-using RadiationBandOptionsMap = std::map<std::string, RadiationBandOptions>;
+using RadiationBandOptionsDict = std::map<std::string, RadiationBandOptions>;
 
 struct RadiationOptions {
   RadiationOptions() = default;
 
   //! radiation input key in the input file
   ADD_ARG(std::string, input_key) = "radiation_config";
-
-  ADD_ARG(std::string, indirs) = "(0.,0.)";
   ADD_ARG(std::string, outdirs) = "";
-  ADD_ARG(RadiationBandOptionsMap, band_options) = {};
+  ADD_ARG(RadiationBandOptionsDict, band_options) = {};
 };
 
 class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
