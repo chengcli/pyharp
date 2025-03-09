@@ -33,10 +33,13 @@ class H2SO4SimpleImpl : public torch::nn::Cloneable<H2SO4SimpleImpl> {
   //! Get optical properties
   /*!
    * This function calculates the shortwave optical properties of H2SO4
+   *
    * In the returned tensor, the first dimension is the wavelength
    * and the last dimension is the optical properties.
-   * The first element of the last dimension is the extinction x-section.
-   * The second element of the last dimension is the single scattering albedo.
+   *
+   * The first element of the last dimension is the extinction coefficient
+   * [1/m]. The second element of the last dimension is the single scattering
+   * albedo.
    *
    * \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
    *

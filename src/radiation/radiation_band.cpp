@@ -1,9 +1,12 @@
 // harp
 #include "radiation_band.hpp"
 
+#include <index.h>
+
 #include <opacity/h2so4_simple.hpp>
 #include <opacity/rfm.hpp>
 #include <opacity/s8_fuller.hpp>
+#include <utils/layer2level.hpp>
 #include <utils/read_dimvar_netcdf.hpp>
 
 #include "flux_utils.hpp"
@@ -13,10 +16,12 @@
 
 namespace harp {
 
+extern std::unordered_map<std::string, torch::Tensor> shared;
+
 int RadiationBandOptions::get_num_waves() const {
   // user specified wave grid
-  if (!ww.empty()) {
-    return ww.size();
+  if (!ww().empty()) {
+    return ww().size();
   }
 
   // cannot determine number of spectral grids if no opacities
@@ -70,9 +75,6 @@ void RadiationBandImpl::reset() {
     register_module(name, opacities[name].ptr());
   }
 
-  // create spectral grid
-  ww = register_buffer("ww", torch::tensor(options.ww()));
-
   // create rtsolver
   auto [uphi, umu] = get_direction_grids<double>(ray_out);
   if (options.solver_name() == "disort") {
@@ -81,20 +83,23 @@ void RadiationBandImpl::reset() {
   } else {
     TORCH_CHECK(false, "Unknown solver: ", options.solver_name());
   }
+
+  // create spectral grid
+  ww = register_buffer("ww", torch::tensor(options.ww()));
 }
 
 torch::Tensor RadiationBandImpl::forward(
-    torch::Tensor conc, torch::Tensor dz,
+    torch::Tensor conc, torch::Tensor path,
     std::map<std::string, torch::Tensor>* bc,
     std::map<std::string, torch::Tensor>* kwargs) {
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
 
   // add wavelength or wavenumber to kwargs, may overwrite existing values
-  if (options.input() == "wavenumber") {
+  if (options.integration() == "wavenumber") {
     (*kwargs)["wavenumber"] = ww;
     (*kwargs)["wavelength"] = 1.e4 / ww;
-  } else if (options.input() == "wavelength") {
+  } else if (options.integration() == "wavelength") {
     (*kwargs)["wavenumber"] = 1.e4 / ww;
     (*kwargs)["wavelength"] = ww;
   }
@@ -132,23 +137,26 @@ torch::Tensor RadiationBandImpl::forward(
     prop[index::ISS] /= (prop[index::IEX] + 1e-10);
   }
 
-  prop[index::IEX] *= dz.unsqueeze(0);
+  prop[index::IEX] *= path.unsqueeze(0);
 
   // export band optical properties
-  // std::string name = "radiation/" + options.name() + "/optics";
-  // shared[name] = prop;
+  std::string op_name = "radiation/" + options.name() + "/opacity";
+  shared[op_name] = prop;
+
+  std::string spec_name = "radiation/" + options.name() + "/spectra";
 
   // run rt solver
   if (kwargs->find("temp") != kwargs->end()) {
     Layer2LevelOptions l2l;
     l2l.order(k4thOrder).lower(kExtrapolate).upper(kConstant);
-    spectra_ = rtsolver.forward(prop, bc, layer2level(kwargs->at("temp"), l2l));
+    shared[spec_name] =
+        rtsolver.forward(prop, bc, layer2level(kwargs->at("temp"), l2l));
   } else {
-    spectra_ = rtsolver.forward(prop, bc);
+    shared[spec_name] = rtsolver.forward(prop, bc);
   }
 
   // accumulate flux from flux spectra
-  return cal_total_flux(spectra_, ww, options.input());
+  return cal_total_flux(shared[spec_name], ww, options.integration());
 }
 
 void RadiationBandImpl::pretty_print(std::ostream& out) const {

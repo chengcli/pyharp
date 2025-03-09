@@ -4,7 +4,6 @@
 // harp
 #include <radiation/disort_options_flux.hpp>
 #include <radiation/radiation_band.hpp>
-#include <utils/read_weights.hpp>
 
 // unit = [mol/m^3]
 torch::Tensor atm_concentration(int ncol, int nlyr, int nspecies) {
@@ -32,6 +31,7 @@ int main(int argc, char** argv) {
       {"H2O",
        op.species_ids({1}).opacity_files({"amarsw-ck-B1.nc"}).type("rfm-ck")},
   };
+  lw_op.integration() = "wavenumber";
 
   int nwave = lw_op.get_num_waves();
   lw_op.disort() = harp::disort_flux_lw(wmin, wmax, nwave, ncol, nlyr);
@@ -48,14 +48,6 @@ int main(int argc, char** argv) {
   kwargs["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 300.0;
 
   auto dz = torch::ones({ncol, nlyr}, torch::kFloat64);
-  auto flux = lw->forward(prop, dz, &bc, &kwargs);
+  auto flux = lw->forward(conc, dz, &bc, &kwargs);
   std::cout << "flux = " << flux << std::endl;
-
-  // ck weights
-  auto weights = harp::read_weights_rfm("amarsw-ck-B1.nc");
-  std::cout << "weights = " << weights << std::endl;
-
-  // band flux
-  auto bflx = (flux * weights.view({-1, 1, 1, 1})).sum(0);
-  std::cout << "bflx = " << bflx << std::endl;
 }

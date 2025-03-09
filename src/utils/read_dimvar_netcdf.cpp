@@ -1,7 +1,9 @@
-// base
-#include <configure.h>
+// C/C++
+#include <stdexcept>
 
 // harp
+#include <configure.h>
+
 #include <utils/find_resource.hpp>
 
 // netcdf
@@ -22,13 +24,13 @@ std::vector<double> read_dimvar_netcdf_double(std::string const& filename,
   size_t len;
   nc_open(full_path.c_str(), NC_NETCDF4, &fileid);
 
-  err = nc_inq_dimid(fileid, varname, &dimid);
+  err = nc_inq_dimid(fileid, varname.c_str(), &dimid);
   if (err != NC_NOERR) throw std::runtime_error(nc_strerror(err));
 
   err = nc_inq_dimlen(fileid, dimid, &len);
   if (err != NC_NOERR) throw std::runtime_error(nc_strerror(err));
 
-  err = nc_inq_varid(fileid, varname, &varid);
+  err = nc_inq_varid(fileid, varname.c_str(), &varid);
   if (err != NC_NOERR) throw std::runtime_error(nc_strerror(err));
 
   std::vector<double> out(len);
@@ -52,13 +54,13 @@ std::vector<float> read_dimvar_netcdf_float(std::string const& filename,
   size_t len;
   nc_open(full_path.c_str(), NC_NETCDF4, &fileid);
 
-  err = nc_inq_dimid(fileid, varname, &dimid);
+  err = nc_inq_dimid(fileid, varname.c_str(), &dimid);
   if (err != NC_NOERR) throw std::runtime_error(nc_strerror(err));
 
   err = nc_inq_dimlen(fileid, dimid, &len);
   if (err != NC_NOERR) throw std::runtime_error(nc_strerror(err));
 
-  err = nc_inq_varid(fileid, varname, &varid);
+  err = nc_inq_varid(fileid, varname.c_str(), &varid);
   if (err != NC_NOERR) throw std::runtime_error(nc_strerror(err));
 
   std::vector<float> out(len);

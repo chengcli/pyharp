@@ -5,6 +5,8 @@
 
 namespace harp {
 
+std::unordered_map<std::string, torch::Tensor> shared;
+
 RadiationImpl::RadiationImpl(RadiationOptions const& options_)
     : options(options_) {
   reset();
@@ -29,12 +31,13 @@ torch::Tensor RadiationImpl::forward(
   bool first_band = true;
 
   for (auto& [name, band] : bands) {
-    fluxes[name] = band->forward(conc, path, bc, kwargs);
+    std::string name1 = "radiation/" + name + "/total_flux";
+    shared[name1] = band->forward(conc, path, bc, kwargs);
     if (first_band) {
-      total_flux = fluxes[name].clone();
+      total_flux = shared[name1].clone();
       first_band = false;
     } else {
-      total_flux += fluxes[name];
+      total_flux += shared[name1];
     }
   }
 
@@ -48,8 +51,11 @@ torch::Tensor RadiationImpl::forward(
     net_flux *= kappa;
   }
 
-  downward = cal_surface_flux(total_flux);
-  upward = cal_toa_flux(total_flux);
+  // export downward flux to surface
+  shared["radiation/downward_flux"] = cal_surface_flux(total_flux);
+
+  // export upward flux out of the top of atmosphere
+  shared["radiation/upward_flux"] = cal_toa_flux(total_flux);
 
   return net_flux;
 }

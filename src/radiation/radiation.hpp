@@ -26,17 +26,8 @@ struct RadiationOptions {
 
 class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
  public:  // public access data
-  //! surface dowward flux
-  torch::Tensor downward;
-
-  //! top of atmosphere upward flux
-  torch::Tensor upward;
-
   //! all RadiationBands
   std::map<std::string, RadiationBand> bands;
-
-  //! all band fluxes
-  std::map<std::string, torch::Tensor> fluxes;
 
   //! options with which this `Radiation` was constructed
   RadiationOptions options;
@@ -55,6 +46,11 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
    * If kwargs contains "area", the fluxes will be scaled by
    * the spherical flux correction factor.
    * In this case, both "dz" and "vol" must be provided in kwargs as well
+   *
+   * This function exports the following tensor variables:
+   *  - radiation/<band_name>/total_flux
+   *  - radiation/downward_flux
+   *  - radiation/upward_flux
    *
    * \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
    * \param path layer pathlength (nlyr) or (ncol, nlyr)
