@@ -1,10 +1,10 @@
 // harp
-#include <math/interpolation.hpp>
 #include <opacity/h2so4_simple.hpp>
 #include <opacity/rfm.hpp>
 #include <opacity/s8_fuller.hpp>
 #include <radiation/calc_dz_hypsometric.hpp>
 #include <radiation/disort_options_flux.hpp>
+#include <radiation/flux_utils.hpp>
 #include <rtsolver/rtsolver.hpp>
 #include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
@@ -460,10 +460,11 @@ int main(int argc, char** argv) {
   bc["albedo"] = surf_sw_albedo * torch::ones({nwave, ncol}, torch::kFloat64);
 
   // shortwave flux at each wavenumber/level
-  auto result = disort->forward(prop, &bc);
+  auto flux_sw = disort->forward(prop, &bc);
 
-  auto [integrated_flux, tot_flux_down_surf, tot_flux_down_toa] =
-      integrate_result(result, wave, nlyr, nwave);
+  auto total_flux_sw = harp::cal_total_flux(flux_sw, wave, "wave");
+  auto surf_flux_sw = harp::cal_surface_flux(total_flux_sw);
+  auto toa_flux_sw = harp::cal_toa_flux(total_flux_sw);
 
   // std::cout << "tot_flux_down_surf: " << tot_flux_down_surf << " W/m^2"
   //           << std::endl;

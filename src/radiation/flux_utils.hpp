@@ -1,11 +1,6 @@
 // torch
 #include <torch/torch.h>
 
-// harp
-#include <index.h>
-
-#include <math/trapezoid.hpp>
-
 namespace harp {
 
 //! \brief Calculate total flux
@@ -40,18 +35,7 @@ namespace harp {
  * \return The integrated total flux
  */
 torch::Tensor cal_total_flux(torch::Tensor flux, torch::Tensor wave_or_weight,
-                             std::string input) {
-  // Check 1D tensor
-  TORCH_CHECK(wave_or_weight.dim() == 1, "wave_or_weight must be 1D tensor");
-
-  if (input == "wave") {
-    return trapezoid(flux, wave_or_weight, /*dim=*/0);
-  } else if (input == "weight") {
-    return (flux * wave_or_weight.unsqueeze(1).expand_as(flux)).sum(0);
-  } else {
-    TORCH_CHECK(false, "input must be either 'wave' or 'weight'");
-  }
-}
+                             std::string input);
 
 //! \brief Calculate net flux
 /*!
@@ -70,11 +54,7 @@ torch::Tensor cal_total_flux(torch::Tensor flux, torch::Tensor wave_or_weight,
  * \param flux The flux tensor
  * \return The net flux
  */
-torch::Tensor cal_net_flux(torch::Tensor flux) {
-  // Check last dimension
-  TORCH_CHECK(flux.size(-1) == 2, "flux must have last dimension of size 2");
-  return flux.select(-1, index::IUP) - flux.select(-1, index::IDN);
-}
+torch::Tensor cal_net_flux(torch::Tensor flux);
 
 //! \brief Calculate surface flux
 /*!
@@ -92,11 +72,7 @@ torch::Tensor cal_net_flux(torch::Tensor flux) {
  * \param flux The flux tensor
  * \return The surface flux
  */
-torch::Tensor cal_surface_flux(torch::Tensor flux) {
-  // Check last dimension
-  TORCH_CHECK(flux.size(-1) == 2, "flux must have last dimension of size 2");
-  return flux.select(-1, index::IDN).select(-1, 0);
-}
+torch::Tensor cal_surface_flux(torch::Tensor flux);
 
 //! \brief Calculate top of atmosphere flux
 /*!
@@ -114,10 +90,6 @@ torch::Tensor cal_surface_flux(torch::Tensor flux) {
  * \param flux The flux tensor
  * \return The top of atmosphere flux
  */
-torch::Tensor cal_toa_flux(torch::Tensor flux) {
-  // Check last dimension
-  TORCH_CHECK(flux.size(-1) == 2, "flux must have last dimension of size 2");
-  return flux.select(-1, index::IUP).select(-1, -1);
-}
+torch::Tensor cal_toa_flux(torch::Tensor flux);
 
 }  // namespace harp
