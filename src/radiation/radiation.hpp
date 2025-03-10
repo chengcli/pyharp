@@ -14,6 +14,7 @@
 namespace harp {
 
 using RadiationBandOptionsDict = std::map<std::string, RadiationBandOptions>;
+extern std::unordered_map<std::string, torch::Tensor> shared;
 
 struct RadiationOptions {
   RadiationOptions() = default;

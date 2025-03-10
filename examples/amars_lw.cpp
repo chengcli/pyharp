@@ -31,13 +31,13 @@ int main(int argc, char** argv) {
       {"H2O",
        op.species_ids({1}).opacity_files({"amarsw-ck-B1.nc"}).type("rfm-ck")},
   };
-  lw_op.integration() = "wavenumber";
+  lw_op.integration() = "weight";
 
   int nwave = lw_op.get_num_waves();
   lw_op.disort() = harp::disort_flux_lw(wmin, wmax, nwave, ncol, nlyr);
   harp::RadiationBand lw(lw_op);
 
-  auto conc = atm_concentration(ncol, nlyr, op.species_ids().size());
+  auto conc = atm_concentration(ncol, nlyr, op.species_names().size());
 
   std::map<std::string, torch::Tensor> bc;
   bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64);
@@ -49,5 +49,6 @@ int main(int argc, char** argv) {
 
   auto dz = torch::ones({ncol, nlyr}, torch::kFloat64);
   auto flux = lw->forward(conc, dz, &bc, &kwargs);
-  std::cout << "flux = " << flux << std::endl;
+  std::cout << "result = " << flux << std::endl;
+  // std::cout << harp::shared.at("radiation/lw/spectra") << std::endl;
 }

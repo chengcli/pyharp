@@ -164,6 +164,11 @@ torch::Tensor RFMImpl::forward(
     TORCH_CHECK(false, "Unsupported device");
   }
 
+  // Check species id in range
+  TORCH_CHECK(
+      options.species_ids()[0] >= 0 && options.species_ids()[0] < conc.size(2),
+      "Invalid species_id: ", options.species_ids()[0]);
+
   // ln(m*2/kmol) -> 1/m
   return 1.E-3 * out.exp() *
          conc.select(2, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);

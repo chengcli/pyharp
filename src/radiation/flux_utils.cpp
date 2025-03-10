@@ -15,7 +15,8 @@ torch::Tensor cal_total_flux(torch::Tensor flux, torch::Tensor wave_or_weight,
   if (input == "wavelength" || input == "wavenumber") {
     return trapezoid(flux, wave_or_weight, /*dim=*/0);
   } else if (input == "weight") {
-    return (flux * wave_or_weight.unsqueeze(1).expand_as(flux)).sum(0);
+    int nwave = wave_or_weight.size(0);
+    return (flux * wave_or_weight.view({nwave, 1, 1, 1})).sum(0);
   } else {
     TORCH_CHECK(false,
                 "input must be either 'wavelength', 'wavenumber', or 'weight'");

@@ -16,6 +16,7 @@
 namespace harp {
 
 using AttenuatorDict = std::map<std::string, AttenuatorOptions>;
+extern std::unordered_map<std::string, torch::Tensor> shared;
 
 //! \brief Options for initializing a `RadiationBand` object
 /*!
