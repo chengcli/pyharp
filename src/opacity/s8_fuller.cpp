@@ -107,6 +107,11 @@ torch::Tensor S8FullerImpl::forward(
     TORCH_CHECK(false, "Unsupported device");
   }
 
+  // Check species id in range
+  TORCH_CHECK(
+      options.species_ids()[0] >= 0 && options.species_ids()[0] < conc.size(2),
+      "Invalid species_id: ", options.species_ids()[0]);
+
   // attenuation [1/m]
   out.select(3, 0) *= conc.select(2, options.species_ids()[0]).unsqueeze(0);
 

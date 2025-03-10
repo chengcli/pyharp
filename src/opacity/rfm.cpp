@@ -25,8 +25,9 @@ RFMImpl::RFMImpl(AttenuatorOptions const& options_) : options(options_) {
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "rfm"),
-              "Mismatch type: ", options.type());
+  TORCH_CHECK(
+      options.type().empty() || (options.type().compare(0, 3, "rfm") == 0),
+      "Mismatch opacity type: ", options.type());
 
   reset();
 }
@@ -162,6 +163,11 @@ torch::Tensor RFMImpl::forward(
   } else {
     TORCH_CHECK(false, "Unsupported device");
   }
+
+  // Check species id in range
+  TORCH_CHECK(
+      options.species_ids()[0] >= 0 && options.species_ids()[0] < conc.size(2),
+      "Invalid species_id: ", options.species_ids()[0]);
 
   // ln(m*2/kmol) -> 1/m
   return 1.E-3 * out.exp() *
