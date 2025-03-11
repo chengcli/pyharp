@@ -1,3 +1,42 @@
+# Radiation configuration file
+#
+# Required the fields:
+#   - species: list of species
+#   - opacities: list of opacities
+#   - bands: list of bands
+#   - <band>: band configuration
+#
+# Required fields for 'species':
+#   - name: species name
+#   - composition: species atomic composition
+#
+# Required fields for 'opacities':
+#   - name: opacity source name
+#   - type: choose between the following recognized types
+#           - 'rfm': RFM line-by-line table
+#           - 'rfm-ck': correlated-k table generated from RFM line-by-line
+#           - 'h2so4_simple': simple H2SO4 shortwave opacity model
+#           - 's8_simple': simple S8 shortwave opacity model
+#   - data: list of opacity data files
+#   - species: list of species used by the opacity source
+#
+# Required fields for each band:
+#   - range: band wavenumber/wavelength range
+#            If the range is in wavenumber, the unit is cm^-1
+#            If the range is in wavelength, the unit is um
+#   - opacities: list of opacities used by the band
+#   - integration: choose between 'wavelength', 'wavenumber', or 'weight'
+#                  If the integration is 'weight', the band is integrated
+#                  using weights from input. Otherwise, the band is integrated
+#                  using the trapezoidal rule along a uniform wavelength
+#                  or wavenumber grid.
+#   - solver: choose between 'disort' or 'twostr'
+#   - flags: a string of flags for the radiative transfer solver
+#            separated by commas
+#
+# Optional fields for each band:
+#   - ww: a list of weights (double) for spectral bins in the band
+
 species:
   - name: CO2
     composition: {C: 1, O: 2}
@@ -44,7 +83,6 @@ bands: [B1, B2, B3, B4, B5, B6, B7, B8]
 
 B1:
   range: [1., 250.]
-  units: cm-1
   opacities: [CO2]
   solver: disort
   flags: |
@@ -52,7 +90,6 @@ B1:
 
 B2:
   range: [250., 438.]
-  units: cm-1
   opacities: [H2O]
   solver: disort
   flags: |
@@ -60,7 +97,6 @@ B2:
 
 B3:
   range: [438., 675.]
-  units: cm-1
   opacities: [SO2]
   integration: weight
   solver: disort
@@ -69,7 +105,6 @@ B3:
 
 B4:
   range: [675., 1062.]
-  units: cm-1
   opacities: [CO2]
   integration: weight
   solver: disort
@@ -78,7 +113,6 @@ B4:
 
 B5:
   range: [1062., 1200.]
-  units: cm-1
   opacities: [SO2]
   integration: weight
   solver: disort
@@ -87,7 +121,6 @@ B5:
 
 B6:
   range: [1200., 1600.]
-  units: cm-1
   opacities: [HO2]
   integration: weight
   solver: disort
@@ -96,7 +129,6 @@ B6:
 
 B7:
   range: [1600., 1900.]
-  units: cm-1
   opacities: [SO2]
   integration: weight
   solver: disort
@@ -105,7 +137,6 @@ B7:
 
 B8:
   range: [1900., 2000.]
-  units: cm-1
   opacities: [H2O]
   integration: weight
   solver: disort
