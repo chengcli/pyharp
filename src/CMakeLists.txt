@@ -6,25 +6,18 @@
 # Define the following symbols
 #
 #   HARP_INCLUDE_DIR
-#   HARP_LIBRARY_DEBUG
-#   HARP_LIBRARY_RELEASE
+#   pyharp::harp
 #
 # Normal usage would be:
 #
 #   include_directories(${HARP_INCLUDE_DIR})
-#   target_link_libraries(${HARP_LIBRARY_DEBUG})
-#   target_link_libraries(${HARP_LIBRARY_RELEASE})
-#
-# Compile the following submodules
-#
-#   rtsolver  : radiative transfer solvers
+#   target_link_libraries(pyharp::harp)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_BINARY_DIR}
   ${NETCDF_INCLUDES}
   ${PNETCDF_INCLUDE_DIR}
-  SYSTEM ${DISORT_INCLUDE_DIR}
   SYSTEM ${TORCH_API_INCLUDE_DIR}
   SYSTEM ${TORCH_INCLUDE_DIR}
   )
@@ -41,6 +34,7 @@ file(GLOB src_files
     utils/*.cpp
     opacity/*.cpp
     radiation/*.cpp
+    rtsolver/*.cpp
     )
 
 add_library(${namel}_${buildl}
@@ -54,20 +48,18 @@ set_target_properties(${namel}_${buildl}
     )
 
 target_link_libraries(${namel}_${buildl}
-		PRIVATE
+    PUBLIC
+    pydisort::disort
+    fmt::fmt
+    yaml-cpp::yaml-cpp
     ${TORCH_LIBRARY}
     ${TORCH_CPU_LIBRARY}
     ${C10_LIBRARY}
     ${NETCDF_LIBRARIES}
     )
 
-add_subdirectory(rtsolver)
+add_library(pyharp::harp ALIAS ${namel}_${buildl})
 
 set(HARP_INCLUDE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}"
   CACHE INTERNAL "harp include directory")
-
-set(HARP_LIBRARY_${buildu}
-  harp_${buildl}
-  rtsolver_${buildl}
-  CACHE INTERNAL "harp library")

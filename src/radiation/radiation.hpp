@@ -17,10 +17,10 @@ using RadiationBandOptionsDict = std::map<std::string, RadiationBandOptions>;
 extern std::unordered_map<std::string, torch::Tensor> shared;
 
 struct RadiationOptions {
+  static RadiationOptions from_yaml(std::string const& filename);
+
   RadiationOptions() = default;
 
-  //! radiation input key in the input file
-  ADD_ARG(std::string, input_key) = "radiation_config";
   ADD_ARG(std::string, outdirs) = "";
   ADD_ARG(RadiationBandOptionsDict, band_options) = {};
 };

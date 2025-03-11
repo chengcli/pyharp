@@ -25,5 +25,5 @@ macro(setup_problem namel)
             SYSTEM
             ${TORCH_API_INCLUDE_DIR})
 
-  target_link_libraries(${namel}.${buildl} PRIVATE ${HARP_LIBRARY_${buildu}})
+  target_link_libraries(${namel}.${buildl} PRIVATE pyharp::harp)
 endmacro()

@@ -9,3 +9,5 @@ set(PACKAGE_NAME disort)
 set(REPO_URL "https://${ACCOUNT}:${TOKEN}@github.com/zoeyzyhu/pydisort")
 set(REPO_TAG "afee3ec897f")
 add_package(${PACKAGE_NAME} ${REPO_URL} ${REPO_TAG} "" ON)
+
+include_directories(${pydisort_SOURCE_DIR})

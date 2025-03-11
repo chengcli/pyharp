@@ -1,11 +1,29 @@
-// harp
-#include "radiation.hpp"
+// yaml
+#include <yaml-cpp/yaml.h>
 
+// harp
 #include "flux_utils.hpp"
+#include "radiation.hpp"
 
 namespace harp {
 
 std::unordered_map<std::string, torch::Tensor> shared;
+
+RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
+  RadiationOptions rad auto config = YAML::LoadFile(filename);
+
+  // check if bands are defined
+  TORCH_CHECK(config["bands"],
+              "'bands' is not defined in the radiation configuration file");
+
+  for (auto name : config["bands"]) {
+    auto bd_name = name.as<std::string>();
+    rad.band_options[bd_name] =
+        RadiationBandOptions::from_yaml(bd_name, config);
+  }
+
+  return rad;
+}
 
 RadiationImpl::RadiationImpl(RadiationOptions const& options_)
     : options(options_) {

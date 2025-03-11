@@ -1,0 +1,113 @@
+species:
+  - name: CO2
+    composition: {C: 1, O: 2}
+
+  - name: H2O
+    composition: {H: 2, O: 1}
+
+  - name: SO2
+    composition: {S: 1, O: 2}
+
+  - name: H2SO4
+    composition: {H: 2, S: 1, O: 4}
+
+  - name: S8
+    composition: {S: 8}
+
+opacities:
+  - name: H2SO4
+    type: h2so4_simple
+    data: [h2so4.txt]
+    species: [H2SO4]
+
+  - name: S8
+    type: s8_simple
+    data: [s8_k_fuller.txt]
+    species: [S8]
+
+  - name: CO2
+    type: rfm-ck
+    data: [amars-ck-<band>.nc]
+    species: [CO2]
+
+  - name: H2O
+    type: rfm-ck
+    data: [amars-ck-<band>.nc]
+    species: [H2O]
+
+  - name: SO2
+    type: rfm-ck
+    data: [amars-ck-<band>.nc]
+    species: [SO2]
+
+bands: [B1, B2, B3, B4, B5, B6, B7, B8]
+
+B1:
+  range: [1., 250.]
+  units: cm-1
+  opacities: [CO2]
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B2:
+  range: [250., 438.]
+  units: cm-1
+  opacities: [H2O]
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B3:
+  range: [438., 675.]
+  units: cm-1
+  opacities: [SO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B4:
+  range: [675., 1062.]
+  units: cm-1
+  opacities: [CO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B5:
+  range: [1062., 1200.]
+  units: cm-1
+  opacities: [SO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B6:
+  range: [1200., 1600.]
+  units: cm-1
+  opacities: [HO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B7:
+  range: [1600., 1900.]
+  units: cm-1
+  opacities: [SO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B8:
+  range: [1900., 2000.]
+  units: cm-1
+  opacities: [H2O]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction

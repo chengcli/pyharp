@@ -6,6 +6,9 @@
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
+// yaml
+#include <yaml-cpp/yaml.h>
+
 // harp
 #include <add_arg.h>
 
@@ -33,6 +36,9 @@ extern std::unordered_map<std::string, torch::Tensor> shared;
  *  - "h2sO4_simple": shortwave optical properties of H2SO4
  */
 struct RadiationBandOptions {
+  static RadiationBandOptions from_yaml(std::string const& name,
+                                        YAML::Node const& config);
+
   //! \brief query the number of spectral grids
   /*!
    * This function queries the number of spectral grids
@@ -53,6 +59,8 @@ struct RadiationBandOptions {
   ADD_ARG(disort::DisortOptions, disort);
 
   ADD_ARG(std::vector<double>, ww) = {};
+
+  /// integration method: "wavenumber", "wavelength", or "weight"
   ADD_ARG(std::string, integration) = "wavenumber";
 };
 

@@ -18,6 +18,57 @@ namespace harp {
 
 extern std::unordered_map<std::string, torch::Tensor> shared;
 
+RadiationBandOptions RadiationBandOptions::from_yaml(
+    std::string const& band_name, const YAML::Node& config) {
+  RadiationBandOptions my;
+
+  // band configuration
+  auto band = config[band_name];
+
+  my.name() = band_name;
+  my.solver_name() = band["rt-solver"].as<std::string>();
+
+  if (band["opacities"]) {
+    for (auto const& name : band["opacities"]) {
+      AttenuatorOptions a;
+      a.name() = name.as<std::string>();
+      a.opacity_files() = config[a.name()]["data"];
+      replace_pattern_inplace(a.opacity_files(), "{band}", band_name);
+      a.species_names() = config["species"];
+
+      for (auto const& sp : config[a.name()]["species"]) {
+        auto sp_name = sp.as<std::string>();
+        // index sp_name in species
+        auto it = std::find(a.species_names().begin(), a.species_names().end(),
+                            sp_name);
+        TORCH_CHECK(it != a.species_names().end(), "species ", sp_name,
+                    " not found in species list");
+        a.species_ids().push_back(it - a.species_names().begin());
+      }
+    }
+  }
+
+  int nwave = my.get_num_waves();
+  auto [wmin, wmax] = get_wavenumber_range(band, nwave);
+
+  if (my.solver_name() == "disort") {
+    my.disort().header("running disort " + band_name);
+    if (band["flags"]) {
+      my.disort().flags() = band["flags"].as<std::string>();
+    }
+    my.disort().nwave(nwave);
+    my.disort().wave_lower(std::vector<double>(nwave, wmin));
+    my.disort().wave_upper(std::vector<double>(nwave, wmax));
+  }
+
+  if (band["ww"]) {
+    my.ww() = band["ww"].as<std::vector<double>>();
+  }
+  my.integration() = band["integration"].as<std::string>();
+
+  return my;
+}
+
 int RadiationBandOptions::get_num_waves() const {
   // user specified wave grid
   if (!ww().empty()) {
