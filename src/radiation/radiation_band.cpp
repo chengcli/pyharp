@@ -12,6 +12,7 @@
 #include "flux_utils.hpp"
 #include "get_direction_grids.hpp"
 #include "parse_radiation_direction.hpp"
+#include "parse_yaml_input.hpp"
 #include "radiation.hpp"
 
 namespace harp {
@@ -26,25 +27,29 @@ RadiationBandOptions RadiationBandOptions::from_yaml(
   auto band = config[band_name];
 
   my.name() = band_name;
-  my.solver_name() = band["rt-solver"].as<std::string>();
+  my.solver_name() = band["solver"].as<std::string>();
 
-  if (band["opacities"]) {
-    for (auto const& name : band["opacities"]) {
-      AttenuatorOptions a;
-      a.name() = name.as<std::string>();
-      a.opacity_files() = config[a.name()]["data"];
-      replace_pattern_inplace(a.opacity_files(), "{band}", band_name);
-      a.species_names() = config["species"];
+  TORCH_CHECK(band["opacities"], "opacities not found in band ", band_name);
 
-      for (auto const& sp : config[a.name()]["species"]) {
-        auto sp_name = sp.as<std::string>();
-        // index sp_name in species
-        auto it = std::find(a.species_names().begin(), a.species_names().end(),
-                            sp_name);
-        TORCH_CHECK(it != a.species_names().end(), "species ", sp_name,
-                    " not found in species list");
-        a.species_ids().push_back(it - a.species_names().begin());
-      }
+  for (auto const& name : band["opacities"]) {
+    AttenuatorOptions a;
+    a.name(name.as<std::string>()) a.opacity_files(
+        config[a.name()]["data"].as<std::vector<std::string>>());
+
+    for (auto& f : a.opacity_files())
+      replace_pattern_inplace(f, "<band>", band_name);
+    a.species_names(config["species"].as<std::vector<std::string>>());
+
+    for (auto const& sp : config[a.name()]["species"]) {
+      auto sp_name = sp.as<std::string>();
+
+      // index sp_name in species
+      auto it = std::find(a.species_names().begin(), a.species_names().end(),
+                          sp_name);
+
+      TORCH_CHECK(it != a.species_names().end(), "species ", sp_name,
+                  " not found in species list");
+      a.species_ids().push_back(it - a.species_names().begin());
     }
   }
 
