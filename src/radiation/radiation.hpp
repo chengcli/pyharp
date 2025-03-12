@@ -16,7 +16,30 @@ namespace harp {
 using RadiationBandOptionsDict = std::map<std::string, RadiationBandOptions>;
 extern std::unordered_map<std::string, torch::Tensor> shared;
 
+//! \brief Options for initializing a `Radiation` object
+/*!
+ * This class defines the options for initializing a `Radiation` object,
+ * which is a module that calculates the cumulative radiative flux in
+ * multiple spectral bands.
+ *
+ * The `RadiationOptions` object records the following options:
+ *  - "outdirs": list of outgoing radiation directions
+ *  - "band_options": dictionary of `RadiationBandOptions` objects
+ *
+ * The `RadiationOptions` object will store a `RadiationBandOptions` object
+ * for each entry in the `band_options` dictionary.
+ */
 struct RadiationOptions {
+  //! \brief Create a `RadiationOptions` object from a YAML file
+  /*!
+   * This function reads a YAML file and creates a `RadiationOptions`
+   * object from it. The YAML file must contain the following fields:
+   *  - "bands": list of band names
+   *  - "<band_name>": band configuration
+   *
+   * This function calls the `from_yaml` function of each `RadiationBandOptions`
+   * object to create a `RadiationBandOptions` object for each band.
+   */
   static RadiationOptions from_yaml(std::string const& filename);
 
   RadiationOptions() = default;

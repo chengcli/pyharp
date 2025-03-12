@@ -22,7 +22,7 @@
 #
 # Required fields for each band:
 #   - range: band wavenumber/wavelength range
-#            If the range is in wavenumber, the unit is cm^-1
+#            If the range is in wavenumber, the unit is cm^{-1}
 #            If the range is in wavelength, the unit is um
 #   - opacities: list of opacities used by the band
 #   - integration: choose between 'wavelength', 'wavenumber', or 'weight'

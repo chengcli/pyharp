@@ -18,8 +18,9 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
               "'bands' is not defined in the radiation configuration file");
 
   for (auto bd : config["bands"]) {
-    auto name = bd.as<std::string>();
-    rad.band_options()[name] = RadiationBandOptions::from_yaml(name, config);
+    auto bd_name = bd.as<std::string>();
+    rad.band_options()[bd_name] =
+        RadiationBandOptions::from_yaml(bd_name, config);
   }
 
   return rad;
