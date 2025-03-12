@@ -44,10 +44,8 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
    *        a wavelength/wavenumber key in kwargs and uses it to calculate
    *        the optical properties by interpolating the data.
    *        The following is a list of possible keys in search order:
-   *          (1) <band_name> + "/wavelength": wavelength [um] (nwave)
-   *          (2) <band_name> + "/wavenumber": wavenumber [1/cm] (nwave)
-   *          (3) "wavelength": wavelength [um] (nwave)
-   *          (4) "wavenumber": wavenumber [1/cm] (nwave)
+   *          (1) "wavelength": wavelength [um] (nwave)
+   *          (2) "wavenumber": wavenumber [1/cm] (nwave)
    *        If none of the keys are found, an error is thrown.
    *
    * \return optical properties (nwave, ncol, nlyr, nprop=2)
