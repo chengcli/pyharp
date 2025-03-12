@@ -80,8 +80,7 @@ opacities:
     data: [amars-ck-<band>.nc]
     species: [SO2]
 
-#bands: [SW, B1, B2, B3, B4, B5, B6, B7, B8]
-bands: [SW]
+bands: [SW, B1, B2, B3, B4, B5, B6, B7, B8]
 
 SW:
   range: [2000., 50000.]

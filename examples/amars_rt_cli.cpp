@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
 
   // configure input data for each radiation band
   std::map<std::string, torch::Tensor> atm, bc;
-  atm["pres"] = new_P;
+  atm["pres"] = new_P.unsqueeze(0).expand({ncol, nlyr});
   atm["temp"] = new_T.unsqueeze(0).expand({ncol, nlyr});
 
   // read radiation configuration from yaml file
@@ -168,5 +168,10 @@ int main(int argc, char** argv) {
   // print radiation options and construct radiation model
   std::cout << "rad op = " << fmt::format("{}", op) << std::endl;
   harp::Radiation rad(op);
-  auto flux = rad->forward(conc, dz, &bc, &atm);
+  auto netflux = rad->forward(conc, dz, &bc, &atm);
+  std::cout << "net flux = " << netflux << std::endl;
+  std::cout << "downward flux = " << harp::shared["radiation/downward_flux"]
+            << std::endl;
+  std::cout << "upward flux = " << harp::shared["radiation/upward_flux"]
+            << std::endl;
 }
