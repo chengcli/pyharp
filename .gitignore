@@ -10,3 +10,9 @@ examples/*/*.nc
 
 # data
 data/*.nc
+
+# mac
+.DS_Store
+
+# doc
+doc/doxygen
