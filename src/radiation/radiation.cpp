@@ -10,16 +10,16 @@ namespace harp {
 std::unordered_map<std::string, torch::Tensor> shared;
 
 RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
-  RadiationOptions rad auto config = YAML::LoadFile(filename);
+  RadiationOptions rad;
+  auto config = YAML::LoadFile(filename);
 
   // check if bands are defined
   TORCH_CHECK(config["bands"],
               "'bands' is not defined in the radiation configuration file");
 
-  for (auto name : config["bands"]) {
-    auto bd_name = name.as<std::string>();
-    rad.band_options[bd_name] =
-        RadiationBandOptions::from_yaml(bd_name, config);
+  for (auto bd : config["bands"]) {
+    auto name = bd.as<std::string>();
+    rad.band_options()[name] = RadiationBandOptions::from_yaml(name, config);
   }
 
   return rad;

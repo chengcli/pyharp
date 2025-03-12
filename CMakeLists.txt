@@ -66,7 +66,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/gtest.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/fmt.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/pydisort.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/yamlpp.cmake)
-#include(${CMAKE_SOURCE_DIR}/cmake/spdlog.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/elements.cmake)
 #include(${CMAKE_SOURCE_DIR}/cmake/pybind11.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up project libraries ...${ColorReset}")

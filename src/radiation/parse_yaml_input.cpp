@@ -21,18 +21,12 @@ std::string parse_unit_with_default(YAML::Node const &node) {
 }
 
 std::pair<double, double> parse_wave_range(YAML::Node const &node) {
-  auto unit = parse_unit_with_default(node);
-
-  char str[80];
-  snprintf(str, sizeof(str), "%s-%s", unit.c_str(), "range");
-
-  if (!node[str]) {
+  if (!node["range"]) {
     throw std::runtime_error("missing spectral range");
   }
 
-  /// wavenumber-range, wavelength-range, frequency-range, etc
-  double wmin = node[str][0].as<double>();
-  double wmax = node[str][1].as<double>();
+  double wmin = node["range"][0].as<double>();
+  double wmax = node["range"][1].as<double>();
 
   if (wmin > wmax) {
     throw std::runtime_error("invalid spectral range");

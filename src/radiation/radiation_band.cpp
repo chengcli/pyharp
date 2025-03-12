@@ -19,28 +19,26 @@ namespace harp {
 
 extern std::unordered_map<std::string, torch::Tensor> shared;
 
-RadiationBandOptions RadiationBandOptions::from_yaml(
-    std::string const& band_name, const YAML::Node& config) {
+RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
+                                                     const YAML::Node& config) {
   RadiationBandOptions my;
 
   // band configuration
-  auto band = config[band_name];
+  auto band = config[bd_name];
+  TORCH_CHECK(band["opacities"], "opacities not found in band ", bd_name);
 
-  my.name() = band_name;
-  my.solver_name() = band["solver"].as<std::string>();
+  for (auto const& op : band["opacities"]) {
+    std::string op_name = op.as<std::string>();
 
-  TORCH_CHECK(band["opacities"], "opacities not found in band ", band_name);
-
-  for (auto const& name : band["opacities"]) {
     AttenuatorOptions a;
-    a.name(name.as<std::string>()) a.opacity_files(
-        config[a.name()]["data"].as<std::vector<std::string>>());
+    a.opacity_files(config[op_name]["data"].as<std::vector<std::string>>());
 
-    for (auto& f : a.opacity_files())
-      replace_pattern_inplace(f, "<band>", band_name);
+    for (auto& f : a.opacity_files()) {
+      replace_pattern_inplace(f, "<band>", bd_name);
+    }
     a.species_names(config["species"].as<std::vector<std::string>>());
 
-    for (auto const& sp : config[a.name()]["species"]) {
+    for (auto const& sp : config[op_name]["species"]) {
       auto sp_name = sp.as<std::string>();
 
       // index sp_name in species
@@ -51,25 +49,32 @@ RadiationBandOptions RadiationBandOptions::from_yaml(
                   " not found in species list");
       a.species_ids().push_back(it - a.species_names().begin());
     }
+
+    my.opacities()[op_name] = a;
   }
 
-  int nwave = my.get_num_waves();
-  auto [wmin, wmax] = get_wavenumber_range(band, nwave);
+  auto [wmin, wmax] = parse_wave_range(band);
 
+  my.name(bd_name);
+  my.solver_name(band["solver"].as<std::string>());
   if (my.solver_name() == "disort") {
-    my.disort().header("running disort " + band_name);
+    my.disort().header("running disort " + bd_name);
     if (band["flags"]) {
       my.disort().flags() = band["flags"].as<std::string>();
     }
-    my.disort().nwave(nwave);
-    my.disort().wave_lower(std::vector<double>(nwave, wmin));
-    my.disort().wave_upper(std::vector<double>(nwave, wmax));
+    my.disort().nwave(1);
+    my.disort().wave_lower(std::vector<double>(1, wmin));
+    my.disort().wave_upper(std::vector<double>(1, wmax));
+  } else if (my.solver_name() == "twostr") {
+    TORCH_CHECK(false, "twostr solver not implemented");
+  } else {
+    TORCH_CHECK(false, "unknown solver: ", my.solver_name());
   }
 
   if (band["ww"]) {
-    my.ww() = band["ww"].as<std::vector<double>>();
+    my.ww(band["ww"].as<std::vector<double>>());
   }
-  my.integration() = band["integration"].as<std::string>();
+  my.integration(band["integration"].as<std::string>());
 
   return my;
 }
