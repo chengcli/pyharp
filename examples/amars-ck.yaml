@@ -13,7 +13,7 @@
 # Required fields for 'opacities':
 #   - name: opacity source name
 #   - type: choose between the following recognized types
-#           - 'rfm': RFM line-by-line table
+#           - 'rfm-lbl': RFM line-by-line table
 #           - 'rfm-ck': correlated-k table generated from RFM line-by-line
 #           - 'h2so4_simple': simple H2SO4 shortwave opacity model
 #           - 's8_fuller': simple S8 shortwave opacity model
@@ -82,10 +82,10 @@ opacities:
 bands: [SW, B1, B2, B3, B4, B5, B6, B7, B8]
 
 SW:
-  range: [0.1, 1.]
+  range: [2000., 50000.]
   opacities: [H2SO4, S8]
   solver: disort
-  integration: wavelength
+  integration: wavenumber
   flags: lamber,quiet,onlyfl
 
 B1:

@@ -46,6 +46,7 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
 
       if (it["name"].as<std::string>() != op_name) continue;
       opacity_found = true;
+      a.bname(bd_name);
 
       TORCH_CHECK(it["type"], "'type' not found in opacity ", op_name);
       a.type(it["type"].as<std::string>());
@@ -57,7 +58,6 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
       }
 
       TORCH_CHECK(it["species"], "'species' not found in opacity ", op_name);
-      a.species_ids().clear();
       for (auto const& sp : it["species"]) {
         auto sp_name = sp.as<std::string>();
 
@@ -242,9 +242,10 @@ torch::Tensor RadiationBandImpl::forward(
     Layer2LevelOptions l2l;
     l2l.order(k4thOrder).lower(kExtrapolate).upper(kConstant);
     shared[spec_name] = rtsolver.forward(
-        prop, bc, std::make_optional(layer2level(kwargs->at("temp"), l2l)));
+        prop, bc, options.name(),
+        std::make_optional(layer2level(kwargs->at("temp"), l2l)));
   } else {
-    shared[spec_name] = rtsolver.forward(prop, bc);
+    shared[spec_name] = rtsolver.forward(prop, bc, options.name());
   }
 
   // accumulate flux from flux spectra

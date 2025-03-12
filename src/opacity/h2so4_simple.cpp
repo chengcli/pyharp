@@ -78,7 +78,11 @@ torch::Tensor H2SO4SimpleImpl::forward(
   constexpr int nprop = 2;
 
   torch::Tensor coord;
-  if (kwargs.count("wavelength") > 0) {
+  if (kwargs.count(options.bname() + "/wavelength") > 0) {
+    coord = kwargs.at(options.bname() + "/wavelength");
+  } else if (kwargs.count(options.bname() + "/wavenumber") > 0) {
+    coord = 1.e4 / kwargs.at(options.bname() + "/wavenumber");
+  } else if (kwargs.count("wavelength") > 0) {
     coord = kwargs.at("wavelength");
   } else if (kwargs.count("wavenumber") > 0) {
     coord = 1.e4 / kwargs.at("wavenumber");
