@@ -39,13 +39,17 @@ struct RadiationBandOptions {
   //! \brief Create a `RadiationBandOptions` object from a YAML file
   /*!
    * This function reads a YAML file and creates a `RadiationBandOptions`
-   * object from it. The YAML file should contain the following fields:
+   * object from it. The band node must contain the following fields:
+   *  - "range": two float values defining the range of the band
    *  - "opacities": list of opacity sources
    *  - "solver": name of the radiative transfer solver
    *  - "integration": integration method ("wavenumber", "wavelength", or
    *                   "weight")
    *
-   * The created `RadiationBandOptions` object will be partially filled
+   * It can optionally contain the following fields:
+   *  - "flags": radiative transfer solver flags passed to the solver
+   *
+   * The returned `RadiationBandOptions` object will be partially filled
    * with the information from the YAML file. The YAML file does not
    * contain settings for the following variables:
    *  - number of spectral grids, default to 1
@@ -53,8 +57,8 @@ struct RadiationBandOptions {
    *  - number of columns, default to 1
    *  - number of layers, default to 1
    *
-   *  Thus, another call, such as, `get_num_waves`, is needed to set
-   *  these variables if they are different from the defaults.
+   * Thus, another call, such as, `get_num_waves`, is needed to set
+   * these variables if they are different from the defaults.
    *
    * \param bd_name name of the band
    * \param config YAML configuration node
