@@ -1,5 +1,5 @@
 // harp
-#include <radiation/disort_options_flux.hpp>
+#include <radiation/disort_config.hpp>
 #include <radiation/radiation.hpp>
 #include <radiation/radiation_formatter.hpp>
 
@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
     auto wmin = band.disort().wave_lower()[0];
     auto wmax = band.disort().wave_upper()[0];
 
-    band.disort(harp::disort_flux(nwave, ncol, nlyr, nstr));
+    band.disort(harp::disort_config(nwave, ncol, nlyr, nstr));
     band.disort().wave_lower(std::vector<double>(nwave, wmin));
     band.disort().wave_upper(std::vector<double>(nwave, wmax));
   }

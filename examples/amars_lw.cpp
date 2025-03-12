@@ -2,7 +2,7 @@
 #include <torch/torch.h>
 
 // harp
-#include <radiation/disort_options_flux.hpp>
+#include <radiation/disort_config.hpp>
 #include <radiation/radiation.hpp>
 #include <radiation/radiation_band.hpp>
 
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
   lw_op.integration() = "weight";
 
   int nwave = lw_op.get_num_waves();
-  lw_op.disort() = harp::disort_flux_lw(wmin, wmax, nwave, ncol, nlyr);
+  lw_op.disort() = harp::disort_config_lw(wmin, wmax, nwave, ncol, nlyr);
   harp::RadiationBand lw(lw_op);
 
   auto conc = atm_concentration(ncol, nlyr, harp::species_names.size());

@@ -28,8 +28,8 @@
 #   - integration: choose between 'wavelength', 'wavenumber', or 'weight'
 #                  If the integration is 'weight', the band is integrated
 #                  using weights from input. Otherwise, the band is integrated
-#                  using the trapezoidal rule along a uniform wavelength
-#                  or wavenumber grid.
+#                  using the trapezoidal rule along a wavelength
+#                  or wavenumber grid (ww).
 #   - solver: choose between 'disort' or 'twostr'
 #   - flags: a string of flags for the radiative transfer solver
 #            separated by commas

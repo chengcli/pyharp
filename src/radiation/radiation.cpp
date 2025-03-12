@@ -37,10 +37,6 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
     species_weights.push_back(elements::get_compound_weight(comp));
   }
 
-  for (auto& s : species_weights) {
-    std::cout << "species weight = " << s << std::endl;
-  }
-
   for (auto bd : config["bands"]) {
     auto bd_name = bd.as<std::string>();
     rad.band_options()[bd_name] =

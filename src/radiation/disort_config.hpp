@@ -6,7 +6,19 @@
 
 namespace harp {
 
-disort::DisortOptions disort_flux(int nwave, int ncol, int nlyr, int nstr = 8);
+//! \brief create disort options for a general grid
+/*!
+ * This function creates a template disort options for a general grid.
+ * It only sets the dimensions inside disort.
+ * It does not turn on any flags.
+ *
+ * \param nwave number of waves
+ * \param ncol number of columns
+ * \param nlyr number of layers
+ * \param nstr number of streams
+ */
+disort::DisortOptions disort_config(int nwave, int ncol, int nlyr,
+                                    int nstr = 8);
 
 //! \brief create disort options for shortwave grid
 /*!
@@ -29,14 +41,14 @@ disort::DisortOptions disort_flux(int nwave, int ncol, int nlyr, int nstr = 8);
  * op.flags("print-input,print-phase-function");
  * ```
  *
- * \param nwave number of wavenumbers
+ * \param nwave number of waves
  * \param ncol number of columns
  * \param nlyr number of layers
  * \param nstr number of streams
  * \return disort options
  */
-disort::DisortOptions disort_flux_sw(int nwave, int ncol, int nlyr,
-                                     int nstr = 8);
+disort::DisortOptions disort_config_sw(int nwave, int ncol, int nlyr,
+                                       int nstr = 8);
 
 //! \brief create disort options for longwave grid
 /*!
@@ -67,7 +79,7 @@ disort::DisortOptions disort_flux_sw(int nwave, int ncol, int nlyr,
  * \param nlyr number of layers
  * \return disort options
  */
-disort::DisortOptions disort_flux_lw(double wmin, double wmax, int nwave,
-                                     int ncol, int nlyr, int nstr = 8);
+disort::DisortOptions disort_config_lw(double wmin, double wmax, int nwave,
+                                       int ncol, int nlyr, int nstr = 8);
 
 }  // namespace harp
