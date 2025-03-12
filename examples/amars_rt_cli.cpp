@@ -2,9 +2,13 @@
 #include <torch/torch.h>
 
 // harp
+#include <math/interpolation.hpp>
+#include <radiation/bbflux.hpp>
+#include <radiation/calc_dz_hypsometric.hpp>
 #include <radiation/disort_config.hpp>
 #include <radiation/radiation.hpp>
 #include <radiation/radiation_formatter.hpp>
+#include <utils/read_data_tensor.hpp>
 
 int main(int argc, char** argv) {
   // parameters of the computational grid
@@ -22,17 +26,52 @@ int main(int argc, char** argv) {
   double aero_scale = 1;
   double sr_sun = 2.92842e-5;  // angular size of the sun at mars
   double btemp = 210;
+  double solar_temp = 5772;
+  double lum_scale = 0.7;
 
-  // configure wave grid and parameters for each band
+  /// ----- read atmosphere data -----  ///
+
+  auto aero_ptx = harp::read_data_tensor("aerosol_output_data.txt");
+  auto aero_p = (aero_ptx.select(1, 0) * 1e5);
+  auto aero_t = aero_ptx.select(1, 1);
+  auto aero_x = aero_ptx.narrow(1, 2, 2);
+  std::cout << "aero_p = " << aero_p << std::endl;
+  std::cout << "aero_t = " << aero_t << std::endl;
+  std::cout << "aero_x = " << aero_x.sizes() << std::endl;
+
+  // unit = [pa]
+  auto new_P = harp::read_data_tensor("pVals.txt").squeeze(1);
+  new_P *= 100.0;  // convert mbar to Pa
+  std::cout << "new_P = " << new_P << std::endl;
+
+  // unit = [K]
+  auto new_T = harp::read_data_tensor("TVals.txt").squeeze(1);
+  std::cout << "new_T = " << new_T << std::endl;
+
+  // unit = [mol/mol]
+  auto new_X = harp::interpn({new_P.log()}, {aero_p.log()}, aero_x);
+  std::cout << "new_X = " << new_X << std::endl;
+
+  // unit = [mol/m^3]
+  auto conc =
+      aero_scale * new_X * new_P.unsqueeze(1) / (R * new_T.unsqueeze(1));
+  std::cout << "conc = " << conc << std::endl;
+
+  // unit = [kg/m^3]
+  auto new_rho = (new_P * mean_mol_weight) / (R * new_T);
+  std::cout << "new_rho = " << new_rho << std::endl;
+
+  // unit = [m]
+  auto dz = harp::calc_dz_hypsometric(new_P, new_T,
+                                      torch::tensor({mean_mol_weight * g / R}));
+  std::cout << "dz = " << dz << std::endl;
+
+  /// ----- done read atmosphere data -----  ///
+
+  // configure input data for each radiation band
   std::map<std::string, torch::Tensor> atm, bc;
-  atm["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64);
-  atm["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64);
-  for (int i = 0; i < nlyr; ++i) {
-    atm["pres"][0][i] = new_p[i];
-    atm["temp"][0][i] = new_T[i];
-  }
-  bc["umu0"] = 0.707 * torch::ones({nwave, ncol}, torch::kFloat64);
-  bc["btemp"] = btemp * torch::ones({nwave, ncol}, torch::kFloat64);
+  atm["pres"] = new_P;
+  atm["temp"] = new_T;
 
   // read radiation configuration from yaml file
   auto op = harp::RadiationOptions::from_yaml("amars-ck.yaml");
@@ -48,19 +87,20 @@ int main(int argc, char** argv) {
       auto wave = torch::linspace(wmin, wmax, nwave, torch::kFloat64);
       atm[name + "/wavenumber"] = wave;
       bc[name + "/fbeam"] =
-          lum_scale * sr_sun * bb_flux(wave, solar_temp, ncol);
+          lum_scale * sr_sun * harp::bbflux_wavenumber(wave, solar_temp, ncol);
       bc[name + "/albedo"] =
           surf_sw_albedo * torch::ones({nwave, ncol}, torch::kFloat64);
+      bc[name + "/umu0"] = 0.707 * torch::ones({nwave, ncol}, torch::kFloat64);
     } else {  // longwave
       band.disort().wave_lower(std::vector<double>(nwave, wmin));
       band.disort().wave_upper(std::vector<double>(nwave, wmax));
       bc[name + "/albedo"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
+      bc[name + "/btemp"] = btemp * torch::ones({nwave, ncol}, torch::kFloat64);
     }
   }
 
   // print radiation options and construct radiation model
   std::cout << "rad op = " << fmt::format("{}", op) << std::endl;
   harp::Radiation rad(op);
-
-  auto flux = rad->forward(conc, dz, &bc, &kwargs);
+  auto flux = rad->forward(conc, dz, &bc, &atm);
 }
