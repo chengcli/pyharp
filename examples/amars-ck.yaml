@@ -11,12 +11,13 @@
 #   - composition: species atomic composition
 #
 # Required fields for 'opacities':
-#   - name: opacity source name
 #   - type: choose between the following recognized types
 #           - 'rfm-lbl': RFM line-by-line table
 #           - 'rfm-ck': correlated-k table generated from RFM line-by-line
 #           - 'h2so4_simple': simple H2SO4 shortwave opacity model
 #           - 's8_fuller': simple S8 shortwave opacity model
+#
+# Optional fields for 'opacities':
 #   - data: list of opacity data files
 #   - species: list of species used by the opacity source
 #
@@ -54,27 +55,27 @@ species:
     composition: {S: 8}
 
 opacities:
-  - name: H2SO4
+  H2SO4:
     type: h2so4_simple
     data: [h2so4.txt]
     species: [H2SO4]
 
-  - name: S8
+  S8:
     type: s8_fuller
     data: [s8_k_fuller.txt]
     species: [S8]
 
-  - name: CO2
+  CO2:
     type: rfm-ck
     data: [amars-ck-<band>.nc]
     species: [CO2]
 
-  - name: H2O
+  H2O:
     type: rfm-ck
     data: [amars-ck-<band>.nc]
     species: [H2O]
 
-  - name: SO2
+  SO2:
     type: rfm-ck
     data: [amars-ck-<band>.nc]
     species: [SO2]

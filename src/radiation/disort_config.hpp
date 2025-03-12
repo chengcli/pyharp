@@ -12,13 +12,14 @@ namespace harp {
  * It only sets the dimensions inside disort.
  * It does not turn on any flags.
  *
+ * \param disort existing DisortOptions
  * \param nwave number of waves
  * \param ncol number of columns
  * \param nlyr number of layers
  * \param nstr number of streams
  */
-disort::DisortOptions disort_config(int nwave, int ncol, int nlyr,
-                                    int nstr = 8);
+void disort_config(disort::DisortOptions *disort, int nwave, int ncol, int nlyr,
+                   int nstr = 8);
 
 //! \brief create disort options for shortwave grid
 /*!

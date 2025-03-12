@@ -1,3 +1,7 @@
+// C/C++
+#include <fstream>
+#include <iostream>
+
 // torch
 #include <torch/torch.h>
 
@@ -9,6 +13,50 @@
 #include <radiation/radiation.hpp>
 #include <radiation/radiation_formatter.hpp>
 #include <utils/read_data_tensor.hpp>
+
+struct AtmosphericData {
+  int n_layers;
+  std::map<std::string, torch::Tensor> data;
+};
+
+AtmosphericData read_rfm_atm(const std::string& filename) {
+  std::ifstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Could not open file: " + filename);
+  }
+
+  AtmosphericData atm_data;
+  std::string line;
+
+  // Read the number of layers
+  std::getline(file, line);
+  std::istringstream iss(line);
+  iss >> atm_data.n_layers;
+
+  // Read the data sections
+  while (std::getline(file, line)) {
+    if (line.empty()) continue;
+
+    // Read the name of the data section
+    if (line[0] == '*') {
+      std::string name = line.substr(1);  // Remove the '*' character
+
+      // Read the data points
+      std::getline(file, line);
+      std::istringstream data_stream(line);
+      std::vector<double> data_points(atm_data.n_layers);
+      for (int i = 0; i < atm_data.n_layers; ++i) {
+        data_stream >> data_points[i];
+      }
+
+      // Store the data points in the map
+      atm_data.data[name] = torch::tensor(data_points, torch::kFloat64);
+    }
+  }
+
+  file.close();
+  return atm_data;
+}
 
 int main(int argc, char** argv) {
   // parameters of the computational grid
@@ -52,8 +100,19 @@ int main(int argc, char** argv) {
   auto new_X = harp::interpn({new_P.log()}, {aero_p.log()}, aero_x);
   std::cout << "new_X = " << new_X << std::endl;
 
+  AtmosphericData atm_data = read_rfm_atm("rfm.atm");
+  auto pre = atm_data.data["PRE [mb]"] * 100.0;
+  auto tem = atm_data.data["TEM [K]"];
+
   // unit = [mol/m^3]
-  auto conc =
+  auto conc = torch::zeros({ncol, nlyr, 5}, torch::kFloat64);
+
+  conc.select(-1, 0) = (atm_data.data["CO2 [ppmv]"] * 1e-6) * (pre / (R * tem));
+  conc.select(-1, 1) = (atm_data.data["H2O [ppmv]"] * 1e-6) * (pre / (R * tem));
+  conc.select(-1, 2) = (atm_data.data["SO2 [ppmv]"] * 1e-6) * (pre / (R * tem));
+
+  // aerosols
+  conc.narrow(-1, 3, new_X.size(-1)) =
       aero_scale * new_X * new_P.unsqueeze(1) / (R * new_T.unsqueeze(1));
   std::cout << "conc = " << conc << std::endl;
 
@@ -81,7 +140,8 @@ int main(int argc, char** argv) {
     auto wmin = band.disort().wave_lower()[0];
     auto wmax = band.disort().wave_upper()[0];
 
-    band.disort(harp::disort_config(nwave, ncol, nlyr, nstr));
+    harp::disort_config(&band.disort(), nwave, ncol, nlyr, nstr);
+    std::cout << "flags = " << band.disort().flags() << std::endl;
 
     if (name == "SW") {  // shortwave
       auto wave = torch::linspace(wmin, wmax, nwave, torch::kFloat64);

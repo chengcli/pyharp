@@ -48,8 +48,8 @@ torch::Tensor read_data_tensor(const std::string& filename) {
   size_t rows = data.size();
   size_t cols = data[0].size();
 
-  torch::Tensor result =
-      torch::empty({static_cast<long>(rows), static_cast<long>(cols)});
+  torch::Tensor result = torch::empty(
+      {static_cast<long>(rows), static_cast<long>(cols)}, torch::kFloat64);
 
   for (size_t i = 0; i < rows; ++i) {
     if (data[i].size() != cols) {

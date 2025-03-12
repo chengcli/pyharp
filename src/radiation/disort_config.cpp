@@ -3,17 +3,14 @@
 
 namespace harp {
 
-disort::DisortOptions disort_config(int nwave, int ncol, int nlyr, int nstr) {
-  disort::DisortOptions op;
+void disort_config(disort::DisortOptions *disort, int nwave, int ncol, int nlyr,
+                   int nstr) {
+  disort->nwave(nwave);
+  disort->ncol(ncol);
 
-  op.nwave(nwave);
-  op.ncol(ncol);
-
-  op.ds().nlyr = nlyr;
-  op.ds().nstr = nstr;
-  op.ds().nmom = nstr;
-
-  return op;
+  disort->ds().nlyr = nlyr;
+  disort->ds().nstr = nstr;
+  disort->ds().nmom = nstr;
 }
 
 disort::DisortOptions disort_config_sw(int nwave, int ncol, int nlyr,

@@ -38,26 +38,23 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
     std::string op_name = op.as<std::string>();
 
     AttenuatorOptions a;
-    bool opacity_found = false;
+    a.bname(bd_name);
 
-    // find opacity
-    for (auto const& it : config["opacities"]) {
-      TORCH_CHECK(it["name"], "'name' not found in opacity ", op_name);
+    TORCH_CHECK(config["opacities"][op_name], op_name,
+                " not found in opacities");
+    auto it = config["opacities"][op_name];
 
-      if (it["name"].as<std::string>() != op_name) continue;
-      opacity_found = true;
-      a.bname(bd_name);
+    TORCH_CHECK(it["type"], "'type' not found in opacity ", op_name);
+    a.type(it["type"].as<std::string>());
 
-      TORCH_CHECK(it["type"], "'type' not found in opacity ", op_name);
-      a.type(it["type"].as<std::string>());
-
-      TORCH_CHECK(it["data"], "'data' not found in opacity ", op_name);
+    if (it["data"]) {
       a.opacity_files(it["data"].as<std::vector<std::string>>());
       for (auto& f : a.opacity_files()) {
         replace_pattern_inplace(f, "<band>", bd_name);
       }
+    }
 
-      TORCH_CHECK(it["species"], "'species' not found in opacity ", op_name);
+    if (it["species"]) {
       for (auto const& sp : it["species"]) {
         auto sp_name = sp.as<std::string>();
 
@@ -70,9 +67,6 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
         a.species_ids().push_back(jt - species_names.begin());
       }
     }
-
-    TORCH_CHECK(opacity_found, "opacity ", op_name, " not found in band ",
-                bd_name);
 
     my.opacities()[op_name] = a;
   }
