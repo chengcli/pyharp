@@ -6,6 +6,8 @@
 
 namespace harp {
 
+disort::DisortOptions disort_flux(int nwave, int ncol, int nlyr, int nstr = 8);
+
 //! \brief create disort options for shortwave grid
 /*!
  * This function creates a template disort options for shortwave grid.

@@ -3,7 +3,6 @@
 // fmt
 #include <fmt/format.h>
 
-template <>
 template <typename T>
 struct fmt::formatter<std::map<std::string, T>> {
   constexpr auto parse(fmt::format_parse_context& ctx) { return ctx.begin(); }
@@ -20,7 +19,6 @@ struct fmt::formatter<std::map<std::string, T>> {
   }
 };
 
-template <>
 template <typename T>
 struct fmt::formatter<std::vector<T>> {
   constexpr auto parse(fmt::format_parse_context& ctx) { return ctx.begin(); }

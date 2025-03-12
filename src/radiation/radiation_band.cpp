@@ -1,6 +1,9 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
+// elements
+#include <elements/utils.hpp>
+
 // harp
 #include <index.h>
 
@@ -83,7 +86,7 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
   if (my.solver_name() == "disort") {
     my.disort().header("running disort " + bd_name);
     if (band["flags"]) {
-      my.disort().flags(band["flags"].as<std::string>());
+      my.disort().flags(elements::trim_copy(band["flags"].as<std::string>()));
     }
     my.disort().nwave(1);
     my.disort().wave_lower(std::vector<double>(1, wmin));
@@ -151,7 +154,7 @@ void RadiationBandImpl::reset() {
       auto a = S8Fuller(op);
       nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "h2sO4_simple") {
+    } else if (op.type() == "h2so4_simple") {
       auto a = H2SO4Simple(op);
       nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
       opacities[name] = torch::nn::AnyModule(a);

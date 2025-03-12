@@ -3,6 +3,19 @@
 
 namespace harp {
 
+disort::DisortOptions disort_flux(int nwave, int ncol, int nlyr, int nstr) {
+  disort::DisortOptions op;
+
+  op.nwave(nwave);
+  op.ncol(ncol);
+
+  op.ds().nlyr = nlyr;
+  op.ds().nstr = nstr;
+  op.ds().nmom = nstr;
+
+  return op;
+}
+
 disort::DisortOptions disort_flux_sw(int nwave, int ncol, int nlyr, int nstr) {
   disort::DisortOptions op;
 

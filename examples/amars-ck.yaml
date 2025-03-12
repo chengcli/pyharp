@@ -16,7 +16,7 @@
 #           - 'rfm': RFM line-by-line table
 #           - 'rfm-ck': correlated-k table generated from RFM line-by-line
 #           - 'h2so4_simple': simple H2SO4 shortwave opacity model
-#           - 's8_simple': simple S8 shortwave opacity model
+#           - 's8_fuller': simple S8 shortwave opacity model
 #   - data: list of opacity data files
 #   - species: list of species used by the opacity source
 #
@@ -60,7 +60,7 @@ opacities:
     species: [H2SO4]
 
   - name: S8
-    type: s8_simple
+    type: s8_fuller
     data: [s8_k_fuller.txt]
     species: [S8]
 
@@ -86,69 +86,60 @@ SW:
   opacities: [H2SO4, S8]
   solver: disort
   integration: wavelength
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl
 
 B1:
   range: [1., 250.]
   opacities: [CO2]
   solver: disort
   integration: weight
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
 
 B2:
   range: [250., 438.]
   opacities: [H2O]
   solver: disort
   integration: weight
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
 
 B3:
   range: [438., 675.]
   opacities: [SO2]
   integration: weight
   solver: disort
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
 
 B4:
   range: [675., 1062.]
   opacities: [CO2]
   integration: weight
   solver: disort
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
 
 B5:
   range: [1062., 1200.]
   opacities: [SO2]
   integration: weight
   solver: disort
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
 
 B6:
   range: [1200., 1600.]
   opacities: [H2O]
   integration: weight
   solver: disort
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
 
 B7:
   range: [1600., 1900.]
   opacities: [SO2]
   integration: weight
   solver: disort
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
 
 B8:
   range: [1900., 2000.]
   opacities: [H2O]
   integration: weight
   solver: disort
-  flags: |
-    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+  flags: lamber,quiet,onlyfl,planck
