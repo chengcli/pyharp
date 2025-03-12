@@ -6,9 +6,17 @@
 namespace harp {
 
 struct AttenuatorOptions {
+  //! type of the opacity source
   ADD_ARG(std::string, type) = "";
+
+  //! name of the band that the opacity is associated with
+  ADD_ARG(std::string, bname) = "";
+
+  //! list of opacity data files
   ADD_ARG(std::vector<std::string>, opacity_files) = {};
-  ADD_ARG(std::vector<int>, species_ids) = { 0 };
+
+  //! list of dependent species indices
+  ADD_ARG(std::vector<int>, species_ids) = {};
 };
 
 }  // namespace harp

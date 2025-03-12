@@ -22,9 +22,20 @@ torch::Tensor interpn_recur(
   torch::Tensor coord = coords[dim];
   torch::Tensor query_d = query_coords[dim].flatten();
 
+  // Determine if coordinates are increasing or decreasing
+  bool is_increasing = coord[1].item<float>() > coord[0].item<float>();
+
   // Get searchsorted index
-  auto search_idx = torch::searchsorted(coord, query_d,
-                                        /*out_int32=*/false, /*right=*/false);
+  torch::Tensor search_idx;
+
+  if (is_increasing) {
+    search_idx = torch::searchsorted(coord, query_d,
+                                     /*out_int32=*/false, /*right=*/true);
+  } else {
+    search_idx = coord.size(0) - torch::searchsorted(coord.flip(0), query_d,
+                                                     /*out_int32=*/false,
+                                                     /*right=*/false);
+  }
 
   // Clamp indices within bounds
   auto index_low = torch::clamp(search_idx - 1, 0, coord.size(-1) - 2);
@@ -57,6 +68,9 @@ torch::Tensor interpn_recur(
 
   auto interp_high =
       interpn_recur(query_coords, coords, lookup, indices_high, extrapolate);
+
+  auto a = interp_low * weight_low.unsqueeze(-1);
+  auto b = interp_high * weight_high.unsqueeze(-1);
 
   // Compute weighted sum
   return interp_low * weight_low.unsqueeze(-1) +

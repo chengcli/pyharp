@@ -1,6 +1,9 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
+// elements
+#include <elements/utils.hpp>
+
 // harp
 #include <index.h>
 
@@ -35,26 +38,23 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
     std::string op_name = op.as<std::string>();
 
     AttenuatorOptions a;
-    bool opacity_found = false;
+    a.bname(bd_name);
 
-    // find opacity
-    for (auto const& it : config["opacities"]) {
-      TORCH_CHECK(it["name"], "'name' not found in opacity ", op_name);
+    TORCH_CHECK(config["opacities"][op_name], op_name,
+                " not found in opacities");
+    auto it = config["opacities"][op_name];
 
-      if (it["name"].as<std::string>() != op_name) continue;
-      opacity_found = true;
+    TORCH_CHECK(it["type"], "'type' not found in opacity ", op_name);
+    a.type(it["type"].as<std::string>());
 
-      TORCH_CHECK(it["type"], "'type' not found in opacity ", op_name);
-      a.type(it["type"].as<std::string>());
-
-      TORCH_CHECK(it["data"], "'data' not found in opacity ", op_name);
+    if (it["data"]) {
       a.opacity_files(it["data"].as<std::vector<std::string>>());
       for (auto& f : a.opacity_files()) {
         replace_pattern_inplace(f, "<band>", bd_name);
       }
+    }
 
-      TORCH_CHECK(it["species"], "'species' not found in opacity ", op_name);
-      a.species_ids().clear();
+    if (it["species"]) {
       for (auto const& sp : it["species"]) {
         auto sp_name = sp.as<std::string>();
 
@@ -68,9 +68,6 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
       }
     }
 
-    TORCH_CHECK(opacity_found, "opacity ", op_name, " not found in band ",
-                bd_name);
-
     my.opacities()[op_name] = a;
   }
 
@@ -83,7 +80,7 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
   if (my.solver_name() == "disort") {
     my.disort().header("running disort " + bd_name);
     if (band["flags"]) {
-      my.disort().flags(band["flags"].as<std::string>());
+      my.disort().flags(elements::trim_copy(band["flags"].as<std::string>()));
     }
     my.disort().nwave(1);
     my.disort().wave_lower(std::vector<double>(1, wmin));
@@ -104,21 +101,34 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
   return my;
 }
 
-int RadiationBandOptions::get_num_waves() const {
-  // user specified wave grid
-  if (!ww().empty()) {
-    return ww().size();
-  }
-
+std::vector<double> RadiationBandOptions::query_waves() const {
   // cannot determine number of spectral grids if no opacities
   if (opacities().empty()) {
-    TORCH_CHECK(false, "Unable to determine number of spectral grids");
+    return {};
   }
 
   // determine number of spectral grids from tabulated opacity sources
   auto op = opacities().begin()->second;
-  auto wave = read_dimvar_netcdf<double>(op.opacity_files()[0], "Wavenumber");
-  return wave.size();
+  if (op.type().compare(0, 3, "rfm") == 0) {
+    return read_dimvar_netcdf<double>(op.opacity_files()[0], "Wavenumber");
+  } else {
+    return {};
+  }
+}
+
+std::vector<double> RadiationBandOptions::query_weights() const {
+  // cannot determine number of spectral grids if no opacities
+  if (opacities().empty()) {
+    return {};
+  }
+
+  // determine number of spectral grids from tabulated opacity sources
+  auto op = opacities().begin()->second;
+  if (op.type().compare(0, 3, "rfm") == 0) {
+    return read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
+  } else {
+    return {};
+  }
 }
 
 RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const& options_)
@@ -151,7 +161,7 @@ void RadiationBandImpl::reset() {
       auto a = S8Fuller(op);
       nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "h2sO4_simple") {
+    } else if (op.type() == "h2so4_simple") {
       auto a = H2SO4Simple(op);
       nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
       opacities[name] = torch::nn::AnyModule(a);
@@ -171,7 +181,7 @@ void RadiationBandImpl::reset() {
   }
 
   // create spectral grid
-  ww = register_buffer("ww", torch::tensor(options.ww()));
+  ww = register_buffer("ww", torch::tensor(options.ww(), torch::kFloat64));
 }
 
 torch::Tensor RadiationBandImpl::forward(
@@ -239,9 +249,10 @@ torch::Tensor RadiationBandImpl::forward(
     Layer2LevelOptions l2l;
     l2l.order(k4thOrder).lower(kExtrapolate).upper(kConstant);
     shared[spec_name] = rtsolver.forward(
-        prop, bc, std::make_optional(layer2level(kwargs->at("temp"), l2l)));
+        prop, bc, options.name(),
+        std::make_optional(layer2level(kwargs->at("temp"), l2l)));
   } else {
-    shared[spec_name] = rtsolver.forward(prop, bc);
+    shared[spec_name] = rtsolver.forward(prop, bc, options.name());
   }
 
   // accumulate flux from flux spectra

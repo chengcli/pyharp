@@ -21,7 +21,6 @@ torch::Tensor calc_dz_hypsometric(torch::Tensor pres, torch::Tensor temp,
     op.upper(kExtrapolate);
 
     auto lnp_levels = layer2level(lnp, op);
-    std::cout << "lnp_levels: " << lnp_levels << std::endl;
     dlnp = lnp_levels.slice(-1, 0, nlyr) - lnp_levels.slice(-1, 1, nlyr + 1);
   } else {
     TORCH_CHECK(false, "Invalid dimensions of pressure and temperature");
