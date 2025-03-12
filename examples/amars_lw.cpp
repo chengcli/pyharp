@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
   };
   lw_op.integration() = "weight";
 
-  int nwave = lw_op.get_num_waves();
+  int nwave = lw_op.query_waves().size();
   lw_op.disort() = harp::disort_config_lw(wmin, wmax, nwave, ncol, nlyr);
   harp::RadiationBand lw(lw_op);
 

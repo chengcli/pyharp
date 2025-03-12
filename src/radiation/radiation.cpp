@@ -72,6 +72,7 @@ torch::Tensor RadiationImpl::forward(
   for (auto& [name, band] : bands) {
     std::string name1 = "radiation/" + name + "/total_flux";
     shared[name1] = band->forward(conc, path, bc, kwargs);
+    std::cout << "shared[" << name1 << "] = " << shared[name1] << std::endl;
     if (first_band) {
       total_flux = shared[name1].clone();
       first_band = false;

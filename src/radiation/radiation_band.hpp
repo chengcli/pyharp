@@ -67,15 +67,21 @@ struct RadiationBandOptions {
   static RadiationBandOptions from_yaml(std::string const& bd_name,
                                         YAML::Node const& config);
 
-  //! \brief query the number of spectral grids
+  //! \brief query the spectral grids
   /*!
-   * This function queries the number of spectral grids
-   * in the following precedence order:
-   *
-   * 1. user specified wave grid
-   * 2. number of tabuled spectral grids in the first opacity
+   * This function queries the spectral grids of the first opacity source
+   * An empty vector is returned if the subroutine cannot determine the
+   * spectral grids.
    */
-  int get_num_waves() const;
+  std::vector<double> query_waves() const;
+
+  //! \brief query the spectral weights
+  /*!
+   * This function queries the spectral grid weights from the opacity source
+   * An empty vector is returned if the subroutine cannot determine the
+   * spectral weights.
+   */
+  std::vector<double> query_weights() const;
 
   RadiationBandOptions() = default;
 

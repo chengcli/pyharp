@@ -101,21 +101,34 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
   return my;
 }
 
-int RadiationBandOptions::get_num_waves() const {
-  // user specified wave grid
-  if (!ww().empty()) {
-    return ww().size();
-  }
-
+std::vector<double> RadiationBandOptions::query_waves() const {
   // cannot determine number of spectral grids if no opacities
   if (opacities().empty()) {
-    TORCH_CHECK(false, "Unable to determine number of spectral grids");
+    return {};
   }
 
   // determine number of spectral grids from tabulated opacity sources
   auto op = opacities().begin()->second;
-  auto wave = read_dimvar_netcdf<double>(op.opacity_files()[0], "Wavenumber");
-  return wave.size();
+  if (op.type().compare(0, 3, "rfm") == 0) {
+    return read_dimvar_netcdf<double>(op.opacity_files()[0], "Wavenumber");
+  } else {
+    return {};
+  }
+}
+
+std::vector<double> RadiationBandOptions::query_weights() const {
+  // cannot determine number of spectral grids if no opacities
+  if (opacities().empty()) {
+    return {};
+  }
+
+  // determine number of spectral grids from tabulated opacity sources
+  auto op = opacities().begin()->second;
+  if (op.type().compare(0, 3, "rfm") == 0) {
+    return read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
+  } else {
+    return {};
+  }
 }
 
 RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const& options_)
@@ -168,7 +181,7 @@ void RadiationBandImpl::reset() {
   }
 
   // create spectral grid
-  ww = register_buffer("ww", torch::tensor(options.ww()));
+  ww = register_buffer("ww", torch::tensor(options.ww(), torch::kFloat64));
 }
 
 torch::Tensor RadiationBandImpl::forward(

@@ -130,12 +130,15 @@ int main(int argc, char** argv) {
   // configure input data for each radiation band
   std::map<std::string, torch::Tensor> atm, bc;
   atm["pres"] = new_P;
-  atm["temp"] = new_T;
+  atm["temp"] = new_T.unsqueeze(0).expand({ncol, nlyr});
 
   // read radiation configuration from yaml file
   auto op = harp::RadiationOptions::from_yaml("amars-ck.yaml");
   for (auto& [name, band] : op.band_options()) {
-    int nwave = name == "SW" ? 500 : band.get_num_waves();
+    // query weights from opacity, only valid for longwave
+    // shortwave values are defined separately
+    band.ww() = band.query_weights();
+    int nwave = name == "SW" ? 500 : band.ww().size();
 
     auto wmin = band.disort().wave_lower()[0];
     auto wmax = band.disort().wave_upper()[0];
@@ -144,8 +147,11 @@ int main(int argc, char** argv) {
     std::cout << "flags = " << band.disort().flags() << std::endl;
 
     if (name == "SW") {  // shortwave
-      auto wave = torch::linspace(wmin, wmax, nwave, torch::kFloat64);
-      atm[name + "/wavenumber"] = wave;
+      band.ww().resize(nwave);
+      for (int i = 0; i < nwave; ++i) {
+        band.ww()[i] = (wmax - wmin) * i / (nwave - 1) + wmin;
+      }
+      auto wave = torch::tensor(band.ww(), torch::kFloat64);
       bc[name + "/fbeam"] =
           lum_scale * sr_sun * harp::bbflux_wavenumber(wave, solar_temp, ncol);
       bc[name + "/albedo"] =
