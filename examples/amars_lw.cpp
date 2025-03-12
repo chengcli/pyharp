@@ -3,6 +3,7 @@
 
 // harp
 #include <radiation/disort_options_flux.hpp>
+#include <radiation/radiation.hpp>
 #include <radiation/radiation_band.hpp>
 
 // unit = [mol/m^3]
@@ -12,9 +13,8 @@ torch::Tensor atm_concentration(int ncol, int nlyr, int nspecies) {
 }
 
 int main(int argc, char** argv) {
-  harp::AttenuatorOptions op;
-  op.species_names({"CO2", "H2O"});
-  op.species_weights({44.0e-3, 18.0e-3});
+  harp::species_names = {"CO2", "H2O"};
+  harp::species_weights = {44.0e-3, 18.0e-3};
 
   int ncol = 1;
   int nlyr = 40;
@@ -22,7 +22,9 @@ int main(int argc, char** argv) {
   double wmin = 1.;
   double wmax = 150.;
 
+  harp::AttenuatorOptions op;
   harp::RadiationBandOptions lw_op;
+
   lw_op.name() = "lw";
   lw_op.solver_name() = "disort";
   lw_op.opacities() = {
@@ -37,7 +39,7 @@ int main(int argc, char** argv) {
   lw_op.disort() = harp::disort_flux_lw(wmin, wmax, nwave, ncol, nlyr);
   harp::RadiationBand lw(lw_op);
 
-  auto conc = atm_concentration(ncol, nlyr, op.species_names().size());
+  auto conc = atm_concentration(ncol, nlyr, harp::species_names.size());
 
   std::map<std::string, torch::Tensor> bc;
   bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64);

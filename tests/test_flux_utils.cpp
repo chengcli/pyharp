@@ -21,7 +21,7 @@ TEST(FluxUtilsTest, CalTotalFluxWave) {
 
 TEST(FluxUtilsTest, CalTotalFluxWeight) {
   // Create a 2D tensor with random values
-  torch::Tensor flux = torch::rand({5, 3});
+  torch::Tensor flux = torch::rand({5, 3, 1, 2});
   // Create a 1D tensor with random values
   torch::Tensor weight = torch::rand({5});
 
@@ -31,7 +31,7 @@ TEST(FluxUtilsTest, CalTotalFluxWeight) {
   std::cout << "total_flux: " << total_flux << std::endl;
 
   // Check the shape of the result
-  EXPECT_EQ(total_flux.sizes(), std::vector<int64_t>({3}));
+  EXPECT_EQ(total_flux.sizes(), std::vector<int64_t>({3, 1, 2}));
 }
 
 TEST(FluxUtilsTest, CalTotalFluxInvalidInput) {

@@ -1,0 +1,154 @@
+# Radiation configuration file
+#
+# Required the fields:
+#   - species: list of species
+#   - opacities: list of opacities
+#   - bands: list of bands
+#   - <band>: band configuration
+#
+# Required fields for 'species':
+#   - name: species name
+#   - composition: species atomic composition
+#
+# Required fields for 'opacities':
+#   - name: opacity source name
+#   - type: choose between the following recognized types
+#           - 'rfm': RFM line-by-line table
+#           - 'rfm-ck': correlated-k table generated from RFM line-by-line
+#           - 'h2so4_simple': simple H2SO4 shortwave opacity model
+#           - 's8_simple': simple S8 shortwave opacity model
+#   - data: list of opacity data files
+#   - species: list of species used by the opacity source
+#
+# Required fields for each band:
+#   - range: band wavenumber/wavelength range
+#            If the range is in wavenumber, the unit is cm^{-1}
+#            If the range is in wavelength, the unit is um
+#   - opacities: list of opacities used by the band
+#   - integration: choose between 'wavelength', 'wavenumber', or 'weight'
+#                  If the integration is 'weight', the band is integrated
+#                  using weights from input. Otherwise, the band is integrated
+#                  using the trapezoidal rule along a uniform wavelength
+#                  or wavenumber grid.
+#   - solver: choose between 'disort' or 'twostr'
+#   - flags: a string of flags for the radiative transfer solver
+#            separated by commas
+#
+# Optional fields for each band:
+#   - ww: a list of weights (double) for spectral bins in the band
+
+species:
+  - name: CO2
+    composition: {C: 1, O: 2}
+
+  - name: H2O
+    composition: {H: 2, O: 1}
+
+  - name: SO2
+    composition: {S: 1, O: 2}
+
+  - name: H2SO4
+    composition: {H: 2, S: 1, O: 4}
+
+  - name: S8
+    composition: {S: 8}
+
+opacities:
+  - name: H2SO4
+    type: h2so4_simple
+    data: [h2so4.txt]
+    species: [H2SO4]
+
+  - name: S8
+    type: s8_simple
+    data: [s8_k_fuller.txt]
+    species: [S8]
+
+  - name: CO2
+    type: rfm-ck
+    data: [amars-ck-<band>.nc]
+    species: [CO2]
+
+  - name: H2O
+    type: rfm-ck
+    data: [amars-ck-<band>.nc]
+    species: [H2O]
+
+  - name: SO2
+    type: rfm-ck
+    data: [amars-ck-<band>.nc]
+    species: [SO2]
+
+bands: [SW, B1, B2, B3, B4, B5, B6, B7, B8]
+
+SW:
+  range: [0.1, 1.]
+  opacities: [H2SO4, S8]
+  solver: disort
+  integration: wavelength
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B1:
+  range: [1., 250.]
+  opacities: [CO2]
+  solver: disort
+  integration: weight
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B2:
+  range: [250., 438.]
+  opacities: [H2O]
+  solver: disort
+  integration: weight
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B3:
+  range: [438., 675.]
+  opacities: [SO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B4:
+  range: [675., 1062.]
+  opacities: [CO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B5:
+  range: [1062., 1200.]
+  opacities: [SO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B6:
+  range: [1200., 1600.]
+  opacities: [H2O]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B7:
+  range: [1600., 1900.]
+  opacities: [SO2]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
+
+B8:
+  range: [1900., 2000.]
+  opacities: [H2O]
+  integration: weight
+  solver: disort
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction

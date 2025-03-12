@@ -7,6 +7,8 @@
 
 namespace harp {
 
+extern std::vector<double> species_weights;
+
 H2SO4SimpleImpl::H2SO4SimpleImpl(AttenuatorOptions const& options_)
     : options(options_) {
   TORCH_CHECK(options.opacity_files().size() == 1,
@@ -66,7 +68,7 @@ void H2SO4SimpleImpl::reset() {
   }
 
   // change extinction x-section [m^2/kg] to [m^2/mol]
-  kdata.select(1, 0) *= options.species_weights()[options.species_ids()[0]];
+  kdata.select(1, 0) *= species_weights[options.species_ids()[0]];
 }
 
 torch::Tensor H2SO4SimpleImpl::forward(
