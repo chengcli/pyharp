@@ -14,7 +14,15 @@
 namespace harp {
 
 using RadiationBandOptionsDict = std::map<std::string, RadiationBandOptions>;
+
+//! dump of shared data to other modules
 extern std::unordered_map<std::string, torch::Tensor> shared;
+
+//! names of all species
+extern std::vector<std::string> species_names;
+
+//! molecular weights of all species [kg/mol]
+extern std::vector<double> species_weights;
 
 //! \brief Options for initializing a `Radiation` object
 /*!

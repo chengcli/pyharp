@@ -16,6 +16,8 @@ extern "C" {
 
 namespace harp {
 
+extern std::vector<std::string> species_names;
+
 RFMImpl::RFMImpl(AttenuatorOptions const& options_) : options(options_) {
   TORCH_CHECK(options.opacity_files().size() == 1,
               "Only one opacity file is allowed");
@@ -103,7 +105,7 @@ void RFMImpl::reset() {
   // data
   kdata = torch::empty({(int)kshape[0], (int)kshape[1], (int)kshape[2]},
                        torch::kFloat64);
-  auto name = options.species_names()[options.species_ids()[0]];
+  auto name = species_names[options.species_ids()[0]];
 
   err = nc_inq_varid(fileid, name.c_str(), &varid);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));

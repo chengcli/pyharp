@@ -1,6 +1,9 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
+// elements
+#include <elements/compound.hpp>
+
 // harp
 #include "flux_utils.hpp"
 #include "radiation.hpp"
@@ -8,6 +11,8 @@
 namespace harp {
 
 std::unordered_map<std::string, torch::Tensor> shared;
+std::vector<std::string> species_names;
+std::vector<double> species_weights;
 
 RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
   RadiationOptions rad;
@@ -16,6 +21,25 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
   // check if bands are defined
   TORCH_CHECK(config["bands"],
               "'bands' is not defined in the radiation configuration file");
+
+  species_names.clear();
+  species_weights.clear();
+
+  for (const auto& sp : config["species"]) {
+    species_names.push_back(sp["name"].as<std::string>());
+    std::map<std::string, double> comp;
+
+    for (const auto& it : sp["composition"]) {
+      std::string key = it.first.as<std::string>();
+      double value = it.second.as<double>();
+      comp[key] = value;
+    }
+    species_weights.push_back(elements::get_compound_weight(comp));
+  }
+
+  for (auto& s : species_weights) {
+    std::cout << "species weight = " << s << std::endl;
+  }
 
   for (auto bd : config["bands"]) {
     auto bd_name = bd.as<std::string>();

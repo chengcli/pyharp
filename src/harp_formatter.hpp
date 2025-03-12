@@ -12,10 +12,10 @@ struct fmt::formatter<std::map<std::string, T>> {
   auto format(const std::map<std::string, T>& p, FormatContext& ctx) const {
     std::string result = "{\n";
     for (auto const& [key, value] : p) {
-      result += fmt::format("\t{}: {}\n", key, value);
-      result += ",\n";
+      result += fmt::format("\t{}: {},", key, value);
+      result += "\n";
     }
-    result += "}\n";
+    result += "}";
     return fmt::format_to(ctx.out(), "{}", result);
   }
 };

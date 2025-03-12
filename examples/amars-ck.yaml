@@ -79,12 +79,21 @@ opacities:
     data: [amars-ck-<band>.nc]
     species: [SO2]
 
-bands: [B1, B2, B3, B4, B5, B6, B7, B8]
+bands: [SW, B1, B2, B3, B4, B5, B6, B7, B8]
+
+SW:
+  range: [0.1, 1.]
+  opacities: [H2SO4, S8]
+  solver: disort
+  integration: wavelength
+  flags: |
+    lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
 
 B1:
   range: [1., 250.]
   opacities: [CO2]
   solver: disort
+  integration: weight
   flags: |
     lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
 
@@ -92,6 +101,7 @@ B2:
   range: [250., 438.]
   opacities: [H2O]
   solver: disort
+  integration: weight
   flags: |
     lamber,quiet,onlyfl,planck,intensity_correction,old_intensity_correction
 
@@ -121,7 +131,7 @@ B5:
 
 B6:
   range: [1200., 1600.]
-  opacities: [HO2]
+  opacities: [H2O]
   integration: weight
   solver: disort
   flags: |

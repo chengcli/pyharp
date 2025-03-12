@@ -15,6 +15,7 @@
 #include <math/interpolation.hpp>
 #include <opacity/h2so4_simple.hpp>
 #include <opacity/s8_fuller.hpp>
+#include <radiation/radiation.hpp>
 #include <rtsolver/rtsolver.hpp>
 #include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
@@ -216,8 +217,8 @@ int main(int argc, char** argv) {
   disort::Disort disort(disort_options(nwave, ncol, nlyr));
 
   harp::AttenuatorOptions op;
-  op.species_names({"S8", "H2SO4"});
-  op.species_weights({256.e-3, 98.e-3});
+  harp::species_names = {"S8", "H2SO4"};
+  harp::species_weights = {256.e-3, 98.e-3};
 
   op.species_ids({0}).opacity_files({"s8_k_fuller.txt"});
   harp::S8Fuller s8(op);
