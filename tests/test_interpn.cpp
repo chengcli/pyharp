@@ -7,7 +7,45 @@
 // harp
 #include <math/interpolation.hpp>
 
-TEST(TestInterpolation, test) {
+TEST(TestInterpolation, test1DIncreasing) {
+  // Coordinate arrays
+  std::vector<torch::Tensor> coords = {
+      torch::tensor({1.0, 2.0, 3.0, 4.0, 5.0}),  // X-coordinates
+  };
+
+  // Lookup data dimension (5,1)
+  torch::Tensor lookup = torch::tensor({{1.0}, {4.0}, {9.0}, {16.0}, {25.0}});
+
+  // Query coordinates (10,) representing the x-coordinates to interpolate
+  std::vector<torch::Tensor> query_coords = {torch::linspace(0.0, 6.0, 10)};
+
+  std::cout << "query = " << query_coords[0] << std::endl;
+
+  // Perform interpolation
+  torch::Tensor result = harp::interpn(query_coords, coords, lookup);
+  std::cout << "Interpolated Values:\n" << result << std::endl;
+}
+
+TEST(TestInterpolation, test1DDecreasing) {
+  // Coordinate arrays
+  std::vector<torch::Tensor> coords = {
+      torch::tensor({5.0, 4.0, 3.0, 2.0, 1.0}),  // X-coordinates
+  };
+
+  // Lookup data dimension (5,1)
+  torch::Tensor lookup = torch::tensor({{25.0}, {16.0}, {9.0}, {4.0}, {1.0}});
+
+  // Query coordinates (10,) representing the x-coordinates to interpolate
+  std::vector<torch::Tensor> query_coords = {torch::linspace(0.0, 6.0, 10)};
+
+  std::cout << "query = " << query_coords[0] << std::endl;
+
+  // Perform interpolation
+  torch::Tensor result = harp::interpn(query_coords, coords, lookup);
+  std::cout << "Interpolated Values:\n" << result << std::endl;
+}
+
+TEST(TestInterpolation, testND) {
   // Coordinate arrays
   std::vector<torch::Tensor> coords = {
       torch::tensor({1.0, 2.0, 3.0}),    // X-coordinates
@@ -29,7 +67,6 @@ TEST(TestInterpolation, test) {
 
   // Perform interpolation
   torch::Tensor result = harp::interpn(query_coords, coords, lookup);
-
   std::cout << "Interpolated Values:\n" << result << std::endl;
 }
 

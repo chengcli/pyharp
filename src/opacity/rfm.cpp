@@ -37,6 +37,9 @@ RFMImpl::RFMImpl(AttenuatorOptions const& options_) : options(options_) {
 void RFMImpl::reset() {
   auto full_path = find_resource(options.opacity_files()[0]);
 
+  // data table shape (nwave, npres, ntemp)
+  size_t kshape[3];
+
 #ifdef NETCDFOUTPUT
   int fileid, dimid, varid, err;
   nc_open(full_path.c_str(), NC_NETCDF4, &fileid);
@@ -59,51 +62,49 @@ void RFMImpl::reset() {
   err = nc_inq_dimlen(fileid, dimid, kshape + 2);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  kaxis = torch::empty({(int)kshape[0] + (int)kshape[1] + (int)kshape[2]},
-                       torch::kFloat64);
+  // wavenumber grid
+  kwave = torch::empty({(int)kshape[0]}, torch::kFloat64);
+
+  // pressure grid
+  klnp = torch::empty({(int)kshape[1]}, torch::kFloat64);
+
+  // temperatur grid
+  ktempa = torch::empty({(int)kshape[2]}, torch::kFloat64);
 
   // wave grid
   err = nc_inq_varid(fileid, "Wavenumber", &varid);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  err = nc_get_var_double(fileid, varid, kaxis.data_ptr<double>());
+  err = nc_get_var_double(fileid, varid, kwave.data_ptr<double>());
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
   // pressure grid
   err = nc_inq_varid(fileid, "Pressure", &varid);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  err = nc_get_var_double(fileid, varid, kaxis.data_ptr<double>() + kshape[0]);
+  err = nc_get_var_double(fileid, varid, klnp.data_ptr<double>());
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
   // change pressure to ln-pressure
-  kaxis.slice(0, kshape[0], kshape[0] + kshape[1]).log_();
+  klnp.log_();
 
   // temperature grid
   err = nc_inq_varid(fileid, "TempGrid", &varid);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  err = nc_get_var_double(fileid, varid,
-                          kaxis.data_ptr<double>() + kshape[0] + kshape[1]);
+  err = nc_get_var_double(fileid, varid, ktempa.data_ptr<double>());
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  // reference atmosphere
-  double* temp = new double[kshape[1]];
+  // reference temperature
+  kreftem = torch::empty({(int)kshape[1], 1}, torch::kFloat64);
   err = nc_inq_varid(fileid, "Temperature", &varid);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  err = nc_get_var_double(fileid, varid, temp);
+  err = nc_get_var_double(fileid, varid, kreftem.data_ptr<double>());
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
 
-  krefatm = torch::empty({2, (int)kshape[1]}, torch::kFloat64);
-  for (int i = 0; i < kshape[1]; i++) {
-    krefatm[IPR][i] = kaxis[kshape[0] + i];
-    krefatm[ITM][i] = temp[i];
-  }
-  delete[] temp;
-
   // data
-  kdata = torch::empty({(int)kshape[0], (int)kshape[1], (int)kshape[2]},
+  kdata = torch::empty({(int)kshape[0], (int)kshape[1], (int)kshape[2], 1},
                        torch::kFloat64);
   auto name = species_names[options.species_ids()[0]];
 
@@ -117,17 +118,18 @@ void RFMImpl::reset() {
 #endif
 
   // register all buffers
-  register_buffer("kaxis", kaxis);
+  register_buffer("kwave", kwave);
+  register_buffer("klnp", klnp);
+  register_buffer("ktempa", ktempa);
   register_buffer("kdata", kdata);
-  register_buffer("krefatm", krefatm);
+  register_buffer("kreftem", kreftem);
 }
 
 torch::Tensor RFMImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
-  int nwave = kshape[0];
+  int nwave = kwave.size(0);
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
-  constexpr int nprop = 1;
 
   TORCH_CHECK(kwargs.count("pres") > 0, "pres is required in kwargs");
   TORCH_CHECK(kwargs.count("temp") > 0, "temp is required in kwargs");
@@ -135,36 +137,23 @@ torch::Tensor RFMImpl::forward(
   auto const& pres = kwargs.at("pres");
   auto const& temp = kwargs.at("temp");
 
+  TORCH_CHECK(pres.size(0) == ncol && pres.size(1) == nlyr,
+              "Invalid pres shape: ", pres.sizes(),
+              "; needs to be (ncol, nlyr)");
+  TORCH_CHECK(temp.size(0) == ncol && temp.size(1) == nlyr,
+              "Invalid temp shape: ", temp.sizes(),
+              "; needs to be (ncol, nlyr)");
+
   // get temperature anomaly
   auto lnp = pres.log();
-  auto tempa = temp - get_reftemp(lnp, krefatm[IPR], krefatm[ITM]);
+  auto tempa = temp - interpn({lnp}, {klnp}, kreftem).squeeze(-1);
 
-  auto out = torch::zeros({nwave, ncol, nlyr, nprop}, conc.options());
-  auto dims = torch::tensor(
-      {(int)kshape[0], (int)kshape[1], (int)kshape[2]},
-      torch::TensorOptions().dtype(torch::kInt64).device(conc.device()));
-  auto coord = torch::empty({nwave, ncol, nlyr, 3}, torch::kFloat64);
+  // interpolate data
+  auto wave = kwave.unsqueeze(-1).unsqueeze(-1).expand({nwave, ncol, nlyr});
+  lnp = lnp.unsqueeze(0).expand({nwave, ncol, nlyr});
+  tempa = tempa.unsqueeze(0).expand({nwave, ncol, nlyr});
 
-  // first coord is wave, second log-pressure, third temperature anomaly
-  coord.select(3, 0).copy_(kaxis.slice(0, 0, nwave).view({-1, 1, 1}));
-  coord.select(3, 1).copy_(lnp);
-  coord.select(3, 2).copy_(tempa);
-
-  auto iter = at::TensorIteratorConfig()
-                  .resize_outputs(false)
-                  .check_all_same_dtype(true)
-                  .declare_static_shape(out.sizes(), /*squash_dims=*/3)
-                  .add_output(out)
-                  .add_input(coord)
-                  .build();
-
-  if (conc.is_cpu()) {
-    call_interpn_cpu<nprop>(iter, kdata, kaxis, dims, /*nval=*/nprop);
-  } else if (conc.is_cuda()) {
-    // call_interpn_cuda<1>(iter, kdata, kwave, dims, 1);
-  } else {
-    TORCH_CHECK(false, "Unsupported device");
-  }
+  auto out = interpn({wave, lnp, tempa}, {kwave, klnp, ktempa}, kdata);
 
   // Check species id in range
   TORCH_CHECK(
@@ -174,34 +163,6 @@ torch::Tensor RFMImpl::forward(
   // ln(m*2/kmol) -> 1/m
   return 1.E-3 * out.exp() *
          conc.select(2, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);
-}
-
-torch::Tensor get_reftemp(torch::Tensor lnp, torch::Tensor klnp,
-                          torch::Tensor ktemp) {
-  int ncol = lnp.size(0);
-  int nlyr = lnp.size(1);
-
-  auto out = torch::zeros({ncol, nlyr}, lnp.options());
-  auto dims = torch::tensor(
-      {nlyr}, torch::TensorOptions().dtype(torch::kInt64).device(lnp.device()));
-
-  auto iter = at::TensorIteratorConfig()
-                  .resize_outputs(false)
-                  .check_all_same_dtype(true)
-                  .declare_static_shape(out.sizes())
-                  .add_output(out)
-                  .add_input(lnp)
-                  .build();
-
-  if (lnp.is_cpu()) {
-    call_interpn_cpu<1>(iter, ktemp, klnp, dims, /*nval=*/1);
-  } else if (lnp.is_cuda()) {
-    // call_interpn_cuda<1>(iter, kdata, kwave, dims, 1);
-  } else {
-    TORCH_CHECK(false, "Unsupported device");
-  }
-
-  return out;
 }
 
 }  // namespace harp
