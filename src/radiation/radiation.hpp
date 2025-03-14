@@ -13,7 +13,7 @@
 
 namespace harp {
 
-using RadiationBandOptionsDict = std::map<std::string, RadiationBandOptions>;
+using RadiationBandDict = std::map<std::string, RadiationBandOptions>;
 
 //! dump of shared data to other modules
 extern std::unordered_map<std::string, torch::Tensor> shared;
@@ -53,7 +53,7 @@ struct RadiationOptions {
   RadiationOptions() = default;
 
   ADD_ARG(std::string, outdirs) = "";
-  ADD_ARG(RadiationBandOptionsDict, band_options) = {};
+  ADD_ARG(RadiationBandDict, band_options) = {};
 };
 
 class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
