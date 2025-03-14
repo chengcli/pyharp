@@ -19,11 +19,11 @@ class RFMImpl : public torch::nn::Cloneable<RFMImpl> {
   torch::Tensor kwave, klnp, ktempa;
 
   //! tabulated absorption x-section [ln(m^2/kmol)]
-  //! (nwave, npres, ntemp)
+  //! (nwave, npres, ntemp, 1)
   torch::Tensor kdata;
 
   //! reference temperature profile
-  //! (npres,)
+  //! (npres, 1)
   torch::Tensor kreftem;
 
   //! options with which this `RFMImpl` was constructed
