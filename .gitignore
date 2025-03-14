@@ -12,7 +12,7 @@ examples/*/*.nc
 data/*.nc
 
 # mac
-.DS_Store
+#.DS_Store
 
 # doc
 doc/doxygen
