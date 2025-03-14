@@ -191,13 +191,39 @@ torch::Tensor calc_dz(int nlyr, torch::Tensor prop,
   auto new_p_tensor = torch::from_blob(const_cast<double*>(new_p.data()), {nlyr}, torch::kFloat64).clone();
 
   auto new_p_levels = harp::layer2level(new_p_tensor, harp::Layer2LevelOptions());
+  auto new_lnp_levels = torch::log(new_p_levels);
     
   for (int i = 0; i < nlyr; ++i) {
-    double dp = new_p_levels[i].item<double>() - new_p_levels[i + 1].item<double>();
-    dz[i][0] *= (dp) / (g * new_rho[i]);
+    //double dp = new_p_levels[i].item<double>() - new_p_levels[i + 1].item<double>();
+    double dlnp = new_lnp_levels[i].item<double>() - new_lnp_levels[i + 1].item<double>();
+    dz[i][0] *= (dlnp * new_p[i]) / (g * new_rho[i]);
   }
 
+  std::cout << "dz = " << dz << std::endl;
   return dz;
+}
+
+torch::Tensor calc_dz_ln(int nlyr, torch::Tensor prop,
+  const std::vector<double>& new_p,
+  const std::vector<double>& new_T, double g,
+  double Rd) {
+auto dz = torch::ones({nlyr, 1},
+    prop.options());  // prop: (nwave, ncol, nlyr, nprop)
+
+// Convert new_p and new_rho to torch::Tensor
+auto new_p_tensor = torch::from_blob(const_cast<double*>(new_p.data()), {nlyr}, torch::kFloat64).clone();
+
+auto new_p_levels = harp::layer2level(new_p_tensor, harp::Layer2LevelOptions());
+auto new_lnp_levels = torch::log(new_p_levels);
+
+for (int i = 0; i < nlyr; ++i) {
+//double dp = new_p_levels[i].item<double>() - new_p_levels[i + 1].item<double>();
+double dlnp = new_lnp_levels[i].item<double>() - new_lnp_levels[i + 1].item<double>();
+dz[i][0] *= (dlnp * Rd * new_T[i]) / g;
+}
+
+std::cout << "dz = " << dz << std::endl;
+return dz;
 }
 
 std::tuple<std::vector<std::vector<double>>, double, double> integrate_result(
@@ -611,7 +637,8 @@ int main(int argc, char** argv) {
   auto prop2 = h2so4->forward(conc, kwargs);
   auto prop = prop1 + prop2;
 
-  auto dz = calc_dz(nlyr, prop, new_p, new_rho, g);
+  //auto dz = calc_dz(nlyr, prop, new_p, new_rho, g);
+  auto dz = calc_dz_ln(nlyr, prop, new_p, new_T, g, R/mean_mol_weight);
   prop *= dz;
 
   // mean single scattering albedo
@@ -727,7 +754,8 @@ int main(int argc, char** argv) {
     auto prop2 = h2so4->forward(conc, kwargs);
     auto prop = prop1 + prop2;
 
-    auto dz = calc_dz(nlyr, prop, new_p, new_rho, g);
+    //auto dz = calc_dz(nlyr, prop, new_p, new_rho, g);
+    auto dz = calc_dz_ln(nlyr, prop, new_p, new_T, g, R/mean_mol_weight);
     prop *= dz;
 
     // mean single scattering albedo

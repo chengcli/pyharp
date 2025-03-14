@@ -72,7 +72,7 @@ void RFMImpl::reset() {
 
   err = nc_get_var_double(fileid, varid, kaxis.data_ptr<double>() + kshape[0]);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
-
+  
   // change pressure to ln-pressure
   kaxis.slice(0, kshape[0], kshape[0] + kshape[1]).div_(100).log_();
 
