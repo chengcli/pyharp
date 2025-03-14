@@ -77,37 +77,20 @@ torch::Tensor S8FullerImpl::forward(
   int nlyr = conc.size(1);
   constexpr int nprop = 2;
 
-  torch::Tensor coord;
+  torch::Tensor wave;
   if (kwargs.count("wavelength") > 0) {
-    coord = kwargs.at("wavelength");
+    wave = kwargs.at("wavelength");
   } else if (kwargs.count("wavenumber") > 0) {
-    coord = 1.e4 / kwargs.at("wavenumber");
+    wave = 1.e4 / kwargs.at("wavenumber");
   } else {
     TORCH_CHECK(false, "wavelength or wavenumber is required in kwargs");
   }
-  int nwave = coord.size(0);
 
-  auto out = torch::zeros({nwave, ncol, nlyr, nprop}, conc.options());
-  auto dims = torch::tensor(
-      {kwave.size(0)},
-      torch::TensorOptions().dtype(torch::kInt64).device(conc.device()));
-
-  auto iter = at::TensorIteratorConfig()
-                  .resize_outputs(false)
-                  .check_all_same_dtype(true)
-                  .declare_static_shape(out.sizes(), /*squash_dims=*/3)
-                  .add_output(out)
-                  .add_owned_const_input(
-                      coord.view({-1, 1, 1, 1}).expand({-1, ncol, nlyr, nprop}))
-                  .build();
-
-  if (conc.is_cpu()) {
-    call_interpn_cpu<nprop>(iter, kdata, kwave, dims, /*nval=*/nprop);
-  } else if (conc.is_cuda()) {
-    // call_interpn_cuda<nprop>(iter, kdata, kwave, dims, nprop);
-  } else {
-    TORCH_CHECK(false, "Unsupported device");
-  }
+  auto out = interpn({wave}, {kwave}, kdata);
+  out = out.unsqueeze(1)   // ncol
+            .unsqueeze(1)  // nlyr
+            .expand({wave.size(0), ncol, nlyr, nprop})
+            .contiguous();
 
   // Check species id in range
   TORCH_CHECK(

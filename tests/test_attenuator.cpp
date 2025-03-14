@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 // harp
+#include <math/interpolation.hpp>
 #include <opacity/h2so4_simple.hpp>
 #include <opacity/rfm.hpp>
 #include <opacity/s8_fuller.hpp>
@@ -54,9 +55,9 @@ TEST(TestOpacity, lw) {
   RFM co2(op);
 
   std::cout << "co2 = " << co2->kdata << std::endl;
-  std::cout << "pres = " << exp(co2->krefatm[RFMImpl::IPR]) << std::endl;
-  std::cout << "temp = " << co2->krefatm[RFMImpl::ITM] << std::endl;
-  std::cout << "kaxis = " << co2->kaxis << std::endl;
+  std::cout << "pres = " << exp(co2->klnp) << std::endl;
+  std::cout << "temp = " << co2->ktempa << std::endl;
+  std::cout << "wave = " << co2->kwave << std::endl;
 
   op.species_ids({1}).opacity_files({"amarsw-ck-B1.nc"});
   RFM h2o(op);
@@ -73,8 +74,7 @@ TEST(TestOpacity, get_reftemp) {
   auto coord = (torch::ones({2, 2}, torch::kFloat64) * 100.e5).log();
   std::cout << "coord = " << coord << std::endl;
 
-  auto temp = get_reftemp(coord, co2->krefatm[RFMImpl::IPR],
-                          co2->krefatm[RFMImpl::ITM]);
+  auto temp = interpn({coord}, {co2->klnp}, co2->kreftem).squeeze(-1);
   std::cout << "temp = " << temp << std::endl;
 }
 

@@ -14,23 +14,17 @@ namespace harp {
 
 class RFMImpl : public torch::nn::Cloneable<RFMImpl> {
  public:
-  constexpr static int IPR = 0;
-  constexpr static int ITM = 1;
-
-  //! data table shape (nwave, npres, ntemp)
-  size_t kshape[3];
-
-  //! data table interpolation axis
-  //! (nwave + npres + ntemp,)
-  torch::Tensor kaxis;
+  //! data table coordinate axis
+  //! (nwave,) (npres,) (ntemp,)
+  torch::Tensor kwave, klnp, ktempa;
 
   //! tabulated absorption x-section [ln(m^2/kmol)]
-  //! (nwave, npres, ntemp)
+  //! (nwave, npres, ntemp, 1)
   torch::Tensor kdata;
 
-  //! reference TP profile (lnp, temp)
-  //! (2, npres)
-  torch::Tensor krefatm;
+  //! reference temperature profile
+  //! (npres, 1)
+  torch::Tensor kreftem;
 
   //! options with which this `RFMImpl` was constructed
   AttenuatorOptions options;
@@ -57,8 +51,5 @@ class RFMImpl : public torch::nn::Cloneable<RFMImpl> {
                         std::map<std::string, torch::Tensor> const& kwargs);
 };
 TORCH_MODULE(RFM);
-
-torch::Tensor get_reftemp(torch::Tensor lnp, torch::Tensor klnp,
-                          torch::Tensor ktemp);
 
 }  // namespace harp
