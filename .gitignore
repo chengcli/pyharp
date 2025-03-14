@@ -15,5 +15,8 @@ data/*.nc
 .DS_Store
 */.DS_Store
 
+# vscode
+.vscode
+
 # doc
 doc/doxygen
