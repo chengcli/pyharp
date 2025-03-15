@@ -64,13 +64,7 @@ int main(int argc, char** argv) {
   int nstr = 4;
 
   // parameters of the amars model
-  double g = 3.711;
-  double mean_mol_weight = 0.044;  // CO2
-  double R = 8.314472;
-  double cp = 844;  // J/(kg K) for CO2
   double surf_sw_albedo = 0.3;
-  // double aero_scale = 1e-6;
-  double aero_scale = 1;
   double sr_sun = 2.92842e-5;  // angular size of the sun at mars
   double btemp0 = 210;
   double solar_temp = 5772;
@@ -99,21 +93,19 @@ int main(int argc, char** argv) {
   auto pre = atm_data.data["PRE [mb]"] * 100.0;
   auto tem = atm_data.data["TEM [K]"];
 
-  // unit = [mol/m^3]
-  auto conc = torch::zeros({ncol, nlyr, 5}, torch::kFloat64);
+  // unit = [mol/mol]
+  // mole fraction
+  auto xfrac = torch::zeros({ncol, nlyr, 5}, torch::kFloat64);
 
-  // calculate means
-  auto mean_co2 = atm_data.data["CO2 [ppmv]"].mean() * 1e-6;
-  auto mean_h2o = atm_data.data["H2O [ppmv]"].mean() * 1e-6;
-  auto mean_so2 = atm_data.data["SO2 [ppmv]"].mean() * 1e-6;
-
-  conc.select(-1, 0) = mean_co2 * (new_P / (R * new_T));
-  conc.select(-1, 1) = mean_h2o * (new_P / (R * new_T));
-  conc.select(-1, 2) = mean_so2 * (new_P / (R * new_T));
+  xfrac.select(-1, 0) = harp::interpn({new_P.log()}, {pre.log()},
+                                      atm_data.data["CO2 [ppmv]"] * 1e-6);
+  xfrac.select(-1, 1) = harp::interpn({new_P.log()}, {pre.log()},
+                                      atm_data.data["H2O [ppmv]"] * 1e-6);
+  xfrac.select(-1, 2) = harp::interpn({new_P.log()}, {pre.log()},
+                                      atm_data.data["SO2 [ppmv]"] * 1e-6);
 
   // aerosols
-  conc.narrow(-1, 3, new_X.size(-1)) =
-      aero_scale * new_X * new_P.unsqueeze(1) / (R * new_T.unsqueeze(1));
+  xfrac.narrow(-1, 3, new_X.size(-1)) = new_X;
 
   /// ----- done read atmosphere data -----  ///
   std::map<std::string, torch::Tensor> atm, bc;
@@ -154,26 +146,27 @@ int main(int argc, char** argv) {
   bc["btemp"] = btemp0 * torch::ones({ncol}, torch::kFloat64);
   bc["ttemp"] = torch::zeros({ncol}, torch::kFloat64);
 
-  // print radiation options and construct radiation model
-  RadiationModelOptions model_op;
+  // parameters of the amars model
+  harp::RadiationModelOptions model_op;
   model_op.ncol(ncol);
   model_op.nlyr(nlyr);
-  model_op.grav(g);
-  model_op.mean_mol_weight(mean_mol_weight);
-  model_op.cp(cp);
-  model_op.aero_scale(aero_scale);
-  model_op.cSurf(200000);
+  model_op.grav(3.711);
+  model_op.mean_mol_weight(0.044);  // CO2
+  model_op.cp(844);                 // J/(kg K) for CO2
+  model_op.aero_scale(1.0);
+  model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
+  model_op.intg(harp::IntegratorOptions().type("rk3"));
   model_op.rad(rad_op);
 
-  RadiationMOdel model(model_op);
+  harp::RadiationModel model(model_op);
 
   int t_lim = 10000;
   double tstep = 86400 / 4.;
   int print_freq = 500;
 
   for (int t_ind = 0; t_ind < t_lim; ++t_ind) {
-    for (int stage = 0; stage < model->pintg->stages().size(); ++stage) {
-      model->forward(conc, atm, bc, tstep, stage);
+    for (int stage = 0; stage < model->pintg->stages.size(); ++stage) {
+      model->forward(xfrac, atm, bc, tstep, stage);
     }
 
     if (t_ind % print_freq == 0) {

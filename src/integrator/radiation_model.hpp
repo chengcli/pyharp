@@ -25,12 +25,13 @@ struct RadiationModelOptions {
   ADD_ARG(double,
           cSurf) = 200000;         //! J/(m^2 K) thermal intertia of the surface
   ADD_ARG(RadiationOptions, rad);  //! radiation model options
+  ADD_ARG(IntegratorOptions, intg);  //! integrator options
 };
 
 class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
  public:
   //! options with which this `RadiationModel` was constructed
-  IntegratorOptions options;
+  RadiationModelOptions options;
 
   //! submodules
   Integrator pintg = nullptr;
@@ -38,7 +39,7 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
 
   //! Constructor to initialize the layers
   RadiationModelImpl() = default;
-  explicit RadiationModel(RadiationModel const& options_);
+  explicit RadiationModelImpl(RadiationModelOptions const& options_);
   void reset() override;
 
   //! Advance the atmosphere & surface temperature by one time step.
@@ -54,7 +55,7 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
    * \return atmospheric temperature tendency
    */
   int forward(torch::Tensor xfrac, std::map<std::string, torch::Tensor>& atm,
-              std::map<std::string, torch::Tensro>& bc, double tstep,
+              std::map<std::string, torch::Tensor>& bc, double tstep,
               int stage);
 
  protected:
@@ -65,6 +66,6 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
   torch::Tensor btemp0_, btemp1_;
 };
 
-TORCH_MODULE(RadiationModelImpl);
+TORCH_MODULE(RadiationModel);
 
 }  // namespace harp
