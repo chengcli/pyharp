@@ -84,6 +84,4 @@ if (BUILD_TESTS)
 endif()
 
 message(STATUS "${Blue}${PROJECT_NAME}-6. Setting up examples ...${ColorReset}")
-if (BUILD_EXAMPLES)
-  add_subdirectory(examples)
-endif()
+add_subdirectory(examples)

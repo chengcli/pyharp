@@ -73,14 +73,9 @@ int main(int argc, char** argv) {
   // double aero_scale = 1e-6;
   double aero_scale = 1;
   double sr_sun = 2.92842e-5;  // angular size of the sun at mars
-  double btemp = 210;
+  double btemp0 = 210;
   double solar_temp = 5772;
   double lum_scale = 0.7;
-
-  // init some params for the loop
-  double inc_sw_surf = 0;
-  double inc_lw_surf = 0;
-  double surf_forcing = 0;
 
   /// ----- read atmosphere data -----  ///
 
@@ -128,6 +123,7 @@ int main(int argc, char** argv) {
   std::map<std::string, torch::Tensor> atm, bc;
   atm["pres"] = new_P.unsqueeze(0).expand({ncol, nlyr});
   atm["temp"] = new_T.unsqueeze(0).expand({ncol, nlyr});
+  atm["rho"] = new_rho.unsqueeze(0).expand({ncol, nlyr});
 
   // read radiation configuration from yaml file
   auto op = harp::RadiationOptions::from_yaml("amars-ck.yaml");
@@ -157,80 +153,53 @@ int main(int argc, char** argv) {
       band.disort().wave_lower(std::vector<double>(nwave, wmin));
       band.disort().wave_upper(std::vector<double>(nwave, wmax));
       bc[name + "/albedo"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
-      bc[name + "/btemp"] = btemp * torch::ones({nwave, ncol}, torch::kFloat64);
     }
   }
+  bc["btemp"] = btemp0 * torch::ones({ncol}, torch::kFloat64);
+  bc["ttemp"] = torch::zeros({ncol}, torch::kFloat64);
 
   // print radiation options and construct radiation model
   harp::Radiation rad(op);
   auto netflux = rad->forward(conc, dz, &bc, &atm);
-  
-  int t_lim = 10000; 
+
+  int t_lim = 10000;
   int print_freq = 500;
-  double tstep = 86400 / 4;  
-  double cSurf = 200000;  // thermal inertia of the surface, assuming half ocean half land
+  double tstep = 86400 / 4.;
+  double cSurf =
+      200000;  // thermal inertia of the surface, assuming half ocean half land
   double current_time = 0;
 
   for (int t_ind = 0; t_ind < t_lim; ++t_ind) {
-    inc_sw_surf = 0;
-    inc_lw_surf = 0;
-    for (auto& [name, band] : op.band_options()) {
-      std::string name1 = "radiation/" + name + "/total_flux";
-      if (name == "SW"){
-        //std::cout << harp::shared[name1] << std::endl;
-        //std::cout << harp::shared[name1][0][0][1] << std::endl;
-        inc_sw_surf += harp::shared[name1][0][0][1].item<double>();
-      }
-      else{
-        inc_lw_surf += harp::shared[name1][0][0][1].item<double>();
+    auto surf_forcing =
+        harp::shared["radiation/downward_flux"] - 5.67e-8 * bc["btemp"].pow(4);
+    bc["btemp"] += surf_forcing * (tstep / cSurf);
 
-      }
-    }
-    surf_forcing = (1 - surf_sw_albedo) * inc_sw_surf + inc_lw_surf - 5.67e-8 * std::pow(btemp, 4);
-    btemp += surf_forcing * (tstep / cSurf);
+    dT_dt = torch::zeros_like(atm["temp"]);
+    auto dT_dt = -1. / (atm["rho"] * cp) *
+                 (netflux.narrow(-1, 1, nlyr) - netflux.narrow(-1, 0, nlyr)) /
+                 dz;
 
+    atm["temp"] += dT_dt * tstep;
+    atm["temp"].clamp_(20, 1000);
 
-    for (auto& [name, band] : op.band_options()) {
-      int nwave = name == "SW" ? 500 : band.ww().size();
-      if (name != "SW"){
-        bc[name + "/btemp"] = btemp * torch::ones({nwave, ncol}, torch::kFloat64);
-      }
-    }
-
-    dT_dt = torch::zeros_like(new_T);
-    for (int i = 0; i < nlyr; ++i) {
-        dT_dt[i] += (-1 / (new_rho[i].item<double>() * cp)) * ((netflux[0][i + 1].item<double>() - netflux[0][i].item<double>()) / dz[i].item<double>());
-    }
-    
-    new_T += dT_dt * tstep;
-    for (int k = 0; k < nlyr; ++k) {
-      if (new_T[k].item<double>() < 20) new_T[k] = 20;
-    }
-    atm["temp"] = new_T.unsqueeze(0).expand({ncol, nlyr});
-
-    conc.select(-1, 0) = (atm_data.data["CO2 [ppmv]"] * 1e-6) * (new_P / (R * new_T));
-    conc.select(-1, 1) = (atm_data.data["H2O [ppmv]"] * 1e-6) * (new_P / (R * new_T));
-    conc.select(-1, 2) = (atm_data.data["SO2 [ppmv]"] * 1e-6) * (new_P / (R * new_T));
-
-
-
-  //        conc[0][k][0] =
-  //        (aero_scale * new_mr[1][k] * new_p[k]) /
-  //        (R * new_T[k]);  // s8 comes second in the file that we read
-                           // in. but we need it to be index 0 in conc
-                           // bc of how it was initialized above
+    conc.select(-1, 0) = (atm_data.data["CO2 [ppmv]"] * 1e-6) *
+                         (atm["pres"] / (R * atm["temp"]));
+    conc.select(-1, 1) = (atm_data.data["H2O [ppmv]"] * 1e-6) *
+                         (atm["pres"] / (R * atm["temp"]));
+    conc.select(-1, 2) = (atm_data.data["SO2 [ppmv]"] * 1e-6) *
+                         (atm["pres"] / (R * atm["temp"]));
 
     // aerosols
-    conc.narrow(-1, 3, new_X.size(-1)) =
-        aero_scale * new_X * new_P.unsqueeze(1) / (R * new_T.unsqueeze(1));
+    conc.narrow(-1, 3, new_X.size(-1)) = aero_scale * new_X.unsqueeze(0) *
+                                         atm["pres"].unsqueeze(-1) /
+                                         (R * atm["temp"].unsqueeze(-1));
 
     // unit = [kg/m^3]
-    new_rho = (new_P * mean_mol_weight) / (R * new_T);
+    atm["rho"] = (atm["pres"] * mean_mol_weight) / (R * atm["temp"]);
 
     // unit = [m]
-    dz = harp::calc_dz_hypsometric(new_P, new_T,
-                                        torch::tensor({mean_mol_weight * g / R}));
-
+    dz = harp::calc_dz_hypsometric(atm["pres"], atm["temp"],
+                                   torch::tensor({mean_mol_weight * g / R}));
 
     if (t_ind % print_freq == 0) {
       std::ostringstream filename;
@@ -238,10 +207,12 @@ int main(int argc, char** argv) {
 
       // Open the file and write the data
       std::ofstream outputFile3(filename.str());
-      outputFile3 << "#p[Pa] T[K] dT/dt [K/s]" << std::endl;
+      outputFile3 << "#p[Pa] T[K] netF[w/m^2] dT/dt [K/s]" << std::endl;
       for (int k = 0; k < nlyr; ++k) {
-        outputFile3 << new_P[k].item<double>() << " " << new_T[k].item<double>() << " " << dT_dt[k].item<double>()
-                    << std::endl;
+        outputFile3 << atm["pres"][0][k].item<double>() << " "
+                    << atm["temp"][0][k].item<double>() << " "
+                    << atm["temp"][0][k].item<double>() << " "
+                    << dT_dt[0][k].item<double>() << std::endl;
       }
       outputFile3.close();
     }

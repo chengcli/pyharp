@@ -161,9 +161,10 @@ int main(int argc, char** argv) {
       band.disort().wave_lower(std::vector<double>(nwave, wmin));
       band.disort().wave_upper(std::vector<double>(nwave, wmax));
       bc[name + "/albedo"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
-      bc[name + "/btemp"] = btemp * torch::ones({nwave, ncol}, torch::kFloat64);
     }
   }
+  bc["btemp"] = btemp * torch::ones({ncol}, torch::kFloat64);
+  bc["ttemp"] = torch::zeros({ncol}, torch::kFloat64);
 
   // print radiation options and construct radiation model
   std::cout << "rad op = " << fmt::format("{}", op) << std::endl;
