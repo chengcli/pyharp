@@ -6,12 +6,11 @@
 #include <torch/torch.h>
 
 // harp
+#include <integrator/radiation_model.hpp>
 #include <math/interpolation.hpp>
 #include <radiation/bbflux.hpp>
-#include <radiation/calc_dz_hypsometric.hpp>
 #include <radiation/disort_config.hpp>
 #include <radiation/radiation.hpp>
-#include <radiation/radiation_formatter.hpp>
 #include <utils/read_data_tensor.hpp>
 
 struct AtmosphericData {
@@ -116,20 +115,15 @@ int main(int argc, char** argv) {
   conc.narrow(-1, 3, new_X.size(-1)) =
       aero_scale * new_X * new_P.unsqueeze(1) / (R * new_T.unsqueeze(1));
 
-  // unit = [kg/m^3]
-  auto new_rho = (new_P * mean_mol_weight) / (R * new_T);
-
   /// ----- done read atmosphere data -----  ///
-  ///
   std::map<std::string, torch::Tensor> atm, bc;
   // set up model atmosphere
   atm["pres"] = new_P.unsqueeze(0).expand({ncol, nlyr});
   atm["temp"] = new_T.unsqueeze(0).expand({ncol, nlyr});
-  atm["rho"] = new_rho.unsqueeze(0).expand({ncol, nlyr});
 
   // read radiation configuration from yaml file
-  auto op = harp::RadiationOptions::from_yaml("amars-ck.yaml");
-  for (auto& [name, band] : op.band_options()) {
+  auto rad_op = harp::RadiationOptions::from_yaml("amars-ck.yaml");
+  for (auto& [name, band] : rad_op.band_options()) {
     // query weights from opacity, only valid for longwave
     // shortwave values are defined separately
     band.ww() = band.query_weights();
@@ -161,7 +155,17 @@ int main(int argc, char** argv) {
   bc["ttemp"] = torch::zeros({ncol}, torch::kFloat64);
 
   // print radiation options and construct radiation model
-  harp::Radiation rad(op);
+  RadiationModelOptions model_op;
+  model_op.ncol(ncol);
+  model_op.nlyr(nlyr);
+  model_op.grav(g);
+  model_op.mean_mol_weight(mean_mol_weight);
+  model_op.cp(cp);
+  model_op.aero_scale(aero_scale);
+  model_op.cSurf(200000);
+  model_op.rad(rad_op);
+
+  RadiationMOdel model(model_op);
 
   int t_lim = 10000;
   double tstep = 86400 / 4.;
@@ -182,8 +186,9 @@ int main(int argc, char** argv) {
       for (int k = 0; k < nlyr; ++k) {
         outputFile3 << atm["pres"][0][k].item<double>() << " "
                     << atm["temp"][0][k].item<double>() << " "
-                    << atm["temp"][0][k].item<double>() << " "
-                    << dT_dt[0][k].item<double>() << std::endl;
+                    << harp::shared["result/netflux"][0][k].item<double>()
+                    << " " << harp::shared["result/dT_atm"][0][k].item<double>()
+                    << std::endl;
       }
       outputFile3.close();
     }
