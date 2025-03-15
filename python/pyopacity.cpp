@@ -34,87 +34,87 @@ void bind_opacity(py::module &m) {
            })
 
       .ADD_OPTION(std::string, harp::AttenuatorOptions, type, R"(
-      Set the type of the opacity source
-      Valid options are:
-        - 's8_fuller'
-        - 'h2so4_simple'
-        - 'rfm-lbl'
-        - 'rfm-ck'
+        Set the type of the opacity source
+        Valid options are:
+          - 's8_fuller'
+          - 'h2so4_simple'
+          - 'rfm-lbl'
+          - 'rfm-ck'
 
-      Parameters
-      ----------
-      type : str
-          type of the opacity source
+        Parameters
+        ----------
+        type : str
+            type of the opacity source
 
-      Returns
-      -------
-      AttenuatorOptions object
+        Returns
+        -------
+        AttenuatorOptions object
 
-      Examples
-      --------
-      >>> import torch
-      >>> from pyharp import AttenuatorOptions
-      >>> op = AttenuatorOptions().type('rfm-lbl')
-      >>> print(op)
-      )")
+        Examples
+        --------
+        >>> import torch
+        >>> from pyharp import AttenuatorOptions
+        >>> op = AttenuatorOptions().type('rfm-lbl')
+        >>> print(op)
+        )")
 
       .ADD_OPTION(std::string, harp::AttenuatorOptions, bname, R"(
-      Set the name of the band that the opacity is associated with
+        Set the name of the band that the opacity is associated with
 
-      Parameters
-      ----------
-      bname : str
-          name of the band that the opacity is associated with
+        Parameters
+        ----------
+        bname : str
+            name of the band that the opacity is associated with
 
-      Returns
-      -------
-      AttenuatorOptions object
+        Returns
+        -------
+        AttenuatorOptions object
 
-      Examples
-      --------
-      >>> import torch
-      >>> from pyharp import AttenuatorOptions
-      >>> op = AttenuatorOptions().bname('band1')
-      )")
+        Examples
+        --------
+        >>> import torch
+        >>> from pyharp import AttenuatorOptions
+        >>> op = AttenuatorOptions().bname('band1')
+        )")
 
       .ADD_OPTION(std::vector<std::string>, harp::AttenuatorOptions,
                   opacity_files, R"(
-      Set the list of opacity data files
+        Set the list of opacity data files
 
-      Parameters
-      ----------
-      opacity_files : list
-          list of opacity data files
+        Parameters
+        ----------
+        opacity_files : list
+            list of opacity data files
 
-      Returns
-      -------
-      AttenuatorOptions object
+        Returns
+        -------
+        AttenuatorOptions object
 
-      Examples
-      --------
-      >>> import torch
-      >>> from pyharp import AttenuatorOptions
-      >>> op = AttenuatorOptions().opacity_files(['file1', 'file2'])
-      )")
+        Examples
+        --------
+        >>> import torch
+        >>> from pyharp import AttenuatorOptions
+        >>> op = AttenuatorOptions().opacity_files(['file1', 'file2'])
+        )")
 
       .ADD_OPTION(std::vector<int>, harp::AttenuatorOptions, species_ids, R"(
-      Set the list of dependent species indices
+        Set the list of dependent species indices
 
-      Parameters
-      ----------
-      species_ids : list
-          list of dependent species indices
+        Parameters
+        ----------
+        species_ids : list
+            list of dependent species indices
 
-      Returns
-      -------
-      AttenuatorOptions object
+        Returns
+        -------
+        AttenuatorOptions object
 
-      Examples
-      --------
-      >>> import torch
-      >>> from pyharp import AttenuatorOptions
-      >>> op = AttenuatorOptions().species_ids([1, 2])
-      )");
+        Examples
+        --------
+        >>> import torch
+        >>> from pyharp import AttenuatorOptions
+        >>> op = AttenuatorOptions().species_ids([1, 2])
+        )");
 
   ADD_HARP_MODULE(S8Fuller, AttenuatorOptions);
   ADD_HARP_MODULE(H2SO4Simple, AttenuatorOptions);
