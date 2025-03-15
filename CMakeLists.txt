@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+
+option(BUILD_TESTS "Build tests" ON)
+option(BUILD_EXAMPLES "Build examples" OFF)
 
 project(pyharp
   LANGUAGES CXX C
@@ -74,7 +78,12 @@ configure_file(${CMAKE_SOURCE_DIR}/configure.h.in configure.h @ONLY)
 add_subdirectory(src)
 
 message(STATUS "${Blue}${PROJECT_NAME}-5. Setting up unit tests ...${ColorReset}")
-add_subdirectory(tests)
+if (BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 message(STATUS "${Blue}${PROJECT_NAME}-6. Setting up examples ...${ColorReset}")
-add_subdirectory(examples)
+if (BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()

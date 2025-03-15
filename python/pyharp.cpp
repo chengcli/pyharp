@@ -6,7 +6,13 @@
 // yaml-cpp
 #include <yaml-cpp/yaml.h>
 
+// harp
+#include <utils/find_resource.hpp>
+
 namespace py = pybind11;
+
+void bind_radiation(py::module &m);
+void bind_opacity(py::module &m);
 
 PYBIND11_MODULE(pyharp, m) {
   m.attr("__name__") = "pyharp";
@@ -29,7 +35,22 @@ PYBIND11_MODULE(pyharp, m) {
           The configuration.
       )");
 
-  m.def("find_resource", &find_resource, R"(
+  m.def(
+      "set_search_paths",
+      [](const std::string path) {
+        strcpy(harp::search_paths, path.c_str());
+        return harp::deserialize_search_paths(harp::search_paths);
+      },
+      R"(
+        Set the search paths for resource files.
+
+        Parameters
+        ----------
+        path : str
+            The search paths.
+      )");
+
+  m.def("find_resource", &harp::find_resource, R"(
       Find a resource file.
 
       Parameters
