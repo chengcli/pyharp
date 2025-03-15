@@ -60,18 +60,18 @@ AtmosphericData read_rfm_atm(const std::string& filename) {
 int main(int argc, char** argv) {
   // parameters of the computational grid
   int ncol = 1;
-  int nlyr = 40;
+  int nlyr = 160;
   int nstr = 4;
 
   // parameters of the amars model
   double surf_sw_albedo = 0.3;
   double sr_sun = 2.92842e-5;  // angular size of the sun at mars
   double btemp0 = 210;
+  double ttemp0 = 200;
   double solar_temp = 5772;
   double lum_scale = 0.7;
 
   /// ----- read atmosphere data -----  ///
-
   auto aero_ptx = harp::read_data_tensor("aerosol_output_data.txt");
   auto aero_p = (aero_ptx.select(1, 0) * 1e5);  // bar to pa
   auto aero_t = aero_ptx.select(1, 1);
@@ -130,6 +130,7 @@ int main(int argc, char** argv) {
 
     auto wmin = band.disort().wave_lower()[0];
     auto wmax = band.disort().wave_upper()[0];
+    band.disort().ds().accur = 1.e-10;
 
     harp::disort_config(&band.disort(), nwave, ncol, nlyr, nstr);
 
@@ -148,10 +149,11 @@ int main(int argc, char** argv) {
       band.disort().wave_lower(std::vector<double>(nwave, wmin));
       band.disort().wave_upper(std::vector<double>(nwave, wmax));
       bc[name + "/albedo"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
+      bc[name + "/temis"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
     }
   }
   bc["btemp"] = btemp0 * torch::ones({ncol}, torch::kFloat64);
-  bc["ttemp"] = torch::zeros({ncol}, torch::kFloat64);
+  bc["ttemp"] = ttemp0 * torch::ones({ncol}, torch::kFloat64);
 
   // parameters of the amars model
   harp::RadiationModelOptions model_op;
@@ -162,7 +164,7 @@ int main(int argc, char** argv) {
   model_op.cp(844);                 // J/(kg K) for CO2
   model_op.aero_scale(1.0);
   model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
-  model_op.intg(harp::IntegratorOptions().type("rk3"));
+  model_op.intg(harp::IntegratorOptions().type("rk2"));
   model_op.rad(rad_op);
 
   harp::RadiationModel model(model_op);
