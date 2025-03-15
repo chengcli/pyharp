@@ -50,13 +50,17 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
    *  - result/dT_atm
    *
    * \param xfrac species mole fraction
-   * \param atm atmosphere variables
+   * \param atm atmospheric state
+   *            This normally includes the following variables:
+   *              - 'temp': temperature [K], (ncol, nlyr)
+   *              - 'pres': pressure [Pa], (ncol, nlyr)
    * \param bc radiation boundary conditions
-   * \return atmospheric temperature tendency
+   * \param dt time step
+   * \param stage stage of the integrator
+   * \return error code
    */
   int forward(torch::Tensor xfrac, std::map<std::string, torch::Tensor>& atm,
-              std::map<std::string, torch::Tensor>& bc, double tstep,
-              int stage);
+              std::map<std::string, torch::Tensor>& bc, double dt, int stage);
 
  protected:
   //! stage registers for atmospheric temperature

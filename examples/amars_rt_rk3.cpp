@@ -60,7 +60,7 @@ AtmosphericData read_rfm_atm(const std::string& filename) {
 int main(int argc, char** argv) {
   // parameters of the computational grid
   int ncol = 1;
-  int nlyr = 160;
+  int nlyr = 40;
   int nstr = 4;
 
   // parameters of the amars model
@@ -96,13 +96,20 @@ int main(int argc, char** argv) {
   // unit = [mol/mol]
   // mole fraction
   auto xfrac = torch::zeros({ncol, nlyr, 5}, torch::kFloat64);
+  xfrac.select(-1, 0) =
+      harp::interpn({new_P.log()}, {pre.log()},
+                    atm_data.data["CO2 [ppmv]"].unsqueeze(-1) * 1e-6)
+          .squeeze(-1);
 
-  xfrac.select(-1, 0) = harp::interpn({new_P.log()}, {pre.log()},
-                                      atm_data.data["CO2 [ppmv]"] * 1e-6);
-  xfrac.select(-1, 1) = harp::interpn({new_P.log()}, {pre.log()},
-                                      atm_data.data["H2O [ppmv]"] * 1e-6);
-  xfrac.select(-1, 2) = harp::interpn({new_P.log()}, {pre.log()},
-                                      atm_data.data["SO2 [ppmv]"] * 1e-6);
+  xfrac.select(-1, 1) =
+      harp::interpn({new_P.log()}, {pre.log()},
+                    atm_data.data["H2O [ppmv]"].unsqueeze(-1) * 1e-6)
+          .squeeze(-1);
+
+  xfrac.select(-1, 2) =
+      harp::interpn({new_P.log()}, {pre.log()},
+                    atm_data.data["SO2 [ppmv]"].unsqueeze(-1) * 1e-6)
+          .squeeze(-1);
 
   // aerosols
   xfrac.narrow(-1, 3, new_X.size(-1)) = new_X;

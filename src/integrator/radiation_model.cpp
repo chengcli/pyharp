@@ -4,6 +4,7 @@
 #include <constants.h>
 
 #include <radiation/calc_dz_hypsometric.hpp>
+#include <radiation/radiation_formatter.hpp>
 
 namespace harp {
 
@@ -11,7 +12,9 @@ namespace harp {
 extern std::unordered_map<std::string, torch::Tensor> shared;
 
 RadiationModelImpl::RadiationModelImpl(RadiationModelOptions const& options_)
-    : options(options_) {}
+    : options(options_) {
+  reset();
+}
 
 void RadiationModelImpl::reset() {
   // set up integrator
@@ -51,8 +54,7 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
                                          options.grav() / constants::Rgas}));
 
   // -------- (2) run one time step --------
-  auto conc = torch::empty_like(xfrac);
-
+  auto conc = xfrac.clone();
   conc.narrow(-1, 0, 3) *=
       atm["pres"].unsqueeze(-1) / (constants::Rgas * atm["temp"].unsqueeze(-1));
 
@@ -65,7 +67,6 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
 
   auto surf_forcing = shared["radiation/downward_flux"] -
                       constants::stefanBoltzmann * bc["btemp"].pow(4);
-
   auto dT_surf = surf_forcing * (dt / options.cSurf());
   shared["result/dT_surf"] = dT_surf;
 
