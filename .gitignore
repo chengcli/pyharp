@@ -13,6 +13,10 @@ data/*.nc
 
 # mac
 .DS_Store
+*/.DS_Store
+
+# vscode
+.vscode
 
 # doc
 doc/doxygen
