@@ -43,15 +43,19 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
 
   //! Advance the atmosphere & surface temperature by one time step.
   /*!
+   * This function exports the following tensor variables:
+   *  - result/net_flux
+   *  - result/dT_surf
+   *  - result/dT_atm
+   *
    * \param xfrac species mole fraction
    * \param atm atmosphere variables
    * \param bc radiation boundary conditions
    * \return atmospheric temperature tendency
    */
-  torch::Tensor forward(torch::Tensor xfrac,
-                        std::map<std::string, torch::Tensor>& atm,
-                        std::map<std::string, torch::Tensro>& bc, double tstep,
-                        int stage);
+  int forward(torch::Tensor xfrac, std::map<std::string, torch::Tensor>& atm,
+              std::map<std::string, torch::Tensro>& bc, double tstep,
+              int stage);
 
  protected:
   //! stage registers for atmospheric temperature

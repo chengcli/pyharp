@@ -31,10 +31,10 @@ RadiationModelImpl::RadiationModelImpl(RadiationModelOptions const& options_)
                             torch::zeros({options.ncol()}, torch::kFloat64));
 }
 
-torch::Tensor RadiationModel::forward(torch::Tensor xfrac,
-                                      std::map<std::string, torch::Tensor>& atm,
-                                      std::map<std::string, torch::Tensro>& bc,
-                                      double dt, int stage) {
+int RadiationModel::forward(torch::Tensor xfrac,
+                            std::map<std::string, torch::Tensor>& atm,
+                            std::map<std::string, torch::Tensro>& bc, double dt,
+                            int stage) {
   // -------- (1) save initial state --------
   if (stage == 0) {
     atemp0_.copy_(atm["temp"]);
@@ -58,9 +58,9 @@ torch::Tensor RadiationModel::forward(torch::Tensor xfrac,
   // aerosols
   conc.narrow(-1, 3, new_X.size(-1)) =
       options.aero_scale() * new_X.unsqueeze(0) * atm["pres"].unsqueeze(-1) /
-      *(constants::Rgas * atm["temp"].unsqueeze(-1));
+      (constants::Rgas * atm["temp"].unsqueeze(-1));
 
-  auto netflux = rad->forward(conc, dz, &bc, &atm);
+  auto netflux = prad->forward(conc, dz, &bc, &atm);
   shared["result/netflux"] = netflux;
 
   auto surf_forcing =

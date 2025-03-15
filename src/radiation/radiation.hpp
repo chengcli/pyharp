@@ -85,24 +85,25 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
    *  - radiation/upward_flux
    *
    * \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
-   * \param path layer pathlength (nlyr) or (ncol, nlyr)
+   * \param dz layer thickness (nlyr) or (ncol, nlyr)
    *
    * \param bc boundary conditions, may contain the following fields:
-   *        "fbeam": solar beam irradiance [W/m^2], (nwave, ncol)
-   *        "umu0": cosine of the solar zenith angle, (nwave, ncol)
-   *        "albedo": surface albedo, (nwave, ncol)
+   *        <band> + "fbeam": solar beam irradiance [W/m^2], (nwave, ncol)
+   *        <band> + "umu0": cosine of the solar zenith angle, (nwave, ncol)
+   *        <band> + "albedo": surface albedo, (nwave, ncol)
+   *        "btemp": bottom temperature
+   *        "ttemp": top temperature
    *
    * \param kwargs additional properties passed to other subroutines,
    *        may contain the following fields:
    *        "pres": pressure (ncol, nlyr)
    *        "temp": temperature (ncol, nlyr)
-   *        "dz": layer thickness (nlyr) or (ncol, nlyr)
    *        "area": cell face area [m^2], (ncol)
    *        "vol": cell volume [m^3], (ncol)
    *
    * \return net flux tensor [W/m^2] (ncol, nlyr+1)
    */
-  torch::Tensor forward(torch::Tensor conc, torch::Tensor path,
+  torch::Tensor forward(torch::Tensor conc, torch::Tensor dz,
                         std::map<std::string, torch::Tensor>* bc,
                         std::map<std::string, torch::Tensor>* kwargs);
 };
