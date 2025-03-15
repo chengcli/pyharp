@@ -61,8 +61,8 @@ AtmosphericData read_rfm_atm(const std::string& filename) {
 int main(int argc, char** argv) {
   // parameters of the computational grid
   int ncol = 1;
-  int nlyr = 40;
-  int nstr = 8;
+  int nlyr = 160;
+  int nstr = 4;
 
   // parameters of the amars model
   double g = 3.711;
@@ -80,17 +80,18 @@ int main(int argc, char** argv) {
   /// ----- read atmosphere data -----  ///
 
   auto aero_ptx = harp::read_data_tensor("aerosol_output_data.txt");
-  auto aero_p = (aero_ptx.select(1, 0) * 1e5);
+  auto aero_p = (aero_ptx.select(1, 0) * 1e5);  // bar to pa
   auto aero_t = aero_ptx.select(1, 1);
   auto aero_x = aero_ptx.narrow(1, 2, 2);
 
   // unit = [pa]
-  auto new_P = harp::read_data_tensor("pVals.txt").squeeze(1);
+  // log pressure grid from 500 mbar to 1 mbar
+  auto new_P = torch::logspace(log10(500.0), log10(1.0), nlyr);
   new_P *= 100.0;  // convert mbar to Pa
 
   // unit = [K]
-  auto new_T = harp::read_data_tensor("TVals.txt").squeeze(1);
-  auto dT_dt = torch::zeros_like(new_T);
+  // isothermal temperature profile at 200 K
+  auto new_T = 200. * torch::ones({nlyr}, torch::kFloat64);
 
   // unit = [mol/mol]
   auto new_X = harp::interpn({new_P.log()}, {aero_p.log()}, aero_x);
@@ -102,9 +103,14 @@ int main(int argc, char** argv) {
   // unit = [mol/m^3]
   auto conc = torch::zeros({ncol, nlyr, 5}, torch::kFloat64);
 
-  conc.select(-1, 0) = (atm_data.data["CO2 [ppmv]"] * 1e-6) * (pre / (R * tem));
-  conc.select(-1, 1) = (atm_data.data["H2O [ppmv]"] * 1e-6) * (pre / (R * tem));
-  conc.select(-1, 2) = (atm_data.data["SO2 [ppmv]"] * 1e-6) * (pre / (R * tem));
+  // calculate means
+  auto mean_co2 = atm_data.data["CO2 [ppmv]"].mean() * 1e-6;
+  auto mean_h2o = atm_data.data["H2O [ppmv]"].mean() * 1e-6;
+  auto mean_so2 = atm_data.data["SO2 [ppmv]"].mean() * 1e-6;
+
+  conc.select(-1, 0) = mean_co2 * (new_P / (R * new_T));
+  conc.select(-1, 1) = mean_h2o * (new_P / (R * new_T));
+  conc.select(-1, 2) = mean_so2 * (new_P / (R * new_T));
 
   // aerosols
   conc.narrow(-1, 3, new_X.size(-1)) =
@@ -113,14 +119,10 @@ int main(int argc, char** argv) {
   // unit = [kg/m^3]
   auto new_rho = (new_P * mean_mol_weight) / (R * new_T);
 
-  // unit = [m]
-  auto dz = harp::calc_dz_hypsometric(new_P, new_T,
-                                      torch::tensor({mean_mol_weight * g / R}));
-
   /// ----- done read atmosphere data -----  ///
-
-  // configure input data for each radiation band
+  ///
   std::map<std::string, torch::Tensor> atm, bc;
+  // set up model atmosphere
   atm["pres"] = new_P.unsqueeze(0).expand({ncol, nlyr});
   atm["temp"] = new_T.unsqueeze(0).expand({ncol, nlyr});
   atm["rho"] = new_rho.unsqueeze(0).expand({ncol, nlyr});
@@ -160,46 +162,15 @@ int main(int argc, char** argv) {
 
   // print radiation options and construct radiation model
   harp::Radiation rad(op);
-  auto netflux = rad->forward(conc, dz, &bc, &atm);
 
   int t_lim = 10000;
-  int print_freq = 500;
   double tstep = 86400 / 4.;
-  double cSurf =
-      200000;  // thermal inertia of the surface, assuming half ocean half land
-  double current_time = 0;
+  int print_freq = 500;
 
   for (int t_ind = 0; t_ind < t_lim; ++t_ind) {
-    auto surf_forcing =
-        harp::shared["radiation/downward_flux"] - 5.67e-8 * bc["btemp"].pow(4);
-    bc["btemp"] += surf_forcing * (tstep / cSurf);
-
-    dT_dt = torch::zeros_like(atm["temp"]);
-    auto dT_dt = -1. / (atm["rho"] * cp) *
-                 (netflux.narrow(-1, 1, nlyr) - netflux.narrow(-1, 0, nlyr)) /
-                 dz;
-
-    atm["temp"] += dT_dt * tstep;
-    atm["temp"].clamp_(20, 1000);
-
-    conc.select(-1, 0) = (atm_data.data["CO2 [ppmv]"] * 1e-6) *
-                         (atm["pres"] / (R * atm["temp"]));
-    conc.select(-1, 1) = (atm_data.data["H2O [ppmv]"] * 1e-6) *
-                         (atm["pres"] / (R * atm["temp"]));
-    conc.select(-1, 2) = (atm_data.data["SO2 [ppmv]"] * 1e-6) *
-                         (atm["pres"] / (R * atm["temp"]));
-
-    // aerosols
-    conc.narrow(-1, 3, new_X.size(-1)) = aero_scale * new_X.unsqueeze(0) *
-                                         atm["pres"].unsqueeze(-1) /
-                                         (R * atm["temp"].unsqueeze(-1));
-
-    // unit = [kg/m^3]
-    atm["rho"] = (atm["pres"] * mean_mol_weight) / (R * atm["temp"]);
-
-    // unit = [m]
-    dz = harp::calc_dz_hypsometric(atm["pres"], atm["temp"],
-                                   torch::tensor({mean_mol_weight * g / R}));
+    for (int stage = 0; stage < model->pintg->stages().size(); ++stage) {
+      model->forward(conc, atm, bc, tstep, stage);
+    }
 
     if (t_ind % print_freq == 0) {
       std::ostringstream filename;
@@ -216,7 +187,5 @@ int main(int argc, char** argv) {
       }
       outputFile3.close();
     }
-
-    netflux = rad->forward(conc, dz, &bc, &atm);
   }
 }
