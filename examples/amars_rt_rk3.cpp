@@ -60,7 +60,7 @@ AtmosphericData read_rfm_atm(const std::string& filename) {
 int main(int argc, char** argv) {
   // parameters of the computational grid
   int ncol = 1;
-  int nlyr = 40;
+  int nlyr = 80;
   int nstr = 4;
 
   // parameters of the amars model
@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
 
     auto wmin = band.disort().wave_lower()[0];
     auto wmax = band.disort().wave_upper()[0];
-    band.disort().ds().accur = 1.e-10;
+    band.disort().accur(1.e-12);
 
     harp::disort_config(&band.disort(), nwave, ncol, nlyr, nstr);
 
@@ -164,13 +164,13 @@ int main(int argc, char** argv) {
   model_op.cp(844);                 // J/(kg K) for CO2
   model_op.aero_scale(1.);
   model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
-  model_op.intg(harp::IntegratorOptions().type("rk3"));
+  model_op.intg(harp::IntegratorOptions().type("rk2"));
   model_op.rad(rad_op);
 
   harp::RadiationModel model(model_op);
 
   int t_lim = 10000;
-  double tstep = 86400 / 16.;
+  double tstep = 86400 / 4.;
   int print_freq = 500;
 
   for (int t_ind = 0; t_ind < t_lim; ++t_ind) {
@@ -187,17 +187,54 @@ int main(int argc, char** argv) {
 
       // opacity of SW band
       auto prop = harp::shared["radiation/SW/opacity"];
-      std::cout << "SW prop size: " << prop.sizes() << std::endl;
 
-      prop = harp::shared["radiation/B1/opacity"];
-      std::cout << "B1 prop size: " << prop.sizes() << std::endl;
-
-      outputFile3 << "#p[Pa] T[K] netF[w/m^2] dT/dt [K/s] tau_SW" << std::endl;
+      outputFile3 << "#p[Pa] T[K] netF[w/m^2] dT/dt[K/s] SW_tau1 SW_tau2 "
+                  << "B1 B2 B3 B4 B5 B6 B7 B8" << std::endl;
       for (int k = 0; k < nlyr; ++k) {
         outputFile3 << atm["pres"][0][k].item<double>() << " "
                     << atm["temp"][0][k].item<double>() << " "
                     << harp::shared["result/netflux"][0][k].item<double>()
                     << " " << harp::shared["result/dT_atm"][0][k].item<double>()
+                    << " "
+                    << harp::shared["radiation/SW/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/SW/opacity"]
+                           .mean(0)[0][k][1]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B1/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B2/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B3/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B4/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B5/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B6/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B7/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B8/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
                     << " " << std::endl;
       }
       outputFile3.close();
