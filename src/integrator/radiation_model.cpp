@@ -5,6 +5,7 @@
 
 #include <radiation/calc_dz_hypsometric.hpp>
 #include <radiation/radiation_formatter.hpp>
+#include <utils/layer2level.hpp>
 
 namespace harp {
 
@@ -63,7 +64,19 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
                            (constants::Rgas * atm["temp"].unsqueeze(-1));
 
   auto netflux = prad->forward(conc, dz, &bc, &atm);
+  // radiative flux
   shared["result/netflux"] = netflux;
+
+  // add thermal diffusion flux
+  auto vec = atm["temp"].sizes().vec();
+  vec.back() += 1;
+  auto dTdz = torch::zeros(vec, atm["temp"].options());
+  dTdz.narrow(-1, 1, options.nlyr() - 1) =
+      2. *
+      (atm["temp"].narrow(-1, 1, options.nlyr() - 1) -
+       atm["temp"].narrow(-1, 0, options.nlyr() - 1)) /
+      (dz.narrow(-1, 1, options.nlyr() - 1) +
+       dz.narrow(-1, 0, options.nlyr() - 1));
 
   auto surf_forcing = shared["radiation/downward_flux"] -
                       constants::stefanBoltzmann * bc["btemp"].pow(4);
@@ -73,9 +86,22 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
   // unit = [kg/m^3]
   auto rho = (atm["pres"] * options.mean_mol_weight()) /
              (constants::Rgas * atm["temp"]);
+
+  // density at levels
+  Layer2LevelOptions l2l;
+  l2l.order(k2ndOrder).lower(kExtrapolate).upper(kExtrapolate);
+  l2l.check_positivity(false);
+  auto rhoh = layer2level(rho.log(), l2l).exp();
+
+  // thermal diffusion flux
+  auto thermal_flux = -options.kappa() * rhoh * options.cp() * dTdz;
+  shared["result/thermal_diffusion_flux"] = thermal_flux;
+
   auto dT_atm = -dt / (rho * options.cp() * dz) *
-                (netflux.narrow(-1, 1, options.nlyr()) -
-                 netflux.narrow(-1, 0, options.nlyr()));
+                (netflux.narrow(-1, 1, options.nlyr()) +
+                 thermal_flux.narrow(-1, 1, options.nlyr()) -
+                 netflux.narrow(-1, 0, options.nlyr()) -
+                 thermal_flux.narrow(-1, 0, options.nlyr()));
   shared["result/dT_atm"] = dT_atm;
 
   // -------- (3) multi-stage averaging --------
