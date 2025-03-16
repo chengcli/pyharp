@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
   double surf_sw_albedo = 0.3;
   double sr_sun = 2.92842e-5;  // angular size of the sun at mars
   double btemp0 = 210;
-  double ttemp0 = 200;
+  double ttemp0 = 100;
   double solar_temp = 5772;
   double lum_scale = 0.7;
 
@@ -79,7 +79,8 @@ int main(int argc, char** argv) {
 
   // unit = [pa]
   // log pressure grid from 500 mbar to 1 mbar
-  auto new_P = torch::logspace(log10(500.0), log10(1.0), nlyr);
+  auto new_P =
+      torch::logspace(log10(500.0), log10(1.0), nlyr, 10, torch::kFloat64);
   new_P *= 100.0;  // convert mbar to Pa
 
   // unit = [K]
@@ -149,7 +150,7 @@ int main(int argc, char** argv) {
       band.disort().wave_lower(std::vector<double>(nwave, wmin));
       band.disort().wave_upper(std::vector<double>(nwave, wmax));
       bc[name + "/albedo"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
-      bc[name + "/temis"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
+      bc[name + "/temis"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
     }
   }
   bc["btemp"] = btemp0 * torch::ones({ncol}, torch::kFloat64);
@@ -165,6 +166,7 @@ int main(int argc, char** argv) {
   model_op.aero_scale(1.);
   model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
   model_op.intg(harp::IntegratorOptions().type("rk2"));
+  model_op.kappa(2.e-1);  // m^2/s thermal diffusivity
   model_op.rad(rad_op);
 
   harp::RadiationModel model(model_op);

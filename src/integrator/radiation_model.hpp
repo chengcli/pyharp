@@ -22,6 +22,7 @@ struct RadiationModelOptions {
   ADD_ARG(double, mean_mol_weight) = 0.044;  //! kg/mol
   ADD_ARG(double, cp) = 844;                 //! J/(kg K)
   ADD_ARG(double, aero_scale) = 1.0;         //! aerosol scale factor
+  ADD_ARG(double, kappa) = 2.e-5;            //! m^2/s thermal diffusivity
   ADD_ARG(double,
           cSurf) = 200000;         //! J/(m^2 K) thermal intertia of the surface
   ADD_ARG(RadiationOptions, rad);  //! radiation model options
@@ -45,7 +46,8 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
   //! Advance the atmosphere & surface temperature by one time step.
   /*!
    * This function exports the following tensor variables:
-   *  - result/net_flux
+   *  - result/netflux
+   *  - result/thermal_diffusion_flux
    *  - result/dT_surf
    *  - result/dT_atm
    *
