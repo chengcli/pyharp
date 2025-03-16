@@ -15,11 +15,10 @@ macro(setup_test namel)
     ${namel}.${buildl}
     PRIVATE ${CMAKE_BINARY_DIR}
             ${HARP_INCLUDE_DIR}
-            SYSTEM
+            ${elements_SOURCE_DIR}
+            ${disort_SOURCE_DIR}
             ${NETCDF_INCLUDES}
-            SYSTEM
             ${TORCH_INCLUDE_DIR}
-            SYSTEM
             ${TORCH_API_INCLUDE_DIR})
 
   target_link_libraries(${namel}.${buildl} PRIVATE pyharp::harp gtest_main)
