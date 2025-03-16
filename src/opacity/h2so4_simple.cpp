@@ -101,7 +101,7 @@ torch::Tensor H2SO4SimpleImpl::forward(
   out.select(3, 0) *= conc.select(2, options.species_ids()[0]).unsqueeze(0);
 
   // attenuation weighted single scattering albedo [1/m]
-  out.select(3, 1) *= out.select(3, 0);
+  // out.select(3, 1) *= out.select(3, 0);
 
   return out;
 }

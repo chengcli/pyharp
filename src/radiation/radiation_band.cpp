@@ -83,6 +83,7 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
       my.disort().flags(elements::trim_copy(band["flags"].as<std::string>()));
     }
     my.disort().nwave(1);
+    my.disort().upward(true);
     my.disort().wave_lower(std::vector<double>(1, wmin));
     my.disort().wave_upper(std::vector<double>(1, wmax));
   } else if (my.solver_name() == "twostr") {
@@ -208,16 +209,16 @@ torch::Tensor RadiationBandImpl::forward(
     auto kdata = a.forward(conc, *kwargs);
     int nprop = kdata.size(-1);
 
-    // total extinction
+    // attenuation coefficients
     prop.select(-1, index::IEX) += kdata.select(-1, index::IEX);
 
-    // single scattering albedo
+    // attenuation weighted single scattering albedo
     if (nprop > 1) {
       prop.select(-1, index::ISS) +=
           kdata.select(-1, index::ISS) * kdata.select(-1, index::IEX);
     }
 
-    // phase moments
+    // attenuation + single scattering albedo weighted phase moments
     if (nprop > 2) {
       prop.narrow(-1, index::IPM, nprop - 2) +=
           kdata.narrow(-1, index::IPM, nprop - 2) *
@@ -225,17 +226,19 @@ torch::Tensor RadiationBandImpl::forward(
     }
   }
 
-  // extinction coefficients -> optical thickness
+  // average phase moments
   int nprop = prop.size(-1);
   if (nprop > 2) {
     prop.narrow(-1, index::IPM, nprop - 2) /=
         (prop.select(-1, index::ISS) + 1e-10);
   }
 
+  // average single scattering albedo
   if (nprop > 1) {
     prop.select(-1, index::ISS) /= (prop.select(-1, index::IEX) + 1e-10);
   }
 
+  // attenuation coefficients -> optical thickness
   prop.select(-1, index::IEX) *= path.unsqueeze(0);
 
   // export band optical properties

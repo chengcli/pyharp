@@ -60,7 +60,7 @@ AtmosphericData read_rfm_atm(const std::string& filename) {
 int main(int argc, char** argv) {
   // parameters of the computational grid
   int ncol = 1;
-  int nlyr = 80;
+  int nlyr = 40;
   int nstr = 4;
 
   // parameters of the amars model
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
       band.disort().wave_lower(std::vector<double>(nwave, wmin));
       band.disort().wave_upper(std::vector<double>(nwave, wmax));
       bc[name + "/albedo"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
-      bc[name + "/temis"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
+      bc[name + "/temis"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
     }
   }
   bc["btemp"] = btemp0 * torch::ones({ncol}, torch::kFloat64);
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
   model_op.grav(3.711);
   model_op.mean_mol_weight(0.044);  // CO2
   model_op.cp(844);                 // J/(kg K) for CO2
-  model_op.aero_scale(1.e-3);
+  model_op.aero_scale(1.);
   model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
   model_op.intg(harp::IntegratorOptions().type("rk3"));
   model_op.rad(rad_op);
@@ -184,13 +184,21 @@ int main(int argc, char** argv) {
 
       // Open the file and write the data
       std::ofstream outputFile3(filename.str());
-      outputFile3 << "#p[Pa] T[K] netF[w/m^2] dT/dt [K/s]" << std::endl;
+
+      // opacity of SW band
+      auto prop = harp::shared["radiation/SW/opacity"];
+      std::cout << "SW prop size: " << prop.sizes() << std::endl;
+
+      prop = harp::shared["radiation/B1/opacity"];
+      std::cout << "B1 prop size: " << prop.sizes() << std::endl;
+
+      outputFile3 << "#p[Pa] T[K] netF[w/m^2] dT/dt [K/s] tau_SW" << std::endl;
       for (int k = 0; k < nlyr; ++k) {
         outputFile3 << atm["pres"][0][k].item<double>() << " "
                     << atm["temp"][0][k].item<double>() << " "
                     << harp::shared["result/netflux"][0][k].item<double>()
                     << " " << harp::shared["result/dT_atm"][0][k].item<double>()
-                    << std::endl;
+                    << " " << std::endl;
       }
       outputFile3.close();
     }
