@@ -63,7 +63,7 @@ void RadiationImpl::reset() {
 }
 
 torch::Tensor RadiationImpl::forward(
-    torch::Tensor conc, torch::Tensor path,
+    torch::Tensor conc, torch::Tensor dz,
     std::map<std::string, torch::Tensor>* bc,
     std::map<std::string, torch::Tensor>* kwargs) {
   torch::Tensor total_flux;
@@ -71,7 +71,7 @@ torch::Tensor RadiationImpl::forward(
 
   for (auto& [name, band] : bands) {
     std::string name1 = "radiation/" + name + "/total_flux";
-    shared[name1] = band->forward(conc, path, bc, kwargs);
+    shared[name1] = band->forward(conc, dz, bc, kwargs);
     if (first_band) {
       total_flux = shared[name1].clone();
       first_band = false;

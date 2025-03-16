@@ -35,6 +35,7 @@ file(GLOB src_files
     opacity/*.cpp
     radiation/*.cpp
     rtsolver/*.cpp
+    integrator/*.cpp
     )
 
 add_library(${namel}_${buildl}
