@@ -60,7 +60,7 @@ AtmosphericData read_rfm_atm(const std::string& filename) {
 int main(int argc, char** argv) {
   // parameters of the computational grid
   int ncol = 1;
-  int nlyr = 160;
+  int nlyr = 40;
   int nstr = 4;
 
   // parameters of the amars model
@@ -162,15 +162,15 @@ int main(int argc, char** argv) {
   model_op.grav(3.711);
   model_op.mean_mol_weight(0.044);  // CO2
   model_op.cp(844);                 // J/(kg K) for CO2
-  model_op.aero_scale(1.0);
+  model_op.aero_scale(1.e-3);
   model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
-  model_op.intg(harp::IntegratorOptions().type("rk2"));
+  model_op.intg(harp::IntegratorOptions().type("rk3"));
   model_op.rad(rad_op);
 
   harp::RadiationModel model(model_op);
 
   int t_lim = 10000;
-  double tstep = 86400 / 4.;
+  double tstep = 86400 / 16.;
   int print_freq = 500;
 
   for (int t_ind = 0; t_ind < t_lim; ++t_ind) {

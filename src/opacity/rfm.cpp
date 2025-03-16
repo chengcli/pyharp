@@ -84,6 +84,8 @@ void RFMImpl::reset() {
 
   err = nc_get_var_double(fileid, varid, klnp.data_ptr<double>());
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
+  // FIXME: dirty fix pressure unit
+  // klnp /= 100.;
 
   // change pressure to ln-pressure
   klnp.log_();
