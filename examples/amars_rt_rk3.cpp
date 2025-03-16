@@ -60,7 +60,7 @@ AtmosphericData read_rfm_atm(const std::string& filename) {
 int main(int argc, char** argv) {
   // parameters of the computational grid
   int ncol = 1;
-  int nlyr = 40;
+  int nlyr = 80;
   int nstr = 4;
 
   // parameters of the amars model
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
     // query weights from opacity, only valid for longwave
     // shortwave values are defined separately
     band.ww() = band.query_weights();
-    int nwave = name == "SW" ? 500 : band.ww().size();
+    int nwave = name == "SW" ? 200 : band.ww().size();
 
     auto wmin = band.disort().wave_lower()[0];
     auto wmax = band.disort().wave_upper()[0];
