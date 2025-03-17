@@ -26,7 +26,7 @@ struct Layer2LevelOptions {
   ADD_ARG(bool, check_positivity) = true;
 };
 
-//! Convert layer variables to level variables
+//! Convert layer variables to level variables for uniform mesh
 /*!
  * The layer variables are defined at the cell center, while the level variables
  * are defined at the cell interface. The last dimension of the input tensor is
@@ -37,4 +37,19 @@ struct Layer2LevelOptions {
  * \return level variables, shape (..., nlevel = nlayer + 1)
  */
 torch::Tensor layer2level(torch::Tensor var, Layer2LevelOptions const &options);
+
+//! Convert layer variables to level variables for non-uniform mesh
+/*!
+ * The layer variables are defined at the cell center, while the level variables
+ * are defined at the cell interface. The last dimension of the input tensor is
+ * the layer dimension.
+ *
+ * \param dx layer thickness, shape (..., nlayer)
+ * \param var layer variables, shape (..., nlayer)
+ * \param options options
+ * \return level variables, shape (..., nlevel = nlayer + 1)
+ */
+torch::Tensor layer2level(torch::Tensor dx, torch::Tensor var,
+                          Layer2LevelOptions const &options);
+
 }  // namespace harp
