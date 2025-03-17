@@ -18,8 +18,8 @@ class H2SO4SimpleImpl : public torch::nn::Cloneable<H2SO4SimpleImpl> {
   //! (nwave, 1)
   torch::Tensor kwave;
 
-  //! extinction x-section + single scattering albedo + phase function moments
-  //! (nwave, nprop=2)
+  //! extinction x-section + single scattering albedo + g-factor (HG)
+  //! (nwave, nprop=3)
   torch::Tensor kdata;
 
   //! options with which this `H2SO4SimpleImpl` was constructed

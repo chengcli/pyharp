@@ -68,6 +68,10 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
       }
     }
 
+    if (it["nmom"]) {
+      a.nmom(it["nmom"].as<int>());
+    }
+
     my.opacities()[op_name] = a;
   }
 
@@ -160,11 +164,11 @@ void RadiationBandImpl::reset() {
           read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
     } else if (op.type() == "s8_fuller") {
       auto a = S8Fuller(op);
-      nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
+      nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op.type() == "h2so4_simple") {
       auto a = H2SO4Simple(op);
-      nmax_prop_ = std::max(nmax_prop_, a->kdata.size(1));
+      nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
       opacities[name] = torch::nn::AnyModule(a);
     } else {
       TORCH_CHECK(false, "Unknown attenuator type: ", op.type());
@@ -222,7 +226,8 @@ torch::Tensor RadiationBandImpl::forward(
     if (nprop > 2) {
       prop.narrow(-1, index::IPM, nprop - 2) +=
           kdata.narrow(-1, index::IPM, nprop - 2) *
-          kdata.select(-1, index::ISS) * kdata.select(-1, index::IEX);
+          (kdata.select(-1, index::ISS) * kdata.select(-1, index::IEX))
+              .unsqueeze(-1);
     }
   }
 
@@ -230,7 +235,7 @@ torch::Tensor RadiationBandImpl::forward(
   int nprop = prop.size(-1);
   if (nprop > 2) {
     prop.narrow(-1, index::IPM, nprop - 2) /=
-        (prop.select(-1, index::ISS) + 1e-10);
+        (prop.select(-1, index::ISS).unsqueeze(-1) + 1e-10);
   }
 
   // average single scattering albedo

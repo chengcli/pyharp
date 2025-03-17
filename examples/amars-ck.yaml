@@ -59,11 +59,13 @@ opacities:
     type: h2so4_simple
     data: [h2so4.txt]
     species: [H2SO4]
+    nmom: 4
 
   S8:
     type: s8_fuller
     data: [s8_k_fuller.txt]
     species: [S8]
+    nmom: 4
 
   CO2:
     type: rfm-ck
