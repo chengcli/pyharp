@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
   model_op.aero_scale(1.);
   model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
   model_op.intg(harp::IntegratorOptions().type("rk2"));
-  model_op.kappa(2.e-1);  // m^2/s thermal diffusivity
+  model_op.kappa(2.e-2);  // m^2/s thermal diffusivity
   model_op.rad(rad_op);
 
   harp::RadiationModel model(model_op);

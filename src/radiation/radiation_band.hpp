@@ -138,7 +138,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
    *  - radiation/<band_name>/spectra
    *
    * \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
-   * \param path layer pathlength (nlyr) or (ncol, nlyr)
+   * \param dz layer thickness (nlyr) or (ncol, nlyr)
    *
    * \param bc boundary conditions, may contain the following fields:
    *        "fbeam": solar beam irradiance [W/m^2], (nwave, ncol)
@@ -152,7 +152,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
    *
    * \return cumulative radiative flux [W/m^2] (ncol, nlyr+1, 2)
    */
-  torch::Tensor forward(torch::Tensor conc, torch::Tensor path,
+  torch::Tensor forward(torch::Tensor conc, torch::Tensor dz,
                         std::map<std::string, torch::Tensor>* bc,
                         std::map<std::string, torch::Tensor>* kwargs);
 

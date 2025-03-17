@@ -91,7 +91,7 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
   Layer2LevelOptions l2l;
   l2l.order(k2ndOrder).lower(kExtrapolate).upper(kExtrapolate);
   l2l.check_positivity(false);
-  auto rhoh = layer2level(rho.log(), l2l).exp();
+  auto rhoh = layer2level(dz, rho.log(), l2l).exp();
 
   // thermal diffusion flux
   auto thermal_flux = -options.kappa() * rhoh * options.cp() * dTdz;

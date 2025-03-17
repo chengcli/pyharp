@@ -186,7 +186,7 @@ void RadiationBandImpl::reset() {
 }
 
 torch::Tensor RadiationBandImpl::forward(
-    torch::Tensor conc, torch::Tensor path,
+    torch::Tensor conc, torch::Tensor dz,
     std::map<std::string, torch::Tensor>* bc,
     std::map<std::string, torch::Tensor>* kwargs) {
   int ncol = conc.size(0);
@@ -239,7 +239,7 @@ torch::Tensor RadiationBandImpl::forward(
   }
 
   // attenuation coefficients -> optical thickness
-  prop.select(-1, index::IEX) *= path.unsqueeze(0);
+  prop.select(-1, index::IEX) *= dz.unsqueeze(0);
 
   // export band optical properties
   std::string op_name = "radiation/" + options.name() + "/opacity";
@@ -250,10 +250,10 @@ torch::Tensor RadiationBandImpl::forward(
   // run rt solver
   if (kwargs->find("temp") != kwargs->end()) {
     Layer2LevelOptions l2l;
-    l2l.order(k4thOrder).lower(kExtrapolate).upper(kExtrapolate);
+    l2l.lower(kExtrapolate).upper(kExtrapolate);
     shared[spec_name] = rtsolver.forward(
         prop, bc, options.name(),
-        std::make_optional(layer2level(kwargs->at("temp"), l2l)));
+        std::make_optional(layer2level(dz, kwargs->at("temp"), l2l)));
   } else {
     shared[spec_name] = rtsolver.forward(prop, bc, options.name());
   }
