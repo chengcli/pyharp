@@ -1,5 +1,4 @@
-#include <torch/torch.h>
-
+// C/C++
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -7,18 +6,23 @@
 #include <tuple>
 #include <vector>
 
-// harp
-#include <add_arg.h>
-#include <configure.h>
-#include <math/interpn.h>
+// torch
+#include <torch/torch.h>
 
-#include <math/interpolation.hpp>
-#include <opacity/h2so4_simple.hpp>
-#include <opacity/s8_fuller.hpp>
-#include <radiation/radiation.hpp>
-#include <rtsolver/rtsolver.hpp>
-#include <utils/fileio.hpp>
-#include <utils/find_resource.hpp>
+// base
+#include <configure.h>
+
+// harp
+#include <harp/add_arg.h>
+#include <harp/math/interpn.h>
+
+#include <harp/math/interpolation.hpp>
+#include <harp/opacity/h2so4_simple.hpp>
+#include <harp/opacity/s8_fuller.hpp>
+#include <harp/radiation/radiation.hpp>
+#include <harp/rtsolver/rtsolver.hpp>
+#include <harp/utils/fileio.hpp>
+#include <harp/utils/find_resource.hpp>
 
 namespace harp {
 

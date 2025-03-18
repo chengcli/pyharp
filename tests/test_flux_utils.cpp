@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 // harp
-#include <radiation/flux_utils.hpp>
+#include <harp/radiation/flux_utils.hpp>
 
 TEST(FluxUtilsTest, CalTotalFluxWave) {
   // Create a 2D tensor with random values

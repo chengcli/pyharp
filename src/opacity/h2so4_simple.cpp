@@ -1,9 +1,9 @@
 // harp
 #include "h2so4_simple.hpp"
 
-#include <math/interpolation.hpp>
-#include <utils/fileio.hpp>
-#include <utils/find_resource.hpp>
+#include <harp/math/interpolation.hpp>
+#include <harp/utils/fileio.hpp>
+#include <harp/utils/find_resource.hpp>
 
 #include "scattering_functions.hpp"
 

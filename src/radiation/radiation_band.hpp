@@ -9,12 +9,14 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
-// harp
-#include <add_arg.h>
-
+// disort
 #include <disort/disort.hpp>
-#include <opacity/attenuator_options.hpp>
-#include <rtsolver/rtsolver.hpp>
+
+// harp
+#include <harp/add_arg.h>
+
+#include <harp/opacity/attenuator_options.hpp>
+#include <harp/rtsolver/rtsolver.hpp>
 
 namespace harp {
 

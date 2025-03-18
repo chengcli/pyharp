@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 // harp
-#include <math/trapezoid.hpp>
+#include <harp/math/trapezoid.hpp>
 
 TEST(Trapezoid, Basic) {
   // Test the trapezoidal rule with a simple function

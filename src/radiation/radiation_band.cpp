@@ -5,14 +5,14 @@
 #include <elements/utils.hpp>
 
 // harp
-#include <index.h>
+#include <harp/index.h>
 
-#include <opacity/h2so4_simple.hpp>
-#include <opacity/opacity_formatter.hpp>
-#include <opacity/rfm.hpp>
-#include <opacity/s8_fuller.hpp>
-#include <utils/layer2level.hpp>
-#include <utils/read_dimvar_netcdf.hpp>
+#include <harp/opacity/h2so4_simple.hpp>
+#include <harp/opacity/opacity_formatter.hpp>
+#include <harp/opacity/rfm.hpp>
+#include <harp/opacity/s8_fuller.hpp>
+#include <harp/utils/layer2level.hpp>
+#include <harp/utils/read_dimvar_netcdf.hpp>
 
 #include "flux_utils.hpp"
 #include "get_direction_grids.hpp"

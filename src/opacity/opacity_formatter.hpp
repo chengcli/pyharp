@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 
 // harp
-#include <harp_formatter.hpp>
+#include <harp/harp_formatter.hpp>
 
 #include "attenuator_options.hpp"
 

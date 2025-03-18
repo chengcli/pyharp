@@ -2,8 +2,8 @@
 #include <configure.h>
 
 // harp
-#include <math/interpolation.hpp>
-#include <utils/find_resource.hpp>
+#include <harp/math/interpolation.hpp>
+#include <harp/utils/find_resource.hpp>
 
 #include "rfm.hpp"
 

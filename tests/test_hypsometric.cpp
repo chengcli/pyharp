@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 // harp
-#include <radiation/calc_dz_hypsometric.hpp>
+#include <harp/radiation/calc_dz_hypsometric.hpp>
 
 TEST(Hypsometric, level) {
   // pressure [Pa]

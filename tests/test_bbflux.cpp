@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 // harp
-#include <radiation/bbflux.hpp>
+#include <harp/radiation/bbflux.hpp>
 
 TEST(BBFluxTest, Wavenumber) {
   // Test with a simple case

@@ -5,7 +5,7 @@
 #include <fmt/format.h>
 
 // harp
-#include <radiation/radiation_formatter.hpp>
+#include <harp/radiation/radiation_formatter.hpp>
 
 TEST(TestYAMLInput, test) {
   // Test the YAML input

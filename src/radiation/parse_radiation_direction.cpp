@@ -2,7 +2,7 @@
 #include <torch/torch.h>
 
 // harp
-#include <utils/vectorize.hpp>
+#include <harp/utils/vectorize.hpp>
 
 #include "parse_radiation_direction.hpp"
 

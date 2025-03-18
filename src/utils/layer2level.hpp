@@ -3,13 +3,9 @@
 // torch
 #include <torch/torch.h>
 
-// clang-format off
-#include <configure.h>
-#include <add_arg.h>
-// clang-format on
-
 // harp
-#include <index.h>
+#include <harp/add_arg.h>
+#include <harp/index.h>
 
 namespace harp {
 
