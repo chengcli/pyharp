@@ -5,6 +5,8 @@
 #include <utils/fileio.hpp>
 #include <utils/find_resource.hpp>
 
+#include "scattering_functions.hpp"
+
 namespace harp {
 
 extern std::vector<double> species_weights;
@@ -47,7 +49,7 @@ void S8FullerImpl::reset() {
   rows--;
 
   TORCH_CHECK(rows > 0, "Empty file: ", full_path);
-  TORCH_CHECK(cols == 3, "Invalid file: ", full_path);
+  TORCH_CHECK(cols == 4, "Invalid file: ", full_path);
 
   kwave = register_buffer("kwave", torch::zeros({rows}, torch::kFloat64));
   kdata =
@@ -75,7 +77,6 @@ torch::Tensor S8FullerImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
-  constexpr int nprop = 2;
 
   torch::Tensor wave;
   if (kwargs.count("wavelength") > 0) {
@@ -86,11 +87,15 @@ torch::Tensor S8FullerImpl::forward(
     TORCH_CHECK(false, "wavelength or wavenumber is required in kwargs");
   }
 
-  auto out = interpn({wave}, {kwave}, kdata);
-  out = out.unsqueeze(1)   // ncol
-            .unsqueeze(1)  // nlyr
-            .expand({wave.size(0), ncol, nlyr, nprop})
-            .contiguous();
+  auto out = torch::zeros({wave.size(0), ncol, nlyr, 2 + options.nmom()},
+                          conc.options());
+  auto data = interpn({wave}, {kwave}, kdata);
+
+  out.narrow(3, 0, 2) = data.narrow(1, 0, 2).unsqueeze(1).unsqueeze(1);
+  out.narrow(3, 2, options.nmom()) =
+      henyey_greenstein(options.nmom(), data.select(1, 2))
+          .unsqueeze(1)
+          .unsqueeze(1);
 
   // Check species id in range
   TORCH_CHECK(

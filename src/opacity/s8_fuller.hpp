@@ -18,8 +18,8 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
   //! (nwave, 1)
   torch::Tensor kwave;
 
-  //! extinction x-section [m^2/mol] + single scattering albedo
-  //! (nwave, nprop=2)
+  //! extinction x-section [m^2/mol] + single scattering albedo + g-factor (HG)
+  //! (nwave, nprop=3)
   torch::Tensor kdata;
 
   //! options with which this `S8FullerImpl` was constructed

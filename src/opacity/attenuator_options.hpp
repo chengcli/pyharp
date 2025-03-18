@@ -17,6 +17,9 @@ struct AttenuatorOptions {
 
   //! list of dependent species indices
   ADD_ARG(std::vector<int>, species_ids) = {};
+
+  //! number of scattering moments
+  ADD_ARG(int, nmom) = 0;
 };
 
 }  // namespace harp
