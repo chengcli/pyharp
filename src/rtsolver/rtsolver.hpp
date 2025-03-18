@@ -8,9 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include <add_arg.h>
-
-#include "cdisort213/cdisort.h"
+#include <harp/add_arg.h>
 
 namespace harp {
 

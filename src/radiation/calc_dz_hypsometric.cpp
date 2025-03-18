@@ -1,7 +1,7 @@
 // harp
 #include "calc_dz_hypsometric.hpp"
 
-#include <utils/layer2level.hpp>
+#include <harp/utils/layer2level.hpp>
 
 namespace harp {
 

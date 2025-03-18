@@ -2,11 +2,11 @@
 #include <gtest/gtest.h>
 
 // harp
-#include <math/interpolation.hpp>
-#include <opacity/h2so4_simple.hpp>
-#include <opacity/rfm.hpp>
-#include <opacity/s8_fuller.hpp>
-#include <radiation/radiation.hpp>
+#include <harp/math/interpolation.hpp>
+#include <harp/opacity/h2so4_simple.hpp>
+#include <harp/opacity/rfm.hpp>
+#include <harp/opacity/s8_fuller.hpp>
+#include <harp/radiation/radiation.hpp>
 
 using namespace harp;
 

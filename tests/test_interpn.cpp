@@ -5,7 +5,7 @@
 #include <torch/torch.h>
 
 // harp
-#include <math/interpolation.hpp>
+#include <harp/math/interpolation.hpp>
 
 TEST(TestInterpolation, test1DIncreasing) {
   // Coordinate arrays

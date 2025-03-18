@@ -14,7 +14,7 @@
 #   target_link_libraries(pyharp::harp)
 
 include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  "${CMAKE_CURRENT_SOURCE_DIR}/.."
   ${CMAKE_BINARY_DIR}
   ${NETCDF_INCLUDES}
   ${PNETCDF_INCLUDE_DIR}
@@ -63,5 +63,5 @@ target_link_libraries(${namel}_${buildl}
 add_library(pyharp::harp ALIAS ${namel}_${buildl})
 
 set(HARP_INCLUDE_DIR
-  "${CMAKE_CURRENT_SOURCE_DIR}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/.."
   CACHE INTERNAL "harp include directory")

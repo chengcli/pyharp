@@ -6,13 +6,13 @@
 #include <torch/torch.h>
 
 // harp
-#include <math/interpolation.hpp>
-#include <radiation/bbflux.hpp>
-#include <radiation/calc_dz_hypsometric.hpp>
-#include <radiation/disort_config.hpp>
-#include <radiation/radiation.hpp>
-#include <radiation/radiation_formatter.hpp>
-#include <utils/read_data_tensor.hpp>
+#include <harp/math/interpolation.hpp>
+#include <harp/radiation/bbflux.hpp>
+#include <harp/radiation/calc_dz_hypsometric.hpp>
+#include <harp/radiation/disort_config.hpp>
+#include <harp/radiation/radiation.hpp>
+#include <harp/radiation/radiation_formatter.hpp>
+#include <harp/utils/read_data_tensor.hpp>
 
 struct AtmosphericData {
   int n_layers;

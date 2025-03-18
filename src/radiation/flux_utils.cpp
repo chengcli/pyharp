@@ -1,9 +1,9 @@
 // harp
 #include "flux_utils.hpp"
 
-#include <index.h>
+#include <harp/index.h>
 
-#include <math/trapezoid.hpp>
+#include <harp/math/trapezoid.hpp>
 
 namespace harp {
 

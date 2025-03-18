@@ -7,7 +7,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include <add_arg.h>
+#include <harp/add_arg.h>
 
 #include "radiation_band.hpp"
 

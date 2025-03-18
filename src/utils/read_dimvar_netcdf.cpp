@@ -1,10 +1,11 @@
 // C/C++
 #include <stdexcept>
 
-// harp
+// base
 #include <configure.h>
 
-#include <utils/find_resource.hpp>
+// harp
+#include <harp/utils/find_resource.hpp>
 
 // netcdf
 #ifdef NETCDFOUTPUT

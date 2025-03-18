@@ -8,11 +8,8 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-// clang-format off
-#include <configure.h>
-#include <add_arg.h>
-#include <index.h>
-// clang-format on
+#include <harp/add_arg.h>
+#include <harp/index.h>
 
 namespace harp {
 struct AtmToStandardGridOptions {

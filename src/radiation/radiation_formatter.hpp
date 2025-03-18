@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 
 // harp
-#include <opacity/opacity_formatter.hpp>
+#include <harp/opacity/opacity_formatter.hpp>
 
 #include "radiation.hpp"
 #include "radiation_band.hpp"

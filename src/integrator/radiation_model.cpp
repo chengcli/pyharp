@@ -1,11 +1,11 @@
 // harp
 #include "radiation_model.hpp"
 
-#include <constants.h>
+#include <harp/constants.h>
 
-#include <radiation/calc_dz_hypsometric.hpp>
-#include <radiation/radiation_formatter.hpp>
-#include <utils/layer2level.hpp>
+#include <harp/radiation/calc_dz_hypsometric.hpp>
+#include <harp/radiation/radiation_formatter.hpp>
+#include <harp/utils/layer2level.hpp>
 
 namespace harp {
 

@@ -2,9 +2,9 @@
 #include <torch/torch.h>
 
 // harp
-#include <radiation/disort_config.hpp>
-#include <radiation/radiation.hpp>
-#include <radiation/radiation_band.hpp>
+#include <harp/radiation/disort_config.hpp>
+#include <harp/radiation/radiation.hpp>
+#include <harp/radiation/radiation_band.hpp>
 
 // unit = [mol/m^3]
 torch::Tensor atm_concentration(int ncol, int nlyr, int nspecies) {
