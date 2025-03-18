@@ -10,13 +10,16 @@ option(BUILD_EXAMPLES "Build examples" OFF)
 
 project(pyharp
   LANGUAGES CXX C
-  )
+  DESCRIPTION "library for radiative transfer in planetary atmospheres")
 
 # search for <Package>_ROOT
 cmake_policy(SET CMP0074 NEW)
 
 # Set the _GLIBCXX_USE_CXX11_ABI flag to 0 (use old ABI)
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+
+# Set MacOS deployment target
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
 
 # Specify the CUDA toolkit location if necessary
 #set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.0)
