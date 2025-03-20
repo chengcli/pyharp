@@ -20,3 +20,6 @@ data/*.nc
 
 # doc
 doc/doxygen
+
+# python
+*egg-info*

@@ -1,12 +1,12 @@
 // torch
 #include <torch/extension.h>
 
-// fvm
-#include <opacity/attenuator_options.hpp>
-#include <opacity/h2so4_simple.hpp>
-#include <opacity/opacity_formatter.hpp>
-#include <opacity/rfm.hpp>
-#include <opacity/s8_fuller.hpp>
+// harp
+#include <harp/opacity/attenuator_options.hpp>
+#include <harp/opacity/h2so4_simple.hpp>
+#include <harp/opacity/opacity_formatter.hpp>
+#include <harp/opacity/rfm.hpp>
+#include <harp/opacity/s8_fuller.hpp>
 
 // python
 #include "pyoptions.hpp"

@@ -66,12 +66,17 @@ else:
 
 if torch.cuda.is_available():
     setup(
+        package_dir={"pyharp": "python"},
+        packages=["pyharp"],
         ext_modules=[cpp_extension.CUDAExtension(
-            name = 'pyharp',
-            sources = glob.glob('python/*.cpp') + glob.glob('src/**/*.cu', recursive=True),
-            include_dirs = [f'{current_dir}',
-                            f'{current_dir}/build',
-                            f'{current_dir}/build/_deps/fmt-src/include'],
+            name = 'pyharp.pyharp',
+            sources = glob.glob('python/src/*.cpp')
+            + glob.glob('src/**/*.cu', recursive=True),
+            include_dirs = [
+                f'{current_dir}',
+                f'{current_dir}/build',
+                f'{current_dir}/build/_deps/fmt-src/include'
+            ],
             library_dirs = [f'{current_dir}/build/lib'] + extra_libdirs,
             libraries = parse_library_names(f'{current_dir}/build/lib'),
             extra_compile_args = {'nvcc': ['--extended-lambda']},
@@ -79,15 +84,20 @@ if torch.cuda.is_available():
         cmdclass={'build_ext': cpp_extension.BuildExtension},
     )
 else:
+    print(glob.glob('python/src/*.cpp'))
     setup(
+        package_dir={"pyharp": "python"},
+        packages=["pyharp"],
         ext_modules=[cpp_extension.CppExtension(
-            name = 'pyharp',
-            sources = glob.glob('python/*.cpp'),
-            include_dirs = [f'{current_dir}/src',
-                            f'{current_dir}/build',
-                            f'{current_dir}/build/_deps/fmt-src/include',
-                            f'{current_dir}/build/_deps/disort-src',
-                            f'{current_dir}/build/_deps/yaml-cpp-src/include'],
+            name = 'pyharp.pyharp',
+            sources = glob.glob('python/src/*.cpp'),
+            include_dirs = [
+                f'{current_dir}',
+                f'{current_dir}/build',
+                f'{current_dir}/build/_deps/fmt-src/include',
+                f'{current_dir}/build/_deps/disort-src',
+                f'{current_dir}/build/_deps/yaml-cpp-src/include'
+            ],
             library_dirs = [f'{current_dir}/build/lib'] + extra_libdirs,
             libraries = parse_library_names(f'{current_dir}/build/lib'),
             extra_link_args=[""]
