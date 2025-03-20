@@ -1,9 +1,9 @@
 // torch
 #include <torch/extension.h>
 
-// fvm
-#include <radiation/radiation.hpp>
-#include <radiation/radiation_formatter.hpp>
+// harp
+#include <harp/radiation/radiation.hpp>
+#include <harp/radiation/radiation_formatter.hpp>
 
 // python
 #include "pyoptions.hpp"

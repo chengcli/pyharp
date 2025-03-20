@@ -7,7 +7,7 @@
 #include <yaml-cpp/yaml.h>
 
 // harp
-#include <utils/find_resource.hpp>
+#include <harp/utils/find_resource.hpp>
 
 namespace py = pybind11;
 
