@@ -19,7 +19,7 @@ struct Layer2LevelOptions {
   ADD_ARG(int, order) = k4thOrder;
   ADD_ARG(int, lower) = kExtrapolate;
   ADD_ARG(int, upper) = kConstant;
-  ADD_ARG(bool, check_positivity) = true;
+  ADD_ARG(bool, check_positivity) = false;
 };
 
 //! Convert layer variables to level variables for uniform mesh

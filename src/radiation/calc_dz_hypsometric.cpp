@@ -19,6 +19,7 @@ torch::Tensor calc_dz_hypsometric(torch::Tensor pres, torch::Tensor temp,
     op.order(k2ndOrder);
     op.lower(kExtrapolate);
     op.upper(kExtrapolate);
+    op.check_positivity(false);
 
     auto lnp_levels = layer2level(lnp, op);
     dlnp = lnp_levels.slice(-1, 0, nlyr) - lnp_levels.slice(-1, 1, nlyr + 1);

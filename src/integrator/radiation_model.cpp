@@ -90,7 +90,6 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
   // density at levels
   Layer2LevelOptions l2l;
   l2l.order(k2ndOrder).lower(kExtrapolate).upper(kExtrapolate);
-  l2l.check_positivity(false);
   auto rhoh = layer2level(dz, rho.log(), l2l).exp();
 
   // thermal diffusion flux

@@ -53,7 +53,7 @@ struct RadiationOptions {
   RadiationOptions() = default;
 
   ADD_ARG(std::string, outdirs) = "";
-  ADD_ARG(RadiationBandDict, band_options) = {};
+  ADD_ARG(RadiationBandDict, bands) = {};
 };
 
 class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {

@@ -255,7 +255,7 @@ torch::Tensor RadiationBandImpl::forward(
   // run rt solver
   if (kwargs->find("temp") != kwargs->end()) {
     Layer2LevelOptions l2l;
-    l2l.lower(kExtrapolate).upper(kExtrapolate);
+    l2l.lower(kExtrapolate).upper(kExtrapolate).check_positivity(true);
     shared[spec_name] = rtsolver.forward(
         prop, bc, options.name(),
         std::make_optional(layer2level(dz, kwargs->at("temp"), l2l)));

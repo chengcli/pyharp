@@ -39,8 +39,7 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
 
   for (auto bd : config["bands"]) {
     auto bd_name = bd.as<std::string>();
-    rad.band_options()[bd_name] =
-        RadiationBandOptions::from_yaml(bd_name, config);
+    rad.bands()[bd_name] = RadiationBandOptions::from_yaml(bd_name, config);
   }
 
   return rad;
@@ -52,7 +51,7 @@ RadiationImpl::RadiationImpl(RadiationOptions const& options_)
 }
 
 void RadiationImpl::reset() {
-  for (auto& [name, bop] : options.band_options()) {
+  for (auto& [name, bop] : options.bands()) {
     // set default outgoing radiation directions
     if (!options.outdirs().empty()) {
       bop.outdirs(options.outdirs());
