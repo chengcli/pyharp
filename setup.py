@@ -70,7 +70,7 @@ if torch.cuda.is_available():
         packages=["pyharp"],
         ext_modules=[cpp_extension.CUDAExtension(
             name = 'pyharp.pyharp',
-            sources = glob.glob('python/src/*.cpp')
+            sources = glob.glob('python/csrc/*.cpp')
             + glob.glob('src/**/*.cu', recursive=True),
             include_dirs = [
                 f'{current_dir}',
@@ -84,13 +84,12 @@ if torch.cuda.is_available():
         cmdclass={'build_ext': cpp_extension.BuildExtension},
     )
 else:
-    print(glob.glob('python/src/*.cpp'))
     setup(
         package_dir={"pyharp": "python"},
         packages=["pyharp"],
         ext_modules=[cpp_extension.CppExtension(
             name = 'pyharp.pyharp',
-            sources = glob.glob('python/src/*.cpp'),
+            sources = glob.glob('python/csrc/*.cpp'),
             include_dirs = [
                 f'{current_dir}',
                 f'{current_dir}/build',
