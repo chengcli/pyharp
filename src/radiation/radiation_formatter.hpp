@@ -28,6 +28,6 @@ struct fmt::formatter<harp::RadiationOptions> {
 
   template <typename FormatContext>
   auto format(const harp::RadiationOptions& p, FormatContext& ctx) const {
-    return fmt::format_to(ctx.out(), "(bands = {})", p.band_options());
+    return fmt::format_to(ctx.out(), "(bands = {})", p.bands());
   }
 };

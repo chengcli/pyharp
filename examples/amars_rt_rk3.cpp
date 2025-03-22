@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 
   // read radiation configuration from yaml file
   auto rad_op = harp::RadiationOptions::from_yaml("amars-ck.yaml");
-  for (auto& [name, band] : rad_op.band_options()) {
+  for (auto& [name, band] : rad_op.bands()) {
     // query weights from opacity, only valid for longwave
     // shortwave values are defined separately
     band.ww() = band.query_weights();

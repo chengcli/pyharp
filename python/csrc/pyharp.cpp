@@ -3,16 +3,19 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-// yaml-cpp
-#include <yaml-cpp/yaml.h>
+// torch
+#include <torch/extension.h>
 
 // harp
+#include <harp/radiation/radiation.hpp>
 #include <harp/utils/find_resource.hpp>
 
 namespace py = pybind11;
 
 void bind_radiation(py::module &m);
 void bind_opacity(py::module &m);
+void bind_math(py::module &m);
+void bind_constants(py::module &m);
 
 PYBIND11_MODULE(pyharp, m) {
   m.attr("__name__") = "pyharp";
@@ -20,19 +23,22 @@ PYBIND11_MODULE(pyharp, m) {
 
   bind_radiation(m);
   bind_opacity(m);
+  bind_math(m);
+  bind_constants(m);
 
-  m.def("load_configure", &YAML::LoadFile, R"(
-      Load configuration from a YAML file.
+  m.def(
+      "shared",
+      []() -> const std::unordered_map<std::string, torch::Tensor> & {
+        return harp::shared;
+      },
+      R"(
+      Shared readonly data between modules.
 
-      Parameters
-      ----------
-      arg0 : str
-          The path to the YAML file.
-
-      Returns
-      -------
-      YAML::Node
-          The configuration.
+      The shared data is a dictionary of tensors, which may contain
+      the following keys:
+        - "radiation/<band_name>/total_flux": total flux in a band
+        - "radiation/downward_flux": downward flux
+        - "radiation/upward_flux": upward flux
       )");
 
   m.def(

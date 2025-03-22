@@ -23,3 +23,6 @@ doc/doxygen
 
 # python
 *egg-info*
+
+# notebook
+*.ipynb
