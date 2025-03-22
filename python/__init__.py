@@ -2,4 +2,4 @@ import torch
 
 from .pyharp import *
 from .disort import *
-from .rfm import *
+from .rfmlib import *
