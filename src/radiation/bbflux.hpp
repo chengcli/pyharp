@@ -21,6 +21,9 @@ namespace harp {
  */
 torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol = 1);
 
+//! \brief calculate blackbody flux using wavenumber
+torch::Tensor bbflux_wavenumber(torch::Tensor wave, torch::Tensor temp);
+
 //! \brief calculate blackbody flux using wavelength
 /*!
  * Formula:
