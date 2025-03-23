@@ -61,6 +61,12 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
                                  torch::Tensor dtau, torch::Tensor w0,
                                  torch::Tensor g, torch::Tensor albedo);
 
+  //! \brief Toon 1989 longwave solver
+  /*!
+   * Based on Elsie Lee's implementation in Exo-FMS_column_ck, which was
+   * based on CHIMERA code by Mike Line.
+   * Reference: Toon, O.B., 1989, JGR, 94, 16287-16301.
+   */
   torch::Tensor longwave_solver(torch::Tensor be, torch::Tensor dtau,
                                 torch::Tensor w0, torch::Tensor g,
                                 torch::Tensor albedo);

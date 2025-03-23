@@ -6,7 +6,7 @@
 
 #include "toon_mckay89.hpp"
 
-torch::Tensor RadiationBand::RTSolverToon::shortwave_solver(
+torch::Tensor ToonMcKay89Impl::shortwave_solver(
     torch::Tensor F0_in, torch::Tensor mu_in, torch::Tensor tau_in,
     torch::Tensor w_in, torch::Tensor g_in, torch::Tensor w_surf_in) {
   int nwave = tau_in.size(0);

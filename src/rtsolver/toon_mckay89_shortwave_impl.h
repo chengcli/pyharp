@@ -12,7 +12,6 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
   int l = 2 * nlay;
   int lm1 = l - 1;
   int lm2 = l - 2;
-  int k, i, n;
 
   // Constants
   const T sqrt3 = sqrt(3.0);
@@ -65,7 +64,7 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
 
   // Early exit if all single scattering albedos are ~0
   int all_zero = 1;
-  for (k = 0; k < nlay; ++k) {
+  for (int k = 0; k < nlay; ++k) {
     if (w_in[k] > 1.0e-12) {
       all_zero = 0;
       break;
@@ -74,26 +73,25 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
 
   if (all_zero) {
     if (mu_in[nlev - 1] == mu_in[0]) {
-      for (k = 0; k < nlev; ++k)
+      for (int k = 0; k < nlev; ++k)
         flx_down[k] =
             F0_in * mu_in[nlev - 1] * exp(-tau_in[k] / mu_in[nlev - 1]);
     } else {
       cum_trans[0] = tau_in[0] / mu_in[0];
-      for (k = 1; k < nlev; ++k)
+      for (int k = 1; k < nlev; ++k)
         cum_trans[k] =
             cum_trans[k - 1] + (tau_in[k] - tau_in[k - 1]) / mu_in[k];
-      for (k = 0; k < nlev; ++k)
+      for (int k = 0; k < nlev; ++k)
         flx_down[k] = F0_in * mu_in[nlev - 1] * exp(-cum_trans[k]);
     }
     flx_down[nlev - 1] *= (1.0 - w_surf_in);
-    for (k = 0; k < nlev; ++k) flx_up[k] = 0.0;
-    goto cleanup;
+    for (int k = 0; k < nlev; ++k) flx_up[k] = 0.0;
   }
 
   // Continue with rest of code
-  for (k = 0; k < nlay; ++k) dtau_in[k] = tau_in[k + 1] - tau_in[k];
+  for (int k = 0; k < nlay; ++k) dtau_in[k] = tau_in[k + 1] - tau_in[k];
 
-  for (k = 0; k < nlay; ++k) {
+  for (int k = 0; k < nlay; ++k) {
     T g2_val = g_in[k] * g_in[k];
     T denom_val = 1.0 - w_in[k] * g2_val;
     w0[k] = ((1.0 - g2_val) * w_in[k]) / denom_val;
@@ -102,22 +100,22 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
   }
 
   tau[0] = 0.0;
-  for (k = 0; k < nlay; ++k) tau[k + 1] = tau[k] + dtau[k];
+  for (int k = 0; k < nlay; ++k) tau[k + 1] = tau[k] + dtau[k];
 
   if (mu_in[nlev - 1] == mu_in[0]) {
-    for (k = 0; k < nlev; ++k)
+    for (int k = 0; k < nlev; ++k)
       dir[k] = F0_in * mu_in[nlev - 1] * exp(-tau[k] / mu_in[nlev - 1]);
-    for (k = 0; k < nlay; ++k) mu_zm[k] = mu_in[nlev - 1];
+    for (int k = 0; k < nlay; ++k) mu_zm[k] = mu_in[nlev - 1];
   } else {
     cum_trans[0] = tau[0] / mu_in[0];
-    for (k = 1; k < nlev; ++k)
+    for (int k = 1; k < nlev; ++k)
       cum_trans[k] = cum_trans[k - 1] + (tau[k] - tau[k - 1]) / mu_in[k];
-    for (k = 0; k < nlev; ++k)
+    for (int k = 0; k < nlev; ++k)
       dir[k] = F0_in * mu_in[nlev - 1] * exp(-cum_trans[k]);
-    for (k = 0; k < nlay; ++k) mu_zm[k] = 0.5 * (mu_in[k] + mu_in[k + 1]);
+    for (int k = 0; k < nlay; ++k) mu_zm[k] = 0.5 * (mu_in[k] + mu_in[k + 1]);
   }
 
-  for (k = 0; k < nlay; ++k) {
+  for (int k = 0; k < nlay; ++k) {
     g1[k] = sqrt3d2 * (2.0 - w0[k] * (1.0 + hg[k]));
     g2[k] = sqrt3d2 * w0[k] * (1.0 - hg[k]);
     if (g2[k] == 0.0) g2[k] = 1e-10;
@@ -136,7 +134,7 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
             denom[k];
   }
 
-  for (k = 0; k < nlay; ++k) {
+  for (int k = 0; k < nlay; ++k) {
     opt1[k] = exp(-tau[k] / mu_zm[k]);
     Cpm1[k] = Ap[k] * opt1[k];
     Cmm1[k] = Am[k] * opt1[k];
@@ -162,7 +160,7 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
   Df[0] = btop - Cmm1[0];
 
   n = 0;
-  for (i = 1; i < lm2; i += 2) {
+  for (int i = 1; i < lm2; i += 2) {
     Af[i] = (E1[n] + E3[n]) * (gam[n + 1] - 1.0);
     Bf[i] = (E2[n] + E4[n]) * (gam[n + 1] - 1.0);
     Cf[i] = 2.0 * (1.0 - gam[n + 1] * gam[n + 1]);
@@ -172,7 +170,7 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
   }
 
   n = 0;
-  for (i = 2; i < lm1; i += 2) {
+  for (int i = 2; i < lm1; i += 2) {
     Af[i] = 2.0 * (1.0 - gam[n] * gam[n]);
     Bf[i] = (E1[n] - E3[n]) * (1.0 + gam[n + 1]);
     Cf[i] = (E1[n] + E3[n]) * (gam[n + 1] - 1.0);
@@ -187,13 +185,13 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
 
   dtridgl(l, Af, Bf, Cf, Df, xk);
 
-  for (n = 0; n < nlay; ++n) {
+  for (int n = 0; n < nlay; ++n) {
     xk1[n] = xk[2 * n] + xk[2 * n + 1];
     xk2[n] = xk[2 * n] - xk[2 * n + 1];
     if (fabs(xk2[n] / xk[2 * n]) < 1e-30) xk2[n] = 0.0;
   }
 
-  for (n = 0; n < nlay; ++n) {
+  for (int n = 0; n < nlay; ++n) {
     flx_up[n] = xk1[n] + gam[n] * xk2[n] + Cpm1[n];
     flx_down[n] = xk1[n] * gam[n] + xk2[n] + Cmm1[n];
   }
@@ -204,5 +202,5 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
   flx_down[nlev - 1] = xk1[nlay - 1] * Ep[nlay - 1] * gam[nlay - 1] +
                        xk2[nlay - 1] * Em[nlay - 1] + Cm[nlay - 1];
 
-  for (n = 0; n < nlev; ++n) flx_down[n] += dir[n];
+  for (int n = 0; n < nlev; ++n) flx_down[n] += dir[n];
 }
