@@ -87,7 +87,7 @@ torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp) {
     d[i] = torch::where(v[i] > VCUT, d[i], torch::zeros_like(temp));
   }
 
-  torch::Tensor ans =
+  auto ans =
       torch::where(smallv == 2, p[1] - p[0],
                    torch::where(smallv == 1, 1.0 - p[0] - d[1], d[0] - d[1]));
 
