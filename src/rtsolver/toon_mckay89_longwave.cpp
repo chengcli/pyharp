@@ -6,7 +6,7 @@
 
 #include "toon_mckay89.hpp"
 
-torch::Tensor ToonMcKay89Impl::longwave_solver(int nlay, torch::Tensor be,
+torch::Tensor ToonMcKay89Impl::longwave_solver(torch::Tensor be,
                                                torch::Tensor tau_in,
                                                torch::Tensor w_in,
                                                torch::Tensor g_in,
