@@ -16,6 +16,84 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol) {
   return result.unsqueeze(-1).expand({nwave, ncol}).contiguous();
 }
 
+torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp) {
+  if (wn2 < wn1 || wn1 < 0.0) {
+    TORCH_CHECK(false, "bbflux_wavenumber: Invalid wavenumbers");
+  }
+
+  TORCH_CHECK(temp.min().item<double>() > 0.0,
+              "bbflux_wavenumber: Temperature must be positive");
+
+  const double C2 = 1.438786;       // h * c / k in units cm * K
+  const double SIGMA = 5.67032e-8;  // Stefan-Boltzmann constant in W/m²K⁴
+  const double VCUT = 1.5;
+  const double sigdpi = SIGMA / M_PI;
+  const double vmax = std::log(DBL_MAX);
+  const double conc = 15.0 / std::pow(M_PI, 4);  // Now computed at runtime
+  const double c1 = 1.1911e-18;  // h * c^2, in units W/(m² * sr * cm⁻⁴)
+  const double A1 = 1.0 / 3.0;
+  const double A2 = -1.0 / 8.0;
+  const double A3 = 1.0 / 60.0;
+  const double A4 = -1.0 / 5040.0;
+  const double A5 = 1.0 / 272160.0;
+  const double A6 = -1.0 / 13305600.0;
+
+  // Helper function to compute Planck integrand value
+  auto planck_function = [](double v) {
+    return std::pow(v, 3) / (std::exp(v) - 1.0);
+  };
+
+  // Handle the case where wn1 == wn2
+  if (wn1 == wn2) {
+    double wn = wn1;
+    auto arg = torch::exp(-C2 * wn / temp);
+    return c1 * std::pow(wn, 3) * arg / (1.0 - arg);
+  }
+
+  torch::Tensor v[2] = {C2 * wn1 / temp, C2 * wn2 / temp};
+  torch::Tensor smallv = torch::zeros_like(temp);
+  torch::Tensor p[2];
+  torch::Tensor d[2];
+
+  // Handle different cases for wavenumbers
+  for (int i = 0; i <= 1; ++i) {
+    smallv += torch::where(v[i] < VCUT, torch::ones_like(temp),
+                           torch::zeros_like(temp));
+
+    auto vsq = v[i] * v[i];
+    p[i] =
+        conc * vsq * v[i] *
+        (A1 + v[i] * (A2 + v[i] * (A3 + vsq * (A4 + vsq * (A5 + vsq * A6)))));
+    p[i] = torch::where(v[i] < VCUT, p[i], torch::zeros_like(temp));
+
+    // Use exponential series expansion
+    int mmax = 1;
+    const double vcp[7] = {10.25, 5.7, 3.9, 2.9, 2.3, 1.9, 0.0};
+    while (v[i] < vcp[mmax - 1] && mmax < 7) {
+      ++mmax;
+    }
+
+    auto ex = torch::exp(-v[i]);
+    auto exm = torch::ones_like(temp);
+    d[i] = torch::zeros_like(temp);
+
+    for (int m = 1; m <= mmax; ++m) {
+      auto mv = static_cast<double>(m) * v[i];
+      exm *= ex;
+      d[i] += exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / (m * m);
+    }
+    d[i] *= conc;
+
+    d[i] = torch::where(v[i] > VCUT, d[i], torch::zeros_like(temp));
+  }
+
+  torch::Tensor ans =
+      torch::where(smallv == 2, p[1] - p[0],
+                   torch::where(smallv == 1, 1.0 - p[0] - d[1], d[0] - d[1]));
+
+  return ans * sigdpi * torch::pow(temp, 4);
+}
+
 torch::Tensor bbflux_wavelength(torch::Tensor wave, double temp, int ncol) {
   // Check if wave is a 1D tensor
   TORCH_CHECK(wave.dim() == 1, "wavelength must be a 1D tensor");
