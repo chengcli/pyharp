@@ -20,6 +20,9 @@ struct ToonMcKay89Options {
 
   //! set upper wavenumber(length) at each bin
   ADD_ARG(std::vector<double>, wave_upper) = {};
+
+  //! zenith correction
+  ADD_ARG(bool, zenith_correction) = false;
 };
 
 class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
@@ -55,12 +58,12 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
    * Reference: Toon, O.B., 1989, JGR, 94,16287-16301.
    */
   torch::Tensor shortwave_solver(torch::Tensor Finc, torch::Tensor mu0,
-                                 torch::Tensor tau_cum, torch::Tensor w0,
-                                 torch::Tensor g, torch::Tensor surface_albedo);
+                                 torch::Tensor dtau, torch::Tensor w0,
+                                 torch::Tensor g, torch::Tensor albedo);
 
-  torch::Tensor longwave_solver(torch::Tensor be, torch::Tensor tau_cum,
+  torch::Tensor longwave_solver(torch::Tensor be, torch::Tensor dtau,
                                 torch::Tensor w0, torch::Tensor g,
-                                torch::Tensor surface_emissivity);
+                                torch::Tensor albedo);
 };
 
 }  // namespace harp

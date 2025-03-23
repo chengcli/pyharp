@@ -20,6 +20,8 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
   int nlay = prop.size(-1);
   int ncol = prop.size(1);
 
+  auto prop1 = prop.flip(-1);  // from top to bottom
+
   // optical thickness
   auto tau = prop.select(-1, 0);
 
@@ -29,24 +31,21 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
   // scattering asymmetry parameter
   auto g = prop.select(-1, 2);
 
-  // increase the last dimension by 1 (lyr -> lvl)
-  auto shape = tau.sizes().vec();
-  shape.back() += 1;
-  torch::Tensor tau_cum = torch::zeros(shape, tau.options());
-  tau_cum.narrow(-1, 1, nlay) = torch::cumsum(tau, -1);
-
-  auto flux = torch::zeros(shape, tau.options());
-
   // add slash
   if (bname.size() > 0 && bname.back() != '/') {
     bname += "/";
   }
 
-  // Call shortwave or longwave solver based on the type of radiation
+  TORCH_CHECK(bc->count(bname + "albedo") > 0,
+              "Boundary condition for surface albedo not found.");
+
   if (!temf.has_value()) {  // shortwave
-    auto Finc = bc[bname + "fbeam"];
-    auto surface_albedo = bc[bname + "albedo"];
-    return shortwave_solver(Finc, bc["umu0"], tau_cum, w0, g, surface_albedo);
+    TORCH_CHECK(bc->count(bname + "fbeam") > 0,
+                "Boundary condition for incoming flux not found.");
+    TORCH_CHECK(bc->count("umu0") > 0, "Boundary condition for mu0 not found.");
+    return shortwave_solver(bc->at(bname + "fbeam"), bc->at("umu0"), tau, w0, g,
+                            bc->at(bname + "albedo"))
+        .flip(-2);
 
   } else {  // longwave
     /*Eigen::VectorXd temp(nlay + 1);
@@ -56,8 +55,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
       be(i) = BB_integrate(ds_.temper[i], spec.wav1, spec.wav2);
     }*/
     auto be = bbflux_wavenumber(wave, temp);
-    auto surface_emissivity = 1. - bc[bname + "albedo"];
-    return longwave_solver(be, tau_cum, w0, g, surface_emissivity);
+    return longwave_solver(be, tau, w0, g, bc->at(bname + "albedo")).flip(-2);
   }
 }
 

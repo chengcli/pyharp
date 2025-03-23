@@ -1,14 +1,17 @@
 // C/C++
 #include <stdexcept>
 
-// hapr
+// harp
+#include <math/tridiag.hpp>
+
 #include "toon_mckay89.hpp"
 
-torch::Tensor RadiationBand::RTSolverToon::toonShortwaveSolver(
+torch::Tensor RadiationBand::RTSolverToon::shortwave_solver(
     torch::Tensor F0_in, torch::Tensor mu_in, torch::Tensor tau_in,
     torch::Tensor w_in, torch::Tensor g_in, torch::Tensor w_surf_in) {
-  int nlev = tau_in.size(-1);
+  int nwave = tau_in.size(0);
   int ncol = tau_in.size(1);
+  int nlay = tau_in.size(2);
 
   // Input validation
   if (mu_in.size(0) != ncol || w_in.size(-1) != nlay ||
@@ -16,8 +19,16 @@ torch::Tensor RadiationBand::RTSolverToon::toonShortwaveSolver(
     throw std::invalid_argument("Input vectors have incorrect sizes.");
   }
 
+  // increase the last dimension by 1 (lyr -> lvl)
+  auto shape = tau_in.sizes().vec();
+  shape.back() += 1;
+  torch::Tensor tau_cum = torch::zeros(shape, tau_in.options());
+  tau_cum.narrow(-1, 1, nlay) = tau_in.cumsum(-1);
+
+  int nlev = tau_cum.size(-1);
+
   // Initialize output flux arrays
-  auto out = torch::zeros({ncol, nlev, 2}, tau_in.options());
+  auto out = torch::zeros({ncol, nlev, 2}, tau_cum.options());
   flx_down = out.select(-1, 0);
   flx_up = out.select(-1, 1);
 
@@ -28,214 +39,175 @@ torch::Tensor RadiationBand::RTSolverToon::toonShortwaveSolver(
   const double btop = 0.0;
 
   // Check if all single scattering albedos are effectively zero
-  bool all_w0_zero = (w_in.array() <= 1.0e-12).all();
+  bool all_w0_zero = (w_in <= 1.0e-12).all().item<bool>();
 
   if (all_w0_zero) {  // no scattering
     // Direct beam only
-    double mu_top = mu_in(nlev - 1);
-    double mu_first = mu_in(0);
+    // No zenith correction, use regular method
+    if (!options.zenith_correction) {
+      flx_down = F0_in.unsqueeze(-1) * mu_in.unsqueeze(-1) *
+                 (-tau_cum / mu_in.unsqueeze(-1)).exp();
+    } else {
+      // Zenith angle correction using cumulative transmission
+      TORCH_CHECK(mu_in.size(-1) == nlay,
+                  "The last dimension of mu_in should have layers");
+      auto trans_cum = torch::zeros_like(tau_cum);
+      trans_cum.narrow(-1, 1, nlay) = tau_in / mu_in;
+      trans_cum.narrow(-1, 1, nlay) = torch::cumsum(trans_cum, -1);
 
-    if (mu_top > 0.0) {
-      if (std::abs(mu_top - mu_first) < 1e-12) {
-        // No zenith correction, use regular method
-        flx_down = F0_in * mu_top * (-tau_in.array() / mu_top).exp();
-      } else {
-        // Zenith angle correction using cumulative transmission
-        Eigen::VectorXd cum_trans(nlev);
-        cum_trans(0) = tau_in(0) / mu_in(0);
-        for (int k = 1; k < nlev; ++k) {
-          cum_trans(k) =
-              cum_trans(k - 1) + (tau_in(k) - tau_in(k - 1)) / mu_in(k);
-        }
-        flx_down = F0_in * mu_top * (-cum_trans.array()).exp();
-      }
-      // Adjust the downward flux at the surface layer for surface albedo
-      flx_down(nlev - 1) *= (1.0 - w_surf_in);
+      flx_down = F0_in.unsqueeze(-1) * mu_in * torch::exp(-trans_cum);
     }
+
+    // Adjust the downward flux at the surface layer for surface albedo
+    flx_down.select(-1, nlev - 1) *= 1.0 - w_surf_in;
 
     // Upward flux remains zero
     return out;
   }
 
   // Delta Eddington scaling
-  Eigen::VectorXd w0 = ((1.0 - g_in.array().square()) * w_in.array()) /
-                       (1.0 - w_in.array() * g_in.array().square());
-  Eigen::VectorXd dtau =
-      (1.0 - w_in.array() * g_in.array().square())
-          .cwiseProduct((tau_in.segment(1, nlay) - tau_in.head(nlay)).array())
-          .matrix();
-  Eigen::VectorXd hg = g_in.array() / (1.0 + g_in.array());
+  auto w0 = ((1.0 - g_in * g_in) * w_in) / (1.0 - w_in * g_in * g_in);
+  auto dtau = (1.0 - w_in * g_in * g_in) * tau_in;
+  auto hg = g_in / (1.0 + g_in);
 
   // Initialize tau_total
-  Eigen::VectorXd tau_total(nlev);
-  tau_total(0) = 0.0;
-  for (int k = 0; k < nlay; ++k) {
-    tau_total(k + 1) = tau_total(k) + dtau(k);
-  }
+  torch::Tensor tau_total = torch::zeros_like(tau_cum);
+  tau_total.narrow(-1, 1, nlay) = dtau.cumsum(-1);
 
   // Compute g1, g2, g3, g4
-  Eigen::VectorXd g1 = sqrt3d2 * (2.0 - w0.array() * (1.0 + hg.array()));
-  Eigen::VectorXd g2 = (sqrt3d2 * w0.array()) * (1.0 - hg.array());
+  auto g1 = sqrt3d2 * (2.0 - w0 * (1.0 + hg));
+  auto g2 = sqrt3d2 * w0 * (1.0 - hg);
   // Prevent division by zero
-  for (int i = 0; i < nlay; ++i) {
-    if (std::abs(g2(i)) < 1.0e-10) {
-      g2(i) = 1.0e-10;
-    }
-  }
+  g2.clamp_(1.0e-10);
+
   // Compute mu_zm at midpoints
-  Eigen::VectorXd mu_zm(nlay);
-  mu_zm = (mu_in.head(nlay) + mu_in.tail(nlay)) / 2.0;
-  Eigen::VectorXd g3 = (1.0 - sqrt3 * hg.array() * mu_zm.array()) / 2.0;
-  Eigen::VectorXd g4 = 1.0 - g3.array();
+  auto mu_zm = (mu_in.narrow(-1, 0, nlay) + mu_in.narrow(-1, 1, nlay)) / 2.0;
+  auto g3 = (1.0 - sqrt3 * hg * mu_zm) / 2.0;
+  auto g4 = 1.0 - g3;
 
   // Compute lam and gam
-  Eigen::VectorXd lam = (g1.array().square() - g2.array().square()).sqrt();
-  Eigen::VectorXd gam = (g1.array() - lam.array()) / g2.array();
+  auto lam = (g1 * g1 - g2 * g2).square();
+  auto gam = (g1 - lam) / g2;
 
   // Compute denom and handle denom == 0
-  Eigen::VectorXd denom =
-      lam.array().square() - (1.0 / (mu_in(nlev - 1) * mu_in(nlev - 1)));
-  for (int i = 0; i < nlay; ++i) {
-    if (std::abs(denom(i)) < 1e-10) {
-      denom(i) = 1.0e-10;
-    }
-  }
+  auto denom = lam * lam - (1.0 / mu_in.select(-1, nlev - 1).square());
+  denom.clamp_(1.0e-10);
 
   // Compute Am and Ap
-  Eigen::VectorXd Am = F0_in * w0.array() *
-                       (g4.array() * (g1.array() + 1.0 / mu_in(nlev - 1)) +
-                        g2.array() * g3.array()) /
-                       denom.array();
-  Eigen::VectorXd Ap = F0_in * w0.array() *
-                       (g3.array() * (g1.array() - 1.0 / mu_in(nlev - 1)) +
-                        g2.array() * g4.array()) /
-                       denom.array();
+  auto Am = F0_in * w0 * (g4 * (g1 + 1.0 / mu_in.select(-1, nlev - 1)) + g2 * g3) / denom;
+  auto Ap = F0_in * w0 * (g3 * (g1 - 1.0 / mu_in.select(-1, nlev - 1)) + g2 * g4) / denom;
 
   // Compute Cpm1 and Cmm1 at the top of the layer
-  Eigen::VectorXd Cpm1 =
-      Ap.array() * (-tau_total.head(nlay).array() / mu_in(nlev - 1)).exp();
-  Eigen::VectorXd Cmm1 =
-      Am.array() * (-tau_total.head(nlay).array() / mu_in(nlev - 1)).exp();
+  auto Cpm1 = Ap * (-tau_total.narrow(-1, 0, nlay) / mu_in.select(-1, nlev - 1)).exp();
+  auto Cmm1 = Am * (-tau_total.narrow(-1, 0, nlay) / mu_in.select(-1, nlev - 1)).exp();
 
   // Compute Cp and Cm at the bottom of the layer
-  Eigen::VectorXd Cp =
-      Ap.array() *
-      (-tau_total.segment(1, nlay).array() / mu_in(nlev - 1)).exp();
-  Eigen::VectorXd Cm =
-      Am.array() *
-      (-tau_total.segment(1, nlay).array() / mu_in(nlev - 1)).exp();
+  auto Cp = Ap * (-tau_total.narrow(-1, 1, nlay) / mu_in.select(-1, nlev - 1)).exp();
+  auto Cm = Am * (-tau_total.narrow(-1, 1, nlay) / mu_in.select(-1, nlev - 1)).exp();
 
   // Compute exponential terms, clamped to prevent overflow
-  Eigen::VectorXd exptrm = (lam.array() * dtau.array()).min(35.0);
-  Eigen::VectorXd Ep = exptrm.array().exp();
-  Eigen::VectorXd Em = 1.0 / Ep.array();
-  Eigen::VectorXd E1 = (Ep.array() + gam.array() * Em.array()).matrix();
-  Eigen::VectorXd E2 = (Ep.array() - gam.array() * Em.array()).matrix();
-  Eigen::VectorXd E3 = (gam.array() * Ep.array() + Em.array()).matrix();
-  Eigen::VectorXd E4 = (gam.array() * Ep.array() - Em.array()).matrix();
+  auto exptrm = (lam * dtau).clamp_(35.0);
+  auto Ep = exptrm.exp();
+  auto Em = 1.0 / Ep;
+  auto E1 = Ep + gam * Em;
+  auto E2 = Ep - gam * Em;
+  auto E3 = gam * Ep + Em;
+  auto E4 = gam * Ep - Em;
 
   // Initialize Af, Bf, Cf, Df
   int l = 2 * nlay;
-  Eigen::VectorXd Af_vec = Eigen::VectorXd::Zero(l);
-  Eigen::VectorXd Bf_vec = Eigen::VectorXd::Zero(l);
-  Eigen::VectorXd Cf_vec = Eigen::VectorXd::Zero(l);
-  Eigen::VectorXd Df_vec = Eigen::VectorXd::Zero(l);
+  auto Af = torch::zeros({nwave, ncol, l}, tau_in.options());
+  auto Bf = torch::zeros({nwave, ncol, l}, tau_in.options());
+  auto Cf = torch::zeros({nwave, ncol, l}, tau_in.options());
+  auto Df = torch::zeros({nwave, ncol, l}, tau_in.options());
 
   // Boundary conditions at the top
-  Af_vec(0) = 0.0;
-  Bf_vec(0) = gam(0) + 1.0;
-  Cf_vec(0) = gam(0) - 1.0;
-  Df_vec(0) = btop - Cmm1(0);
+  Af.select(-1, 0) = 0.0;
+  Bf.select(-1, 0) = gam.select(-1, 0) + 1.0;
+  Cf.select(-1, 0) = gam.select(-1, 0) - 1.0;
+  Df.select(-1, 0) = btop - Cmm1.select(-1, 0);
   for (int i = 1, n = 1; i < l - 1; i += 2, ++n) {
-    if (n >= nlay) {
-      throw std::out_of_range(
-          "Index out of range in sw_Toon89 Af, Bf, Cf, Df population.");
-    }
-    Af_vec(i) = (E1(n - 1) + E3(n - 1)) * (gam(n) - 1.0);
-    Bf_vec(i) = (E2(n - 1) + E4(n - 1)) * (gam(n) - 1.0);
-    Cf_vec(i) = 2.0 * (1.0 - gam(n) * gam(n));
-    Df_vec(i) = (gam(n) - 1.0) * (Cpm1(n) - Cp(n - 1)) +
-                (1.0 - gam(n)) * (Cm(n - 1) - Cmm1(n));
+    TORCK_CHECK(n < nlay,
+                "Index out of range in sw_Toon89 Af, Bf, Cf, Df population.");
+
+    Af.select(-1, i) = (E1.select(-1, n - 1) + E3.select(-1, n - 1)) *
+                       (gam.select(-1, n) - 1.0);
+    Bf.select(-1, i) = (E2.select(-1, n - 1) + E4.select(-1, n - 1)) *
+                       (gam.select(-1, n) - 1.0);
+    Cf.select(-1, i) = 2.0 * (1.0 - gam.select(-1, n).square());
+    Df.select(-1, i) =
+        (gam.select(-1, n) - 1.0) *
+            (Cpm1.select(-1, n) - Cp.select(-1, n - 1)) +
+        (1.0 - gam.select(-1, n)) * (Cm.select(-1, n - 1) - Cmm1.select(-1, n));
   }
 
   // Populate Af, Bf, Cf, Df for even indices
   // Start from n=1 to avoid negative indexing (Cp(n-1) when n=0)
   for (int i = 2, n = 1; i < l - 1; i += 2, ++n) {
-    if (n >= nlay) {
-      throw std::out_of_range(
-          "Index out of range in sw_Toon89 Af, Bf, Cf, Df population.");
-    }
-    Af_vec(i) = 2.0 * (1.0 - gam(n) * gam(n));
-    Bf_vec(i) = (E1(n - 1) - E3(n - 1)) * (1.0 + gam(n));
-    Cf_vec(i) = (E1(n - 1) + E3(n - 1)) * (gam(n) - 1.0);
-    Df_vec(i) =
-        E3(n - 1) * (Cpm1(n) - Cp(n - 1)) + E1(n - 1) * (Cm(n - 1) - Cmm1(n));
+    TORCH_CHECK(n < nlay,
+                "Index out of range in sw_Toon89 Af, Bf, Cf, Df population.");
+
+    Af.select(-1, i) = 2.0 * (1.0 - gam.select(-1, n).square());
+    Bf.select(-1, i) = (E1.select(-1, n - 1) - E3.select(-1, n - 1)) *
+                       (1.0 + gam.select(-1, n));
+    Cf.select(-1, i) = (E1.select(-1, n - 1) + E3.select(-1, n - 1)) *
+                       (gam.select(-1, n) - 1.0);
+    Df.select(-1, i) =
+        E3.select(-1, n - 1) * (Cpm1.select(-1, n) - Cp.select(-1, n - 1)) +
+        E1.select(-1, n - 1) * (Cm.select(-1, n - 1) - Cmm1.select(-1, n));
   }
 
   // Boundary conditions at l (last index)
-  Af_vec(l - 1) = E1(nlay - 1) - w_surf_in * E3(nlay - 1);
-  Bf_vec(l - 1) = E2(nlay - 1) - w_surf_in * E4(nlay - 1);
-  Cf_vec(l - 1) = 0.0;
-  Df_vec(l - 1) = bsurf - Cp(nlay - 1) + w_surf_in * Cm(nlay - 1);
-
-  // Prepare a, b, c, d for the solver
-  Eigen::VectorXd a_tridiag = Af_vec.segment(1, l - 1);
-  Eigen::VectorXd b_tridiag = Bf_vec;
-  Eigen::VectorXd c_tridiag = Cf_vec.segment(0, l - 1);
-  Eigen::VectorXd d_tridiag = Df_vec;
+  Af.select(-1, l - 1) = E1.select(-1, nlay - 1) - w_surf_in * E3.select(-1, nlay - 1);
+  Bf.select(-1, l - 1) = E2.select(-1, nlay - 1) - w_surf_in * E4.select(-1, nlay - 1);
+  Cf.select(-1, l - 1) = 0.0;
+  Df.select(-1, l - 1) = bsurf - Cp.select(-1, nlay - 1) + w_surf_in * Cm.select(-1, nlay - 1);
 
   // Solve the tridiagonal system
-  Eigen::VectorXd xk =
-      tridiagonal_solver(a_tridiag, b_tridiag, c_tridiag, d_tridiag);
+  tridiag_lu(Af, Bf, Cf);
+  tridiag_solve(Df, Af, Bf, Cf);
 
   // Compute xk1 and xk2 from xk
-  Eigen::VectorXd xk1(nlay);
-  Eigen::VectorXd xk2(nlay);
-  for (int idx = 0; idx < nlay; ++idx) {
-    int two_n = 2 * idx;
-    if (two_n + 1 >= xk.size()) {
-      throw std::out_of_range("Index out of range when accessing xk.");
-    }
-    xk1(idx) = xk(two_n) + xk(two_n + 1);
-    xk2(idx) = xk(two_n) - xk(two_n + 1);
-    if (std::abs(xk2(idx) / xk(two_n)) < 1e-30) {
-      xk2(idx) = 0.0;
-    }
-  }
+  // select even and odd indices
+  auto xk_2n = Df.index_select(-1, torch::arange(0, tensor.size(0), 2));
+  auto xk_2np1 = Df.index_select(-1, torch::arange(1, tensor.size(0), 2));
+
+  auto xk1 = xk_2n + xk_2np1;
+  auto xk2 = xk_2n - xk_2np1;
+
+  xk2 = torch::where(torch::abs(xk2 / xk_2n) < 1e-30, torch::zeros_like(xk2), xk2);
 
   // Populate flx_up and flx_down for layers 1 to nlay
-  flx_up.head(nlay) =
-      (xk1.array() + gam.array() * xk2.array() + Cpm1.array()).matrix();
-  flx_down.head(nlay) =
-      (xk1.array() * gam.array() + xk2.array() + Cmm1.array()).matrix();
+  flx_up.select(-1, 0, nlay) = xk1 + g * xk2 + Cpm1;
+  flx_down.select(-1, 0, nlay) = xk1 * gam + xk2 + Cmm1;
 
   // Compute flx_up and flx_down at level nlev
-  flx_up(nlev - 1) = xk1(nlay - 1) * std::exp(1.0) +
-                     gam(nlay - 1) * xk2(nlay - 1) * std::exp(-1.0) +
-                     Cp(nlay - 1);
-  flx_down(nlev - 1) = xk1(nlay - 1) * std::exp(1.0) * gam(nlay - 1) +
-                       xk2(nlay - 1) * std::exp(-1.0) + Cm(nlay - 1);
+  flx_up.select(-1, 0, nlev - 1) = xk1.select(-1, nlay - 1) * std::exp(1.0)
+    + gam.select(-1, nlay - 1) * xk2.select(-1, nlay - 1) * std::exp(-1.0)
+    + Cp.select(-1, nlay - 1);
+  flx_down.select(-1, 0, nlev - 1) = xk1.select(-1, nlay - 1) * std::exp(1.0)
+    * gam.select(-1, nlay - 1) + xk2.select(-1, nlay - 1) * std::exp(-1.0)
+    + Cm.select(-1, nlay - 1);
 
   // Compute dir flux
-  Eigen::VectorXd dir = Eigen::VectorXd::Zero(nlev);
-  double mu_top_nonzero = mu_in(nlev - 1);
-  double mu_first_nonzero = mu_in(0);
-  if (std::abs(mu_top_nonzero - mu_first_nonzero) < 1e-12) {
+  Torch::Tensor dir;
+  if (!options.zenith_correction) {
     // No zenith correction
-    dir = F0_in * mu_top_nonzero * (-tau_in.array() / mu_top_nonzero).exp();
+    dir = F0_in.unsqueeze(-1) * mu_in.unsqueeze(-1) *
+          (-tau_cum / mu_in.unsqueeze(-1)).exp();
   } else {
     // Zenith angle correction
-    Eigen::VectorXd cum_trans(nlev);
-    cum_trans(0) = tau_total(0) / mu_in(0);
-    for (int k = 1; k < nlev; ++k) {
-      cum_trans(k) =
-          cum_trans(k - 1) + (tau_total(k) - tau_total(k - 1)) / mu_in(k);
-    }
-    dir = F0_in * mu_top_nonzero * (-cum_trans.array()).exp();
+    TORCH_CHECK(mu_in.size(-1) == nlay,
+                "The last dimension of mu_in should have layers");
+    auto trans_cum = torch::zeros_like(tau_cum);
+    trans_cum.narrow(-1, 1, nlay) = tau_in / mu_in;
+    trans_cum.narrow(-1, 1, nlay) = torch::cumsum(trans_cum, -1);
+
+    dir = F0_in * mu_in * torch::exp(-trans_cum);
   }
 
   // Adjust the downward flux at the surface layer for surface albedo
-  dir(nlev - 1) *= (1.0 - w_surf_in);
+  dir.select(-1, nlev - 1) *= 1.0 - w_surf_in;
 
   // for(int i=0; i <nlev; ++i) std::cout << "flux_up: " << flx_up(i) << "
   // flux_down: " << flx_down(i) << " dirflux_down: " << dir(i) << std::endl;
@@ -243,8 +215,7 @@ torch::Tensor RadiationBand::RTSolverToon::toonShortwaveSolver(
   flx_down += dir;
 
   // Ensure no negative fluxes due to numerical errors
-  flx_down = flx_down.cwiseMax(0.0);
-  flx_up = flx_up.cwiseMax(0.0);
+  out.clamp_(0.0);
 
   return out;
 }
