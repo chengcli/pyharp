@@ -1,3 +1,7 @@
+// C/C++
+#include <cfloat>
+#include <limits>
+
 // harp
 #include "bbflux.hpp"
 
@@ -38,11 +42,6 @@ torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp) {
   const double A5 = 1.0 / 272160.0;
   const double A6 = -1.0 / 13305600.0;
 
-  // Helper function to compute Planck integrand value
-  auto planck_function = [](double v) {
-    return std::pow(v, 3) / (std::exp(v) - 1.0);
-  };
-
   // Handle the case where wn1 == wn2
   if (wn1 == wn2) {
     double wn = wn1;
@@ -67,17 +66,13 @@ torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp) {
     p[i] = torch::where(v[i] < VCUT, p[i], torch::zeros_like(temp));
 
     // Use exponential series expansion
-    int mmax = 1;
     const double vcp[7] = {10.25, 5.7, 3.9, 2.9, 2.3, 1.9, 0.0};
-    while (v[i] < vcp[mmax - 1] && mmax < 7) {
-      ++mmax;
-    }
 
     auto ex = torch::exp(-v[i]);
     auto exm = torch::ones_like(temp);
     d[i] = torch::zeros_like(temp);
 
-    for (int m = 1; m <= mmax; ++m) {
+    for (int m = 1; m <= 6; ++m) {
       auto mv = static_cast<double>(m) * v[i];
       exm *= ex;
       d[i] += exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / (m * m);

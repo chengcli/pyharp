@@ -21,7 +21,17 @@ namespace harp {
  */
 torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol = 1);
 
-//! \brief calculate blackbody flux using wavenumber
+//! \brief calculate integrated blackbody flux using wavenumber
+/*!
+ * Calculate the integrated blackbody flux between two wavenumbers
+ * for a tensor of temperatures.
+ * If wn1 == wn2, return the flux at that wavenumber.
+ *
+ * \param wn1 small wavenumber [cm^-1]
+ * \param wn2 large wavenumber [cm^-1]
+ * \param temp [K]
+ * \return blackbody flux [w/(m^2)]
+ */
 torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp);
 
 //! \brief calculate blackbody flux using wavelength
