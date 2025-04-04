@@ -14,8 +14,8 @@
 #   - type: choose between the following recognized types
 #           - 'rfm-lbl': RFM line-by-line table
 #           - 'rfm-ck': correlated-k table generated from RFM line-by-line
-#           - 'h2so4_simple': simple H2SO4 shortwave opacity model
-#           - 's8_fuller': simple S8 shortwave opacity model
+#           - 'h2so4-simple': simple H2SO4 shortwave opacity model
+#           - 's8-fuller': simple S8 shortwave opacity model
 #
 # Optional fields for 'opacities':
 #   - data: list of opacity data files
@@ -56,13 +56,13 @@ species:
 
 opacities:
   H2SO4:
-    type: h2so4_simple
+    type: h2so4-simple
     data: [h2so4.txt]
     species: [H2SO4]
     nmom: 4
 
   S8:
-    type: s8_fuller
+    type: s8-fuller
     data: [s8_k_fuller.txt]
     species: [S8]
     nmom: 4

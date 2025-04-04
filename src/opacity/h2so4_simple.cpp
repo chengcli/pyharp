@@ -20,7 +20,7 @@ H2SO4SimpleImpl::H2SO4SimpleImpl(AttenuatorOptions const& options_)
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "h2so4_simple"),
+  TORCH_CHECK(options.type().empty() || (options.type() == "h2so4-simple"),
               "Mismatch type: ", options.type());
 
   reset();
@@ -98,9 +98,8 @@ torch::Tensor H2SO4SimpleImpl::forward(
           .unsqueeze(1);
 
   // Check species id in range
-  TORCH_CHECK(
-      options.species_ids()[0] >= 0 && options.species_ids()[0] < conc.size(2),
-      "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options.species_ids()[0] < conc.size(2),
+              "Invalid species_id: ", options.species_ids()[0]);
 
   // attenuation [1/m]
   out.select(3, 0) *= conc.select(2, options.species_ids()[0]).unsqueeze(0);

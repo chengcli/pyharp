@@ -20,7 +20,7 @@ S8FullerImpl::S8FullerImpl(AttenuatorOptions const& options_)
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "s8_fuller"),
+  TORCH_CHECK(options.type().empty() || (options.type() == "s8-fuller"),
               "Mismatch type: ", options.type());
 
   reset();
@@ -98,9 +98,8 @@ torch::Tensor S8FullerImpl::forward(
           .unsqueeze(1);
 
   // Check species id in range
-  TORCH_CHECK(
-      options.species_ids()[0] >= 0 && options.species_ids()[0] < conc.size(2),
-      "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options.species_ids()[0] < conc.size(2),
+              "Invalid species_id: ", options.species_ids()[0]);
 
   // attenuation [1/m]
   out.select(3, 0) *= conc.select(2, options.species_ids()[0]).unsqueeze(0);
