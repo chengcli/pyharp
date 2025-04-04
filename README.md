@@ -1,5 +1,4 @@
-# 🌍 QKUN
-# Pyharp: High-performance Atmosphere Radiation Package in Python
+# 🌍 Pyharp: High-performance Atmosphere Radiation Package in Python
 
 [![build](https://github.com/chengcli/pyharp/actions/workflows/main.yml/badge.svg)](https://github.com/chengcli/pyharp/actions/workflows/main.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://img.shields.io/badge/license-MIT-blue)
@@ -15,6 +14,7 @@ This will copy all source files into your local computer. You will need to insta
 system libraries before installing pyharp. All following instructions are executed under
 the `pyharp/` directory, which is referred to as the `root`.
 
+---
 
 ### 🧪 System Requirements:
 - Python 3.9+
@@ -69,14 +69,19 @@ pip install -e .
 
 ---
 
-## 🛰️ Supported Opacity
-| Opacity Name   | Reference        | Data Level(s)  |
-|----------------|------------------|----------------|
-| **pace**       | OCI              | L1B, L2        |
-| **aqua**       | AIRS,MODIS       | L1B, L2        |
-| **gpm**        | GMI              | L1B, L2        |
-| **sentinel-5p**| TROPOMI          | L1B, L2        |
-| *(More coming)*| ...              | ...            |
+## 🛰️ Supported Opacities
+| Opacity Name  | Tested    | Peer Reviewed | Reference |
+|---------------|-----------|---------------|-----------|
+| rfm-lbl       | NO        | |           |
+| rfm-ck        | YES       | |           |
+| helios        | NO       | |           |
+| simple-grey   | NO       | |           |
+| freedman-mean | NO       | |           |
+| jup-gas-vis   | NO       | |           |
+| jup-gas-ir    | NO       | |           |
+| s8-fuller     | YES       | |           |
+| h2so4-simple  | YES       | |           |
+| *(More coming)*| ...      | ...           |           |
 
 ---
 

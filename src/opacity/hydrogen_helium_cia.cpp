@@ -1,4 +1,11 @@
+// C/C++
+#include <fstream>
+#include <iostream>
+
 // utils
+#include <harp/constants.h>
+
+#include <harp/math/interpolation.hpp>
 #include <harp/utils/fileio.hpp>
 #include <harp/utils/find_resource.hpp>
 
@@ -36,7 +43,7 @@ void HydrogenHeliumCIAImpl::reset() {
 
   kwave = torch::empty({nwave}, torch::kFloat64);
   kdata = torch::empty({nwave, ntemp, 1}, torch::kFloat64);
-  for (int i = 0; k < nwave; i++) {
+  for (int i = 0; i < nwave; i++) {
     double val;
     kwave[i] = val;
     for (int j = 0; j < ntemp; j++) {
@@ -71,8 +78,8 @@ torch::Tensor HydrogenHeliumCIAImpl::forward(
   TORCH_CHECK(options.species_ids()[0] < conc.size(-1),
               "Invalid species_id: ", options.species_ids()[0]);
 
-  auto x0 = conc.select(-1, options.species_id()[0]);
-  auto amagat = constants::Avogadro * x0 / Constants::Lo;
+  auto x0 = conc.select(-1, options.species_ids()[0]);
+  auto amagat = constants::Avogadro * x0 / constants::Lo;
   auto amagat_H2 = amagat * (1. - options.xHe());
   auto amagat_He = amagat * options.xHe();
 

@@ -168,9 +168,9 @@ void RadiationBandImpl::reset() {
       auto a = Helios(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
-      options.ww() =
-          std::vector<double>(a.weights.data_ptr<double>(),
-                              a.weights.data_ptr<double>() + a.weights.numel());
+      options.ww() = std::vector<double>(
+          a->weights.data_ptr<double>(),
+          a->weights.data_ptr<double>() + a->weights.numel());
     } else if (op.type() == "simple-grey") {
       auto a = SimpleGrey(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
@@ -179,7 +179,7 @@ void RadiationBandImpl::reset() {
       auto a = FreedmanMean(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "jup-gas-visible") {
+    } else if (op.type() == "jup-gas-vis") {
       auto a = JupGasVisible(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
@@ -187,11 +187,11 @@ void RadiationBandImpl::reset() {
       auto a = JupGasIR(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "s8_fuller") {
+    } else if (op.type() == "s8-fuller") {
       auto a = S8Fuller(op);
       nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "h2so4_simple") {
+    } else if (op.type() == "h2so4-simple") {
       auto a = H2SO4Simple(op);
       nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
       opacities[name] = torch::nn::AnyModule(a);

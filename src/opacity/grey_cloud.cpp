@@ -1,8 +1,7 @@
 // harp
-#include "grey_cloud.hpp"
-
 #include <harp/constants.h>
 
+#include "grey_opacities.hpp"
 #include "scattering_functions.hpp"
 
 namespace harp {
@@ -18,7 +17,7 @@ GreyCloudImpl::GreyCloudImpl(AttenuatorOptions const& options_)
   }
 }
 
-torch::Tensor GreyCloud::forward(
+torch::Tensor GreyCloudImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
@@ -36,15 +35,15 @@ torch::Tensor GreyCloud::forward(
 
   auto result = torch::zeros({ncol, nlyr, 2 + options.nmom()}, conc.options());
 
-  if (totc < 1e-10) {
-    return result.unsqueeze(0);
-  } else {
-    result.select(-1, 0) = options.xsection() * totc * constants::Avogadro;
-    result.select(-1, 1) = options.ssa();
-    result.narrow(-1, 2, options.nmom()) = double_henyey_greenstein(
-        options.nmom(), options.ff(), options.g1(), options.g2());
-    return result.unsqueeze(0);
-  }
+  auto ff = torch::tensor(options.ff(), conc.options());
+  auto g1 = torch::tensor(options.g1(), conc.options());
+  auto g2 = torch::tensor(options.g2(), conc.options());
+
+  result.select(-1, 0) = options.xsection() * totc * constants::Avogadro;
+  result.select(-1, 1) = options.ssa();
+  result.narrow(-1, 2, options.nmom()) =
+      double_henyey_greenstein(options.nmom(), ff, g1, g2);
+  return result.unsqueeze(0);
 }
 
 }  // namespace harp

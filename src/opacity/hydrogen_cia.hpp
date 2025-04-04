@@ -22,6 +22,9 @@ class HydrogenCIAImpl : public torch::nn::Cloneable<HydrogenCIAImpl> {
   //! (nwave, ntemp)
   torch::Tensor kdata;
 
+  //! options with which this `HeliosImpl` was constructed
+  AttenuatorOptions options;
+
   //! Constructor to initialize the layer
   HydrogenCIAImpl() = default;
   explicit HydrogenCIAImpl(AttenuatorOptions const& options_);
@@ -43,6 +46,9 @@ class HydrogenHeliumCIAImpl
   //! data table
   //! (nwave, ntemp)
   torch::Tensor kdata;
+
+  //! options with which this `HeliosImpl` was constructed
+  AttenuatorOptions options;
 
   //! Constructor to initialize the layer
   HydrogenHeliumCIAImpl() = default;

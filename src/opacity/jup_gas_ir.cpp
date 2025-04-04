@@ -14,7 +14,8 @@ torch::Tensor JupGasIRImpl::forward(
   auto const& pres = kwargs.at("pres");
   auto const& temp = kwargs.at("temp");
 
-  Real dens = (pres * mu) / (constants::Rgas * temp);  // kg/m^3
+  auto mu = mean_molecular_weight(conc);
+  auto dens = (pres * mu) / (constants::Rgas * temp);  // kg/m^3
 
   auto jstrat =
       8.e-4 * pres.pow(-0.5);  // IR opacity from hydrocarbons and haze

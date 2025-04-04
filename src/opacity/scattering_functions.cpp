@@ -24,4 +24,6 @@ torch::Tensor double_henyey_greenstein(int nmom, torch::Tensor const& ff,
   auto result2 = henyey_greenstein(nmom, g2);
 
   return ff * result1 + (1.0 - ff) * result2;
+}
+
 }  // namespace harp

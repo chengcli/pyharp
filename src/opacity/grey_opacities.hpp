@@ -15,12 +15,13 @@ namespace harp {
 // Richard S. Freedman 2011. APJS
 class FreedmanMeanImpl : public torch::nn::Cloneable<FreedmanMeanImpl> {
  public:
-  static constexpr double c1, c2, c3, c4, c5, c6, c7, c13;
+  static const double c1, c2, c3, c4, c5, c6, c7, c13;
 
   AttenuatorOptions options;
 
   FreedmanMeanImpl() = default;
-  explicit HeliosImpl(AttenuatorOptions const& options_) : options(options_) {
+  explicit FreedmanMeanImpl(AttenuatorOptions const& options_)
+      : options(options_) {
     reset();
   }
   void reset() override {}
@@ -74,6 +75,19 @@ class JupGasIRImpl : public torch::nn::Cloneable<JupGasIRImpl> {
   torch::Tensor forward(torch::Tensor conc,
                         std::map<std::string, torch::Tensor> const& kwargs);
 };
-TORCH_MODULE(JupGasIRImpl);
+TORCH_MODULE(JupGasIR);
+
+class GreyCloudImpl : public torch::nn::Cloneable<GreyCloudImpl> {
+ public:
+  AttenuatorOptions options;
+
+  GreyCloudImpl() = default;
+  explicit GreyCloudImpl(AttenuatorOptions const& options_);
+  void reset() override {}
+
+  torch::Tensor forward(torch::Tensor conc,
+                        std::map<std::string, torch::Tensor> const& kwargs);
+};
+TORCH_MODULE(GreyCloud);
 
 }  // namespace harp

@@ -1,3 +1,7 @@
+// C/C++
+#include <fstream>
+#include <iostream>
+
 // base
 #include <configure.h>
 
@@ -44,7 +48,7 @@ void HeliosImpl::reset() {
 
   ktemp = torch::empty({ntemp}, torch::kFloat64);
   // temperature grid
-  for (int i = 0; i < len_[0]; ++i) {
+  for (int i = 0; i < ntemp; ++i) {
     double val;
     file >> val;
     ktemp[i] = val;
@@ -52,7 +56,7 @@ void HeliosImpl::reset() {
 
   klnp = torch::empty({npres}, torch::kFloat64);
   // pressure grid
-  for (int j = 0; j < len_[1]; ++j) {
+  for (int j = 0; j < npres; ++j) {
     double val;
     file >> val;
     klnp[j] = val;
@@ -73,7 +77,7 @@ void HeliosImpl::reset() {
     double val;
     file >> val;
     for (int b = 0; b < nband; ++b)
-      kwave[b * ng + g] = blimits[b] + (blimits[b + 1] - blimts[b]) * gpoint;
+      kwave[b * ng + g] = blimits[b] + (blimits[b + 1] - blimits[b]) * val;
   }
 
   for (int g = 0; g < ng; ++g) {
@@ -82,10 +86,10 @@ void HeliosImpl::reset() {
     weights[g] = val;
   }
 
-  kdata = torch::empty({nwave, npres, ntemp, 1}, torch::kFloat64);
+  kdata = torch::empty({nband * ng, npres, ntemp, 1}, torch::kFloat64);
   for (int i = 0; i < ntemp; ++i)
     for (int j = 0; j < npres; ++j)
-      for (int g = 0; g < band * ng; ++g) {
+      for (int g = 0; g < nband * ng; ++g) {
         double val;
         file >> val;
         kdata[g][j][i][0] = val;
@@ -97,7 +101,7 @@ void HeliosImpl::reset() {
   // register all buffers
   register_buffer("kwave", kwave);
   register_buffer("klnp", klnp);
-  register_buffer("ktemp", ktempa);
+  register_buffer("ktemp", ktemp);
   register_buffer("kdata", kdata);
   register_buffer("weights", weights);
 }
@@ -128,7 +132,7 @@ torch::Tensor HeliosImpl::forward(
 
   //!!! CHECK UNITS !!!!
   // ln(cm^2 / molecule) -> 1/m
-  return val.exp() * conc.select(2, 0).unsqueeze(0).unsqueeze(-1);
+  return out.exp() * conc.select(-1, 0).unsqueeze(0).unsqueeze(-1);
 }
 
 }  // namespace harp
