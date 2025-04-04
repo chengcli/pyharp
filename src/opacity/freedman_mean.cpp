@@ -1,5 +1,8 @@
 // harp
+#include <harp/constants.h>
+
 #include "grey_opacities.hpp"
+#include "mean_molecular_weight.hpp"
 
 namespace harp {
 
@@ -14,10 +17,12 @@ constexpr double FreedmanMean::c7 = -5.490;
 constexpr double FreedmanMean::c13 = 0.8321;
 
 torch::Tensor FreedmanMeanImpl::forward(
-    torch::Tensor const& conc,
-    std::map<std::string, torch::Tensor> const& kwargs) {
-  Real p = var.w[IPR];
-  Real T = var.w[IDN];
+    torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
+  TORCH_CHECK(kwargs.count("pres") > 0, "pres is required in kwargs");
+  TORCH_CHECK(kwargs.count("temp") > 0, "temp is required in kwargs");
+
+  auto const& pres = kwargs.at("pres");
+  auto const& temp = kwargs.at("temp");
 
   double c8, c9, c10, c11, c12;
 
@@ -35,29 +40,27 @@ torch::Tensor FreedmanMeanImpl::forward(
     c12 = -0.0414;
   }
 
-  Real logp = log10(p * 10.);  // Pa to dyn/cm2
-  Real logT = log10(T);
+  auto logp = torch::log10(pres * 10.);  // Pa to dyn/cm2
+  auto logT = torch::log10(temp);
 
-  if (p < 0.1) logp = 0.;          // 1 microbar to 300 bar from Freedman
-  if (T < 75.) logT = log10(75.);  // 75 to 4000 K from Freedman
+  logp.clamp_(0.1);  // 1 microbar to 300 bar from Freedman
+  logT.clamp_(75.);  // 75 to 4000 K from Freedman
 
-  Real met = GetPar<Real>("met");
-  Real scale = GetPar<Real>("scale");
+  auto klowp = c1 * torch::atan(logT - c2) -
+               c3 / (logp + c4) * torch::exp(torch::pow(logT - c5, 2.0)) +
+               c6 * options.metallicity() + c7;  // Eqn 4
 
-  Real klowp = c1 * atan(logT - c2) -
-               c3 / (logp + c4) * exp(pow(logT - c5, 2.0)) + c6 * met +
-               c7;  // Eqn 4
+  // Eqn 5
+  auto khigp = c8 + c9 * logT + c10 * logT.pow(2.) + logp * (c11 + c12 * logT) +
+               c13 * met * (0.5 + 1. / M_PI * torch::atan((logT - 2.5) / 0.2));
 
-  Real khigp =
-      c8 + c9 * logT + c10 * pow(logT, 2.) + logp * (c11 + c12 * logT) +
-      c13 * met * (0.5 + 1. / M_PI * atan((logT - 2.5) / 0.2));  // Eqn 5
+  auto result = torch::pow(10.0, klowp) + torch::pow(10.0, khigp);  // cm^2/g
 
-  Real result = pow(10.0, klowp) + pow(10.0, khigp);  // cm^2/g
+  auto mu = mean_molecular_weight(conc);
+  auto dens = (pres * mu) / (constants::Rgas * temp);  // kg/m^3
 
-  auto pthermo = Thermodynamics::GetInstance();
-  Real dens = p / (pthermo->GetRd() * T);  // kg/m^3
-
-  return options.scale() * 0.1 * dens * result;  // -> 1/m
+  return options.scale() * 0.1 *
+         (dens * result).unsqueeze(0).unsqueeze(-1);  // -> 1/m
 }
 
 }  // namespace harp

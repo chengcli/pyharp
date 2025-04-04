@@ -14,14 +14,13 @@ namespace harp {
 
 class HydrogenCIAImpl : public torch::nn::Cloneable<HydrogenCIAImpl> {
  public:
-  //! data table coordinate axis
+  //! wavenumber coordinate and temperature
   //! (nwave,) (ntemp,)
-  torch::Tensor kwave, ktempa;
+  torch::Tensor kwave, ktemp;
 
-  //! extinction x-section + single scattering albedo + phase function moments
-  //! (batch, specs, temps, levels, comps)
-  torch::Tensor kdata_h2h2;
-  torch::Tensor kdata_h2he;
+  //! data table
+  //! (nwave, ntemp)
+  torch::Tensor kdata;
 
   //! Constructor to initialize the layer
   HydrogenCIAImpl() = default;
@@ -33,5 +32,27 @@ class HydrogenCIAImpl : public torch::nn::Cloneable<HydrogenCIAImpl> {
                         std::map<std::string, torch::Tensor> const& kwargs);
 };
 TORCH_MODULE(HydrogenCIA);
+
+class HydrogenHeliumCIAImpl
+    : public torch::nn::Cloneable<HydrogenHeliumCIAImpl> {
+ public:
+  //! wavenumber coordinate and temperature
+  //! (nwave,) (ntemp,)
+  torch::Tensor kwave, ktemp;
+
+  //! data table
+  //! (nwave, ntemp)
+  torch::Tensor kdata;
+
+  //! Constructor to initialize the layer
+  HydrogenHeliumCIAImpl() = default;
+  explicit HydrogenHeliumCIAImpl(AttenuatorOptions const& options_);
+  void reset() override;
+
+  //! Get optical properties
+  torch::Tensor forward(torch::Tensor conc,
+                        std::map<std::string, torch::Tensor> const& kwargs);
+};
+TORCH_MODULE(HydrogenHeliumCIA);
 
 }  // namespace harp

@@ -28,7 +28,7 @@ HeliosImpl::HeliosImpl(AttenuatorOptions const& options_) : options(options_) {
 void HeliosImpl::reset() {
   auto full_path = find_resource(options.opacity_files()[0]);
 
-  std::ifstream file(full_path.c_str());
+  std::ifstream file(full_path.c_str(), std::ios::in);
   if (!file.is_open()) {
     throw std::runtime_error("Failed to open file: " + full_path);
   }
@@ -45,43 +45,52 @@ void HeliosImpl::reset() {
   ktemp = torch::empty({ntemp}, torch::kFloat64);
   // temperature grid
   for (int i = 0; i < len_[0]; ++i) {
-    file >> ktemp[i];
+    double val;
+    file >> val;
+    ktemp[i] = val;
   }
 
   klnp = torch::empty({npres}, torch::kFloat64);
   // pressure grid
   for (int j = 0; j < len_[1]; ++j) {
-    Real pres;
-    file >> klnp[j];
+    double val;
+    file >> val;
+    klnp[j] = val;
   }
   klnp.log_();
 
   std::vector<double> blimits(nband + 1);
   // band limits
   for (int b = 0; b <= nband; ++b) {
-    file >> blimits[b];
+    double val;
+    file >> val;
+    blimits[b] = val;
   }
 
   // g-points and weights
   kwave = torch::empty({nband * ng}, torch::kFloat64);
   for (int g = 0; g < ng; ++g) {
-    double gpoint;
-    file >> gpoint;
+    double val;
+    file >> val;
     for (int b = 0; b < nband; ++b)
       kwave[b * ng + g] = blimits[b] + (blimits[b + 1] - blimts[b]) * gpoint;
   }
 
   for (int g = 0; g < ng; ++g) {
-    file >> weights[g];
+    double val;
+    file >> val;
+    weights[g] = val;
   }
 
   kdata = torch::empty({nwave, npres, ntemp, 1}, torch::kFloat64);
   for (int i = 0; i < ntemp; ++i)
     for (int j = 0; j < npres; ++j)
       for (int g = 0; g < band * ng; ++g) {
-        file >> kdata[g][j][i][0]
+        double val;
+        file >> val;
+        kdata[g][j][i][0] = val;
       }
-  kdata.clip_(1.0e-99).log_();
+  kdata.clamp_(1.0e-99).log_();
 
   file.close();
 

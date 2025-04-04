@@ -16,7 +16,7 @@ torch::Tensor SimpleGreyImpl::forward(
   auto const& temp = kwargs.at("temp");
 
   auto mu = mean_molecular_weight(conc);
-  auto dens = (pres * mu) / (Constants::Rgas * temp);  // kg/m^3
+  auto dens = (pres * mu) / (constants::Rgas * temp);  // kg/m^3
 
   // kappa = kappa_a * pow(p, kappa_b)
   auto kappa = options.kappa_a() * pres.pow(options.kappa_b());
