@@ -7,7 +7,9 @@
 // harp
 #include <harp/index.h>
 
+#include <harp/opacity/grey_opacities.hpp>
 #include <harp/opacity/h2so4_simple.hpp>
+#include <harp/opacity/helios.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
 #include <harp/opacity/s8_fuller.hpp>
@@ -162,6 +164,29 @@ void RadiationBandImpl::reset() {
       opacities[name] = torch::nn::AnyModule(a);
       options.ww() =
           read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
+    } else if (op.type() == "helios") {
+      auto a = Helios(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
+      options.ww() =
+          std::vector<double>(a.weights.data_ptr<double>(),
+                              a.weights.data_ptr<double>() + a.weights.numel());
+    } else if (op.type() == "simple-grey") {
+      auto a = SimpleGrey(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
+    } else if (op.type() == "freedman-mean") {
+      auto a = FreedmanMean(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
+    } else if (op.type() == "jup-gas-visible") {
+      auto a = JupGasVisible(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
+    } else if (op.type() == "jup-gas-ir") {
+      auto a = JupGasIR(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
     } else if (op.type() == "s8_fuller") {
       auto a = S8Fuller(op);
       nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());

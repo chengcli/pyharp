@@ -1,26 +1,36 @@
+#pragma once
+
+// torch
+#include <torch/nn/cloneable.h>
+#include <torch/nn/functional.h>
+#include <torch/nn/module.h>
+#include <torch/nn/modules/common.h>
+#include <torch/nn/modules/container/any.h>
+
+// harp
+#include "attenuator_options.hpp"
 
 namespace harp {
 
-class HydrogenCIAImpl : public AttenuatorImpl,
-                        public torch::nn::Cloneable<HydrogenCIAImpl> {
+class HydrogenCIAImpl : public torch::nn::Cloneable<HydrogenCIAImpl> {
+ public:
+  //! data table coordinate axis
+  //! (nwave,) (ntemp,)
+  torch::Tensor kwave, ktempa;
+
   //! extinction x-section + single scattering albedo + phase function moments
   //! (batch, specs, temps, levels, comps)
   torch::Tensor kdata_h2h2;
   torch::Tensor kdata_h2he;
 
-  //! scale the atmospheric variables to the standard grid
-  AtmToStandardGrid scale_grid;
-
   //! Constructor to initialize the layer
-  HydrogenCIAImpl();
+  HydrogenCIAImpl() = default;
   explicit HydrogenCIAImpl(AttenuatorOptions const& options_);
   void reset() override;
 
-  //! Load opacity from data file
-  virtual void load();
-
   //! Get optical properties
-  torch::Tensor forward(torch::Tensor var_x);
+  torch::Tensor forward(torch::Tensor conc,
+                        std::map<std::string, torch::Tensor> const& kwargs);
 };
 TORCH_MODULE(HydrogenCIA);
 
