@@ -1,15 +1,22 @@
 // harp
+#include <harp/constants.h>
+
 #include "grey_opacities.hpp"
+#include "mean_molecular_weight.hpp"
 
 namespace harp {
 
 torch::Tensor JupGasVisibleImpl::forward(
-    torch::Tensor const &conc,
-    std::map<std::string, torch::Tensor> const &kwargs) {
-  Real p = var.w[IPR];
-  Real T = var.w[IDN];
+    torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
+  TORCH_CHECK(kwargs.count("pres") > 0, "pres is required in kwargs");
+  TORCH_CHECK(kwargs.count("temp") > 0, "temp is required in kwargs");
 
-  auto dens = p / (pthermo->GetRd() * T);  // kg/m^3
+  auto const& pres = kwargs.at("pres");
+  auto const& temp = kwargs.at("temp");
+
+  auto mu = mean_molecular_weight(conc);
+
+  auto dens = (pres * mu) / (constants::Rgas * temp);  // kg/m^3
 
   // this one is a good haze
   // Real result = 1.e-6*pow(p,0.5)+1.e-3*pow(p/1.e3, -2.); //visible opacity
@@ -22,7 +29,9 @@ torch::Tensor JupGasVisibleImpl::forward(
   // std::cout<<"scale=  " <<scale<<"  pres=  "<<p<< "  dens= "
   // <<dens<<std::endl;
 
-  return options.scale() * dens * (strongch4 + weakch4);  // -> 1/m
+  return (options.scale() * dens * (strongch4 + weakch4))
+      .unsqueeze(0)
+      .unsqueeze(-1);  // -> 1/m
 }
 
 }  // namespace harp

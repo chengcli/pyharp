@@ -39,8 +39,8 @@ void HydrogenCIAImpl::reset() {
   op.ntemp(cols);
   op.npres(rows);
 
-  kdata_h2h2 = register_buffer("kdata_h2h2",
-                                   torch::zeros({cols, rows}, torch::kFloat));
+  kdata_h2h2 =
+      register_buffer("kdata_h2h2", torch::zeros({cols, rows}, torch::kFloat));
   kdata_h2he =
       register_buffer("kdata_h2he", torch::zeros({cols, rows}, torch::kFloat));
 }
