@@ -20,7 +20,7 @@ H2SO4SimpleImpl::H2SO4SimpleImpl(AttenuatorOptions const& options_)
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "h2so4_simple"),
+  TORCH_CHECK(options.type().empty() || (options.type() == "h2so4-simple"),
               "Mismatch type: ", options.type());
 
   reset();

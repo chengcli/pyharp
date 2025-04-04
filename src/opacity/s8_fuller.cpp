@@ -20,7 +20,7 @@ S8FullerImpl::S8FullerImpl(AttenuatorOptions const& options_)
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "s8_fuller"),
+  TORCH_CHECK(options.type().empty() || (options.type() == "s8-fuller"),
               "Mismatch type: ", options.type());
 
   reset();
