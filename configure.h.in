@@ -18,4 +18,4 @@
   #define DISPATCH_MACRO
 #endif
 
-#define HARP_ROOT_DIR "@CMAKE_SOURCE_DIR@"
+constexpr char HARP_ROOT_DIR[] = "@HARP_INCLUDE_DIR@";
