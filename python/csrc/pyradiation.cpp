@@ -13,7 +13,9 @@
 namespace py = pybind11;
 
 void bind_radiation(py::module &m) {
-  m.def("bbflux_wavenumber", &harp::bbflux_wavenumber, R"(
+  m.def("bbflux_wavenumber",
+        py::overload_cast<torch::Tensor, double, int>(&harp::bbflux_wavenumber),
+        R"(
         Calculate blackbody flux using wavenumber
 
         Parameters
@@ -39,6 +41,36 @@ void bind_radiation(py::module &m) {
         >>> flux = bbflux_wavenumber(wave, temp)
         )",
         py::arg("wave"), py::arg("temp"), py::arg("ncol") = 1);
+
+  m.def("bbflux_wavenumber",
+        py::overload_cast<double, double, torch::Tensor>(
+            &harp::bbflux_wavenumber),
+        R"(
+        Calculate blackbody flux using wavenumber
+
+        Parameters
+        ----------
+        wn1 : double
+            wavenumber [cm^-1]
+        wn2 : double
+            temperature [K]
+        temp: torch.Tensor
+            number of columns, default to 1
+
+        Returns
+        -------
+        torch.Tensor
+            blackbody flux [w/(m^2 cm^-1)]
+
+        Examples
+        --------
+        >>> import torch
+        >>> from pyharp import bbflux_wavenumber
+        >>> wave = torch.tensor([1.0, 2.0, 3.0])
+        >>> temp = 300.0
+        >>> flux = bbflux_wavenumber(wave, temp)
+        )",
+        py::arg("wn1"), py::arg("wn2"), py::arg("temp") = 1);
 
   m.def("bbflux_wavelength", &harp::bbflux_wavelength, R"(
         Calculate blackbody flux using wavelength
