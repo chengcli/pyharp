@@ -75,6 +75,10 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/yamlpp.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/elements.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up project libraries ...${ColorReset}")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/python/VERSION" PROJECT_VERSION)
+string(STRIP "${PROJECT_VERSION}" PROJECT_VERSION)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
+               ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h @ONLY)
 configure_file(${CMAKE_SOURCE_DIR}/configure.h.in configure.h @ONLY)
 add_subdirectory(src)
 
