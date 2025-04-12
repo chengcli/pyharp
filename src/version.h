@@ -1,3 +1,3 @@
 #pragma once
 
-#define PYHARP_VERSION "1.3.5"
+#define PYHARP_VERSION "1.3.6"
