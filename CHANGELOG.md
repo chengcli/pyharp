@@ -8,13 +8,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
-<small>[Compare with latest](https://github.com/chengcli/pyharp/compare/v1.3.5...HEAD)</small>
+<small>[Compare with latest](https://github.com/chengcli/pyharp/compare/v1.3.6...HEAD)</small>
+
+<!-- insertion marker -->
+## [v1.3.6](https://github.com/chengcli/pyharp/releases/tag/v1.3.6) - 2025-04-12
+
+<small>[Compare with v1.3.5](https://github.com/chengcli/pyharp/compare/v1.3.5...v1.3.6)</small>
 
 ### Added
 
 - Add bump version (#31) ([69554b5](https://github.com/chengcli/pyharp/commit/69554b5f7a79821dde7b564760d7477987d99693) by Cheng Li).
 
-<!-- insertion marker -->
 ## [v1.3.5](https://github.com/chengcli/pyharp/releases/tag/v1.3.5) - 2025-04-10
 
 <small>[Compare with v1.3.4](https://github.com/chengcli/pyharp/compare/v1.3.4...v1.3.5)</small>
