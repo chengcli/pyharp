@@ -32,9 +32,8 @@ def parse_library_names(libdir):
         library_name = file_name[3:].rsplit('.', 1)[0]
         library_names.append(library_name)
 
-    # add homebrew libraries if on MacOS
-    if platform.system() == 'Darwin':
-        library_names.extend(['netcdf'])
+    # add netcdf library
+    library_names.extend(['netcdf'])
 
     return library_names
 
@@ -136,8 +135,7 @@ else:
             libraries = [
                 "torch_global_deps",
             ] + parse_library_names(f'{current_dir}/build/lib'),
-            extra_link_args=[""],
-            extra_compile_args=extra_link_args,
+            extra_link_args=extra_link_args,
             )
         ],
         cmdclass={
