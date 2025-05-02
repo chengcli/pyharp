@@ -119,7 +119,92 @@ void bind_opacity(py::module &m) {
             >>> op = AttenuatorOptions().species_ids([1, 2])
         )");
 
-  ADD_HARP_MODULE(S8Fuller, AttenuatorOptions);
-  ADD_HARP_MODULE(H2SO4Simple, AttenuatorOptions);
-  ADD_HARP_MODULE(RFM, AttenuatorOptions);
+  ADD_HARP_MODULE(S8Fuller, AttenuatorOptions, R"(
+        S8 absorption data from Fuller et al. (1987)
+
+        Args:
+          conc (torch.Tensor):
+            concentration of the species in mol/cm^3
+
+          kwargs (dict[str, torch.Tensor]):
+            keyword arguments.
+            Either 'wavelength' or 'wavenumber' must be provided
+            if 'wavelength' is provided, the unit is nm.
+            if 'wavenumber' is provided, the unit is cm^-1.
+
+        Returns:
+          torch.Tensor:
+            attenuation [1/m], single scattering albedo and scattering phase function
+            The shape of the output tensor is (nwave, ncol, nlyr, 2 + nmom)
+            where nwave is the number of wavelengths,
+            ncol is the number of columns,
+            nlyr is the number of layers,
+            2 is for attenuation and scattering coefficients,
+            and nmom is the number of moments.
+
+        Examples:
+          .. code-block:: python
+
+            >>> import torch
+            >>> from pyharp import S8Fuller
+            >>> op = S8Fuller(AttenuatorOptions())
+        )");
+
+  ADD_HARP_MODULE(H2SO4Simple, AttenuatorOptions, R"(
+        H2SO4 absorption data from the simple model
+
+        Args:
+          conc (torch.Tensor)
+            concentration of the species in mol/cm^3
+
+          kwargs (dict[str, torch.Tensor])
+            keyword arguments.
+            Either 'wavelength' or 'wavenumber' must be provided
+            if 'wavelength' is provided, the unit is nm.
+            if 'wavenumber' is provided, the unit is cm^-1.
+
+        Returns:
+          torch.Tensor:
+            attenuation [1/m], single scattering albedo and scattering phase function.
+            The shape of the output tensor is (nwave, ncol, nlyr, 2 + nmom)
+            where nwave is the number of wavelengths,
+            ncol is the number of columns,
+            nlyr is the number of layers,
+            2 is for attenuation and scattering coefficients,
+            and nmom is the number of moments.
+
+        Examples:
+          .. code-block:: python
+
+            >>> import torch
+            >>> from pyharp import H2SO4Simple
+            >>> op = H2SO4Simple(AttenuatorOptions())
+        )");
+
+  ADD_HARP_MODULE(RFM, AttenuatorOptions, R"(
+        Line-by-line absorption data computed by RFM
+
+        Args:
+          conc (torch.Tensor): concentration of the species in mol/cm^3
+          kwargs (dict[str, torch.Tensor]): keyword arguments
+            Either 'wavelength' or 'wavenumber' must be provided
+            if 'wavelength' is provided, the unit is nm.
+            if 'wavenumber' is provided, the unit is cm^-1.
+
+        Returns:
+          torch.Tensor: attenuation [1/m], single scattering albedo and scattering phase function
+            The shape of the output tensor is (nwave, ncol, nlyr, 2 + nmom)
+            where nwave is the number of wavelengths,
+            ncol is the number of columns,
+            nlyr is the number of layers,
+            2 is for attenuation and scattering coefficients,
+            and nmom is the number of moments.
+
+        Examples:
+          .. code-block:: python
+
+            >>> import torch
+            >>> from pyharp import RFM
+            >>> op = RFM(AttenuatorOptions())
+        )");
 }

@@ -186,7 +186,32 @@ void bind_radiation(py::module &m) {
             >>> print(op)
         )");
 
-  ADD_HARP_MODULE(Radiation, RadiationOptions);
+  ADD_HARP_MODULE(Radiation, RadiationOptions, R"(
+        Calculate the net radiation flux
+
+        Args:
+          conc (torch.Tensor):
+            concentration [mol/m^3]
+
+          dz (torch.Tensor):
+            height [m]
+
+          bc (dict[str, torch.Tensor]):
+            boundary conditions
+
+          kwargs (dict[str, torch.Tensor]):
+            additional arguments
+
+        Returns:
+          RadiationOptions object
+
+        Examples:
+          .. code-block:: python
+
+            >>> import torch
+            >>> from pyharp import RadiationOptions
+            >>> op = RadiationOptions().band_options(['band1', 'band2'])
+        )");
 
   py::class_<harp::RadiationBandOptions>(m, "RadiationBandOptions", R"(
         Set radiation options
@@ -363,5 +388,30 @@ void bind_radiation(py::module &m) {
             >>> print(op)
         )");
 
-  ADD_HARP_MODULE(RadiationBand, RadiationBandOptions);
+  ADD_HARP_MODULE(RadiationBand, RadiationBandOptions, R"(
+        Calculate the net radiation flux for a band
+
+        Args:
+          conc (torch.Tensor):
+            concentration [mol/m^3]
+
+          dz (torch.Tensor):
+            height [m]
+
+          bc (dict):
+            boundary conditions
+
+          kwargs (dict):
+            additional arguments
+
+        Returns:
+          RadiationBand object
+
+        Examples:
+          .. code-block:: python
+
+            >>> import torch
+            >>> from pyharp import RadiationBandOptions
+            >>> op = RadiationBandOptions().band_options(['band1', 'band2'])
+        )");
 }

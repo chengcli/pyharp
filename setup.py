@@ -99,7 +99,6 @@ if torch.cuda.is_available():
         name="pyharp",
         package_dir={"pyharp": "python"},
         packages=["pyharp"],
-        package_data={"pyharp.cpp": ["*.pyi"]},
         ext_modules=[cpp_extension.CUDAExtension(
             name = 'pyharp.pyharp',
             sources = glob.glob('python/csrc/*.cpp')
@@ -123,7 +122,6 @@ else:
     setup(
         package_dir={"pyharp": "python"},
         packages=["pyharp"],
-        package_data={"pyharp.cpp": ["*.pyi"]},
         ext_modules=[cpp_extension.CppExtension(
             name = 'pyharp.pyharp',
             sources = glob.glob('python/csrc/*.cpp'),
