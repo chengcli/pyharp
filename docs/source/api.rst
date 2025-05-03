@@ -16,6 +16,9 @@ Main Classes
 .. autoclass:: pyharp.cpp.RadiationBand
    :members: forward
 
+.. autoclass:: pyharp.cpp.Radiation
+   :members: forward
+
 .. autoclass:: pyharp.cpp.S8Fuller
    :members: forward
 

@@ -39,42 +39,42 @@ PYBIND11_MODULE(pyharp, m) {
       []() -> const std::unordered_map<std::string, torch::Tensor> & {
         return harp::shared;
       },
-      R"(
-      `Pyharp` module deposits data -- tensors -- to a shared dictionary, which can be accessed by other modules.
-      This function returns a readonly view of the shared data from a key.
+      R"doc(
+`Pyharp` module deposits data -- tensors -- to a shared dictionary, which can be accessed by other modules.
+This function returns a readonly view of the shared data from a key.
 
-      After running the forward method of the :class:`RadiationBand <pyharp.cpp.RadiationBand>`, the shared data with the following keys are available:
+After running the forward method of the :class:`RadiationBand <pyharp.cpp.RadiationBand>`, the shared data with the following keys are available:
 
-        .. list-table::
-          :widths: 15 25
-          :header-rows: 1
+  .. list-table::
+    :widths: 15 25
+    :header-rows: 1
 
-          * - Key
-            - Description
-          * - "radiation/<band_name>/total_flux"
-            - total flux in a band
-          * - "radiation/downward_flux"
-            - downward flux to surface
-          * - "radiation/upward_flux"
-            - upward flux to space
+    * - Key
+      - Description
+    * - "radiation/<band_name>/total_flux"
+      - total flux in a band
+    * - "radiation/downward_flux"
+      - downward flux to surface
+    * - "radiation/upward_flux"
+      - upward flux to space
 
-      Returns:
-        dict[str, torch.Tensor]: Shared readonly data of the pyharp module
+Returns:
+  dict[str, torch.Tensor]: Shared readonly data of the pyharp module
 
-      Examples:
-        .. code-block:: python
+Examples:
+  .. code-block:: python
 
-          >>> import pyharp
-          >>> import torch
+    >>> import pyharp
+    >>> import torch
 
-          # ... after calling the forward method
+    # ... after calling the forward method
 
-          # get the shared data
-          >>> shared = pyharp.shared()
+    # get the shared data
+    >>> shared = pyharp.shared()
 
-          # get the total flux in a band
-          >>> shared["radiation/<band_name>/total_flux"]
-      )");
+    # get the total flux in a band
+    >>> shared["radiation/<band_name>/total_flux"]
+      )doc");
 
   m.def(
       "set_search_paths",
@@ -82,40 +82,42 @@ PYBIND11_MODULE(pyharp, m) {
         strcpy(harp::search_paths, path.c_str());
         return harp::deserialize_search_paths(harp::search_paths);
       },
-      R"(
-        Set the search paths for resource files.
+      R"doc(
+Set the search paths for resource files.
 
-        Args:
-          path (str): The search paths
+Args:
+  path (str): The search paths
 
-        Return:
-          str: The search paths
+Return:
+  str: The search paths
 
-        Example:
-          .. code-block:: python
+Example:
+  .. code-block:: python
 
-            >>> import pyharp
+    >>> import pyharp
 
-            # set the search paths
-            >>> pyharp.set_search_paths("/path/to/resource/files")
-      )");
+    # set the search paths
+    >>> pyharp.set_search_paths("/path/to/resource/files")
+      )doc",
+      py::arg("path"));
 
-  m.def("find_resource", &harp::find_resource, R"(
-      Find a resource file from the search paths.
+  m.def("find_resource", &harp::find_resource, R"doc(
+Find a resource file from the search paths.
 
-      Args:
-        filename (str): The name of the resource file.
+Args:
+  filename (str): The name of the resource file.
 
-      Returns:
-        str: The full path to the resource file.
+Returns:
+  str: The full path to the resource file.
 
-      Example:
-        .. code-block:: python
+Example:
+  .. code-block:: python
 
-          >>> import pyharp
+    >>> import pyharp
 
-          # find a resource file
-          >>> path = pyharp.find_resource("example.txt")
-          >>> print(path)  # /path/to/resource/files/example.txt
-      )");
+    # find a resource file
+    >>> path = pyharp.find_resource("example.txt")
+    >>> print(path)  # /path/to/resource/files/example.txt
+      )doc",
+        py::arg("filename"));
 }
