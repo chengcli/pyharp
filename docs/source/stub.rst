@@ -2,4 +2,4 @@
 
 .. code-block:: python
 
-   pybind11-stubgen pyharp
+   pybind11-stubgen pyharp --ignore-invalid-expressions disort::DisortOptions
