@@ -77,7 +77,7 @@ Args:
 Returns:
   torch.Tensor: blackbody flux [w/(m^2 um^-1)]
 
-Examples
+Examples:
   .. code-block:: python
 
     >>> from pyharp import bbflux_wavelength
@@ -105,7 +105,7 @@ Args:
 Returns:
   torch.Tensor: height between pressure levels [m]
 
-Examples
+Examples:
   .. code-block:: python
 
     >>> from pyharp import calc_dz_hypsometric
@@ -116,107 +116,11 @@ Examples
     )doc",
         py::arg("pres"), py::arg("temp"), py::arg("g_ov_R"));
 
-  py::class_<harp::RadiationOptions>(m, "RadiationOptions", R"doc(
-Set radiation band options
-
-Returns:
-  RadiationOptions object
-
-Examples:
-  .. code-block:: python
-
-    >>> import torch
-    >>> from pyharp import RadiationOptions
-    >>> op = RadiationOptions().band_options(['band1', 'band2'])
-    )doc")
-
-      .def(py::init<>())
-
-      .def("__repr__",
-           [](const harp::RadiationOptions &a) {
-             return fmt::format("RadiationOptions{}", a);
-           })
-
-      .def_static("from_yaml", &harp::RadiationOptions::from_yaml, R"doc(
-Create a `RadiationOptions` object from a YAML file
-
-Args:
-  filename (str): YAML file name
-
-Returns:
-  RadiationOptions object
-
-Examples:
-  .. code-block:: python
-
-    >>> import torch
-    >>> from pyharp import RadiationOptions
-    >>> op = RadiationOptions.from_yaml('radiation.yaml')
-    )doc")
-
-      .ADD_OPTION(std::string, harp::RadiationOptions, outdirs, R"doc(
-Set outgoing ray directions
-
-Args:
-  outdirs (str): outgoing ray directions
-
-Returns:
-  RadiationOptions object
-
-Examples:
-  .. code-block:: python
-
-    >>> import torch
-    >>> from pyharp import RadiationOptions
-    >>> op = RadiationOptions().outdirs('(0, 10), (0, 20)')
-    >>> print(op)
-    )doc")
-
-      .ADD_OPTION(harp::RadiationBandDict, harp::RadiationOptions, bands, R"doc(
-Set radiation band options
-
-Args:
-  bands (dict[str,str]): radiation band options
-
-Returns:
-  RadiationOptions object
-
-Examples:
-  .. code-block:: python
-
-    >>> import torch
-    >>> from pyharp import RadiationOptions
-    >>> op = RadiationOptions().bands({'band1': 'outdir1', 'band2': 'outdir2'})
-    >>> print(op)
-    )doc");
-
-  ADD_HARP_MODULE(Radiation, RadiationOptions, R"doc(
-Calculate the net radiation flux
-
-Args:
-  conc (torch.Tensor): concentration [mol/m^3]
-  dz (torch.Tensor): height [m]
-  bc (dict[str, torch.Tensor]): boundary conditions
-  kwargs (dict[str, torch.Tensor]): additional arguments
-
-Returns:
-  RadiationOptions object
-
-Examples:
-  .. code-block:: python
-
-    >>> import torch
-    >>> from pyharp import RadiationOptions
-    >>> op = RadiationOptions().band_options(['band1', 'band2'])
-    )doc",
-                  py::arg("conc"), py::arg("dz"), py::arg("bc"),
-                  py::arg("kwargs"));
-
   py::class_<harp::RadiationBandOptions>(m, "RadiationBandOptions", R"doc(
-Set radiation options
+Set radiation band options
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -268,7 +172,7 @@ Args:
   name (str): radiation band name
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -286,7 +190,7 @@ Args:
   outdirs (str): outgoing ray directions
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -304,7 +208,7 @@ Args:
   solver_name (str): solver name
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -323,7 +227,7 @@ Args:
   disort (pydisort.DisortOptions): disort options
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -341,7 +245,7 @@ Args:
   ww (list[float]): wavenumbers
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -359,7 +263,7 @@ Args:
   integration (str): integration method
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -378,7 +282,7 @@ Args:
   opacities (dict[str,str]): opacities
 
 Returns:
-  RadiationBandOptions object
+  harp::RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -388,6 +292,103 @@ Examples:
     >>> op = RadiationBandOptions().opacities({'band1': 'opacity1', 'band2': 'opacity2'})
     >>> print(op)
     )doc");
+
+  py::class_<harp::RadiationOptions>(m, "RadiationOptions", R"doc(
+Set radiation band options
+
+Returns:
+  harp::RadiationOptions: class object
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp import RadiationOptions
+    >>> op = RadiationOptions().band_options(['band1', 'band2'])
+    )doc")
+
+      .def(py::init<>())
+
+      .def("__repr__",
+           [](const harp::RadiationOptions &a) {
+             return fmt::format("RadiationOptions{}", a);
+           })
+
+      .def_static("from_yaml", &harp::RadiationOptions::from_yaml, R"doc(
+Create a :class:`pyharp.RadiationOptions` object from a YAML file
+
+Args:
+  filename (str): YAML file name
+
+Returns:
+  harp::RadiationOptions: class object
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp import RadiationOptions
+    >>> op = RadiationOptions.from_yaml('radiation.yaml')
+    )doc",
+                  py::arg("filename"))
+
+      .ADD_OPTION(std::string, harp::RadiationOptions, outdirs, R"doc(
+Set outgoing ray directions
+
+Args:
+  outdirs (str): outgoing ray directions
+
+Returns:
+  harp::RadiationOptions: class object
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp import RadiationOptions
+    >>> op = RadiationOptions().outdirs('(0, 10), (0, 20)')
+    >>> print(op)
+    )doc")
+
+      .ADD_OPTION(harp::RadiationBandDict, harp::RadiationOptions, bands, R"doc(
+Set radiation band options
+
+Args:
+  bands (dict[str,str]): radiation band options
+
+Returns:
+  harp::RadiationOptions: class object
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp import RadiationOptions
+    >>> op = RadiationOptions().bands({'band1': 'outdir1', 'band2': 'outdir2'})
+    >>> print(op)
+    )doc");
+
+  ADD_HARP_MODULE(Radiation, RadiationOptions, R"doc(
+Calculate the net radiation flux
+
+Args:
+  conc (torch.Tensor): concentration [mol/m^3]
+  dz (torch.Tensor): height [m]
+  bc (dict[str, torch.Tensor]): boundary conditions
+  kwargs (dict[str, torch.Tensor]): additional arguments
+
+Returns:
+  torch.Tensor: net flux [w/m^2]
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp import RadiationOptions
+    >>> op = RadiationOptions().band_options(['band1', 'band2'])
+    )doc",
+                  py::arg("conc"), py::arg("dz"), py::arg("bc"),
+                  py::arg("kwargs"));
 
   ADD_HARP_MODULE(RadiationBand, RadiationBandOptions, R"doc(
 Calculate the net radiation flux for a band
@@ -399,7 +400,7 @@ Args:
   kwargs (dict[str, torch.Tensor]): additional arguments
 
 Returns:
-  RadiationBand object
+  torch.Tensor: [W/m^2] (ncol, nlyr+1)
 
 Examples:
   .. code-block:: python

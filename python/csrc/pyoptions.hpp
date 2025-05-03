@@ -12,7 +12,8 @@
 #define ADD_HARP_MODULE(m_name, op_name, doc, args...)                  \
   torch::python::bind_module<harp::m_name##Impl>(m, #m_name)            \
       .def(py::init<>(), R"(Construct a new default module.)")          \
-      .def(py::init<harp::op_name>(), "Construct a " #m_name " module") \
+      .def(py::init<harp::op_name>(), "Construct a " #m_name " module", \
+           py::arg("options"))                                          \
       .def_readonly("options", &harp::m_name##Impl::options)            \
       .def("__repr__",                                                  \
            [](const harp::m_name##Impl &a) {                            \

@@ -14,19 +14,19 @@ Main Classes
    :members:
 
 .. autoclass:: pyharp.cpp.RadiationBand
-   :members: forward
+   :members: __init__, forward
 
 .. autoclass:: pyharp.cpp.Radiation
-   :members: forward
+   :members: __init__, forward
 
 .. autoclass:: pyharp.cpp.S8Fuller
-   :members: forward
+   :members: __init__, forward
 
 .. autoclass:: pyharp.cpp.H2SO4Simple
-   :members: forward
+   :members: __init__, forward
 
 .. autoclass:: pyharp.cpp.RFM
-   :members: forward
+   :members: __init__, forward
 
 Main Functions
 --------------
