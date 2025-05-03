@@ -29,3 +29,6 @@ docs/doxygen
 
 # version
 src/version.h
+
+# stubs
+*stubs/
