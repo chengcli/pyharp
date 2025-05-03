@@ -1,9 +1,6 @@
 // torch
 #include <torch/extension.h>
 
-// disort
-#include <disort/disort.hpp>
-
 // harp
 #include <harp/radiation/bbflux.hpp>
 #include <harp/radiation/calc_dz_hypsometric.hpp>
@@ -116,11 +113,13 @@ Examples:
     )doc",
         py::arg("pres"), py::arg("temp"), py::arg("g_ov_R"));
 
-  py::class_<harp::RadiationBandOptions>(m, "RadiationBandOptions", R"doc(
-Set radiation band options
+  auto pyRadiationBandOptions =
+      py::class_<harp::RadiationBandOptions>(m, "RadiationBandOptions");
 
+  pyRadiationBandOptions
+      .def(py::init<>(), R"doc(
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -129,8 +128,6 @@ Examples:
     >>> from pyharp import RadiationBandOptions
     >>> op = RadiationBandOptions().name('band1').outdirs('outdir')
     )doc")
-
-      .def(py::init<>())
 
       .def("__repr__",
            [](const harp::RadiationBandOptions &a) {
@@ -172,7 +169,7 @@ Args:
   name (str): radiation band name
 
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the band name
 
 Examples:
   .. code-block:: python
@@ -190,7 +187,7 @@ Args:
   outdirs (str): outgoing ray directions
 
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the outgoing ray directions
 
 Examples:
   .. code-block:: python
@@ -208,7 +205,7 @@ Args:
   solver_name (str): solver name
 
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the solver name
 
 Examples:
   .. code-block:: python
@@ -227,13 +224,14 @@ Args:
   disort (pydisort.DisortOptions): disort options
 
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions | pydisort.DisortOptions: class object if argument is not empty, otherwise the disort options
 
 Examples:
   .. code-block:: python
 
     >>> import torch
-    >>> from pyharp import RadiationBandOptions, DisortOptions
+    >>> from pyharp import RadiationBandOptions
+    >>> from pydisort import DisortOptions
     >>> op = RadiationBandOptions().disort(DisortOptions().nwave(10))
     >>> print(op)
     )doc")
@@ -242,10 +240,10 @@ Examples:
 Set or get wavelength, wavenumber or weights for a wave grid
 
 Args:
-  ww (list[float]): wavenumbers
+  ww (list[float]): wavenumbers/wavelengths/weights
 
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions | list[float]: class object if argument is not empty, otherwise the wavenumbers/wavelengths/weights
 
 Examples:
   .. code-block:: python
@@ -263,7 +261,7 @@ Args:
   integration (str): integration method
 
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the integration method
 
 Examples:
   .. code-block:: python
@@ -279,10 +277,10 @@ Examples:
 Set or get opacities
 
 Args:
-  opacities (dict[str,str]): opacities
+  opacities (dict[str,pyharp.AttenuatorOptions]): opacities
 
 Returns:
-  harp::RadiationBandOptions: class object
+  pyharp.RadiationBandOptions | dict[str,AttenuatorOptions]: class object if argument is not empty, otherwise the attenuator options
 
 Examples:
   .. code-block:: python
@@ -293,11 +291,15 @@ Examples:
     >>> print(op)
     )doc");
 
-  py::class_<harp::RadiationOptions>(m, "RadiationOptions", R"doc(
+  auto pyRadiationOptions =
+      py::class_<harp::RadiationOptions>(m, "RadiationOptions");
+
+  pyRadiationOptions
+      .def(py::init<>(), R"doc(
 Set radiation band options
 
 Returns:
-  harp::RadiationOptions: class object
+  pyharp.RadiationOptions: class object
 
 Examples:
   .. code-block:: python
@@ -306,8 +308,6 @@ Examples:
     >>> from pyharp import RadiationOptions
     >>> op = RadiationOptions().band_options(['band1', 'band2'])
     )doc")
-
-      .def(py::init<>())
 
       .def("__repr__",
            [](const harp::RadiationOptions &a) {
@@ -321,7 +321,7 @@ Args:
   filename (str): YAML file name
 
 Returns:
-  harp::RadiationOptions: class object
+  pyharp.RadiationOptions: class object
 
 Examples:
   .. code-block:: python
@@ -339,7 +339,7 @@ Args:
   outdirs (str): outgoing ray directions
 
 Returns:
-  harp::RadiationOptions: class object
+  pyharp.RadiationOptions | str : class object if argument is not empty, otherwise the outgoing ray directions
 
 Examples:
   .. code-block:: python
@@ -354,10 +354,10 @@ Examples:
 Set radiation band options
 
 Args:
-  bands (dict[str,str]): radiation band options
+  bands (dict[str,pyharp.RadiationBandOptions]): radiation band options
 
 Returns:
-  harp::RadiationOptions: class object
+  pyharp.RadiationOptions | dict[str,pyharp.RadiationBandOptions]: class object if argument is not empty, otherwise the radiation band options
 
 Examples:
   .. code-block:: python

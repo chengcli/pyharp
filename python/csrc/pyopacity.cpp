@@ -14,11 +14,15 @@
 namespace py = pybind11;
 
 void bind_opacity(py::module &m) {
-  py::class_<harp::AttenuatorOptions>(m, "AttenuatorOptions", R"doc(
+  auto pyAttenuatorOptions =
+      py::class_<harp::AttenuatorOptions>(m, "AttenuatorOptions");
+
+  pyAttenuatorOptions
+      .def(py::init<>(), R"doc(
 Set opacity band options
 
 Returns:
-  AttenuatorOptions object
+  pyharp.AttenuatorOptions: class object
 
 Examples:
   .. code-block:: python
@@ -28,15 +32,13 @@ Examples:
     >>> op = AttenuatorOptions().band_options(['band1', 'band2'])
         )doc")
 
-      .def(py::init<>())
-
       .def("__repr__",
            [](const harp::AttenuatorOptions &a) {
              return fmt::format("AttenuatorOptions{}", a);
            })
 
       .ADD_OPTION(std::string, harp::AttenuatorOptions, type, R"doc(
-Set the type of the opacity source
+Set or get the type of the opacity source
 
 Valid options are:
   .. list-table::
@@ -58,7 +60,7 @@ Args:
   type (str): type of the opacity source
 
 Returns:
-  AttenuatorOptions object
+  pyharp.AttenuatorOptions | str : class object if argument is not empty, otherwise the type
 
 Examples:
   .. code-block:: python
@@ -76,7 +78,7 @@ Args:
   bname (str): name of the band that the opacity is associated with
 
 Returns:
-  AttenuatorOptions object
+  pyharp.AttenuatorOptions | str : class object if argument is not empty, otherwise the band name
 
 Examples:
   .. code-block:: python
@@ -94,7 +96,7 @@ Args:
   opacity_files (list): list of opacity data files
 
 Returns:
-  AttenuatorOptions object
+  pyharp.AttenuatorOptions | list[str]: class object if argument is not empty, otherwise the list of opacity data files
 
 Examples:
   .. code-block:: python
@@ -111,7 +113,7 @@ Args:
   species_ids (list): list of dependent species indices
 
 Returns:
-  AttenuatorOptions object
+  pyharp.AttenuatorOptions | list[int]: class object if argument is not empty, otherwise the list of dependent species indices
 
 Examples:
   .. code-block:: python

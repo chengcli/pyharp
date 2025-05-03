@@ -29,8 +29,8 @@ PYBIND11_MODULE(pyharp, m) {
   .. [1] Li, C., Le, T., Zhang, X., & Yung, Y. L. (2018). A high-performance atmospheric radiation package: With applications to the radiative energy budgets of giant planets. Journal of Quantitative Spectroscopy and Radiative Transfer, 217, 353-362.
   )";
 
-  bind_radiation(m);
   bind_opacity(m);
+  bind_radiation(m);
   bind_math(m);
   bind_constants(m);
 

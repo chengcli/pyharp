@@ -29,6 +29,3 @@ docs/doxygen
 
 # version
 src/version.h
-
-# stub file
-*/stubs
