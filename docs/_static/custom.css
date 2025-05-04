@@ -1,0 +1,33 @@
+.sig {
+    display: block;
+    width: 100%;
+    background: #f8f8f8;  /* or match your theme */
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.py.property {
+    display: block;
+    width: 100%;
+    margin-bottom: 1em; /* Optional: space between properties */
+}
+
+/* Make sidebar font size larger */
+.wy-side-nav-search,       /* Search box area */
+.wy-menu-vertical a {
+    font-size: 100%;       /* Adjust as needed */
+}
+
+/* Highlight the current sidebar entry */
+.wy-menu-vertical .current > a {
+    color: #ffd54f;               /* Optional: override font color */
+    font-weight: bold;          /* Optional: make it stand out */
+}
+
+.wy-menu-vertical li.toctree-l1.current > a {
+    background-color: #ffd54f;
+}
+
+.wy-menu-vertical li.toctree-l2.current > a {
+    background-color: #ffe082;
+}

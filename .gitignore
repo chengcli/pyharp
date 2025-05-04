@@ -19,10 +19,16 @@ data/*.nc
 .vscode
 
 # doc
-doc/doxygen
+docs/doxygen
 
 # python
 *egg-info*
 
 # notebook
 *.ipynb
+
+# version
+src/version.h
+
+# stubs
+*stubs/

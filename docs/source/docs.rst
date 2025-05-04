@@ -1,0 +1,2 @@
+ - https://pybind11.readthedocs.io/en/latest/advanced/misc.html#avoiding-cpp-types-in-docstrings
+ - https://pybind11.readthedocs.io/en/latest/advanced/functions.html#default-arguments-revisited
