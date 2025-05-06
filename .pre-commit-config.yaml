@@ -26,9 +26,3 @@ repos:
         language: system
         files: .*\.cmake$
         args: ["-i"]
-
-      - id: black
-        name: Fix *.py
-        entry: black
-        language: system
-        files: ^(tools|examples)/.*\.(py|.py.in)$
