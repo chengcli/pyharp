@@ -29,6 +29,7 @@ endif(NETCDF_INCLUDES AND NETCDF_LIBRARIES)
 find_path(
   NETCDF_INCLUDES netcdf.h
   HINTS /opt/homebrew/include
+        /usr/include
         NETCDF_DIR
         NETCDF_INC
         $ENV{NETCDF_DIR}
@@ -40,6 +41,7 @@ find_library(
   NETCDF_LIBRARIES_C
   NAMES netcdf
   HINTS /opt/homebrew/lib
+        /usr/lib/x86_64-linux-gnu/
         NETCDF_DIR
         NETCDF_LIB
         $ENV{NETCDF_DIR}
