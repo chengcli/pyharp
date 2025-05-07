@@ -101,7 +101,7 @@ jobs:
           TORCH_CMAKE_PREFIX_PATH=$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DNETCDF=ON
+            -DNETCDF=ON \
             -DCMAKE_OSX_ARCHITECTURES=${{ env.MACOS_ARCH }} \
             -DCMAKE_PREFIX_PATH="$TORCH_CMAKE_PREFIX_PATH"
 
