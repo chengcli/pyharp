@@ -54,9 +54,6 @@ target_link_libraries(${namel}_${buildl}
     fmt::fmt
     yaml-cpp::yaml-cpp
     elements::elements
-    ${TORCH_LIBRARY}
-    ${TORCH_CPU_LIBRARY}
-    ${C10_LIBRARY}
     ${NETCDF_LIBRARIES}
     )
 

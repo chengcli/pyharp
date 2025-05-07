@@ -33,7 +33,7 @@ endif()
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${_ABI_OUTPUT})
 
 # Set MacOS deployment target
-set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
 
 # Specify the CUDA toolkit location if necessary
 #set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.0)
