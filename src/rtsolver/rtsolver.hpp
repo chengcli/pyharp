@@ -44,3 +44,5 @@ class BeerLambertImpl : public torch::nn::Cloneable<BeerLambertImpl> {
 TORCH_MODULE(BeerLambert);
 
 }  // namespace harp
+
+#undef ADD_ARG

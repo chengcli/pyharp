@@ -77,3 +77,5 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
 };
 
 }  // namespace harp
+
+#undef ADD_ARG

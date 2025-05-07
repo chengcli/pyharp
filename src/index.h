@@ -16,6 +16,6 @@ constexpr int IPM = 2;  //! phase moments
 // flux variables
 constexpr int IUP = 0;  //! upward
 constexpr int IDN = 1;  //! downward
-};                      // namespace index
+};  // namespace index
 
 }  // namespace harp

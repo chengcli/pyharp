@@ -6,7 +6,7 @@
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
-// harp
+// arg
 #include <harp/add_arg.h>
 
 // according to:
@@ -44,3 +44,5 @@ class IntegratorImpl : public torch::nn::Cloneable<IntegratorImpl> {
 TORCH_MODULE(Integrator);
 
 }  // namespace harp
+
+#undef ADD_ARG

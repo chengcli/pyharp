@@ -8,8 +8,9 @@ string(TOUPPER ${CMAKE_BUILD_TYPE} buildu)
 macro(setup_test namel)
   add_executable(${namel}.${buildl} ${namel}.cpp)
 
-  set_target_properties(${namel}.${buildl}
-                        PROPERTIES COMPILE_FLAGS ${CMAKE_CXX_FLAGS_${buildu}})
+  set_target_properties(
+    ${namel}.${buildl}
+    PROPERTIES COMPILE_FLAGS ${CMAKE_CXX_FLAGS_${buildu}})
 
   target_include_directories(
     ${namel}.${buildl}
@@ -21,7 +22,12 @@ macro(setup_test namel)
             ${TORCH_INCLUDE_DIR}
             ${TORCH_API_INCLUDE_DIR})
 
-  target_link_libraries(${namel}.${buildl} PRIVATE pyharp::harp gtest_main)
+  target_link_libraries(${namel}.${buildl}
+    PRIVATE pyharp::harp
+            gtest_main
+            ${TORCH_LIBRARY}
+            ${TORCH_CPU_LIBRARY}
+            ${C10_LIBRARY})
 
   add_test(NAME ${namel}.${buildl} COMMAND ${namel}.${buildl})
 endmacro()

@@ -10,7 +10,8 @@ repos:
       - id: check-yaml
         exclude: ^data/
 
-  - repo: local
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
     hooks:
       - id: clang-format
         name: Fix *.c,*.cc,*.cpp,*.h,*.hpp
@@ -19,16 +20,3 @@ repos:
         files: ^(src|python|tools|tests|examples)/.*\.(c|cc|cpp|h|hpp)$
         exclude: ^(src/opacity/microwave)/.*\.(c|cc|cpp|h|hpp)$
         args: ["-i", "-style=Google"]
-
-      - id: cmake-format
-        name: Fix *.cmake
-        entry: cmake-format
-        language: system
-        files: .*\.cmake$
-        args: ["-i"]
-
-      - id: black
-        name: Fix *.py
-        entry: black
-        language: system
-        files: ^(tools|examples)/.*\.(py|.py.in)$

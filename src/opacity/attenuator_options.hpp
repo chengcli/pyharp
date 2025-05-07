@@ -65,3 +65,5 @@ struct AttenuatorOptions {
 };
 
 }  // namespace harp
+
+#undef ADD_ARG

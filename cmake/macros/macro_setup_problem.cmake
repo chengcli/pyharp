@@ -10,20 +10,22 @@ macro(setup_problem namel)
 
   set_target_properties(
     ${namel}.${buildl}
-    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-               COMPILE_FLAGS ${CMAKE_CXX_FLAGS_${buildu}})
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    COMPILE_FLAGS ${CMAKE_CXX_FLAGS_${buildu}})
 
   target_include_directories(
     ${namel}.${buildl}
     PRIVATE ${CMAKE_BINARY_DIR}
             ${HARP_INCLUDE_DIR}
             ${DISORT_INCLUDE_DIR}
-            SYSTEM
             ${NETCDF_INCLUDES}
-            SYSTEM
             ${TORCH_INCLUDE_DIR}
-            SYSTEM
             ${TORCH_API_INCLUDE_DIR})
 
-  target_link_libraries(${namel}.${buildl} PRIVATE pyharp::harp)
+  target_link_libraries(${namel}.${buildl}
+    PRIVATE pyharp::harp
+            ${TORCH_LIBRARY}
+            ${TORCH_CPU_LIBRARY}
+            ${C10_LIBRARY})
 endmacro()

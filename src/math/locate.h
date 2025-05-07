@@ -32,7 +32,7 @@ DISPATCH_MACRO int locate(T const *xx, T x, int n) {
   if (x == xx[1])
     j = 1;
   else if (x == xx[n])
-    //j = n - 1;
+    // j = n - 1;
     j = n;
   else
     j = jl;

@@ -7,11 +7,12 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include <harp/add_arg.h>
-
 #include <harp/radiation/radiation.hpp>
 
 #include "integrator.hpp"
+
+// arg
+#include <harp/add_arg.h>
 
 namespace harp {
 
@@ -75,3 +76,5 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
 TORCH_MODULE(RadiationModel);
 
 }  // namespace harp
+
+#undef ADD_ARG
