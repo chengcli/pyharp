@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-22.04, macOS-15]
+        os: [ubuntu-latest, macOS-latest]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -74,7 +74,8 @@ jobs:
                 -DBUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel
+        #run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel
+        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }}
 
       - name: Install the project
         run: pip install .
