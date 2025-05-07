@@ -44,7 +44,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, macOS-latest]
+        #os: [ubuntu-latest, macOS-latest]
+        os: [macOS-latest]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -59,6 +60,16 @@ jobs:
         run: |
           pip install numpy 'torch>=2.7'
 
+      - name: Install NetCDF
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y libnetcdf-dev
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew update
+            brew install netcdf
+          fi
+
       - name: Cache CMake build
         uses: actions/cache@v3
         with:
@@ -71,11 +82,11 @@ jobs:
         run: |
           cmake -B ${{ github.workspace }}/build \
                 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                -DNETCDF=ON \
                 -DBUILD_TESTS=ON
 
       - name: Build
-        #run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel
-        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }}
+        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel 2
 
       - name: Install the project
         run: pip install .
