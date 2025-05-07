@@ -85,7 +85,7 @@ jobs:
                 -DBUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel 2
+        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel 3
 
       - name: Install the project
         run: pip install .

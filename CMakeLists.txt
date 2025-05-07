@@ -7,6 +7,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
 
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_EXAMPLES "Build examples" OFF)
+option(NETCDF "Build with netcdf support" ON)
 
 project(pyharp
   LANGUAGES CXX C
