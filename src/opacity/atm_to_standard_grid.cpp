@@ -1,4 +1,7 @@
+// harp
 #include "atm_to_standard_grid.hpp"
+
+#include <harp/index.h>
 
 namespace harp {
 void AtmToStandardGridImpl::reset() {

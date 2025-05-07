@@ -13,10 +13,10 @@
 #include <disort/disort.hpp>
 
 // harp
-#include <harp/add_arg.h>
-
 #include <harp/opacity/attenuator_options.hpp>
-#include <harp/rtsolver/rtsolver.hpp>
+
+// arg
+#include <harp/add_arg.h>
 
 namespace harp {
 
@@ -165,3 +165,5 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
 TORCH_MODULE(RadiationBand);
 
 }  // namespace harp
+
+#undef ADD_ARG

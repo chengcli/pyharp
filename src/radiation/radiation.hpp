@@ -7,9 +7,10 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include <harp/add_arg.h>
-
 #include "radiation_band.hpp"
+
+// arg
+#include <harp/add_arg.h>
 
 namespace harp {
 
@@ -110,3 +111,5 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
 TORCH_MODULE(Radiation);
 
 }  // namespace harp
+
+#undef ADD_ARG

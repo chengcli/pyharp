@@ -7,9 +7,8 @@
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
-// harp
+// arg
 #include <harp/add_arg.h>
-#include <harp/index.h>
 
 namespace harp {
 struct AtmToStandardGridOptions {
@@ -59,3 +58,5 @@ class AtmToStandardGridImpl
 };
 TORCH_MODULE(AtmToStandardGrid);
 }  // namespace harp
+
+#undef ADD_ARG

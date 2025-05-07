@@ -5,7 +5,6 @@
 
 // harp
 #include <harp/add_arg.h>
-#include <harp/index.h>
 
 namespace harp {
 
@@ -49,3 +48,5 @@ torch::Tensor layer2level(torch::Tensor dx, torch::Tensor var,
                           Layer2LevelOptions const &options);
 
 }  // namespace harp
+
+#undef ADD_ARG
