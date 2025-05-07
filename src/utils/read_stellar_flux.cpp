@@ -1,7 +1,8 @@
 // C/C++
-#include "read_stellar_flux.hpp"
-
 #include <fstream>
+
+// harp
+#include "read_stellar_flux.hpp"
 
 std::pair<std::vector<double>, std::vector<double>> read_stellar_flux(
     std::string file1, std::string file2) {
