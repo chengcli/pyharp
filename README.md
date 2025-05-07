@@ -1,6 +1,6 @@
 # 🌍 Pyharp: High-performance Atmosphere Radiation Package in Python
 
-[![build](https://github.com/chengcli/pyharp/actions/workflows/main.yml/badge.svg)](https://github.com/chengcli/pyharp/actions/workflows/main.yml)
+[![build](https://github.com/chengcli/pyharp/actions/workflows/ci.yml/badge.svg)](https://github.com/chengcli/pyharp/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://img.shields.io/badge/license-MIT-blue)
 
 ## 📦 Installation
