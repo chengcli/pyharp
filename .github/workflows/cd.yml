@@ -163,8 +163,8 @@ jobs:
             export LD_LIBRARY_PATH=$(python -c "import torch; print(torch.__path__[0] + '/lib')")
             auditwheel repair --exclude lib*.so -w {dest_dir} {wheel}
           CIBW_BEFORE_BUILD: |
+            apt-get update && apt-get install -y libnetcdf-dev
             pip install numpy 'torch>=2.7'
-            sudo apt-get install -y libnetcdf-dev
             TORCH_LIB=$(python -c "import torch; print(torch.__path__[0] + '/lib')")
             TORCH_CMAKE_PREFIX_PATH=$(python -c "import torch.utils; print(torch.utils.cmake_prefix_path)")
             export LD_LIBRARY_PATH="$TORCH_LIB:$LD_LIBRARY_PATH"
