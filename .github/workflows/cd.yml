@@ -157,6 +157,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libnetcdf-dev
 
+      - name: Install cmake
+        run: |
+          pip install cmake
+
       - name: Build Linux wheel
         env:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
