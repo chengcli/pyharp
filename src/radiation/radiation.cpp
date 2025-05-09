@@ -1,10 +1,9 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
-// elements
-#include <elements/compound.hpp>
-
 // harp
+#include <harp/compound.hpp>
+
 #include "flux_utils.hpp"
 #include "radiation.hpp"
 
@@ -34,7 +33,7 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
       double value = it.second.as<double>();
       comp[key] = value;
     }
-    species_weights.push_back(elements::get_compound_weight(comp));
+    species_weights.push_back(get_compound_weight(comp));
   }
 
   for (auto bd : config["bands"]) {

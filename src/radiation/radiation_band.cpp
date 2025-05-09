@@ -1,9 +1,6 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
-// elements
-#include <elements/utils.hpp>
-
 // harp
 #include <harp/index.h>
 
@@ -15,6 +12,7 @@
 #include <harp/opacity/s8_fuller.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/read_dimvar_netcdf.hpp>
+#include <harp/utils/strings.hpp>
 
 #include "flux_utils.hpp"
 #include "get_direction_grids.hpp"
@@ -86,7 +84,7 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
   if (my.solver_name() == "disort") {
     my.disort().header("running disort " + bd_name);
     if (band["flags"]) {
-      my.disort().flags(elements::trim_copy(band["flags"].as<std::string>()));
+      my.disort().flags(trim_copy(band["flags"].as<std::string>()));
     }
     my.disort().nwave(1);
     my.disort().upward(true);

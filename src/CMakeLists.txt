@@ -52,7 +52,6 @@ target_link_libraries(${namel}_${buildl}
     pydisort::disort
     fmt::fmt
     yaml-cpp::yaml-cpp
-    elements::elements
     ${NETCDF_LIBRARIES}
     )
 

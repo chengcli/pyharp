@@ -87,7 +87,6 @@ find_package(Torch REQUIRED)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gtest.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/pydisort.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/yamlpp.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/elements.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up project libraries ...${ColorReset}")
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/python/VERSION" PROJECT_VERSION)
