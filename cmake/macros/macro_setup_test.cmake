@@ -16,7 +16,6 @@ macro(setup_test namel)
     ${namel}.${buildl}
     PRIVATE ${CMAKE_BINARY_DIR}
             ${HARP_INCLUDE_DIR}
-            ${ELEMENTS_INCLUDE_DIR}
             ${DISORT_INCLUDE_DIR}
             ${NETCDF_INCLUDES}
             ${TORCH_INCLUDE_DIR}
