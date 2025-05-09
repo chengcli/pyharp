@@ -3,4 +3,5 @@ h5py
 netcdf4
 numpy
 pre-commit
+pydisort>=1.1.1
 torch>=2.7.0
