@@ -15,9 +15,8 @@ def parse_library_names(libdir):
                 file_name = os.path.basename(file)
                 library_names.append(file_name[3:].rsplit(".", 1)[0])
 
-    # add homebrew libraries if on MacOS
-    if platform.system() == 'Darwin':
-        library_names.extend(['netcdf'])
+    # add system netcdf library
+    library_names.extend(['netcdf'])
 
     return library_names
 
@@ -31,13 +30,13 @@ include_dirs = [
 ]
 
 # add homebrew directories if on MacOS
+lib_dirs = [f"{current_dir}/build/lib"]
 if platform.system() == 'Darwin':
-    lib_dirs = [f"{current_dir}/build/lib", '/opt/homebrew/lib']
+    lib_dirs.extend(['/opt/homebrew/lib'])
 else:
-    lib_dirs = [f"{current_dir}/build/lib"]
+    lib_dirs.extend(['/lib64/', '/usr/lib/x86_64-linux-gnu/'])
 
 libraries = parse_library_names(f"{current_dir}/build/lib")
-
 
 if torch.cuda.is_available():
     ext_module = cpp_extension.CUDAExtension(
@@ -47,7 +46,8 @@ if torch.cuda.is_available():
         include_dirs=include_dirs,
         library_dirs=lib_dirs,
         libraries=libraries,
-        extra_compile_args = {'nvcc': ['--extended-lambda']},
+        extra_compile_args={'nvcc': ['--extended-lambda'],
+                            'cc': ["-Wno-attributes"]},
     )
 else:
     ext_module = cpp_extension.CppExtension(
@@ -56,6 +56,7 @@ else:
         include_dirs=include_dirs,
         library_dirs=lib_dirs,
         libraries=libraries,
+        extra_compile_args=['-Wno-attributes'],
         )
 
 setup(
