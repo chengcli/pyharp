@@ -1,6 +1,8 @@
 import numpy as np
+import tarfile
 from importlib import resources
-from typing import Tuple
+from typing import Tuple, List
+from .get_legacy_data_1460 import _get_legacy_data_1460
 
 def load_sonora_atm() -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -40,3 +42,34 @@ def load_sonora_window() -> Tuple[np.ndarray, np.ndarray]:
             data[current_key].extend(values)
 
     return np.array(data['lambda1']), np.array(data['lambda2'])
+
+def load_sonora_abundances(filename: str) -> Tuple[List[str], np.ndarray]:
+    """
+    Returns the abundances from the Sonora 2020 database.
+
+    Returns:
+        Tuple[List[str], np.ndarray]: List of species and their abundances.
+    """
+
+    species = np.genfromtxt(filename, dtype=str, max_rows=1)
+    abundances = np.genfromtxt(filename, skip_header=1)
+
+    return species.tolist(), abundances
+
+def load_sonora_data(ck_name: str):
+    """
+    This functions calls the get_legacy_data_1460
+    """
+
+    # create a dummy class to hold result
+    class Dummy:
+        full_abunds = {}
+
+    with tarfile.open(ck_name + ".tar.gz", "r:gz") as tar:
+        # Access the file inside without extracting to disk
+        member = tar.getmember(ck_name + '/ascii_data')
+        op = Dummy()
+        op.ck_file = tar.extractfile(member)
+        _get_legacy_data_1460(op)
+
+    return vars(op)

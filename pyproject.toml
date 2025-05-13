@@ -15,6 +15,7 @@ requires-python = ">=3.9"
 dependencies = [
   "numpy",
   "pydisort",
+  "pandas",
   "cmake<=3.30",
   "torch>=2.7.0",
 ]

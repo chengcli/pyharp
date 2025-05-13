@@ -36,3 +36,6 @@ src/version.h
 
 # junk
 z.junk/
+
+# examples
+examples/*.tar.gz
