@@ -41,4 +41,7 @@ Documentation = "pyharp.readthedocs.io"
 fetch-sonora = "pyharp.api.fetch_sonora:main"
 
 [tool.setuptools]
-packages = ["pyharp", "pyharp.api"]
+packages = ["pyharp", "pyharp.api", "pyharp.sonora"]
+
+[tool.setuptools.package-data]
+"pyharp.sonora" = ["sonora2020_*.txt"]
