@@ -5,18 +5,22 @@ from typing import Tuple
 def load_sonora_atm() -> Tuple[np.ndarray, np.ndarray]:
     """
     Returns the atmospheric pressure and temperature from the Sonora 2020 database.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Atmospheric pressure (Pa) and temperature (K).
     """
-    filepath = resources.path('pyharp.sonora', 'sonora2020_1460_layer_list.txt')
-    data = np.genfromtxt(filepath, skip_header=1)
+    with resources.files('pyharp.sonora').joinpath('sonora2020_1460_layer_list.txt').open('r') as f:
+        data = np.genfromtxt(f, skip_header=2)
     return data[:, 2] * 1.e5, data[:, 1]
 
 def load_sonora_window() -> Tuple[np.ndarray, np.ndarray]:
     """
     Returns the Sonora 2020 spectral window (start, end) in nm.
-    """
-    filepath = resources.path('pyharp.sonora', 'sonora2020_196_windows.txt')
 
-    with open(filepath, 'r') as f:
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Start and end wavelengths (nm).
+    """
+    with resources.files('pyharp.sonora').joinpath('sonora2020_196_windows.txt').open('r') as f:
         lines = f.readlines()
 
     data = {'lambda1': [], 'lambda2': []}
