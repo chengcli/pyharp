@@ -10,6 +10,7 @@ examples/*/*.nc
 
 # data
 data/*.nc
+data/*.tar.gz
 
 # mac
 .DS_Store
@@ -32,3 +33,6 @@ src/version.h
 
 # stubs
 *stubs/
+
+# junk
+z.junk/
