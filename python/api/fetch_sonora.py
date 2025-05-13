@@ -13,7 +13,8 @@ The correlated-k coefficients are calculated using pre-mixed opacities, with abu
 The opacity sources included in the calculations are: C2H2, C2H4, C2H6, CH4, CO, CO2, CrH, Fe, FeH, H2, H3+, H2O, H2S, HCN, LiCl, LiF, LiH, MgH, N2, NH3, OCS, PH3, SiO, TiO, and VO, in addition to alkali metals (Li, Na, K, Rb, Cs). The corresponding high resolution opacities for these atoms and molecules can be found in the Zenodo repository 10.5281/zenodo.6600976. The references for the line lists used in these opacity calculations are listed in the file Opacity_references_2021.pdf. Please include these references, as well as the reference to this Zenodo repository when publishing your paper.
 """
 
-sonora2020_url_tmplate = "https://zenodo.org/records/5590989/files/sonora_2020_feh{feh}_co_{co}.data.196.tar.gz?download=1"
+# version3
+sonora2020_url_tmplate = "https://zenodo.org/records/7542068/files/sonora_2020_feh{feh}_co_{co}.data.196.tar.gz?download=1"
 
 valid_feh = [
     "+000", "+030", "+050", "+070", "+100", "-030", "-050", "-070", "-100"
