@@ -90,7 +90,7 @@ def load_sonora_data(ck_name: str) -> dict:
     del op.pressures
     return vars(op)
 
-def save_sonora_multiband_ck(ck_name: str , data: dict, clean=True) -> None:
+def save_sonora_multiband(ck_name: str , data: dict, clean=True) -> None:
     """
     Save the Sonora 2020 data to a .pt file.
 
@@ -98,6 +98,7 @@ def save_sonora_multiband_ck(ck_name: str , data: dict, clean=True) -> None:
         ck_name (str): The name of the ck file.
         data (dict): The data to save.
         clean (bool): Whether to clean up the original tar.gz file.
+
     Returns:
         None
     """
@@ -109,16 +110,24 @@ def save_sonora_multiband_ck(ck_name: str , data: dict, clean=True) -> None:
             for key in values:
                 setattr(self, key, values[key])
 
-    tensor_dict = {
+    out = {
         'pres': torch.tensor(data['press'], dtype=torch.float64),
         'temp': torch.tensor(data['temps'], dtype=torch.float64),
         'wmin': torch.tensor(wmin, dtype=torch.float64),
         'wmax': torch.tensor(wmax, dtype=torch.float64),
-        'points': torch.tensor(data['gauss_pts'], dtype=torch.float64),
-        'weights': torch.tensor(data['gauss_wts'], dtype=torch.float64),
+        'gauss_pts': torch.tensor(data['gauss_pts'], dtype=torch.float64),
+        'gauss_wts': torch.tensor(data['gauss_wts'], dtype=torch.float64),
         'kappa': torch.tensor(data['kappa'], dtype=torch.float64),
     }
-    container = torch.jit.script(Container(tensor_dict))
+
+    wmin = out['wmin'][:, None]
+    wmax = out['wmax'][:, None]
+    pt = out['gauss_pts'][None, :]
+    out['wavenumber'] = (wmin * (1. - pt) + wmax * pt).flatten()
+    out['weights'] = out['gauss_wts'].repeat(data['nwno'])
+    out['kappa'] = out['kappa'].reshape(-1, *out['kappa'].shape[2:])
+
+    container = torch.jit.script(Container(out))
     container.save(f'{ck_name}.pt')
 
     # Clean up the original tar.gz file

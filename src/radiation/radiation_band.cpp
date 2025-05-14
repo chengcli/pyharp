@@ -119,7 +119,7 @@ std::vector<double> RadiationBandOptions::query_waves() const {
   if (op.type().compare(0, 3, "rfm") == 0) {
     return read_dimvar_netcdf<double>(op.opacity_files()[0], "Wavenumber");
   } else if (op.type().compare(0, 9, "multiband") == 0) {
-    return read_var_pt<double>(op.opacity_files()[0], "Wavenumber");
+    return read_var_pt<double>(op.opacity_files()[0], "wavenumber");
   } else {
     return {};
   }
@@ -168,6 +168,11 @@ void RadiationBandImpl::reset() {
       opacities[name] = torch::nn::AnyModule(a);
       options.ww() =
           read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
+    } else if (op.type() == "multiband") {
+      auto a = MultiBand(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
+      options.ww() = read_var_pt<double>(op.opacity_files()[0], "wavenumber");
     } else if (op.type() == "helios") {
       auto a = Helios(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);

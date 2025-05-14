@@ -20,6 +20,11 @@ Use the following script to checkout options and download the Sonora2020 databas
 
 By default, ``fetch-sonora`` downloads the database with [Fe/H] = 0.0 and C/O = 1 times solar abundances.
 
+.. automodule:: pyharp.sonora
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Add a new opacity format
 ------------------------
 
