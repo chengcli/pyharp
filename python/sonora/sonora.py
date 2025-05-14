@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import tarfile
 from importlib import resources
@@ -56,7 +57,7 @@ def load_sonora_abundances(filename: str) -> Tuple[List[str], np.ndarray]:
 
     return species.tolist(), abundances
 
-def load_sonora_data(ck_name: str):
+def load_sonora_data(ck_name: str) -> dict:
     """
     This functions calls the get_legacy_data_1460
     """
@@ -72,4 +73,25 @@ def load_sonora_data(ck_name: str):
         op.ck_file = tar.extractfile(member)
         _get_legacy_data_1460(op)
 
+    # kappa was (pres, temp, band, wave)
+    # reshape kappa to (band, wave, pres, temp)
+    op.kappa = np.transpose(op.kappa, (2, 3, 0, 1))
+
+    # bar -> pa
+    op.press = list(op.pressures[:op.max_pc] * 1.e5)
+    del op.pressures
     return vars(op)
+
+def save_sonora_multiband_ck(ck_name: str , data: dict):
+    wmin, wmax = load_sonora_window()
+    tensor_dict = {
+        'pres': torch.tensor(data['press'], dtype=torch.float64),
+        'temp': torch.tensor(data['temps'], dtype=torch.float64),
+        'wmin': torch.tensor(wmin, dtype=torch.float64),
+        'wmax': torch.tensor(wmax, dtype=torch.float64),
+        'points': torch.tensor(data['gauss_pts'], dtype=torch.float64),
+        'weights': torch.tensor(data['gauss_wts'], dtype=torch.float64),
+        'kappa': torch.tensor(data['kappa'], dtype=torch.float64),
+    }
+    torch.save(tensor_dict, f'{ck_name}.pt')
+    print(f"Saved {ck_name}.pt")
