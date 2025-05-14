@@ -168,11 +168,11 @@ void RadiationBandImpl::reset() {
       opacities[name] = torch::nn::AnyModule(a);
       options.ww() =
           read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
-    } else if (op.type() == "multiband") {
+    } else if (op.type() == "multiband-ck") {
       auto a = MultiBand(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
-      options.ww() = read_var_pt<double>(op.opacity_files()[0], "wavenumber");
+      options.ww() = read_var_pt<double>(op.opacity_files()[0], "weights");
     } else if (op.type() == "helios") {
       auto a = Helios(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);

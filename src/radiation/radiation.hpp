@@ -104,9 +104,10 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
    *
    * \return net flux tensor [W/m^2] (ncol, nlyr+1)
    */
-  torch::Tensor forward(torch::Tensor conc, torch::Tensor dz,
-                        std::map<std::string, torch::Tensor>* bc,
-                        std::map<std::string, torch::Tensor>* kwargs);
+  std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> forward(
+      torch::Tensor conc, torch::Tensor dz,
+      std::map<std::string, torch::Tensor>* bc,
+      std::map<std::string, torch::Tensor>* kwargs);
 };
 TORCH_MODULE(Radiation);
 

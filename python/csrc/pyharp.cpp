@@ -34,6 +34,9 @@ PYBIND11_MODULE(pyharp, m) {
   bind_math(m);
   bind_constants(m);
 
+  m.attr("species_names") = &harp::species_names;
+  m.attr("species_weights") = &harp::species_weights;
+
   m.def(
       "shared",
       []() -> const std::unordered_map<std::string, torch::Tensor> & {
