@@ -3,6 +3,7 @@
 #include <iostream>
 
 // torch
+#include <torch/script.h>
 #include <torch/torch.h>
 
 // base

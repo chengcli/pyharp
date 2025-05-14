@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
 
   // print radiation options and construct radiation model
   harp::Radiation rad(op);
-  auto netflux = rad->forward(conc, dz, &bc, &atm);
+  auto [netflux, dnflux, upflux] = rad->forward(conc, dz, &bc, &atm);
 
   int t_lim = 10000;
   int print_freq = 500;
@@ -170,8 +170,7 @@ int main(int argc, char** argv) {
   double current_time = 0;
 
   for (int t_ind = 0; t_ind < t_lim; ++t_ind) {
-    auto surf_forcing =
-        harp::shared["radiation/downward_flux"] - 5.67e-8 * bc["btemp"].pow(4);
+    auto surf_forcing = dnflux - 5.67e-8 * bc["btemp"].pow(4);
     bc["btemp"] += surf_forcing * (tstep / cSurf);
 
     dT_dt = torch::zeros_like(atm["temp"]);
@@ -217,6 +216,9 @@ int main(int argc, char** argv) {
       outputFile3.close();
     }
 
-    netflux = rad->forward(conc, dz, &bc, &atm);
+    auto result = rad->forward(conc, dz, &bc, &atm);
+    netflux = std::get<0>(result);
+    dnflux = std::get<1>(result);
+    upflux = std::get<2>(result);
   }
 }

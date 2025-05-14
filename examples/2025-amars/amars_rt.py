@@ -107,11 +107,8 @@ if __name__ == "__main__":
     # run RT
     conc = xfrac.clone()
     conc *= atm["pres"].unsqueeze(-1) / (constants.Rgas * atm["temp"].unsqueeze(-1))
-    netflux = rad.forward(conc, dz, bc, atm)
-
-    downwarf_flux = harp.shared()["radiation/downward_flux"]
-    upward_flux = harp.shared()["radiation/upward_flux"]
+    netflux, dnflux, upflux = rad.forward(conc, dz, bc, atm)
 
     print("net flux = ", netflux)
-    print("downward flux = ", downwarf_flux)
-    print("upward flux = ", upward_flux)
+    print("downward flux = ", dnflux)
+    print("upward flux = ", upflux)

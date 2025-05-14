@@ -63,7 +63,7 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
   conc.narrow(-1, 3, 2) *= options.aero_scale() * atm["pres"].unsqueeze(-1) /
                            (constants::Rgas * atm["temp"].unsqueeze(-1));
 
-  auto netflux = prad->forward(conc, dz, &bc, &atm);
+  auto [netflux, dnflux, upflux] = prad->forward(conc, dz, &bc, &atm);
   // radiative flux
   shared["result/netflux"] = netflux;
 
@@ -78,8 +78,7 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
       (dz.narrow(-1, 1, options.nlyr() - 1) +
        dz.narrow(-1, 0, options.nlyr() - 1));
 
-  auto surf_forcing = shared["radiation/downward_flux"] -
-                      constants::stefanBoltzmann * bc["btemp"].pow(4);
+  auto surf_forcing = dnflux - constants::stefanBoltzmann * bc["btemp"].pow(4);
   auto dT_surf = surf_forcing * (dt / options.cSurf());
   shared["result/dT_surf"] = dT_surf;
 
