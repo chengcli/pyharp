@@ -47,6 +47,7 @@ extensions = [
     "sphinx.ext.githubpages",
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc.typehints",
+    "sphinx_copybutton",
 ]
 
 intersphinx_mapping = {

@@ -15,6 +15,7 @@ requires-python = ">=3.9"
 dependencies = [
   "numpy",
   "pydisort",
+  "pandas",
   "cmake<=3.30",
   "torch>=2.7.0",
 ]
@@ -41,4 +42,7 @@ Documentation = "pyharp.readthedocs.io"
 fetch-sonora = "pyharp.api.fetch_sonora:main"
 
 [tool.setuptools]
-packages = ["pyharp", "pyharp.api"]
+packages = ["pyharp", "pyharp.api", "pyharp.sonora"]
+
+[tool.setuptools.package-data]
+"pyharp.sonora" = ["sonora2020_*.txt"]

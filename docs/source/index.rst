@@ -9,3 +9,4 @@ Pyharp Documentation
     :caption: Contents:
 
     api
+    opacity

@@ -1,5 +1,6 @@
 numpy
 pyharp
 sphinx
+sphinx-copybutton
 sphinx_rtd_theme
 sphinxcontrib-napoleon
