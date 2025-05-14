@@ -35,6 +35,16 @@ PYBIND11_MODULE(pyharp, m) {
   bind_constants(m);
 
   m.def(
+      "species_names",
+      []() -> const std::vector<std::string> & { return harp::species_names; },
+      R"doc(Retrieves the list of species names)doc");
+
+  m.def(
+      "species_weights",
+      []() -> const std::vector<double> & { return harp::species_weights; },
+      R"doc(Retrieves the list of species molecular weights [kg/mol])doc");
+
+  m.def(
       "shared",
       []() -> const std::unordered_map<std::string, torch::Tensor> & {
         return harp::shared;

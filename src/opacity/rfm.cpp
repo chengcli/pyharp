@@ -164,7 +164,7 @@ torch::Tensor RFMImpl::forward(
 
   // ln(m*2/kmol) -> 1/m
   return 1.E-3 * out.exp() *
-         conc.select(2, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);
+         conc.select(-1, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);
 }
 
 }  // namespace harp

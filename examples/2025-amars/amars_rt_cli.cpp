@@ -169,10 +169,8 @@ int main(int argc, char** argv) {
   // print radiation options and construct radiation model
   std::cout << "rad op = " << fmt::format("{}", op) << std::endl;
   harp::Radiation rad(op);
-  auto netflux = rad->forward(conc, dz, &bc, &atm);
+  auto [netflux, dnflux, upflux] = rad->forward(conc, dz, &bc, &atm);
   std::cout << "net flux = " << netflux << std::endl;
-  std::cout << "downward flux = " << harp::shared["radiation/downward_flux"]
-            << std::endl;
-  std::cout << "upward flux = " << harp::shared["radiation/upward_flux"]
-            << std::endl;
+  std::cout << "downward flux = " << dnflux << std::endl;
+  std::cout << "upward flux = " << upflux << std::endl;
 }

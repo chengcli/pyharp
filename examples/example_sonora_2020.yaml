@@ -1,18 +1,18 @@
 species:
   - name: H2
-    composition: {H: 1.8, He: 0.2}
+    composition: {H: 1.9, He: 0.1}
 
 opacities:
   H2:
-    type: MultiBandCK
+    type: multiband-ck
     data: ["sonora_2020_feh+000_co_100.data.196.pt"]
     species: [H2]
 
 bands: [sonora196]
 
 sonora196:
-  range: [30.8, 38300.]
+  range: [30.8, 38300.] # wavenumber
   opacities: [H2]
   solver: disort
-  integration: wavenumber
-  flags: lamber,quiet,onlyfl
+  integration: weight
+  flags: lamber,quiet,onlyfl,planck

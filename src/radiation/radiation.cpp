@@ -60,7 +60,7 @@ void RadiationImpl::reset() {
   }
 }
 
-torch::Tensor RadiationImpl::forward(
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> RadiationImpl::forward(
     torch::Tensor conc, torch::Tensor dz,
     std::map<std::string, torch::Tensor>* bc,
     std::map<std::string, torch::Tensor>* kwargs) {
@@ -88,13 +88,8 @@ torch::Tensor RadiationImpl::forward(
     net_flux *= kappa;
   }
 
-  // export downward flux to surface
-  shared["radiation/downward_flux"] = cal_surface_flux(total_flux);
-
-  // export upward flux out of the top of atmosphere
-  shared["radiation/upward_flux"] = cal_toa_flux(total_flux);
-
-  return net_flux;
+  return std::make_tuple(net_flux, cal_surface_flux(total_flux),
+                         cal_toa_flux(total_flux));
 }
 
 }  // namespace harp
