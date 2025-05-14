@@ -108,7 +108,8 @@ if __name__ == "__main__":
 
     # configure radiation model
     config_file = "example_sonora_2020.yaml"
-    rad = configure_bands(config_file, ncol=1, nlyr=atm['pres'].shape[-1], nstr=4)
+    rad = configure_bands(config_file, ncol=1,
+                          nlyr=atm['pres'].shape[-1], nstr=8)
     print(rad.options)
 
     # calculate concentration and layer thickness
