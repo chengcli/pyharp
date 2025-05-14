@@ -43,10 +43,10 @@ def preprocess_sonora(fname: str):
 def configure_atm(pmax: float, pmin: float,
                   ncol: int = 1,
                   nlyr: int = 100) -> dict[str, torch.Tensor]:
-    p1bar, T1bar = 1.e5, 169.
+    p1bar, T1bar, Tmin = 1.e5, 169., 135.
     pres = torch.logspace(np.log10(pmax), np.log10(pmin), nlyr + 1, dtype=torch.float64)
     temp = T1bar * torch.pow(pres / p1bar, 2. / 7.)
-    temp.clip_(min=135.)
+    temp.clip_(min=Tmin)
     atm = {
         'pres' : (pres[1:] * pres[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
         'temp' : (temp[1:] * temp[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
