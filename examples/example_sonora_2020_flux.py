@@ -36,6 +36,9 @@ def preprocess_sonora(fname: str):
 
     save_sonora_multiband(fname, data, clean=False)
 
+    # load it back!
+    sonora = torch.jit.load(fname + ".pt")
+
 def configure_atm(pmax: float, pmin: float,
                   ncol: int = 1,
                   nlyr: int = 100) -> dict[str, torch.Tensor]
@@ -95,7 +98,6 @@ if __name__ == "__main__":
     fname = "sonora_2020_feh+000_co_100.data.196"
     if not os.path.exists(fname + ".pt"):
         preprocess_sonora(fname)
-    sonora = torch.jit.load(fname + ".pt")
 
     # configure atmosphere model
     atm = configure_atm(100.e5, 10., ncol=1, nlyr=100)
@@ -104,12 +106,14 @@ if __name__ == "__main__":
     config_file = "example_sonora_2020.yaml"
     rad = configure_bands(config_file, ncol=1, nlyr=atm['pres'].shape[0], nstr=4)
 
-    # calculate layer thickness
+    # calculate concentration and layer thickness
     mean_mol_weight = pyharp.species_weights[0]
     grav = 24.8
     dz = calc_dz_hypsometric(atm["pres"], atm["temp"],
                              torch.tensor(mean_mol_weight * grav / constants.Rgas)
                              )
+    conc = atm["pres"] / (atm["temp"] * constants.Rgas)
+    conc.unsqueeze_(-1)
 
     # run rt
     netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)

@@ -10,6 +10,8 @@
 #include <configure.h>
 
 // harp
+#include <harp/constants.h>
+
 #include <harp/math/interpolation.hpp>
 #include <harp/utils/find_resource.hpp>
 
@@ -77,9 +79,9 @@ torch::Tensor MultiBandImpl::forward(
 
   auto out = interpn({wave, lnp, temp}, {kwave, klnp, ktemp}, kdata);
 
-  //!!! CHECK UNITS !!!!
   // ln(cm^2 / molecule) -> 1/m
-  return out.exp() * conc.select(-1, 0).unsqueeze(0).unsqueeze(-1);
+  return 1.e-4 * constants::Avogadro * out.exp() *
+         conc.select(-1, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);
 }
 
 }  // namespace harp
