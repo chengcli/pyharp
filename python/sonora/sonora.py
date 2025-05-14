@@ -90,7 +90,7 @@ def load_sonora_data(ck_name: str) -> dict:
     del op.pressures
     return vars(op)
 
-def save_sonora_multiband(ck_name: str , data: dict, clean=True) -> None:
+def save_sonora_multiband(ck_name: str, data: dict, clean: bool=True) -> None:
     """
     Save the Sonora 2020 data to a .pt file.
 
@@ -125,6 +125,8 @@ def save_sonora_multiband(ck_name: str , data: dict, clean=True) -> None:
     pt = out['gauss_pts'][None, :]
     out['wavenumber'] = (wmin * (1. - pt) + wmax * pt).flatten()
     out['weights'] = out['gauss_wts'].repeat(data['nwno'])
+
+    # (nband, ng, ...) -> (nband * ng, ...)
     out['kappa'] = out['kappa'].reshape(-1, *out['kappa'].shape[2:])
 
     container = torch.jit.script(Container(out))
