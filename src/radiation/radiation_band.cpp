@@ -7,11 +7,13 @@
 #include <harp/opacity/grey_opacities.hpp>
 #include <harp/opacity/h2so4_simple.hpp>
 #include <harp/opacity/helios.hpp>
+#include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
 #include <harp/opacity/s8_fuller.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/read_dimvar_netcdf.hpp>
+#include <harp/utils/read_var_pt.hpp>
 #include <harp/utils/strings.hpp>
 
 #include "flux_utils.hpp"
@@ -107,30 +109,34 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
 }
 
 std::vector<double> RadiationBandOptions::query_waves() const {
-  // cannot determine number of spectral grids if no opacities
+  // cannot determine spectral grids if no opacities
   if (opacities().empty()) {
     return {};
   }
 
-  // determine number of spectral grids from tabulated opacity sources
+  // determine spectral grids from an opacity file
   auto op = opacities().begin()->second;
   if (op.type().compare(0, 3, "rfm") == 0) {
     return read_dimvar_netcdf<double>(op.opacity_files()[0], "Wavenumber");
+  } else if (op.type().compare(0, 9, "multiband") == 0) {
+    return read_var_pt<double>(op.opacity_files()[0], "Wavenumber");
   } else {
     return {};
   }
 }
 
 std::vector<double> RadiationBandOptions::query_weights() const {
-  // cannot determine number of spectral grids if no opacities
+  // cannot determine spectral weights if no opacities
   if (opacities().empty()) {
     return {};
   }
 
-  // determine number of spectral grids from tabulated opacity sources
+  // determine spectral weights from the opacity file
   auto op = opacities().begin()->second;
   if (op.type().compare(0, 3, "rfm") == 0) {
     return read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
+  } else if (op.type().compare(0, 9, "multiband") == 0) {
+    return read_var_pt<double>(op.opacity_files()[0], "weights");
   } else {
     return {};
   }

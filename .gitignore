@@ -40,3 +40,6 @@ z.junk/
 # examples
 examples/*.tar.gz
 examples/*.pt
+
+# idl source codes
+*.pro

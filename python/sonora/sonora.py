@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import tarfile
@@ -48,6 +49,8 @@ def load_sonora_abundances(filename: str) -> Tuple[List[str], np.ndarray]:
     """
     Returns the abundances from the Sonora 2020 database.
 
+    Args:
+        filename (str): Path to the abundances file.
     Returns:
         Tuple[List[str], np.ndarray]: List of species and their abundances.
     """
@@ -60,6 +63,11 @@ def load_sonora_abundances(filename: str) -> Tuple[List[str], np.ndarray]:
 def load_sonora_data(ck_name: str) -> dict:
     """
     This functions calls the get_legacy_data_1460
+
+    Args:
+        ck_name (str): The name of the ck file without the .tar.gz extension.
+    Returns:
+        dict: A dictionary containing the loaded data.
     """
 
     # create a dummy class to hold result
@@ -82,8 +90,25 @@ def load_sonora_data(ck_name: str) -> dict:
     del op.pressures
     return vars(op)
 
-def save_sonora_multiband_ck(ck_name: str , data: dict):
+def save_sonora_multiband_ck(ck_name: str , data: dict, clean=True) -> None:
+    """
+    Save the Sonora 2020 data to a .pt file.
+
+    Args:
+        ck_name (str): The name of the ck file.
+        data (dict): The data to save.
+        clean (bool): Whether to clean up the original tar.gz file.
+    Returns:
+        None
+    """
     wmin, wmax = load_sonora_window()
+
+    class Container(torch.nn.Module):
+        def __init__(self, values: dict):
+            super().__init__()
+            for key in values:
+                setattr(self, key, values[key])
+
     tensor_dict = {
         'pres': torch.tensor(data['press'], dtype=torch.float64),
         'temp': torch.tensor(data['temps'], dtype=torch.float64),
@@ -93,5 +118,10 @@ def save_sonora_multiband_ck(ck_name: str , data: dict):
         'weights': torch.tensor(data['gauss_wts'], dtype=torch.float64),
         'kappa': torch.tensor(data['kappa'], dtype=torch.float64),
     }
-    torch.save(tensor_dict, f'{ck_name}.pt')
+    container = torch.jit.script(Container(tensor_dict))
+    container.save(f'{ck_name}.pt')
+
+    # Clean up the original tar.gz file
+    if clean:
+        os.remove(f"{ck_name}.tar.gz")
     print(f"Saved {ck_name}.pt")
