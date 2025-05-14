@@ -1,6 +1,7 @@
 import torch
 import os
 import pyharp
+import numpy as np
 from typing import Tuple
 from pyharp.sonora import (
         load_sonora_data,
@@ -8,7 +9,7 @@ from pyharp.sonora import (
         save_sonora_multiband,
         )
 from pyharp import (
-        constants
+        constants,
         RadiationOptions,
         Radiation,
         calc_dz_hypsometric,
@@ -41,16 +42,19 @@ def preprocess_sonora(fname: str):
 
 def configure_atm(pmax: float, pmin: float,
                   ncol: int = 1,
-                  nlyr: int = 100) -> dict[str, torch.Tensor]
+                  nlyr: int = 100) -> dict[str, torch.Tensor]:
     p1bar, T1bar = 1.e5, 169.
-    pres = torch.logspace(log10(pmax), log10(pmin), nlyr + 1, dtype=torch.float64)
+    pres = torch.logspace(np.log10(pmax), np.log10(pmin), nlyr + 1, dtype=torch.float64)
     temp = T1bar * torch.pow(pres / p1bar, 2. / 7.)
+    temp.clip_(min=135.)
     atm = {
         'pres' : (pres[1:] * pres[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
         'temp' : (temp[1:] * temp[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
         'btemp0' : temp[0].unsqueeze(0).expand(ncol),
         'ttemp0' : temp[-1].unsqueeze(0).expand(ncol),
     }
+    print("atm pres = ", atm['pres'])
+    print("atm temp = ", atm['temp'])
     return atm
 
 def configure_bands(config_file: str,
@@ -64,15 +68,15 @@ def configure_bands(config_file: str,
         if name == "sonora196":
             band.ww(band.query_weights())
             nwave = len(band.ww())
-            ng = nwave / len(wmin)
+            ng = int(nwave / len(wmin))
 
-            band.disort().accur(1.0e-12)
+            band.disort().accur(1.0e-4)
             disort_config(band.disort(), nstr, nlyr, ncol, nwave)
 
-            data = list(wmin) * ng
+            data = [wmin] * ng
             band.disort().wave_lower([x for col in zip(*data) for x in col])
 
-            data = list(wmax) * ng
+            data = [wmax] * ng
             band.disort().wave_upper([x for col in zip(*data) for x in col])
         else:
             raise ValueError(f"Unknown band: {name}")
@@ -84,7 +88,7 @@ def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
     ncol = conc.shape[0]
     bc = {}
     for [name, band] in rad.options.bands().items():
-        nwave = len(band.ww)
+        nwave = len(band.ww())
         bc[name + "/albedo"] = torch.zeros((nwave, ncol), dtype=torch.float64)
         bc[name + "/temis"] = torch.ones((nwave, ncol), dtype=torch.float64)
 
@@ -104,16 +108,22 @@ if __name__ == "__main__":
 
     # configure radiation model
     config_file = "example_sonora_2020.yaml"
-    rad = configure_bands(config_file, ncol=1, nlyr=atm['pres'].shape[0], nstr=4)
+    rad = configure_bands(config_file, ncol=1, nlyr=atm['pres'].shape[-1], nstr=4)
+    print(rad.options)
 
     # calculate concentration and layer thickness
-    mean_mol_weight = pyharp.species_weights[0]
-    grav = 24.8
+    mean_mol_weight = pyharp.species_weights()[0]
+    print("mean mol weight = ", mean_mol_weight)
+    grav = 24.8 # m/s^2
     dz = calc_dz_hypsometric(atm["pres"], atm["temp"],
                              torch.tensor(mean_mol_weight * grav / constants.Rgas)
                              )
+    print("dz = ", dz)
     conc = atm["pres"] / (atm["temp"] * constants.Rgas)
     conc.unsqueeze_(-1)
 
     # run rt
     netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)
+    print("netflux = ", netflux)
+    print("surface flux = ", dnflux)
+    print("toa flux = ", upflux)

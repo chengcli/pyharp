@@ -34,8 +34,15 @@ PYBIND11_MODULE(pyharp, m) {
   bind_math(m);
   bind_constants(m);
 
-  m.attr("species_names") = &harp::species_names;
-  m.attr("species_weights") = &harp::species_weights;
+  m.def(
+      "species_names",
+      []() -> const std::vector<std::string> & { return harp::species_names; },
+      R"doc(Retrieves the list of species names)doc");
+
+  m.def(
+      "species_weights",
+      []() -> const std::vector<double> & { return harp::species_weights; },
+      R"doc(Retrieves the list of species molecular weights [kg/mol])doc");
 
   m.def(
       "shared",

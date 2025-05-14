@@ -29,9 +29,9 @@ MultiBandImpl::MultiBandImpl(AttenuatorOptions const& options_)
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(
-      options.type().empty() || (options.type().compare(0, 3, "helios") == 0),
-      "Mismatch opacity type: ", options.type());
+  TORCH_CHECK(options.type().empty() ||
+                  (options.type().compare(0, 9, "multiband") == 0),
+              "Mismatch opacity type: ", options.type());
 
   reset();
 }
@@ -41,11 +41,12 @@ void MultiBandImpl::reset() {
 
   // Load the file
   torch::jit::script::Module container = torch::jit::load(full_path);
-  auto kwave = container.attr("wavenumber").toTensor();
-  auto klnp = container.attr("pres").toTensor().log_();
-  auto ktemp = container.attr("temp").toTensor();
-  auto kdata = container.attr("kappa").toTensor().unsqueeze(-1);
-  auto weights = container.attr("weights").toTensor();
+
+  kwave = container.attr("wavenumber").toTensor();
+  klnp = container.attr("pres").toTensor().log_();
+  ktemp = container.attr("temp").toTensor();
+  kdata = container.attr("kappa").toTensor().unsqueeze(-1);
+  weights = container.attr("weights").toTensor();
 
   // register all buffers
   register_buffer("kwave", kwave);
@@ -65,7 +66,7 @@ torch::Tensor MultiBandImpl::forward(
   TORCH_CHECK(kwargs.count("temp") > 0, "temp is required in kwargs");
 
   auto const& pres = kwargs.at("pres");
-  auto const& temp = kwargs.at("temp").unsqueeze(0).expand({nwave, ncol, nlyr});
+  auto const& temp = kwargs.at("temp");
 
   TORCH_CHECK(pres.size(0) == ncol && pres.size(1) == nlyr,
               "Invalid pres shape: ", pres.sizes(),
@@ -76,8 +77,8 @@ torch::Tensor MultiBandImpl::forward(
 
   auto wave = kwave.unsqueeze(-1).unsqueeze(-1).expand({nwave, ncol, nlyr});
   auto lnp = pres.log().unsqueeze(0).expand({nwave, ncol, nlyr});
-
-  auto out = interpn({wave, lnp, temp}, {kwave, klnp, ktemp}, kdata);
+  auto tempa = temp.unsqueeze(0).expand({nwave, ncol, nlyr});
+  auto out = interpn({wave, lnp, tempa}, {kwave, klnp, ktemp}, kdata);
 
   // ln(cm^2 / molecule) -> 1/m
   return 1.e-4 * constants::Avogadro * out.exp() *

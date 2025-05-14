@@ -1,6 +1,6 @@
 species:
   - name: H2
-    composition: {H: 1.8, He: 0.2}
+    composition: {H: 1.9, He: 0.1}
 
 opacities:
   H2:
@@ -15,4 +15,4 @@ sonora196:
   opacities: [H2]
   solver: disort
   integration: weight
-  flags: lamber,quiet,onlyfl
+  flags: lamber,quiet,onlyfl,planck
