@@ -4,6 +4,7 @@ import pyharp
 from typing import Tuple
 from pyharp.sonora import (
         load_sonora_data,
+        load_sonora_window,
         save_sonora_multiband,
         )
 from pyharp import (
@@ -35,24 +36,6 @@ def preprocess_sonora(fname: str):
 
     save_sonora_multiband(fname, data, clean=False)
 
-def configure_bands(config_file: str,
-                    ncol: int = 1,
-                    nlyr: int = 100,
-                    nstr: int = 4) -> Radiation:
-    rad_op = RadiationOptions.from_yaml(config_file)
-
-    for [name, band] in rad_op.bands().items():
-        band.ww(band.query_weights())
-        nwave = len(band.ww())
-
-        band.disort().accur(1.0e-12)
-        disort_config(band.disort(), nstr, nlyr, ncol, nwave)
-
-        band.disort().wave_lower([wmin] * nwave)
-        band.disort().wave_upper([wmax] * nwave)
-
-    return Radiation(rad_op)
-
 def configure_atm(pmax: float, pmin: float,
                   ncol: int = 1,
                   nlyr: int = 100) -> dict[str, torch.Tensor]
@@ -67,8 +50,34 @@ def configure_atm(pmax: float, pmin: float,
     }
     return atm
 
-def main(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor, **atm) ->
-    Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def configure_bands(config_file: str,
+                    ncol: int = 1,
+                    nlyr: int = 100,
+                    nstr: int = 4) -> Radiation:
+    rad_op = RadiationOptions.from_yaml(config_file)
+    wmin, wmax = load_sonora_window()
+
+    for [name, band] in rad_op.bands().items():
+        if name == "sonora196":
+            band.ww(band.query_weights())
+            nwave = len(band.ww())
+            ng = nwave / len(wmin)
+
+            band.disort().accur(1.0e-12)
+            disort_config(band.disort(), nstr, nlyr, ncol, nwave)
+
+            data = list(wmin) * ng
+            band.disort().wave_lower([x for col in zip(*data) for x in col])
+
+            data = list(wmax) * ng
+            band.disort().wave_upper([x for col in zip(*data) for x in col])
+        else:
+            raise ValueError(f"Unknown band: {name}")
+
+    return Radiation(rad_op)
+
+def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
+           atm: dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     ncol = conc.shape[0]
     bc = {}
     for [name, band] in rad.options.bands().items():
@@ -90,7 +99,6 @@ if __name__ == "__main__":
 
     # configure atmosphere model
     atm = configure_atm(100.e5, 10., ncol=1, nlyr=100)
-    grav = 24.8
 
     # configure radiation model
     config_file = "example_sonora_2020.yaml"
@@ -98,9 +106,10 @@ if __name__ == "__main__":
 
     # calculate layer thickness
     mean_mol_weight = pyharp.species_weights[0]
+    grav = 24.8
     dz = calc_dz_hypsometric(atm["pres"], atm["temp"],
                              torch.tensor(mean_mol_weight * grav / constants.Rgas)
                              )
 
     # run rt
-    netflux, dnflux, upflux = main(rad, conc, dz, *atm)
+    netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)
