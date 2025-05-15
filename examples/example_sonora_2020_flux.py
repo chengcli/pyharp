@@ -104,7 +104,7 @@ if __name__ == "__main__":
         preprocess_sonora(fname)
 
     # configure atmosphere model
-    atm = configure_atm(100.e5, 10., ncol=1, nlyr=100)
+    atm = construct_atm(100.e5, 10., ncol=1, nlyr=100)
 
     # configure radiation model
     config_file = "example_sonora_2020.yaml"
