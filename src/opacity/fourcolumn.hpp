@@ -12,7 +12,7 @@
 
 namespace harp {
 
-class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
+class FourColumnImpl : public torch::nn::Cloneable<FourColumnImpl> {
  public:
   //! wavelength [um]
   //! (nwave, 1)
@@ -22,12 +22,12 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
   //! (nwave, nprop=3)
   torch::Tensor kdata;
 
-  //! options with which this `S8FullerImpl` was constructed
+  //! options with which this `FourColumnImpl` was constructed
   AttenuatorOptions options;
 
   //! Constructor to initialize the layer
-  S8FullerImpl() = default;
-  explicit S8FullerImpl(AttenuatorOptions const& options_);
+  FourColumnImpl() = default;
+  explicit FourColumnImpl(AttenuatorOptions const& options_);
   void reset() override;
 
   //! Get optical properties
@@ -48,11 +48,11 @@ class S8FullerImpl : public torch::nn::Cloneable<S8FullerImpl> {
    *          (2) "wavenumber": wavenumber [1/cm] (nwave)
    *        If none of the keys are found, an error is thrown.
    *
-   * \return optical properties (nwave, ncol, nlyr, nprop=2)
+   * \return optical properties (nwave, ncol, nlyr, nprop=3)
    */
   torch::Tensor forward(torch::Tensor conc,
                         std::map<std::string, torch::Tensor> const& kwargs);
 };
-TORCH_MODULE(S8Fuller);
+TORCH_MODULE(FourColumn);
 
 }  // namespace harp

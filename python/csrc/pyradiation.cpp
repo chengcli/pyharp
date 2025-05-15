@@ -45,8 +45,8 @@ Examples:
 Calculate blackbody flux using wavenumber
 
 Args:
-  wn1 (double): wavenumber [cm^-1]
-  wn2 (double): temperature [K]
+  wn1 (float): wavenumber [cm^-1]
+  wn2 (float): temperature [K]
   temp (torch.Tensor): number of columns, default to 1
 
 Returns:
@@ -119,7 +119,7 @@ Examples:
   pyRadiationBandOptions
       .def(py::init<>(), R"doc(
 Returns:
-  pyharp.RadiationBandOptions: class object
+  RadiationBandOptions: class object
 
 Examples:
   .. code-block:: python
@@ -169,7 +169,7 @@ Args:
   name (str): radiation band name
 
 Returns:
-  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the band name
+  RadiationBandOptions | str : class object if argument is not empty, otherwise the band name
 
 Examples:
   .. code-block:: python
@@ -187,7 +187,7 @@ Args:
   outdirs (str): outgoing ray directions
 
 Returns:
-  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the outgoing ray directions
+  RadiationBandOptions | str : class object if argument is not empty, otherwise the outgoing ray directions
 
 Examples:
   .. code-block:: python
@@ -205,7 +205,7 @@ Args:
   solver_name (str): solver name
 
 Returns:
-  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the solver name
+  RadiationBandOptions | str : class object if argument is not empty, otherwise the solver name
 
 Examples:
   .. code-block:: python
@@ -224,7 +224,7 @@ Args:
   disort (pydisort.DisortOptions): disort options
 
 Returns:
-  pyharp.RadiationBandOptions | pydisort.DisortOptions: class object if argument is not empty, otherwise the disort options
+  RadiationBandOptions | pydisort.DisortOptions: class object if argument is not empty, otherwise the disort options
 
 Examples:
   .. code-block:: python
@@ -261,7 +261,7 @@ Args:
   integration (str): integration method
 
 Returns:
-  pyharp.RadiationBandOptions | str : class object if argument is not empty, otherwise the integration method
+  RadiationBandOptions | str : class object if argument is not empty, otherwise the integration method
 
 Examples:
   .. code-block:: python
@@ -277,10 +277,10 @@ Examples:
 Set or get opacities
 
 Args:
-  opacities (dict[str,pyharp.AttenuatorOptions]): opacities
+  opacities (dict[str,AttenuatorOptions]): opacities
 
 Returns:
-  pyharp.RadiationBandOptions | dict[str,AttenuatorOptions]: class object if argument is not empty, otherwise the attenuator options
+  RadiationBandOptions | dict[str,AttenuatorOptions]: class object if argument is not empty, otherwise the attenuator options
 
 Examples:
   .. code-block:: python
@@ -299,7 +299,7 @@ Examples:
 Set radiation band options
 
 Returns:
-  pyharp.RadiationOptions: class object
+  RadiationOptions: class object
 
 Examples:
   .. code-block:: python
@@ -321,7 +321,7 @@ Args:
   filename (str): YAML file name
 
 Returns:
-  pyharp.RadiationOptions: class object
+  RadiationOptions: class object
 
 Examples:
   .. code-block:: python
@@ -339,7 +339,7 @@ Args:
   outdirs (str): outgoing ray directions
 
 Returns:
-  pyharp.RadiationOptions | str : class object if argument is not empty, otherwise the outgoing ray directions
+  RadiationOptions | str : class object if argument is not empty, otherwise the outgoing ray directions
 
 Examples:
   .. code-block:: python
@@ -354,10 +354,10 @@ Examples:
 Set radiation band options
 
 Args:
-  bands (dict[str,pyharp.RadiationBandOptions]): radiation band options
+  bands (dict[str,RadiationBandOptions]): radiation band options
 
 Returns:
-  pyharp.RadiationOptions | dict[str,pyharp.RadiationBandOptions]: class object if argument is not empty, otherwise the radiation band options
+  RadiationOptions | dict[str,RadiationBandOptions]: class object if argument is not empty, otherwise the radiation band options
 
 Examples:
   .. code-block:: python

@@ -4,13 +4,12 @@
 // harp
 #include <harp/index.h>
 
+#include <harp/opacity/fourcolumn.hpp>
 #include <harp/opacity/grey_opacities.hpp>
-#include <harp/opacity/h2so4_simple.hpp>
 #include <harp/opacity/helios.hpp>
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
-#include <harp/opacity/s8_fuller.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/read_dimvar_netcdf.hpp>
 #include <harp/utils/read_var_pt.hpp>
@@ -196,12 +195,8 @@ void RadiationBandImpl::reset() {
       auto a = JupGasIR(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "s8-fuller") {
-      auto a = S8Fuller(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
-      opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "h2so4-simple") {
-      auto a = H2SO4Simple(op);
+    } else if (op.type() == "fourcolumn") {
+      auto a = FourColumn(op);
       nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
       opacities[name] = torch::nn::AnyModule(a);
     } else {

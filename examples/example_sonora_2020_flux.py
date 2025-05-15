@@ -35,7 +35,7 @@ def preprocess_sonora(fname: str):
     # wavenumber
     print("wavenumber:", data['wno'])
 
-    save_sonora_multiband(fname, data, clean=False)
+    save_sonora_multiband(fname, data)
 
     # load it back!
     sonora = torch.jit.load(fname + ".pt")
@@ -99,7 +99,7 @@ def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
 
 if __name__ == "__main__":
     # prepare sonora2020 opacity data
-    fname = "sonora_2020_feh+000_co_100.data.196"
+    fname = "sonora_2020_feh+030_co_250.data.196"
     if not os.path.exists(fname + ".pt"):
         preprocess_sonora(fname)
 

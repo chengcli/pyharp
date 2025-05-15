@@ -34,8 +34,7 @@ extern std::unordered_map<std::string, torch::Tensor> shared;
  * The `RadiationBand` object recognizes the following opacity source types:
  *  - "rfm-lbl": line-by-line opacity defined on wavenumber grid
  *  - "rfm-ck": correlated-k opacity table computed from rfm line-by-line table
- *  - "s8_fuller": shortwave optical properties of S8
- *  - "h2sO4_simple": shortwave optical properties of H2SO4
+ *  - "four-column": Four-column opacity table
  */
 struct RadiationBandOptions {
   //! \brief Create a `RadiationBandOptions` object from a YAML file

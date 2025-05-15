@@ -91,8 +91,6 @@ Detailed documentation and examples are available at [https://pyharp.readthedocs
 | freedman-mean | NO       | |           |
 | jup-gas-vis   | NO       | |           |
 | jup-gas-ir    | NO       | |           |
-| s8-fuller     | YES       | |           |
-| h2so4-simple  | YES       | |           |
 | *(More coming)*| ...      | ...           |           |
 
 ---
