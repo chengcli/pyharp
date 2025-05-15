@@ -43,6 +43,7 @@ struct RadiationOptions {
   /*!
    * This function reads a YAML file and creates a `RadiationOptions`
    * object from it. The YAML file must contain the following fields:
+   *  - "species", list of species names and their composition
    *  - "bands": list of band names
    *  - "<band_name>": band configuration
    *
