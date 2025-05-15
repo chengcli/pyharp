@@ -21,6 +21,10 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
   TORCH_CHECK(config["bands"],
               "'bands' is not defined in the radiation configuration file");
 
+  // check if species are defined
+  TORCH_CHECK(config["species"],
+              "'species' is not defined in the radiation configuration file");
+
   species_names.clear();
   species_weights.clear();
 
