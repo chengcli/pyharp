@@ -40,7 +40,7 @@ def preprocess_sonora(fname: str):
     # load it back!
     sonora = torch.jit.load(fname + ".pt")
 
-def configure_atm(pmax: float, pmin: float,
+def construct_atm(pmax: float, pmin: float,
                   ncol: int = 1,
                   nlyr: int = 100) -> dict[str, torch.Tensor]:
     p1bar, T1bar, Tmin = 1.e5, 169., 135.
