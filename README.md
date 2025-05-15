@@ -19,14 +19,14 @@ git clone https://github.com/chengcli/pyharp
 ```
 
 This will copy all source files into your local computer. You will need to install a few
-system libraries before installing pyharp. All following instructions are executed under
+system libraries before installing Pyharp. All following instructions are executed under
 the `pyharp/` directory.
 
-### System library requirements
+### System required for building locally
 - Python 3.9+
 - Linux or macOS
 - netCDF
-- use python virtual environment for isolation
+- python virtual environment (venv)
 
 #### MacOS installation
 ```bash
@@ -45,7 +45,7 @@ sudo apt-get install libnetcdf-dev
 
 ### Build C++ library
 After you completed the installation steps, you can build the pyharp library.
-The easiest way is to build it in-place, meaning that the build (binary files) are
+We will build the package in-place, meaning that the build (binary files) are
 located under `pyharp/build/bin`. To do so, make a new directory named `build`
 ```
 mkdir build
@@ -70,6 +70,13 @@ The python library can be installed by running the following command:
 ```bash
 pip install -e .
 ```
+
+### Test the installation
+To test the installation, import pyharp in a python shell:
+```python
+import pyharp
+```
+The build is successful if you do not see any error messages.
 
 ---
 
