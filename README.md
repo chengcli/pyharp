@@ -77,6 +77,7 @@ To test the installation, import pyharp in a python shell:
 import pyharp
 ```
 The build is successful if you do not see any error messages.
+Detailed documentation and examples are available at [https://pyharp.readthedocs.io](https://pyharp.readthedocs.io).
 
 ---
 
