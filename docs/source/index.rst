@@ -86,6 +86,7 @@ These provide basic data structures and functions for numerical computation and 
   import torch
   import os
   import numpy as np
+  from typing import Tuple
 
 We will download the ``sonora2020`` opacity dataset and preprocess it to a format that can be used by the Pyharp module.
 These are the submodule functions we need.
@@ -123,7 +124,14 @@ We first download a sample of it via the script
 
    fetch-sonora --feh=+000 --co=100
 
-This downloads a file named `sonora_2020_feh+000_co_100.data.196.tar.gz` in the current directory. The ``feh`` argument specifies the metallicity of the atmosphere and the ``co`` argument specifies the carbon-to-oxygen ratio (solar).
+
+The ``fetch-sonora`` script is a command line tool shipped with Pyharp that downloads the ``sonora2020`` data from the Zenodo archive.
+This command will download a file named `sonora_2020_feh+000_co_100.data.196.tar.gz` in the current directory. The ``feh`` argument specifies the metallicity of the atmosphere and the ``co`` argument specifies the carbon-to-oxygen ratio (solar).
+You can check out the various options of the ``fetch-sonora`` script by running
+
+.. code-block:: bash
+
+   fetch-sonora -h
 
 .. code-block:: python
 

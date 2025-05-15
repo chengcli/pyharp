@@ -1,22 +1,28 @@
-# 🌍 Pyharp: High-performance Atmosphere Radiation Package in Python
+# Pyharp: High-performance Atmosphere Radiation Package in Python
 
 [![build](https://github.com/chengcli/pyharp/actions/workflows/ci.yml/badge.svg)](https://github.com/chengcli/pyharp/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://img.shields.io/badge/license-MIT-blue)
 
-## 📦 Installation
+## Installation
 
-Pyharp can be installed on either a Linux distribution or on MacOS. Open a Linux or Mac terminal,
-you can clone this repo using the following command:
+Pyharp can be installed on either a Linux distribution or on MacOS via ``pip``:
+
+```bash
+pip install pyharp
 ```
+
+You can also install it locally, which allows you to modify the source code and test it locally.
+Open a Linux or Mac terminal and clone this repo using the following command:
+
+```bash
 git clone https://github.com/chengcli/pyharp
 ```
+
 This will copy all source files into your local computer. You will need to install a few
 system libraries before installing pyharp. All following instructions are executed under
 the `pyharp/` directory, which is referred to as the `root`.
 
----
-
-### 🧪 System Requirements:
+### System library requirements
 - Python 3.9+
 - Linux or macOS
 - netCDF
@@ -32,14 +38,7 @@ If you are using `RedHat`, you may need to install `hdf5` and `netCDF` libraries
 sudo yum install netcdf
 ```
 
-To install the required python libraries, you can use the following command:
-```
-pip install -r requirements.txt
-```
-
----
-
-## Build and test
+### Build and test
 After you completed the installation steps, you can build the pyharp library.
 The easiest way is to build it in-place, meaning that the build (binary files) are
 located under `root`. To do so, make a new directory named `build`
@@ -61,7 +60,7 @@ make -j4
 This comman will use 4 cores to compile the code in parallel. Once complete, all executable
 files will be placed in `build/bin`.
 
-### 🛠️ Install locally (dev mode)
+### Install locally (dev mode)
 The python library can be installed by running the following command:
 ```bash
 pip install -e .
@@ -69,7 +68,7 @@ pip install -e .
 
 ---
 
-## 🛰️ Supported Opacities
+## Supported Opacities
 | Opacity Name  | Tested    | Peer Reviewed | Reference |
 |---------------|-----------|---------------|-----------|
 | rfm-lbl       | NO        | |           |
@@ -85,7 +84,7 @@ pip install -e .
 
 ---
 
-## 🤝 Contributing
+## Contributing
 Contributions are welcome!
 Please open an issue or PR if you’d like to:
 - Add new opacity sources
@@ -94,5 +93,5 @@ Please open an issue or PR if you’d like to:
 
 ---
 
-## 📬 Contact
+## Contact
 Maintained by @chengcli — feel free to reach out with ideas, feedback, or collaboration proposals.
