@@ -18,7 +18,7 @@ def parse_library_names(libdir):
     # add system netcdf library
     library_names.extend(['netcdf'])
 
-    return library_names
+    return sorted(library_names)
 
 current_dir = os.getenv("WORKSPACE", Path().absolute())
 include_dirs = [
@@ -37,6 +37,12 @@ else:
     lib_dirs.extend(['/lib64/', '/usr/lib/x86_64-linux-gnu/'])
 
 libraries = parse_library_names(f"{current_dir}/build/lib")
+print(f"libraries: {libraries}")
+
+extra_link_args = []
+#if platform.system() == 'Linux':
+#    extra_link_args.extend(['-Wl,--whole-archive',
+#                            f"{current_dir}/build/lib/libharp_release.a", '-Wl,--no-whole-archive'])
 
 if torch.cuda.is_available():
     ext_module = cpp_extension.CUDAExtension(
@@ -48,6 +54,7 @@ if torch.cuda.is_available():
         libraries=libraries,
         extra_compile_args={'nvcc': ['--extended-lambda'],
                             'cc': ["-Wno-attributes"]},
+        extra_link_args=extra_link_args,
     )
 else:
     ext_module = cpp_extension.CppExtension(
@@ -57,6 +64,7 @@ else:
         library_dirs=lib_dirs,
         libraries=libraries,
         extra_compile_args=['-Wno-attributes'],
+        extra_link_args=extra_link_args,
         )
 
 setup(
