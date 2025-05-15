@@ -16,17 +16,6 @@ PYBIND11_MODULE(pyharp, m) {
   m.attr("__name__") = "pyharp";
   m.doc() = R"(
   Python bindings for HARP (High-performance Atmospheric Radiation Package) Program"
-
-  Summary
-  -------
-  This module provides a python interface to the C++ version of the HARP program [1]_, which contains a suite of classes and subroutines for computing the radiative fluxes and radiances for a plane-parallel atmosphere.
-
-  Significant changes have been made to the original `HARP <https://github.com/luminoctum/athena-harp>`_ code
-  as the backend has changed from ``Athena`` to ``PyTorch``.
-
-  References
-  ----------
-  .. [1] Li, C., Le, T., Zhang, X., & Yung, Y. L. (2018). A high-performance atmospheric radiation package: With applications to the radiative energy budgets of giant planets. Journal of Quantitative Spectroscopy and Radiative Transfer, 217, 353-362.
   )";
 
   bind_opacity(m);
