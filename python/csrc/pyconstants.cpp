@@ -12,4 +12,8 @@ void bind_constants(py::module &m) {
 
   c.attr("Rgas") = py::float_(constants::Rgas);
   c.attr("kBtolz") = py::float_(constants::kBoltz);
+  c.attr("Avogadro") = py::float_(constants::Avogadro);
+  c.attr("hPlanck") = py::float_(constants::hPlanck);
+  c.attr("cLight") = py::float_(constants::cLight);
+  c.attr("stefanBoltzmann") = py::float_(constants::stefanBoltzmann);
 }
