@@ -89,11 +89,11 @@ def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
     bc = {}
     for [name, band] in rad.options.bands().items():
         nwave = len(band.ww())
-        bc[name + "/albedo"] = torch.zeros((nwave, ncol), dtype=torch.float64)
-        bc[name + "/temis"] = torch.ones((nwave, ncol), dtype=torch.float64)
+        bc[name + "/albedo"] = torch.ones((nwave, ncol), dtype=torch.float64)
+        bc[name + "/temis"] = torch.zeros((nwave, ncol), dtype=torch.float64)
 
-    bc["btemp"] = atm['btemp0']
-    bc["ttemp"] = atm['ttemp0']
+    bc["btemp"] = torch.zeros((ncol), dtype=torch.float64)
+    bc["ttemp"] = torch.zeros((ncol), dtype=torch.float64)
 
     return rad.forward(conc, dz, bc, atm)
 
