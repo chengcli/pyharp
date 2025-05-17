@@ -2,6 +2,7 @@ import torch
 import os
 import pyharp
 import numpy as np
+import matplotlib.pyplot as plt
 from typing import Tuple
 from pyharp.sonora import (
         load_sonora_data,
@@ -97,6 +98,33 @@ def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
 
     return rad.forward(conc, dz, bc, atm)
 
+def plot_optical_depth(fname: str,
+                       rad: Radiation,
+                       conc: torch.Tensor,
+                       atm: dict[str, torch.Tensor],
+                       dz: torch.Tensor):
+    ab = rad.get_module("sonora196").get_module("H2")
+    tauc = ab.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
+
+    # load sonora ck table info
+    sonora = torch.jit.load(fname + ".pt")
+    nwave, ncol, nlyr = tauc.shape
+    ng = len(sonora.gauss_pts)
+    wave_um = 1.e4 / (0.5 * (sonora.wmin + sonora.wmax))
+
+    # reshape to (band, ng, ncol, nlyr)
+    tauc = tauc.reshape((nwave // ng, ng, ncol, nlyr))
+    tauc = (tauc * sonora.gauss_wts[None, :, None, None]).sum(dim=1)
+    tauc.squeeze_()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(wave_um, tauc[:, -1], lw=2, color='blue', label='H2')
+    ax.set(xscale='log', yscale='log', xlim=(0.25, 15),
+           xlabel='Wavelength (um)',
+           ylabel='Optical Thickness')
+
+    plt.show()
+
 if __name__ == "__main__":
     # prepare sonora2020 opacity data
     fname = "sonora_2020_feh+030_co_250.data.196"
@@ -128,3 +156,6 @@ if __name__ == "__main__":
     print("netflux = ", netflux)
     print("surface flux = ", dnflux)
     print("toa flux = ", upflux)
+
+    # plot optical depth
+    plot_optical_depth(fname, rad, conc, atm, dz)

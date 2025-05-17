@@ -41,7 +41,6 @@ def run_forward(case: str='kcross'):
         # m
         dz = calc_dz_hypsometric(atm["pres"], atm["temp"],
                                  torch.tensor(-mu_grav / const.Rgas))
-        print(dz)
         result = ab.forward(conc, atm).squeeze() * dz.unsqueeze(0)
 
     # load sonora ck table info
@@ -84,6 +83,7 @@ def plot_opacity(case: str='kcross'):
             ax.set_xlabel("Wavelength (um)")
         ax.set(xscale="log", yscale="log", xlim=(0.25, 15),
                ylabel=f"{temp[i].item():.0f} K")
+
     plt.tight_layout()
     plt.subplots_adjust(hspace=0.0)
     #plt.show()
@@ -96,55 +96,7 @@ def plot_opacity(case: str='kcross'):
     else:
         raise ValueError(f"Unknown case: {case}")
 
-def test_sonora2020():
-    fname = "sonora_2020_feh+000_co_100.data.196.pt"
-    op = AttenuatorOptions().type("multiband-ck")
-    op.opacity_files([fname])
-    op.species_ids([0])
-
-    ab = MultiBand(op)
-    print(ab.kdata.is_contiguous())
-    print(ab.kwave)
-    print(ab.klnp)
-    print(ab.ktemp)
-    print(ab.weights)
-    print('p = ', ab.klnp[12].exp())
-    print('t = ', ab.ktemp[22])
-
-    sonora = torch.jit.load(fname)
-    wmin = sonora.wmin
-    wmax = sonora.wmax
-    print('kappa = ', sonora.kappa.is_contiguous())
-
-    data = load_sonora_data("sonora_2020_feh+000_co_100.data.196")
-
-    atm = {
-        'pres': torch.tensor([[1.0e5]]),
-        'temp': torch.tensor([[305.0]]),
-    }
-    conc = atm['pres'] / (const.Rgas * atm['temp'])
-    print(conc)
-    print("op1 = ", ab.kdata[1, 12, 22, 0].exp() * 6.022e23 * conc)
-    print("kappa shape = ", data['kappa'].shape)
-    print("kappa = ", np.exp(data['kappa'][0, 1, 12, 22]) * 6.022e23 * conc)
-
-    exit()
-    kcoeff = ab.forward(conc, atm).squeeze()
-    print('kcoeff1 = {:.10f}'.format(kcoeff[1]))
-
-    exit()
-
-    fig, ax = plt.subplots()
-    ax.plot(ab.kwave, kcoeff)
-    ax.set_xlabel("Wavenumber (cm$^{-1}$)")
-    ax.set_ylabel("Attenuation Coefficient (m$^{-1}$)")
-    ax.set_xscale("log")
-
-    plt.show()
-
-
 if __name__ == "__main__":
-    #test_sonora2020()
-    #plot_opacity(case='kcross')
-    #plot_opacity(case='kcoeff')
+    plot_opacity(case='kcross')
+    plot_opacity(case='kcoeff')
     plot_opacity(case='tau')
