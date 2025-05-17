@@ -1,6 +1,7 @@
 import torch
 import os
 import pyharp
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple
@@ -36,7 +37,7 @@ def preprocess_sonora(fname: str):
     # wavenumber
     print("wavenumber:", data['wno'])
 
-    save_sonora_multiband(fname, data)
+    save_sonora_multiband(fname, data, clean=False)
 
     # load it back!
     sonora = torch.jit.load(fname + ".pt")
@@ -114,20 +115,36 @@ def plot_optical_depth(fname: str,
 
     # reshape to (band, ng, ncol, nlyr)
     tauc = tauc.reshape((nwave // ng, ng, ncol, nlyr))
-    tauc = (tauc * sonora.gauss_wts[None, :, None, None]).sum(dim=1)
+    #tauc = (tauc * sonora.gauss_wts[None, :, None, None]).sum(dim=1)
     tauc.squeeze_()
+    print('tauc = ', tauc.shape)
+
+    with open('saved_dictionary.pkl', 'rb') as f:
+        df = pickle.load(f)
+    tauc2 = torch.tensor(df['full_output']['taugas'])
+    #tauc2 = (tauc2 * sonora.gauss_wts[None, None, :]).sum(dim=-1)
+    print('tauc2 = ', tauc2.shape)
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(wave_um, tauc[:, -1], lw=2, color='blue', label='H2')
+    cmap = plt.cm.viridis
+    colors = cmap(np.linspace(0.2, 0.9, len(sonora.gauss_pts)))
+
+    for ck in [0, 7]:
+        ax.plot(wave_um, tauc[:, ck, -2], lw=2, ls='-',
+                color=colors[ck], label='pyharp, ck = {}'.format(ck))
+        ax.plot(wave_um, tauc2[0, :, ck], lw=2, ls='--',
+                color=colors[ck], label='picaso, ck = {}'.format(ck))
+
     ax.set(xscale='log', yscale='log', xlim=(0.25, 15),
            xlabel='Wavelength (um)',
            ylabel='Optical Thickness')
+    ax.legend(frameon=False)
 
-    plt.show()
+    #plt.show()
 
 if __name__ == "__main__":
     # prepare sonora2020 opacity data
-    fname = "sonora_2020_feh+030_co_250.data.196"
+    fname = "sonora_2020_feh+000_co_100.data.196"
     if not os.path.exists(fname + ".pt"):
         preprocess_sonora(fname)
 
@@ -159,3 +176,5 @@ if __name__ == "__main__":
 
     # plot optical depth
     plot_optical_depth(fname, rad, conc, atm, dz)
+    plt.tight_layout()
+    plt.savefig("sonora_2020_optical_depth.png", dpi=300)

@@ -4,7 +4,7 @@ import argparse
 from tqdm import tqdm
 
 """
-DATA URL: https://zenodo.org/records/5590989#.Yzy1qezMJb9
+DATA URL: https://zenodo.org/records/7542068
 
 There are 108 correlated k-coefficients datasets, using the naming convention sonora_2020_fehxxxx_co_yyy.data.196.tar.gz (54 models) or sonora_2020_fehxxxx_co_yyy_noTiOVO.data.196.tar.gz (54 models), where xxxx is the metallicity in 10x dex relative to solar, and yyy is the 100x C/O ratio relative to solar, as a multiplication factor. For example a metallicity of +000 and a C/O ratio of 100 indicates solar abundances, feh+070 should be read as a metallicity of +0.7 dex, feh-100 as -1.0 dex, co_025 should be read as 0.25x C/O relative to solar, and co_200 as 2x C/O relative to solar. We use the Lodders et al. 2010 value for the solar C/O=0.458. The files with “noTiOVO” in the filename contain the correlated k-coefficients calculated without the opacity of TiO and VO. The rest of the molecular abundances and opacities are the same as the equilibrium chemistry values in the regular files. These files are useful for calculating models without any TiO- and VO-induced temperature inversion in the atmosphere.
 
