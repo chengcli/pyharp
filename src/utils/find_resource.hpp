@@ -61,7 +61,7 @@ void set_default_directories();
  * \param dir  String name for the directory to be added to the search path
  *
  */
-void add_resource_directory(std::string const& dir);
+void add_resource_directory(std::string const& dir, bool prepend = true);
 
 //! Find a resource file.
 /*!

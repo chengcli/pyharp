@@ -38,8 +38,8 @@ torch::Tensor interpn_recur(
   }
 
   // Clamp indices within bounds
-  auto index_low = torch::clamp(search_idx - 1, 0, coord.size(-1) - 2);
-  auto index_high = index_low + 1;
+  auto index_low = torch::clamp(search_idx - 1, 0, coord.size(-1) - 1);
+  auto index_high = torch::clamp(index_low + 1, 0, coord.size(-1) - 1);
 
   // Compute interpolation weights
   auto x0 = coord.index({index_low});

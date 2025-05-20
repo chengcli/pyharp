@@ -10,6 +10,7 @@
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
+#include <harp/opacity/wave_temp_table.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/read_dimvar_netcdf.hpp>
 #include <harp/utils/read_var_pt.hpp>
@@ -107,14 +108,19 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
   return my;
 }
 
-std::vector<double> RadiationBandOptions::query_waves() const {
+std::vector<double> RadiationBandOptions::query_waves(
+    std::string op_name) const {
+  // assign first opacity if no name is given
+  if (op_name.empty()) {
+    op_name = opacities().begin()->first;
+  }
+
   // cannot determine spectral grids if no opacities
-  if (opacities().empty()) {
+  if (opacities().empty() || opacities().find(op_name) == opacities().end()) {
     return {};
   }
 
-  // determine spectral grids from an opacity file
-  auto op = opacities().begin()->second;
+  auto op = opacities().at(op_name);
   if (op.type().compare(0, 3, "rfm") == 0) {
     return read_dimvar_netcdf<double>(op.opacity_files()[0], "Wavenumber");
   } else if (op.type().compare(0, 9, "multiband") == 0) {
@@ -124,14 +130,19 @@ std::vector<double> RadiationBandOptions::query_waves() const {
   }
 }
 
-std::vector<double> RadiationBandOptions::query_weights() const {
-  // cannot determine spectral weights if no opacities
-  if (opacities().empty()) {
+std::vector<double> RadiationBandOptions::query_weights(
+    std::string op_name) const {
+  // assign first opacity if no name is given
+  if (opacities().find(op_name) == opacities().end()) {
     return {};
   }
 
-  // determine spectral weights from the opacity file
-  auto op = opacities().begin()->second;
+  // cannot determine spectral weights if no opacities
+  if (opacities().empty() || opacities().find(op_name) == opacities().end()) {
+    return {};
+  }
+
+  auto op = opacities().at(op_name);
   if (op.type().compare(0, 3, "rfm") == 0) {
     return read_dimvar_netcdf<double>(op.opacity_files()[0], "weights");
   } else if (op.type().compare(0, 9, "multiband") == 0) {
@@ -144,6 +155,10 @@ std::vector<double> RadiationBandOptions::query_weights() const {
 RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const& options_)
     : options(options_) {
   reset();
+
+  if (options.solver_name() == "disort") {
+    options.disort(rtsolver.get<disort::Disort>()->options);
+  }
 }
 
 void RadiationBandImpl::reset() {
@@ -172,6 +187,10 @@ void RadiationBandImpl::reset() {
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
       options.ww() = read_var_pt<double>(op.opacity_files()[0], "weights");
+    } else if (op.type() == "wave-temp-table") {
+      auto a = WaveTempTable(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
     } else if (op.type() == "helios") {
       auto a = Helios(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);

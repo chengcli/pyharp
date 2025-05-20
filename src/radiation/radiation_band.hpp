@@ -74,7 +74,7 @@ struct RadiationBandOptions {
    * An empty vector is returned if the subroutine cannot determine the
    * spectral grids.
    */
-  std::vector<double> query_waves() const;
+  std::vector<double> query_waves(std::string op_name = "") const;
 
   //! \brief query the spectral weights
   /*!
@@ -82,7 +82,7 @@ struct RadiationBandOptions {
    * An empty vector is returned if the subroutine cannot determine the
    * spectral weights.
    */
-  std::vector<double> query_weights() const;
+  std::vector<double> query_weights(std::string op_name = "") const;
 
   RadiationBandOptions() = default;
 
