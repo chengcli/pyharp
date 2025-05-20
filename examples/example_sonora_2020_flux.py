@@ -1,8 +1,11 @@
 import torch
 import os
 import pyharp
+import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 from typing import Tuple
+from pyharp import h2_cia_legacy
 from pyharp.sonora import (
         load_sonora_data,
         load_sonora_window,
@@ -53,8 +56,8 @@ def construct_atm(pmax: float, pmin: float,
         'btemp0' : temp[0].unsqueeze(0).expand(ncol),
         'ttemp0' : temp[-1].unsqueeze(0).expand(ncol),
     }
-    print("atm pres = ", atm['pres'])
-    print("atm temp = ", atm['temp'])
+    #print("atm pres = ", atm['pres'])
+    #print("atm temp = ", atm['temp'])
     return atm
 
 def configure_bands(config_file: str,
@@ -66,7 +69,7 @@ def configure_bands(config_file: str,
 
     for [name, band] in rad_op.bands().items():
         if name == "sonora196":
-            band.ww(band.query_weights())
+            band.ww(band.query_weights("H2-molecule"))
             nwave = len(band.ww())
             ng = int(nwave / len(wmin))
 
@@ -89,13 +92,56 @@ def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
     bc = {}
     for [name, band] in rad.options.bands().items():
         nwave = len(band.ww())
-        bc[name + "/albedo"] = torch.zeros((nwave, ncol), dtype=torch.float64)
-        bc[name + "/temis"] = torch.ones((nwave, ncol), dtype=torch.float64)
+        bc[name + "/albedo"] = torch.ones((nwave, ncol), dtype=torch.float64)
+        bc[name + "/temis"] = torch.zeros((nwave, ncol), dtype=torch.float64)
 
-    bc["btemp"] = atm['btemp0']
-    bc["ttemp"] = atm['ttemp0']
+    bc["btemp"] = torch.zeros((ncol), dtype=torch.float64)
+    bc["ttemp"] = torch.zeros((ncol), dtype=torch.float64)
 
     return rad.forward(conc, dz, bc, atm)
+
+def plot_optical_depth(fname: str,
+                       rad: Radiation,
+                       conc: torch.Tensor,
+                       atm: dict[str, torch.Tensor],
+                       dz: torch.Tensor):
+    ab = rad.get_module("sonora196").get_module("H2-molecule")
+    tauc = ab.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
+
+    # load sonora ck table info
+    sonora = torch.jit.load(fname + ".pt")
+    nwave, ncol, nlyr = tauc.shape
+    ng = len(sonora.gauss_pts)
+    wave_um = 1.e4 / (0.5 * (sonora.wmin + sonora.wmax))
+
+    # reshape to (band, ng, ncol, nlyr)
+    tauc = tauc.reshape((nwave // ng, ng, ncol, nlyr))
+    #tauc = (tauc * sonora.gauss_wts[None, :, None, None]).sum(dim=1)
+    tauc.squeeze_()
+    print('tauc = ', tauc.shape)
+
+    with open('saved_dictionary.pkl', 'rb') as f:
+        df = pickle.load(f)
+    tauc2 = torch.tensor(df['full_output']['taugas'])
+    #tauc2 = (tauc2 * sonora.gauss_wts[None, None, :]).sum(dim=-1)
+    print('tauc2 = ', tauc2.shape)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    cmap = plt.cm.viridis
+    colors = cmap(np.linspace(0.2, 0.9, len(sonora.gauss_pts)))
+
+    for ck in [0, 7]:
+        ax.plot(wave_um, tauc[:, ck, -2], lw=2, ls='-',
+                color=colors[ck], label='pyharp, ck = {}'.format(ck))
+        ax.plot(wave_um, tauc2[0, :, ck], lw=2, ls='--',
+                color=colors[ck], label='picaso, ck = {}'.format(ck))
+
+    ax.set(xscale='log', yscale='log', xlim=(0.25, 15),
+           xlabel='Wavelength (um)',
+           ylabel='Optical Thickness')
+    ax.legend(frameon=False)
+
+    #plt.show()
 
 if __name__ == "__main__":
     # prepare sonora2020 opacity data
@@ -110,7 +156,6 @@ if __name__ == "__main__":
     config_file = "example_sonora_2020.yaml"
     rad = configure_bands(config_file, ncol=1,
                           nlyr=atm['pres'].shape[-1], nstr=8)
-    print(rad.options)
 
     # calculate concentration and layer thickness
     mean_mol_weight = pyharp.species_weights()[0]
@@ -124,7 +169,19 @@ if __name__ == "__main__":
     conc.unsqueeze_(-1)
 
     # run rt
+    wmin = rad.get_module("sonora196").options.disort().wave_lower()
+    wmax = rad.get_module("sonora196").options.disort().wave_upper()
+    atm['wavenumber'] = 0.5 * (torch.tensor(wmin) + torch.tensor(wmax))
+    #print("atm = ", atm)
+
+    #print("wmin = ", wmin)
+    #print(rad.get_module("sonora196").options.disort())
     netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)
     print("netflux = ", netflux)
     print("surface flux = ", dnflux)
     print("toa flux = ", upflux)
+
+    # plot optical depth
+    plot_optical_depth(fname, rad, conc, atm, dz)
+    plt.tight_layout()
+    plt.savefig("sonora_2020_optical_depth.png", dpi=300)

@@ -11,6 +11,7 @@ examples/*/*.nc
 # data
 data/*.nc
 data/*.tar.gz
+data/*.py
 
 # mac
 .DS_Store
@@ -43,3 +44,13 @@ examples/*.pt
 
 # idl source codes
 *.pro
+
+# figures
+*.png
+*.jpg
+
+# package data
+python/*/*.txt
+
+# pkl
+*.pkl

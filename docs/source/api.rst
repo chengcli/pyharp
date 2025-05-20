@@ -32,16 +32,16 @@ The following classes are used to configure and compute radiative transfer.
 Opacity Classes
 ---------------
 
-.. autoclass:: pyharp.AttenuatorOptions
+.. autoclass:: pyharp.opacity.AttenuatorOptions
    :members:
 
-.. autoclass:: pyharp.cpp.S8Fuller
+.. autoclass:: pyharp.opacity.cpp.FourColumn
    :members: __init__, forward
 
-.. autoclass:: pyharp.cpp.H2SO4Simple
+.. autoclass:: pyharp.opacity.cpp.MultiBand
    :members: __init__, forward
 
-.. autoclass:: pyharp.cpp.RFM
+.. autoclass:: pyharp.opacity.cpp.RFM
    :members: __init__, forward
 
 Helper Functions

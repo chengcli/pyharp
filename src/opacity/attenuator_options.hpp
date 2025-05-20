@@ -26,10 +26,10 @@ struct AttenuatorOptions {
   //! metallicity (used in Freedman mean opacities)
   ADD_ARG(double, metallicity) = 0.0;
 
-  //! helium mixing ratio in hydrogen cia calculation
-  ADD_ARG(double, xHe) = 0.0;
-
   //// Continuum Parameters  /////
+
+  //! number fraction of species in cia calculation
+  ADD_ARG(std::vector<double>, fractions) = { 1.0 };
 
   //! kappa_a (used in xiz semigrey opacity)
   ADD_ARG(double, kappa_a) = 0.0;

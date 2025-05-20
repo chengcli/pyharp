@@ -37,7 +37,6 @@ else:
     lib_dirs.extend(['/lib64/', '/usr/lib/x86_64-linux-gnu/'])
 
 libraries = parse_library_names(f"{current_dir}/build/lib")
-print(f"libraries: {libraries}")
 
 extra_link_args = []
 #if platform.system() == 'Linux':

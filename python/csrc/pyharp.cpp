@@ -35,12 +35,13 @@ PYBIND11_MODULE(pyharp, m) {
 
   m.def(
       "shared",
-      []() -> const std::unordered_map<std::string, torch::Tensor> & {
-        return harp::shared;
+      []() {
+        return py::make_iterator(harp::shared.begin(), harp::shared.end());
       },
+      py::keep_alive<0, 1>(),
       R"doc(
 `Pyharp` module deposits data -- tensors -- to a shared dictionary, which can be accessed by other modules.
-This function returns a readonly view of the shared data from a key.
+This function returns an iterator over the shared data.
 
 After running the forward method of the :class:`RadiationBand <pyharp.cpp.RadiationBand>`, the shared data with the following keys are available:
 
@@ -52,13 +53,9 @@ After running the forward method of the :class:`RadiationBand <pyharp.cpp.Radiat
       - Description
     * - "radiation/<band_name>/total_flux"
       - total flux in a band
-    * - "radiation/downward_flux"
-      - downward flux to surface
-    * - "radiation/upward_flux"
-      - upward flux to space
 
-Returns:
-  dict[str, torch.Tensor]: Shared readonly data of the pyharp module
+Yields:
+  torch.Tensor: shared data of the pyharp module
 
 Examples:
   .. code-block:: python
@@ -68,12 +65,43 @@ Examples:
 
     # ... after calling the forward method
 
-    # get the shared data
-    >>> shared = pyharp.shared()
-
-    # get the total flux in a band
-    >>> shared["radiation/<band_name>/total_flux"]
+    # loop over the shared data
+    >>> for data in pyharp.shared():
+    >>>     print(type(data), data.size())  # prints the shared data
       )doc");
+
+  m.def(
+      "get_shared",
+      [](const std::string &key) {
+        auto it = harp::shared.find(key);
+        if (it == harp::shared.end()) {
+          throw std::runtime_error("Key not found in shared data");
+        }
+        return it->second;
+      },
+      R"doc(
+Get the shared data by key.
+
+Args:
+  key (str): The key of the shared data.
+
+Returns:
+  torch.Tensor: The shared data.
+
+Example:
+
+  .. code-block:: python
+
+    >>> import pyharp
+    >>> import torch
+
+    # ... after calling the forward method
+
+    # get the shared data
+    >>> data = pyharp.get_shared("radiation/band1/total_flux")
+    >>> print(type(data), data.size())  # prints the shared data
+      )doc",
+      py::arg("key"));
 
   m.def(
       "set_search_paths",
@@ -99,6 +127,50 @@ Example:
     >>> pyharp.set_search_paths("/path/to/resource/files")
       )doc",
       py::arg("path"));
+
+  m.def(
+      "get_search_paths",
+      []() { return harp::deserialize_search_paths(harp::search_paths); },
+      R"doc(
+Get the search paths for resource files.
+
+Return:
+  str: The search paths
+
+Example:
+  .. code-block:: python
+
+    >>> import pyharp
+
+    # get the search paths
+    >>> pyharp.get_search_paths()
+      )doc");
+
+  m.def(
+      "add_resource_directory",
+      [](const std::string path, bool prepend) {
+        harp::add_resource_directory(path, prepend);
+        return harp::deserialize_search_paths(harp::search_paths);
+      },
+      R"doc(
+Add a resource directory to the search paths.
+
+Args:
+  path (str): The resource directory to add.
+  prepend (bool): If true, prepend the directory to the search paths. If false, append it.
+
+Returns:
+  str: The updated search paths.
+
+Example:
+  .. code-block:: python
+
+    >>> import pyharp
+
+    # add a resource directory
+    >>> pyharp.add_resource_directory("/path/to/resource/files")
+      )doc",
+      py::arg("path"), py::arg("prepend") = true);
 
   m.def("find_resource", &harp::find_resource, R"doc(
 Find a resource file from the search paths.

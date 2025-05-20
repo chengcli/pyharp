@@ -1,7 +1,6 @@
 // harp
-#include <opacity/h2so4_simple.hpp>
+#include <opacity/fourcolumn.hpp>
 #include <opacity/rfm.hpp>
-#include <opacity/s8_fuller.hpp>
 #include <radiation/calc_dz_hypsometric.hpp>
 #include <radiation/disort_options_flux.hpp>
 #include <radiation/flux_utils.hpp>
@@ -363,7 +362,7 @@ void calc_shortwave(double wmin, double wmax, int nwave, int nlyr) {
        op.species_ids({0}).opacity_files({"h2so4.txt"}).type("h2so4_simple")},
       {"s8", op.species_ids({1})
                  .opacity_files({"s8_k_fuller.txt"})
-                 .type("s8_fuller")}};
+                 .type("fourcolumn")}};
   rt_sw_op.disort() = disort(disort_flux_sw(nwave, ncol, nlyr));
 
   RadiationBand rt_sw(rt_sw_op);

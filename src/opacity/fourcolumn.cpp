@@ -1,17 +1,17 @@
-// harp
-#include "s8_fuller.hpp"
-
+// torch
 #include <harp/math/interpolation.hpp>
 #include <harp/utils/fileio.hpp>
 #include <harp/utils/find_resource.hpp>
 
+// harp
+#include "fourcolumn.hpp"
 #include "scattering_functions.hpp"
 
 namespace harp {
 
 extern std::vector<double> species_weights;
 
-S8FullerImpl::S8FullerImpl(AttenuatorOptions const& options_)
+FourColumnImpl::FourColumnImpl(AttenuatorOptions const& options_)
     : options(options_) {
   TORCH_CHECK(options.opacity_files().size() == 1,
               "Only one opacity file is allowed");
@@ -20,13 +20,14 @@ S8FullerImpl::S8FullerImpl(AttenuatorOptions const& options_)
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "s8-fuller"),
-              "Mismatch type: ", options.type());
+  TORCH_CHECK(options.type().empty() ||
+                  (options.type().compare(0, 10, "fourcolumn") == 0),
+              "Mismatch type: ", options.type(), " expecting 'fourcolumn'");
 
   reset();
 }
 
-void S8FullerImpl::reset() {
+void FourColumnImpl::reset() {
   auto full_path = find_resource(options.opacity_files()[0]);
 
   // remove comment
@@ -73,7 +74,7 @@ void S8FullerImpl::reset() {
   kdata.select(1, 0) *= species_weights[options.species_ids()[0]];
 }
 
-torch::Tensor S8FullerImpl::forward(
+torch::Tensor FourColumnImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
@@ -91,18 +92,18 @@ torch::Tensor S8FullerImpl::forward(
                           conc.options());
   auto data = interpn({wave}, {kwave}, kdata);
 
-  out.narrow(3, 0, 2) = data.narrow(1, 0, 2).unsqueeze(1).unsqueeze(1);
-  out.narrow(3, 2, options.nmom()) =
+  out.narrow(-1, 0, 2) = data.narrow(1, 0, 2).unsqueeze(1).unsqueeze(1);
+  out.narrow(-1, 2, options.nmom()) =
       henyey_greenstein(options.nmom(), data.select(1, 2))
           .unsqueeze(1)
           .unsqueeze(1);
 
   // Check species id in range
-  TORCH_CHECK(options.species_ids()[0] < conc.size(2),
+  TORCH_CHECK(options.species_ids()[0] < conc.size(-1),
               "Invalid species_id: ", options.species_ids()[0]);
 
   // attenuation [1/m]
-  out.select(3, 0) *= conc.select(2, options.species_ids()[0]).unsqueeze(0);
+  out.select(-1, 0) *= conc.select(-1, options.species_ids()[0]).unsqueeze(0);
 
   return out;
 }

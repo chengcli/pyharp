@@ -31,7 +31,8 @@ MultiBandImpl::MultiBandImpl(AttenuatorOptions const& options_)
 
   TORCH_CHECK(options.type().empty() ||
                   (options.type().compare(0, 9, "multiband") == 0),
-              "Mismatch opacity type: ", options.type());
+              "Mismatch opacity type: ", options.type(),
+              " expecting 'multiband'");
 
   reset();
 }

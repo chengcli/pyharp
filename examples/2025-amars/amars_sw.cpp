@@ -17,8 +17,7 @@
 #include <harp/math/interpn.h>
 
 #include <harp/math/interpolation.hpp>
-#include <harp/opacity/h2so4_simple.hpp>
-#include <harp/opacity/s8_fuller.hpp>
+#include <harp/opacity/fourcolumn.hpp>
 #include <harp/radiation/radiation.hpp>
 #include <harp/rtsolver/rtsolver.hpp>
 #include <harp/utils/fileio.hpp>
@@ -225,10 +224,10 @@ int main(int argc, char** argv) {
   harp::species_weights = {256.e-3, 98.e-3};
 
   op.species_ids({0}).opacity_files({"s8_k_fuller.txt"});
-  harp::S8Fuller s8(op);
+  harp::FourColumn s8(op);
 
   op.species_ids({1}).opacity_files({"h2so4.txt"});
-  harp::H2SO4Simple h2so4(op);
+  harp::FourColumn h2so4(op);
 
   auto wave = short_wavenumber_grid(nwave);
   auto conc = atm_concentration(ncol, nlyr, nspecies);
