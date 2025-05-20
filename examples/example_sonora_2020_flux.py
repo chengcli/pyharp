@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple
+from pyharp import h2_cia_legacy
 from pyharp.sonora import (
         load_sonora_data,
         load_sonora_window,
@@ -55,8 +56,8 @@ def construct_atm(pmax: float, pmin: float,
         'btemp0' : temp[0].unsqueeze(0).expand(ncol),
         'ttemp0' : temp[-1].unsqueeze(0).expand(ncol),
     }
-    print("atm pres = ", atm['pres'])
-    print("atm temp = ", atm['temp'])
+    #print("atm pres = ", atm['pres'])
+    #print("atm temp = ", atm['temp'])
     return atm
 
 def configure_bands(config_file: str,
@@ -68,7 +69,7 @@ def configure_bands(config_file: str,
 
     for [name, band] in rad_op.bands().items():
         if name == "sonora196":
-            band.ww(band.query_weights())
+            band.ww(band.query_weights("H2-molecule"))
             nwave = len(band.ww())
             ng = int(nwave / len(wmin))
 
@@ -104,7 +105,7 @@ def plot_optical_depth(fname: str,
                        conc: torch.Tensor,
                        atm: dict[str, torch.Tensor],
                        dz: torch.Tensor):
-    ab = rad.get_module("sonora196").get_module("H2")
+    ab = rad.get_module("sonora196").get_module("H2-molecule")
     tauc = ab.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
 
     # load sonora ck table info
@@ -155,7 +156,6 @@ if __name__ == "__main__":
     config_file = "example_sonora_2020.yaml"
     rad = configure_bands(config_file, ncol=1,
                           nlyr=atm['pres'].shape[-1], nstr=8)
-    print(rad.options)
 
     # calculate concentration and layer thickness
     mean_mol_weight = pyharp.species_weights()[0]
@@ -169,6 +169,13 @@ if __name__ == "__main__":
     conc.unsqueeze_(-1)
 
     # run rt
+    wmin = rad.get_module("sonora196").options.disort().wave_lower()
+    wmax = rad.get_module("sonora196").options.disort().wave_upper()
+    atm['wavenumber'] = 0.5 * (torch.tensor(wmin) + torch.tensor(wmax))
+    #print("atm = ", atm)
+
+    #print("wmin = ", wmin)
+    #print(rad.get_module("sonora196").options.disort())
     netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)
     print("netflux = ", netflux)
     print("surface flux = ", dnflux)

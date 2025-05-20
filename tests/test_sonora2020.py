@@ -4,7 +4,10 @@ import torch
 import numpy as np
 from pyharp import constants as const
 from pyharp import calc_dz_hypsometric
-from pyharp.sonora import load_sonora_data
+from pyharp.sonora import (
+        load_sonora_data,
+        load_sonora_atm,
+        )
 from pyharp.opacity import MultiBand, AttenuatorOptions
 from matplotlib import pyplot as plt
 
@@ -15,6 +18,11 @@ def setup_sonora_opacity():
     op.species_ids([0])
     ab = MultiBand(op)
     sonora = torch.jit.load(fname)
+    atm = load_sonora_atm()
+    print('kpres = ', ab.klnp)
+    print('ktemp = ', ab.ktemp)
+    print('pres = ', sonora.pres)
+    print('temp = ', sonora.temp)
     return ab, sonora
 
 def setup_atm_grid():
@@ -103,34 +111,65 @@ def test_sonora2020():
     op.species_ids([0])
 
     ab = MultiBand(op)
-    print(ab.kdata.is_contiguous())
-    print(ab.kwave)
-    print(ab.klnp)
-    print(ab.ktemp)
-    print(ab.weights)
     print('p = ', ab.klnp[12].exp())
     print('t = ', ab.ktemp[22])
 
     sonora = torch.jit.load(fname)
     wmin = sonora.wmin
     wmax = sonora.wmax
-    print('kappa = ', sonora.kappa.is_contiguous())
 
     data = load_sonora_data("sonora_2020_feh+000_co_100.data.196")
 
     atm = {
-        'pres': torch.tensor([[1.0e5]]),
-        'temp': torch.tensor([[305.0]]),
+        'pres': torch.tensor([[1.732e5]]),
+        'temp': torch.tensor([[302.5]]),
     }
-    conc = atm['pres'] / (const.Rgas * atm['temp'])
-    print(conc)
-    print("op1 = ", ab.kdata[1, 12, 22, 0].exp() * 6.022e23 * conc)
-    print("kappa shape = ", data['kappa'].shape)
-    print("kappa = ", np.exp(data['kappa'][0, 1, 12, 22]) * 6.022e23 * conc)
+    #conc = atm['pres'] / (const.Rgas * atm['temp'])
+    print('kwave = ', ab.kwave)
+    print('klnp = ', ab.klnp)
+    print('ktemp = ', ab.ktemp)
+    print('kwave = ', ab.kwave[256])
+    print("op1 = ", ab.kdata[256, 12, 22, 0].exp())
+    print("op2 = ", sonora.kappa[256, 13, 22].exp())
+    print("op3 = ", np.exp(data['kappa'][32, 0, 12, 22]))
+    print("op4 = ", np.exp(data['kappa'][32, 0, 13, 22]))
 
-    exit()
+    atm1 = {
+        'pres': torch.tensor([[1.0e5]]),
+        'temp': torch.tensor([[300.0]]),
+    }
+    atm2 = {
+        'pres': torch.tensor([[3.0e5]]),
+        'temp': torch.tensor([[300.0]]),
+    }
+    atm3 = {
+        'pres': torch.tensor([[1.0e5]]),
+        'temp': torch.tensor([[310.0]]),
+    }
+    atm4 = {
+        'pres': torch.tensor([[3.0e5]]),
+        'temp': torch.tensor([[310.0]]),
+    }
+
+    conc = torch.ones_like(atm1['pres']).unsqueeze(-1)
+    kcoeff1 = ab.forward(conc, atm1).squeeze()
+    kcoeff1 *= 1.e4 / const.Avogadro
+    kcoeff2 = ab.forward(conc, atm2).squeeze()
+    kcoeff2 *= 1.e4 / const.Avogadro
+    kcoeff3 = ab.forward(conc, atm3).squeeze()
+    kcoeff3 *= 1.e4 / const.Avogadro
+    kcoeff4 = ab.forward(conc, atm4).squeeze()
+    kcoeff4 *= 1.e4 / const.Avogadro
+
     kcoeff = ab.forward(conc, atm).squeeze()
-    print('kcoeff1 = {:.10f}'.format(kcoeff[1]))
+    kcoeff *= 1.e4 / const.Avogadro
+    print('kcoeff1 = ', kcoeff1[256])
+    print('kcoeff2 = ', kcoeff2[256])
+    print('kcoeff3 = ', kcoeff3[256])
+    print('kcoeff4 = ', kcoeff4[256])
+    print('kcoeff = ', (3./8. * (kcoeff1.log() + kcoeff2.log())
+                      + 1./8. * (kcoeff3.log() + kcoeff4.log())).exp()[256])
+    print('kcoeff = ', kcoeff[256])
 
     exit()
 
@@ -144,7 +183,8 @@ def test_sonora2020():
 
 
 if __name__ == "__main__":
-    #test_sonora2020()
+    torch.set_printoptions(precision=12)
+    test_sonora2020()
     #plot_opacity(case='kcross')
     #plot_opacity(case='kcoeff')
-    plot_opacity(case='tau')
+    #plot_opacity(case='tau')

@@ -7,6 +7,7 @@
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
+#include <harp/opacity/wave_temp_table.hpp>
 
 // python
 #include "pyoptions.hpp"
@@ -143,6 +144,34 @@ Examples:
     >>> op = AttenuatorOptions().fractions([0.9, 0.1])
         )doc");
 
+  ADD_HARP_MODULE(WaveTempTable, AttenuatorOptions, R"doc(
+Wave-Temp opacity data table
+
+Args:
+  conc (torch.Tensor): concentration of the species in mol/cm^3
+
+  kwargs (dict[str, torch.Tensor]): keyword arguments.
+    Both 'temp' [k] and ('wavenumber' [cm^{-1}] or 'wavelength' [num]) must be provided
+
+Returns:
+  torch.Tensor:
+    attenuation [1/m], single scattering albedo and scattering phase function
+    The shape of the output tensor is (nwave, ncol, nlyr, 1)
+    where nwave is the number of wavelengths,
+    ncol is the number of columns,
+    nlyr is the number of layers,
+    1 is for attenuation coefficients,
+    and nmom is the number of scattering moments.
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp.opacity import WaveTempTable, AttenuatorOptions
+    >>> op = MultiBand(AttenuatorOptions())
+        )doc",
+                  py::arg("conc"), py::arg("kwargs"));
+
   ADD_HARP_MODULE(MultiBand, AttenuatorOptions, R"doc(
 Multi-band opacity data
 
@@ -155,11 +184,11 @@ Args:
 Returns:
   torch.Tensor:
     attenuation [1/m], single scattering albedo and scattering phase function
-    The shape of the output tensor is (nwave, ncol, nlyr, 2 + nmom)
+    The shape of the output tensor is (nwave, ncol, nlyr, 1)
     where nwave is the number of wavelengths,
     ncol is the number of columns,
     nlyr is the number of layers,
-    2 is for attenuation and scattering coefficients,
+    1 is for attenuation coefficients,
     and nmom is the number of scattering moments.
 
 Examples:

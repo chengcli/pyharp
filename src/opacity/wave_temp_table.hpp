@@ -16,11 +16,11 @@ class WaveTempTableImpl : public torch::nn::Cloneable<WaveTempTableImpl> {
  public:
   //! wavenumber coordinate and temperature
   //! (nwave,) (ntemp,)
-  torch::Tensor kwave, ktemp;
+  std::vector<torch::Tensor> kwave, ktemp;
 
   //! data table
-  //! (ncia, nwave, ntemp)
-  torch::Tensor kdata;
+  //! ncia x (nwave, ntemp)
+  std::vector<torch::Tensor> kdata;
 
   //! options with which this `WaveTempTableImpl` was constructed
   AttenuatorOptions options;

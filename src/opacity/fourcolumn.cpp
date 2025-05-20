@@ -20,8 +20,9 @@ FourColumnImpl::FourColumnImpl(AttenuatorOptions const& options_)
   TORCH_CHECK(options.species_ids()[0] >= 0,
               "Invalid species_id: ", options.species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() || (options.type() == "s8-fuller"),
-              "Mismatch type: ", options.type());
+  TORCH_CHECK(options.type().empty() ||
+                  (options.type().compare(0, 10, "fourcolumn") == 0),
+              "Mismatch type: ", options.type(), " expecting 'fourcolumn'");
 
   reset();
 }

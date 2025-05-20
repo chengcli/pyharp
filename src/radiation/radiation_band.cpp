@@ -189,9 +189,13 @@ void RadiationBandImpl::reset() {
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
       options.ww() = read_var_pt<double>(op.opacity_files()[0], "weights");
-    } else if (op.type() == "wave-temp-table") {
+    } else if (op.type() == "wavetemp") {
       auto a = WaveTempTable(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
+      opacities[name] = torch::nn::AnyModule(a);
+    } else if (op.type() == "fourcolumn") {
+      auto a = FourColumn(op);
+      nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op.type() == "helios") {
       auto a = Helios(op);
@@ -215,10 +219,6 @@ void RadiationBandImpl::reset() {
     } else if (op.type() == "jup-gas-ir") {
       auto a = JupGasIR(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
-      opacities[name] = torch::nn::AnyModule(a);
-    } else if (op.type() == "fourcolumn") {
-      auto a = FourColumn(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options.nmom());
       opacities[name] = torch::nn::AnyModule(a);
     } else {
       TORCH_CHECK(false, "Unknown attenuator type: ", op.type());
