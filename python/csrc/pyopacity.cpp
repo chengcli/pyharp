@@ -112,7 +112,7 @@ Examples:
 Set or get the list of dependent species indices
 
 Args:
-  species_ids (list): list of dependent species indices
+  species_ids (list[int]): list of dependent species indices
 
 Returns:
   AttenuatorOptions | list[int]: class object if argument is not empty, otherwise the list of dependent species indices
@@ -123,6 +123,24 @@ Examples:
     >>> import torch
     >>> from pyharp.opacity import AttenuatorOptions
     >>> op = AttenuatorOptions().species_ids([1, 2])
+        )doc")
+
+      .ADD_OPTION(std::vector<double>, harp::AttenuatorOptions, fractions,
+                  R"doc(
+Set or get fractions of species in cia calculatioin
+
+Args:
+  fractions (list[float]): list of species fractions
+
+Returns:
+  AttenuatorOptions | list[float]: class object if argument is not empty, otherwise the list of species fractions
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp.opacity import AttenuatorOptions
+    >>> op = AttenuatorOptions().fractions([0.9, 0.1])
         )doc");
 
   ADD_HARP_MODULE(MultiBand, AttenuatorOptions, R"doc(

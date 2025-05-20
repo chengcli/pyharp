@@ -128,6 +128,50 @@ Example:
       )doc",
       py::arg("path"));
 
+  m.def(
+      "get_search_paths",
+      []() { return harp::deserialize_search_paths(harp::search_paths); },
+      R"doc(
+Get the search paths for resource files.
+
+Return:
+  str: The search paths
+
+Example:
+  .. code-block:: python
+
+    >>> import pyharp
+
+    # get the search paths
+    >>> pyharp.get_search_paths()
+      )doc");
+
+  m.def(
+      "add_resource_directory",
+      [](const std::string path, bool prepend) {
+        harp::add_resource_directory(path, prepend);
+        return harp::deserialize_search_paths(harp::search_paths);
+      },
+      R"doc(
+Add a resource directory to the search paths.
+
+Args:
+  path (str): The resource directory to add.
+  prepend (bool): If true, prepend the directory to the search paths. If false, append it.
+
+Returns:
+  str: The updated search paths.
+
+Example:
+  .. code-block:: python
+
+    >>> import pyharp
+
+    # add a resource directory
+    >>> pyharp.add_resource_directory("/path/to/resource/files")
+      )doc",
+      py::arg("path"), py::arg("prepend") = true);
+
   m.def("find_resource", &harp::find_resource, R"doc(
 Find a resource file from the search paths.
 

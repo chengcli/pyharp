@@ -156,6 +156,8 @@ RadiationBandImpl::RadiationBandImpl(RadiationBandOptions const& options_)
     : options(options_) {
   reset();
 
+  // disort options maybe updated after initialization
+  // reset it back
   if (options.solver_name() == "disort") {
     options.disort(rtsolver.get<disort::Disort>()->options);
   }

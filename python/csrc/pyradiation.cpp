@@ -137,6 +137,9 @@ Examples:
       .def("query_waves", &harp::RadiationBandOptions::query_waves, R"doc(
 Query the spectral grids
 
+Args:
+  op_name (str): opacity name
+
 Returns:
   list[float]: spectral grids
 
@@ -146,10 +149,14 @@ Examples:
     >>> import torch
     >>> from pyharp import RadiationOptions
     >>> op = RadiationOptions().query_waves()
-    )doc")
+    )doc",
+           py::arg("op_name") = "")
 
       .def("query_weights", &harp::RadiationBandOptions::query_weights, R"doc(
 Query the weights
+
+Args:
+  op_name (str): opacity name
 
 Returns:
   list[float]: weights
@@ -160,7 +167,8 @@ Examples:
     >>> import torch
     >>> from pyharp import RadiationOptions
     >>> op = RadiationOptions().query_weights()
-    )doc")
+    )doc",
+           py::arg("op_name") = "")
 
       .ADD_OPTION(std::string, harp::RadiationBandOptions, name, R"doc(
 Set or get radiation band name
