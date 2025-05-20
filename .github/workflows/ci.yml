@@ -25,7 +25,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install style checkers
-        run: pip install --user cpplint cppcheck
+        run: pip install --user cpplint cppcheck clang-format==20.1.4
 
       - name: Cache pre-commit
         uses: actions/cache@v3
