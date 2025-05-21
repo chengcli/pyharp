@@ -4,4 +4,4 @@ from .pyharp import *
 from .disort import *
 from .rfmlib import *
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
