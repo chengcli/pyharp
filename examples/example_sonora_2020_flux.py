@@ -44,8 +44,8 @@ def preprocess_sonora(fname: str):
     sonora = torch.jit.load(fname + ".pt")
 
 def construct_atm(pmax: float, pmin: float,
-                  ncol: int = 1,
-                  nlyr: int = 100) -> dict[str, torch.Tensor]:
+                  ncol: int=1,
+                  nlyr: int=100) -> dict[str, torch.Tensor]:
     p1bar, T1bar, Tmin = 1.e5, 169., 135.
     pres = torch.logspace(np.log10(pmax), np.log10(pmin), nlyr + 1, dtype=torch.float64)
     temp = T1bar * torch.pow(pres / p1bar, 2. / 7.)
@@ -105,43 +105,61 @@ def plot_optical_depth(fname: str,
                        conc: torch.Tensor,
                        atm: dict[str, torch.Tensor],
                        dz: torch.Tensor):
-    ab = rad.get_module("sonora196").get_module("H2-molecule")
-    tauc = ab.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
+    ab_mol = rad.get_module("sonora196").get_module("H2-molecule")
+    tauc_mol = ab_mol.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
 
-    # load sonora ck table info
+    ab_cia = rad.get_module("sonora196").get_module("H2-continuum")
+    tauc_cia = ab_cia.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
+
     sonora = torch.jit.load(fname + ".pt")
-    nwave, ncol, nlyr = tauc.shape
+    nwave, ncol, nlyr = tauc_mol.shape
     ng = len(sonora.gauss_pts)
     wave_um = 1.e4 / (0.5 * (sonora.wmin + sonora.wmax))
 
     # reshape to (band, ng, ncol, nlyr)
-    tauc = tauc.reshape((nwave // ng, ng, ncol, nlyr))
-    #tauc = (tauc * sonora.gauss_wts[None, :, None, None]).sum(dim=1)
-    tauc.squeeze_()
-    print('tauc = ', tauc.shape)
+    tauc_mol = tauc_mol.reshape((nwave // ng, ng, ncol, nlyr))
+    tauc_cia = tauc_cia.reshape((nwave // ng, ng, ncol, nlyr))
+
+    # average over gauss points
+    tauc_mol = (tauc_mol * sonora.gauss_wts[None, :, None, None]).sum(dim=1)
+    tauc_mol.squeeze_()
+    print('tauc_mol = ', tauc_mol.shape)
+
+    tauc_cia = (tauc_cia * sonora.gauss_wts[None, :, None, None]).sum(dim=1)
+    tauc_cia.squeeze_()
+    print('tauc_cia = ', tauc_cia.shape)
 
     with open('saved_dictionary.pkl', 'rb') as f:
         df = pickle.load(f)
-    tauc2 = torch.tensor(df['full_output']['taugas'])
-    #tauc2 = (tauc2 * sonora.gauss_wts[None, None, :]).sum(dim=-1)
-    print('tauc2 = ', tauc2.shape)
+    tauc_tot = torch.tensor(df['full_output']['taugas'])
+    tauc_tot = (tauc_tot * sonora.gauss_wts[None, None, :]).sum(dim=-1)
+    print('tauc_tot = ', tauc_tot.shape)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     cmap = plt.cm.viridis
     colors = cmap(np.linspace(0.2, 0.9, len(sonora.gauss_pts)))
 
-    for ck in [0, 7]:
-        ax.plot(wave_um, tauc[:, ck, -2], lw=2, ls='-',
-                color=colors[ck], label='pyharp, ck = {}'.format(ck))
-        ax.plot(wave_um, tauc2[0, :, ck], lw=2, ls='--',
-                color=colors[ck], label='picaso, ck = {}'.format(ck))
+    ax.plot(wave_um, tauc_mol[:, 1], lw=2, ls='-',
+            color='b', label='pyharp-molecule')
+    ax.plot(wave_um, tauc_mol[:, 1] + tauc_cia[:, 1], lw=2, ls='-',
+            color='g', label='pyharp-continuum')
+    ax.plot(wave_um, tauc_tot[-1, :], lw=2, ls='--',
+            color='g', label='picaso')
 
     ax.set(xscale='log', yscale='log', xlim=(0.25, 15),
            xlabel='Wavelength (um)',
            ylabel='Optical Thickness')
     ax.legend(frameon=False)
 
-    #plt.show()
+def plot_flux(atm, netflux):
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+    ax.plot(netflux[0,1:], atm['pres'][0,:] / 1.e5, lw=2, ls='-',
+            color='b')
+    ax.set(xscale='linear', yscale='log',
+           ylim=(1.e3, 1.e-4), xlim=(0.5, 25.),
+           ylabel='Pressure (bar)',
+           xlabel='Net Flux (W/m2)')
 
 if __name__ == "__main__":
     # prepare sonora2020 opacity data
@@ -150,7 +168,7 @@ if __name__ == "__main__":
         preprocess_sonora(fname)
 
     # configure atmosphere model
-    atm = construct_atm(100.e5, 10., ncol=1, nlyr=100)
+    atm = construct_atm(1000.e5, 10., ncol=1, nlyr=100)
 
     # configure radiation model
     config_file = "example_sonora_2020.yaml"
@@ -172,16 +190,16 @@ if __name__ == "__main__":
     wmin = rad.get_module("sonora196").options.disort().wave_lower()
     wmax = rad.get_module("sonora196").options.disort().wave_upper()
     atm['wavenumber'] = 0.5 * (torch.tensor(wmin) + torch.tensor(wmax))
-    #print("atm = ", atm)
 
-    #print("wmin = ", wmin)
-    #print(rad.get_module("sonora196").options.disort())
     netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)
     print("netflux = ", netflux)
     print("surface flux = ", dnflux)
     print("toa flux = ", upflux)
 
     # plot optical depth
-    plot_optical_depth(fname, rad, conc, atm, dz)
+    #plot_optical_depth(fname, rad, conc, atm, dz)
+    #plt.tight_layout()
+    #plt.savefig("sonora_2020_optical_depth.png", dpi=300)
+    plot_flux(atm, netflux)
     plt.tight_layout()
-    plt.savefig("sonora_2020_optical_depth.png", dpi=300)
+    plt.savefig("sonora_2020_flux.png", dpi=300)

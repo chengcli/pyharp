@@ -1,18 +1,18 @@
 species:
-  - name: H2
+  - name: H2mix
     composition: {H: 1.9, He: 0.1}
 
 opacities:
   H2-molecule:
     type: multiband-ck
     data: ["sonora_2020_feh+000_co_100.data.196.pt"]
-    species: [H2]
+    species: [H2mix]
 
   H2-continuum:
     type: wavetemp
     fractions: [0.9, 0.1]
     data: ["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"]
-    species: [H2]
+    species: [H2mix]
 
 bands: [sonora196]
 
