@@ -97,6 +97,9 @@ struct RadiationBandOptions {
 
   /// integration method: "wavenumber", "wavelength", or "weight"
   ADD_ARG(std::string, integration) = "wavenumber";
+
+  //! user-supplied RT solver
+  ADD_ARG(torch::nn::AnyModule, user) = torch::nn::AnyModule();
 };
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {

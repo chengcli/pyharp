@@ -11,7 +11,7 @@ def load_sonora_atm() -> Tuple[np.ndarray, np.ndarray]:
     Returns the atmospheric pressure and temperature from the Sonora 2020 database.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: Atmospheric pressure (Pa) and temperature (K).
+        tuple[numpy.ndarray, numpy.ndarray]: Atmospheric pressure (Pa) and temperature (K).
     """
     with resources.files('pyharp.sonora').joinpath('sonora2020_1460_layer_list.txt').open('r') as f:
         data = np.genfromtxt(f, skip_header=2)
@@ -22,7 +22,7 @@ def load_sonora_window() -> Tuple[np.ndarray, np.ndarray]:
     Returns the Sonora 2020 spectral window (start, end) in nm.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: Start and end wavelengths (nm).
+        tuple[numpy.ndarray, numpy.ndarray]: Start and end wavelengths (nm).
     """
     with resources.files('pyharp.sonora').joinpath('sonora2020_196_windows.txt').open('r') as f:
         lines = f.readlines()
@@ -52,7 +52,7 @@ def load_sonora_abundances(filename: str) -> Tuple[List[str], np.ndarray]:
     Args:
         filename (str): Path to the abundances file.
     Returns:
-        Tuple[List[str], np.ndarray]: List of species and their abundances.
+        tuple[list[str], numpy.ndarray]: List of species and their abundances.
     """
 
     species = np.genfromtxt(filename, dtype=str, max_rows=1)

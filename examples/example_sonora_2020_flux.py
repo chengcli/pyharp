@@ -165,7 +165,7 @@ if __name__ == "__main__":
     if not os.path.exists(fname + ".pt"):
         preprocess_sonora(fname)
 
-    # configure atmosphere model
+    # construct atmosphere model
     atm = construct_atm(1000.e5, 10., ncol=1, nlyr=100)
 
     # configure radiation model

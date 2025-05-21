@@ -172,7 +172,12 @@ void RadiationBandImpl::reset() {
 
   // create opacities
   for (auto const& [name, op] : options.opacities()) {
-    if (op.type() == "rfm-lbl") {
+    if (op.type() == "user") {
+      TORCH_CHECK(op.user().is_empty(),
+                  "user opacity not found, please set 'user' field in "
+                  "AttenuatorOptions");
+      opacities[name] = op.user().clone();
+    } else if (op.type() == "rfm-lbl") {
       auto a = RFM(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
@@ -228,7 +233,10 @@ void RadiationBandImpl::reset() {
 
   // create rtsolver
   auto [uphi, umu] = get_direction_grids<double>(ray_out);
-  if (options.solver_name() == "disort") {
+  if (options.solver_name() == "user") {
+    rtsolver = options.user().clone();
+    register_module("solver", rtsolver.ptr());
+  } else if (options.solver_name() == "disort") {
     rtsolver = torch::nn::AnyModule(disort::Disort(options.disort()));
     register_module("solver", rtsolver.ptr());
   } else {

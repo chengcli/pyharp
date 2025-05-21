@@ -3,6 +3,9 @@
 // harp
 #include <harp/add_arg.h>
 
+// torch
+#include <torch/nn/modules/container/any.h>
+
 namespace harp {
 
 struct AttenuatorOptions {
@@ -62,6 +65,9 @@ struct AttenuatorOptions {
 
   //! number of scattering moments
   ADD_ARG(int, nmom) = 0;
+
+  //! user-supplid opacities
+  ADD_ARG(torch::nn::AnyModule, user) = torch::nn::AnyModule();
 };
 
 }  // namespace harp
