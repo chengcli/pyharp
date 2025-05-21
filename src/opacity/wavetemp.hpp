@@ -12,7 +12,7 @@
 
 namespace harp {
 
-class WaveTempTableImpl : public torch::nn::Cloneable<WaveTempTableImpl> {
+class WaveTempImpl : public torch::nn::Cloneable<WaveTempImpl> {
  public:
   //! wavenumber coordinate and temperature
   //! (nwave,) (ntemp,)
@@ -22,18 +22,18 @@ class WaveTempTableImpl : public torch::nn::Cloneable<WaveTempTableImpl> {
   //! ncia x (nwave, ntemp)
   std::vector<torch::Tensor> kdata;
 
-  //! options with which this `WaveTempTableImpl` was constructed
+  //! options with which this `WaveTempImpl` was constructed
   AttenuatorOptions options;
 
   //! Constructor to initialize the layer
-  WaveTempTableImpl() = default;
-  explicit WaveTempTableImpl(AttenuatorOptions const& options_);
+  WaveTempImpl() = default;
+  explicit WaveTempImpl(AttenuatorOptions const& options_);
   void reset() override;
 
   //! Get optical properties
   torch::Tensor forward(torch::Tensor conc,
                         std::map<std::string, torch::Tensor> const& kwargs);
 };
-TORCH_MODULE(WaveTempTable);
+TORCH_MODULE(WaveTemp);
 
 }  // namespace harp

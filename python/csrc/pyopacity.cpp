@@ -7,7 +7,7 @@
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
-#include <harp/opacity/wave_temp_table.hpp>
+#include <harp/opacity/wavetemp.hpp>
 
 // python
 #include "pyoptions.hpp"
@@ -144,8 +144,8 @@ Examples:
     >>> op = AttenuatorOptions().fractions([0.9, 0.1])
         )doc");
 
-  ADD_HARP_MODULE(WaveTempTable, AttenuatorOptions, R"doc(
-Wave-Temp opacity data table
+  ADD_HARP_MODULE(WaveTemp, AttenuatorOptions, R"doc(
+Wave-Temp opacity data
 
 Args:
   conc (torch.Tensor): concentration of the species in mol/cm^3
@@ -167,7 +167,7 @@ Examples:
   .. code-block:: python
 
     >>> import torch
-    >>> from pyharp.opacity import WaveTempTable, AttenuatorOptions
+    >>> from pyharp.opacity import WaveTemp, AttenuatorOptions
     >>> op = MultiBand(AttenuatorOptions())
         )doc",
                   py::arg("conc"), py::arg("kwargs"));

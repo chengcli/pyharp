@@ -10,6 +10,7 @@ The following functions are used to set and get global states in the Pyharp pack
 .. autofunction:: pyharp.species_weights
 .. autofunction:: pyharp.shared
 .. autofunction:: pyharp.set_search_paths
+.. autofunction:: pyharp.get_search_paths
 .. autofunction:: pyharp.find_resource
 
 Radiation Classes
@@ -39,6 +40,9 @@ Opacity Classes
    :members: __init__, forward
 
 .. autoclass:: pyharp.opacity.cpp.MultiBand
+   :members: __init__, forward
+
+.. autoclass:: pyharp.opacity.cpp.WaveTemp
    :members: __init__, forward
 
 .. autoclass:: pyharp.opacity.cpp.RFM

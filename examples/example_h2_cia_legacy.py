@@ -3,14 +3,14 @@
 import torch
 import numpy as np
 from pyharp import h2_cia_legacy, find_resource
-from pyharp.opacity import AttenuatorOptions, WaveTempTable
+from pyharp.opacity import AttenuatorOptions, WaveTemp
 
 def setup_h2_cia_legacy_opacity():
     op = AttenuatorOptions().type("wavetemp")
     op.opacity_files(["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"])
     op.fractions([0.9, 0.1])
     op.species_ids([0])
-    return WaveTempTable(op)
+    return WaveTemp(op)
 
 def run_forward():
     full_path = find_resource("H2-H2-eq.xiz.pt")
