@@ -43,21 +43,8 @@ Examples:
       .ADD_OPTION(std::string, harp::AttenuatorOptions, type, R"doc(
 Set or get the type of the opacity source format
 
-Valid options are:
-  .. list-table::
-    :widths: 15 25
-    :header-rows: 1
-
-    * - Key
-      - Description
-    * - 'rfm-lbl'
-      - Line-by-line absorption data computed by RFM
-    * - 'rfm-ck'
-      - Correlated-k absorption computed from line-by-line data
-    * - 'multiband-ck'
-      - Multi-band opacity data from saved torch ".pt" file
-    * - 'fourcolumn'
-      - Four-column opacity data (wavelength [um]/wavenumber [cm^{-1}], cross-section [m^2/kg], ssa, g)
+Valid options are, ``user``, ``rfm-lbl``, ``rfm-ck``, ``four-column``, ``wavetemp``, ``multiband``.
+See :ref:`opacity_choices` for more details.
 
 Args:
   type (str): type of the opacity source
@@ -142,6 +129,22 @@ Examples:
     >>> import torch
     >>> from pyharp.opacity import AttenuatorOptions
     >>> op = AttenuatorOptions().fractions([0.9, 0.1])
+        )doc")
+
+      .ADD_OPTION(torch::nn::AnyModule, harp::AttenuatorOptions, user, R"doc(
+Enroll a user-supplied opacity source
+Args:
+  user (torch.nn.Module): user-supplied opacity source
+
+Returns:
+  AttenuatorOptions | torch.nn.Module: class object if argument is not empty, otherwise the user-supplied opacity source
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp.opacity import AttenuatorOptions
+    >>> op = AttenuatorOptions().user(torch.nn.Module())
         )doc");
 
   ADD_HARP_MODULE(WaveTemp, AttenuatorOptions, R"doc(

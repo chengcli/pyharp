@@ -205,7 +205,7 @@ This improves the computational efficiency as the 196 radiative transfer calcula
 
       for [name, band] in rad_op.bands().items():
           if name == "sonora196":
-              band.ww(band.query_weights())
+              band.ww(band.query_weights("H2-molecule"))
               nwave = len(band.ww())
               ng = int(nwave / len(wmin))
 

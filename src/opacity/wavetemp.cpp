@@ -28,6 +28,9 @@ WaveTempImpl::WaveTempImpl(AttenuatorOptions const& options_)
       options.type().empty() || (options.type().compare(0, 8, "wavetemp") == 0),
       "Mismatch opacity type: ", options.type(), " expecting 'wavetemp'");
 
+  TORCH_CHECK(options.fractions().size() == options.opacity_files().size(),
+              "`fractions` and `opacity_files` must have the same size");
+
   reset();
 }
 
