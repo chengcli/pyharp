@@ -13,11 +13,11 @@
 #include <harp/utils/fileio.hpp>
 #include <harp/utils/find_resource.hpp>
 
-#include "wave_temp_table.hpp"
+#include "wavetemp.hpp"
 
 namespace harp {
 
-WaveTempTableImpl::WaveTempTableImpl(AttenuatorOptions const& options_)
+WaveTempImpl::WaveTempImpl(AttenuatorOptions const& options_)
     : options(options_) {
   TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
 
@@ -31,7 +31,7 @@ WaveTempTableImpl::WaveTempTableImpl(AttenuatorOptions const& options_)
   reset();
 }
 
-void WaveTempTableImpl::reset() {
+void WaveTempImpl::reset() {
   kwave.resize(options.opacity_files().size());
   ktemp.resize(options.opacity_files().size());
   kdata.resize(options.opacity_files().size());
@@ -61,7 +61,7 @@ void WaveTempTableImpl::reset() {
   }
 }
 
-torch::Tensor WaveTempTableImpl::forward(
+torch::Tensor WaveTempImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   auto const& temp = kwargs.at("temp");
 

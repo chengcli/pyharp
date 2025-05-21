@@ -1,17 +1,17 @@
 import torch
 import os
-import pyharp
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple
-from pyharp import h2_cia_legacy
+import pyharp
 from pyharp.sonora import (
         load_sonora_data,
         load_sonora_window,
         save_sonora_multiband,
         )
 from pyharp import (
+        h2_cia_legacy,
         constants,
         RadiationOptions,
         Radiation,
@@ -53,8 +53,6 @@ def construct_atm(pmax: float, pmin: float,
     atm = {
         'pres' : (pres[1:] * pres[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
         'temp' : (temp[1:] * temp[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
-        'btemp0' : temp[0].unsqueeze(0).expand(ncol),
-        'ttemp0' : temp[-1].unsqueeze(0).expand(ncol),
     }
     #print("atm pres = ", atm['pres'])
     #print("atm temp = ", atm['temp'])

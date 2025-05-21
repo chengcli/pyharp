@@ -19,7 +19,6 @@ bands: [sonora196]
 sonora196:
   range: [30.8, 38300.] # wavenumber
   opacities: [H2-molecule, H2-continuum]
-  #opacities: [H2-molecule]
   solver: disort
   integration: weight
   flags: lamber,quiet,onlyfl,planck

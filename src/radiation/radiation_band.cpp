@@ -10,7 +10,7 @@
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
-#include <harp/opacity/wave_temp_table.hpp>
+#include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/read_dimvar_netcdf.hpp>
 #include <harp/utils/read_var_pt.hpp>
@@ -190,7 +190,7 @@ void RadiationBandImpl::reset() {
       opacities[name] = torch::nn::AnyModule(a);
       options.ww() = read_var_pt<double>(op.opacity_files()[0], "weights");
     } else if (op.type() == "wavetemp") {
-      auto a = WaveTempTable(op);
+      auto a = WaveTemp(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op.type() == "fourcolumn") {

@@ -38,20 +38,26 @@ Radiative transfer is a physical calculation regarding the interaction of radiat
 .. code-block:: yaml
 
   species:
-    - name: H2
+    - name: H2mix
       composition: {H: 1.9, He: 0.1}
 
   opacities:
-    H2:
+    H2-molecule:
       type: multiband-ck
       data: ["sonora_2020_feh+000_co_100.data.196.pt"]
-      species: [H2]
+      species: [H2mix]
+
+    H2-continuum:
+      type: wavetemp
+      fractions: [0.9, 0.1]
+      data: ["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"]
+      species: [H2mix]
 
   bands: [sonora196]
 
   sonora196:
     range: [30.8, 38300.] # wavenumber
-    opacities: [H2]
+    opacities: [H2-molecule, H2-continuum]
     solver: disort
     integration: weight
     flags: lamber,quiet,onlyfl,planck
@@ -59,26 +65,31 @@ Radiative transfer is a physical calculation regarding the interaction of radiat
 `YAML` is a human-readable data serialization standard that is commonly used for configuration files.
 The major fields can be specified in numbers, floats, strings, lists and dictionaries.
 
-In this example, the Pyharp module has one species, `H2`, and the atomic composition of it is specified as a dictionary with the key as the name of the atom and the value as its abundance.
+In this example, the Pyharp module has one species, `H2mix`, and the atomic composition of it is specified as a dictionary with the key as the name of the atom and the value as its abundance.
 We use this entry to calculate its molecular weight.
 
 Next, we specify the opacity sources, which are dictionary entries with the name of the opacity source as the key and its properties as the value.
-In this case, we have one opacity source, `H2`, which is a multiband opacity source with the data file `sonora_2020_feh+000_co_100.data.196.pt` and the dependent species is `H2`.
-We use these information to retrieve the opacity data from the file and calculate
-species indices in a tensor data.
+In this case, we have two opacity sources:
+
+#. `H2-molecule`, which is a :class:`pyharp.opacity.cpp.MultiBand` molecular opacity source with the data file `sonora_2020_feh+000_co_100.data.196.pt` and the dependent species is `H2mix`. We use these information to retrieve the opacity data from the file and calculate species indices in a tensor data.
+#. `H2-continuum`, which is a :class:`pyharp.opacity.cpp.WaveTemp` continuum opacity source with the data files `H2-H2-eq.xiz.pt` and `H2-He-eq.xiz.pt` and the dependent species is also `H2mix`. The data files for continuum absorption are shipped with Pyharp package. The following statement loads the data file directory such that Pyharp can find them:
+
+  .. code-block:: python
+
+    from pyharp import h2_cia_legacy
 
 Next, we specify the radiation bands, which is a list of band names.
 For each band, a dictionary entry is created with the band name as the key and its properties as the value.
 
 Each band can have its own spectral range, opacity sources, solver, integration method and flags associated with radiative transfer computation.
-In this example, we have one band, `sonora196`, which has a spectral range of 30.8 to 38300 cm :math:`^{-1}`; the opacity source is `H2`; the radiative transfer solver is `disort`; the integration method is `weight` (correlated-K); and the flags passed to `disort` are `lamber`, `quiet`, `onlyfl` and `planck`, which assumes lambertian surface, quiet mode, flux-only calculation and activate planck function for the radiation source function respectively.
+In this example, we have one band, `sonora196`, which has a spectral range of 30.8 to 38300 cm :math:`^{-1}`; the opacity sources are `H2-molecule` and `H2-continuum`; the radiative transfer solver is :class:`disort.cpp.Disort`; the integration method is ``weight`` (correlated-K); and the flags passed to :class:`disort.cpp.Disort` are ``lamber``, ``quiet``, ``onlyfl`` and ``planck``, which assumes lambertian surface, quiet mode, flux-only calculation and activate planck function for the radiation source function respectively.
 
-Please see the `pydisort <https://pydisort.readthedocs.io/en/latest/>`_ documentation for more details on the available options of disort and their meanings.
+Please see the `pydisort <https://pydisort.readthedocs.io/en/latest/>`_ documentation for more details on the available options of :class:`pydisort.DisortOptions` and their meanings.
 
 Load modules
 ~~~~~~~~~~~~
 
-Then, we create a python file and load system modules include `torch`, `numpy` and `os`.
+Then, we create a python file and load system modules include :mod:`torch`, :mod:`numpy` and :mod:`os`.
 These provide basic data structures and functions for numerical computation and file handling.
 
 .. code-block:: python
@@ -88,7 +99,7 @@ These provide basic data structures and functions for numerical computation and 
   import numpy as np
   from typing import Tuple
 
-We will download the ``sonora2020`` opacity dataset and preprocess it to a format that can be used by the Pyharp module.
+We will download the :mod:`pyharp.sonora` opacity dataset and preprocess it to a format that can be used by the Pyharp module.
 These are the submodule functions we need.
 
 .. code-block:: python
@@ -105,6 +116,7 @@ Last, we load Pyharp classes and functions. Pyharp uses a minimal set of classes
 
   import pyharp
   from pyharp import (
+          h2_cia_legacy,
           constants,
           RadiationOptions,
           Radiation,
@@ -117,7 +129,7 @@ That's all you need for the header of the program.
 Pre-process sonora2020 data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``sonora2020`` data is a large dataset that contains the opacity data for hydrogen and helium atmospheres.
+The :mod:`pyharp.sonora` data is a large dataset that contains the opacity data for hydrogen and helium atmospheres.
 We first download a sample of it via the script
 
 .. code-block:: bash
@@ -125,7 +137,7 @@ We first download a sample of it via the script
    fetch-sonora --feh=+000 --co=100
 
 
-The ``fetch-sonora`` script is a command line tool shipped with Pyharp that downloads the ``sonora2020`` data from the Zenodo archive.
+The ``fetch-sonora`` script is a command line tool shipped with Pyharp that downloads the :mod:`pyharp.sonora` data from the Zenodo archive.
 This command will download a file named `sonora_2020_feh+000_co_100.data.196.tar.gz` in the current directory. The ``feh`` argument specifies the metallicity of the atmosphere and the ``co`` argument specifies the carbon-to-oxygen ratio (solar).
 You can check out the various options of the ``fetch-sonora`` script by running
 
@@ -166,8 +178,6 @@ The following function constructs a simple atmosphere model with a given pressur
         atm = {
             'pres' : (pres[1:] * pres[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
             'temp' : (temp[1:] * temp[:-1]).sqrt().unsqueeze(0).expand(ncol, nlyr),
-            'btemp0' : temp[0].unsqueeze(0).expand(ncol),
-            'ttemp0' : temp[-1].unsqueeze(0).expand(ncol),
         }
         return atm
 
@@ -181,7 +191,7 @@ So, generally, we need to loop over the bands and configure them one by one.
 There is no rule for dividing or defining the bands. However, each band must have the same number of spectral points, absorbers, radiation flags and opacity sources.
 The radiative transfer calculation is computed in parallel for every spectral point within each band, but sequentially over bands. So, there is a performance penalty when the number of bands is too large.
 
-Since the ``sonora2020`` dataset is homogeneous despite that it contains opacities for 196 wavenumber bands, we can group all of them in a single band, `sonora196`, with a single opacity source, `H2`, that is of type `multiband-ck`.
+Since the :mod:`pyharp.sonora` dataset is homogeneous despite that it contains opacities for 196 wavenumber bands, we can group all of them in a single band, `sonora196`, with two opacity sources, `H2-molecule`, that is of type :class:`pyharp.opacity.cpp.MultiBand` and `H2-continuum`, that is of type :class:`pyharp.opacity.cpp.WaveTemp`.
 This improves the computational efficiency as the 196 radiative transfer calculations are performed in parallel.
 
 .. code-block:: python
@@ -221,7 +231,7 @@ Specifically, we need to define the albedo, emissivity, temperature of the surfa
 Some boundary conditions are band-dependent, which is reflected in the keys of the `bc` dictionary.
 Others are band-independent, such as the temperature of the surface and the top of the atmosphere.
 
-Here comes the ``forward`` method of the `Radiation` class, which takes the concentration (in mol m :math:`^{-3}`), layer thickness (in m), boundary conditions and atmospheric state (pressure in pa and temperature in K) as inputs and returns the radiative fluxes.
+Here comes the ``forward`` method of :class:`pyharp.cpp.Radiation`, which takes the concentration (in mol m :math:`^{-3}`), layer thickness (in m), boundary conditions and atmospheric state (pressure in pa and temperature in K) as inputs and returns the radiative fluxes.
 
 Throughout the Pyharp code, we will be using SI units unless otherwise specified.
 
@@ -233,11 +243,11 @@ Throughout the Pyharp code, we will be using SI units unless otherwise specified
       bc = {}
       for [name, band] in rad.options.bands().items():
           nwave = len(band.ww())
-          bc[name + "/albedo"] = torch.zeros((nwave, ncol), dtype=torch.float64)
-          bc[name + "/temis"] = torch.ones((nwave, ncol), dtype=torch.float64)
+          bc[name + "/albedo"] = torch.ones((nwave, ncol), dtype=torch.float64)
+          bc[name + "/temis"] = torch.zeros((nwave, ncol), dtype=torch.float64)
 
-      bc["btemp"] = atm['btemp0']
-      bc["ttemp"] = atm['ttemp0']
+      bc["btemp"] = torch.zeros((ncol), dtype=torch.float64)
+      bc["ttemp"] = torch.zeros((ncol), dtype=torch.float64)
 
       return rad.forward(conc, dz, bc, atm)
 
@@ -245,8 +255,11 @@ The main program
 ~~~~~~~~~~~~~~~~
 
 This is the main program that calls the above functions and runs the radiative transfer model.
-The ``run_rt`` function produces three radiative fluxes: 1) net flux at each atmospheric
-layer, 2) downward flux to the surface and 3) upward flux at the top of the atmosphere.
+The ``run_rt`` function produces three radiative fluxes:
+
+#. net flux at each atmospheric layer
+#. downward flux to the surface
+#. upward flux at the top of the atmosphere
 
 The first two fluxes are important for forcing the atmospheric circulation and the
 coupling between the atmosphere and the surface, while the last one is important for the
