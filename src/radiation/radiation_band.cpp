@@ -7,6 +7,7 @@
 #include <harp/opacity/fourcolumn.hpp>
 #include <harp/opacity/grey_opacities.hpp>
 #include <harp/opacity/helios.hpp>
+#include <harp/opacity/jit_opacity.hpp>
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
@@ -72,6 +73,10 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
 
     if (it["nmom"]) {
       a.nmom(it["nmom"].as<int>());
+    }
+
+    if (it["fractions"]) {
+      a.fractions(it["fractions"].as<std::vector<double>>());
     }
 
     my.opacities()[op_name] = a;
@@ -172,11 +177,8 @@ void RadiationBandImpl::reset() {
 
   // create opacities
   for (auto const& [name, op] : options.opacities()) {
-    if (op.type() == "user") {
-      TORCH_CHECK(op.user().is_empty(),
-                  "user opacity not found, please set 'user' field in "
-                  "AttenuatorOptions");
-      opacities[name] = op.user().clone();
+    if (op.type() == "jit") {
+      opacities[name] = torch::nn::AnyModule(JITOpacity(op));
     } else if (op.type() == "rfm-lbl") {
       auto a = RFM(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
@@ -233,8 +235,8 @@ void RadiationBandImpl::reset() {
 
   // create rtsolver
   auto [uphi, umu] = get_direction_grids<double>(ray_out);
-  if (options.solver_name() == "user") {
-    rtsolver = options.user().clone();
+  if (options.solver_name() == "jit") {
+    // rtsolver = options.user().clone();
     register_module("solver", rtsolver.ptr());
   } else if (options.solver_name() == "disort") {
     rtsolver = torch::nn::AnyModule(disort::Disort(options.disort()));

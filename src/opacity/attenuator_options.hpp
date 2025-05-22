@@ -21,6 +21,9 @@ struct AttenuatorOptions {
   //! list of dependent species indices
   ADD_ARG(std::vector<int>, species_ids) = {};
 
+  //! list of kwargs to pass to the JIT module
+  ADD_ARG(std::vector<std::string>, jit_kwargs) = {};
+
   //! opacity scale
   ADD_ARG(double, scale) = 1.0;
 
@@ -65,9 +68,6 @@ struct AttenuatorOptions {
 
   //! number of scattering moments
   ADD_ARG(int, nmom) = 0;
-
-  //! user-supplid opacities
-  ADD_ARG(torch::nn::AnyModule, user) = torch::nn::AnyModule();
 };
 
 }  // namespace harp

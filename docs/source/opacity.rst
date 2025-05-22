@@ -1,4 +1,4 @@
-How to set opacity sources
+Working with opacity class
 ==========================
 
 At the core of Pyharp is the way of managing and using different flavors of opacities.
@@ -7,9 +7,7 @@ optical properties. If you have two opacity sources that share the same file for
 belong to the same opacity source category (type).
 
 It is also possible that user supplies a function that can compute and return the optical
-properties without using any data file. This would be the case when the opacity source is
-simple, e.g. a grey opacity. A user can do that by defining a :class:`torch.nn.Module` and passing it to
-the :meth:`pyharp.opacity.AttenuatorOptions.user` field.
+properties without using any data file. See :ref:`new_opacity` for more details.
 
 A complete list of supported opacity types is given in the table below.
 
@@ -22,10 +20,9 @@ A complete list of supported opacity types is given in the table below.
   * - Key
     - Format
     - Description
-  * - 'user'
-    - None
-    - User-supplied opacity module. The ``user`` field
-      must be set to use this option
+  * - 'jit'
+    - '.pt' (saved by :func:`torch.jit.save`)
+    - Just-In-Time scripted opacity model
   * - 'rfm-lbl'
     - NetCDF
     - Line-by-line absorption data computed by RFM
@@ -54,6 +51,8 @@ A complete list of supported opacity types is given in the table below.
       #. Henyey-Greenstein asymmetry factor (g)
 
 We give a few examples showing how to use these opacity class to load and compute optical properties.
+
+.. _example_sonora:
 
 Example 1. Compute Sonora2020 molecular opacities
 -------------------------------------------------
@@ -152,8 +151,8 @@ The ``forward`` method of an opacity class takes two arguments:
 
 By choosing different values for the `conc` argument, the ``forward`` method can be multi-purpose:
 
-#. if `conc` is one, the returned `result` is interpreted as the extinction coefficient in m :math:`^2`/mol
-#. if `conc` is concentration in mol/m :math:`^3`, the return `result` is interpreted as the extinction coefficient in 1/m.
+#. if `conc` is one, the returned `result` is interpreted as the extinction coefficient in m^2/mol
+#. if `conc` is concentration in mol/m^3, the return `result` is interpreted as the extinction coefficient in 1/m.
    You can further multiply it by the layer thickness in m to get the optical thickness of the layer.
 
 Example 2. Compute Hydrogen continuum opacities
@@ -174,7 +173,7 @@ You can find out the absolute path of the data files using:
   from pyharp import find_resource
   print(find_resource("H2-H2-eq.xiz.pt"))
 
-Similar to the Example 1, we set up the opacity class first:
+Similar to :ref:`Example 1 <example_sonora>`, we set up the opacity class first:
 
 .. code-block:: python
 
@@ -190,7 +189,7 @@ For this example, hydrogen-hydrogen continuum and hydrogen-helium continuum
 are stored in two separate files. The fractions of the two molecules are 0.9 and 0.1 respectively within the species id 0.
 
 The continumm absorption is a function of temperature and wavenumber.
-Set these up like:
+Set these fields up like:
 
 .. code-block:: python
 
@@ -209,65 +208,59 @@ Last, we call the ``forward`` method to compute the optical properties:
 
 Be aware that we have used the :meth:`torch.Tensor.unsqueeze` method to add back the degenerate dimension.
 
-Details of opacity sources
---------------------------
+.. _new_opacity:
 
-Pyharp ships with a number of opacity sources that can be used to compute the
-optical properties of the plantary atmosphere.
+Example 3. Add a new opacity
+----------------------------
 
-Sonora2020 molecular opacities
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One of the most powerful features of Pyharp is the ability to add a new opacity source easily. This is fasciliated by the Just-In-Time (JIT) compilation feature of PyTorch.
 
-This is a database of pre-mixed Correlated-K hydrogen-helium opacities with abundances given by equilibrium chemistry
-for each metallicity-C/O combination (version 3) [1]_.
-It has been used for brown dwarf atmospheres [2]_.
-View this `document <_static/sonora2020_opacity_references_20201.pdf>`_ for references of opacities included in the database.
+JIT compilation scripts (compiles) a python module and saves the binary code to a file. The saved file can be loaded and used in the same way as the built-in opacity sources.
 
-Use the following script to checkout options and download the Sonora2020 database:
+Let's define a grey opacity source that has 0.1 m^2/mol cross-section for all wavelengths:
 
-.. code-block:: bash
+.. code-block:: python
 
-   fetch-sonora -h
+  import torch
 
-By default, ``fetch-sonora`` downloads the database with [Fe/H] = 0.0 and C/O = 1 times solar abundances.
+  class GreyOpacity(torch.nn.Module):
+      species_id = 0
+      def forward(self, conc: torch.Tensor) -> torch.Tensor:
+          return (0.1 * conc[species_id]).unsqueeze(-1)
 
-The following functions are available to process the original Sonora2020 opacities and
-load/save them in the :mod:`torch`'s ``pt`` format.
+Then we create a model, script it, and save it to a file:
 
-.. automodule:: pyharp.sonora
-   :members:
-   :undoc-members:
-   :imported-members:
+.. code-block:: python
 
-Hydrogen and Helium continuum
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  model = GreyOpacity()
+  scripted = torch.jit.script(model)
+  scripted.save("grey_opacity.pt")
 
-Pyharp ships with the following continuum opacity sources for H2 and He:
+We use the :class:`pyharp.opacity.cpp.JITOpacity` class to load the JIT compiled model from the ``.pt`` file:
 
-#. H2-H2-eq.xiz.pt
-#. H2-He-eq.xiz.pt
-#. H2-H2-nm.xiz.pt
-#. H2-He-nm.xiz.pt
-#. H2-H2-eq.orton.pt
-#. H2-He-eq.orton.pt
-#. H2-H2-nm.orton.pt
-#. H2-He-nm.orton.pt
+.. code-block:: python
 
-These are legacy files that have been used the original HARP publication [3]_.
-They are used here in Pyharp to compute the collisional induced absorption (CIA) of H2 and He molecules.
-The following functions have been used to process the legacy CIA data files:
+  from pyharp.opacity import AttenuatorOptions, JITOpacity
 
-.. automodule:: pyharp.h2_cia_legacy
-   :members:
-   :undoc-members:
-   :imported-members:
+  op = AttenuatorOptions().type("jit")
+  op.opacity_files(["grey_opacity.pt"])
+
+  ab = JITOpacity(op)
+
+Finally, calculating the opacity is the same as before:
+
+.. code-block:: python
+
+  conc = torch.ones(3, 5)
+  result = ab.forward(conc, {})
 
 
-Add a new opacity format
-------------------------
+Summary
+-------
 
-References
-----------
-.. [1] Lupu, R., et al. "Correlated k coefficients for H2-He atmospheres; 196 spectral windows and 1460 pressure-temperature points." Zenodo, doi 0.5281/zenodo.5590988 (2021).
-.. [2] Marley, Mark S., et al. "The Sonora brown dwarf atmosphere and evolution models. I. Model description and application to cloudless atmospheres in rainout chemical equilibrium." The Astrophysical Journal 920.2 (2021): 85.
-.. [3] Li, C., Le, T., Zhang, X., & Yung, Y. L. (2018). A high-performance atmospheric radiation package: With applications to the radiative energy budgets of giant planets. Journal of Quantitative Spectroscopy and Radiative Transfer, 217, 353-362.
+From these examples, we can see that :class:`pyharp.opacity.AttenuatorOptions` is
+the central class that manages the opacity source.
+This is a general structure of how classes in Pyharp are organized.
+There is an `Options` class that manages the parameters of a class.
+The actual class that does the computation is initialized from the `Options` class.
+All opacity classes with :ref:`opacity_classes` follow this pattern and :class:`pyharp.cpp.RadiationBand` and :class:`pyharp.cpp.Radiation` classes also follow this pattern.

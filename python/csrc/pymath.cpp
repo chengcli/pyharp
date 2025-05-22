@@ -15,6 +15,9 @@ Args:
   coords (list[torch.Tensor]): Coordinate arrays, len = ndim, each tensor has shape (nx1,), (nx2,) ...
   lookup (torch.Tensor): Lookup tensor (nx1, nx2, ..., nval)
 
+Returns:
+  torch.Tensor: Interpolated values
+
 Examples:
   .. code-block:: python
 
