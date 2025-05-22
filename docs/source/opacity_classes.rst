@@ -1,3 +1,5 @@
+.. _opacity_classes:
+
 Opacity Classes
 ---------------
 

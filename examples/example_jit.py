@@ -24,17 +24,4 @@ op.opacity_files(["grey_opacity.pt"])
 
 ab = JITOpacity(op)
 conc = torch.ones(3, 5)
-atm = {
-    'temp': torch.tensor([100.0, 300.0, 600.0]).unsqueeze(-1),
-    'pressure': torch.tensor([1.0, 10.0, 100.0]).unsqueeze(-1),
-}
-print(ab.forward(conc, atm))
-
-#config_file = "example_sonora_2020.yaml"
-#rad_op = RadiationOptions.from_yaml(config_file)
-#grey_op = AttenuatorOptions().type("user")
-#print(grey_op)
-#rad = Radiation(rad_op)
-#print(rad.bands()['sonora196'])
-#rad_op.bands()['sonora196'].opacities()["grey"] = GreyOpacity()
-#print(rad_op.bands()['sonora196'].opacities())
+print(ab.forward(conc, {}))
