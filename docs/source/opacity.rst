@@ -1,5 +1,5 @@
-Working with opacity class
-==========================
+Working with the opacity class
+==============================
 
 At the core of Pyharp is the way of managing and using different flavors of opacities.
 We define a distinct opacity source by the file format of the data it uses to compute the
@@ -9,12 +9,12 @@ belong to the same opacity source category (type).
 It is also possible that user supplies a function that can compute and return the optical
 properties without using any data file. See :ref:`new_opacity` for more details.
 
-A complete list of supported opacity types is given in the table below.
+A complete list of built-in opacity types is given in the table below.
 
 .. _opacity_choices:
 
-.. list-table:: List of supported opacity types
-  :widths: 15 10 20
+.. list-table:: List of built-in opacity types
+  :widths: 12 10 20
   :header-rows: 1
 
   * - Key
@@ -67,9 +67,7 @@ and preprocess the data using:
 
 .. code-block:: python
 
-   from pyharp.sonora import (
-      load_sonora_data, load_sonora_window,
-   )
+   from pyharp.sonora import load_sonora_data
    fname = "sonora_2020_feh+000_co_100.data.196"
 
    # load sonora data into a dictionary
@@ -177,7 +175,6 @@ Similar to :ref:`Example 1 <example_sonora>`, we set up the opacity class first:
 
 .. code-block:: python
 
-  from pyharp import h2_cia_legacy
   from pyharp.opacity import AttenuatorOptions, WaveTemp
   op = AttenuatorOptions().type("wavetemp")
   op.opacity_files(["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"])
@@ -259,8 +256,8 @@ Summary
 -------
 
 From these examples, we can see that :class:`pyharp.opacity.AttenuatorOptions` is
-the central class that manages the opacity source.
+the central class that manages the opacity source options.
 This is a general structure of how classes in Pyharp are organized.
-There is an `Options` class that manages the parameters of a class.
+There is always an `Options` class that manages the parameters of a class.
 The actual class that does the computation is initialized from the `Options` class.
-All opacity classes with :ref:`opacity_classes` follow this pattern and :class:`pyharp.cpp.RadiationBand` and :class:`pyharp.cpp.Radiation` classes also follow this pattern.
+All opacity classes within :ref:`opacity_classes` follow this pattern and :class:`pyharp.cpp.RadiationBand` and :class:`pyharp.cpp.Radiation` classes also follow this pattern.
