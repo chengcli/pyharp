@@ -21,7 +21,7 @@ Calculate blackbody flux using wavenumber
 Args:
   wave (torch.Tensor): wavenumber [cm^-1]
   temp (float): temperature [K]
-  ncol (int, optional) number of columns, default to 1
+  ncol (int, optional): number of columns, default to 1
 
 Returns:
   torch.Tensor: blackbody flux [w/(m^2 cm^-1)]
@@ -89,7 +89,7 @@ Calculate the height between pressure levels using the hypsometric equation
 
 .. math::
 
-  dz = \frac{R}{g} \cdot T \cdot \ln\left(\frac{p_1}{p_2}\right)
+  dz = \frac{RT}{g} \cdot d\ln p
 
 where :math:`R` is the specific gas constant, :math:`g` is the gravity,
 :math:`T` is the temperature, :math:`p_1` and :math:`p_2` are the pressure levels.

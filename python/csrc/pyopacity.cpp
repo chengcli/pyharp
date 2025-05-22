@@ -157,6 +157,7 @@ JIT opacity model
 Args:
   conc (torch.Tensor): concentration of the species in mol/m^3
   kwargs (dict[str, torch.Tensor]): keyword arguments passed to the JIT model
+
     The keyword arguments must be provided in the form of a dictionary.
     The keys of the dictionary are the names of the input tensors
     and the values are the corresponding tensors.
@@ -175,17 +176,17 @@ Args:
   conc (torch.Tensor): concentration of the species in mol/m^3
 
   kwargs (dict[str, torch.Tensor]): keyword arguments.
-    Both 'temp' [k] and ('wavenumber' [cm^{-1}] or 'wavelength' [num]) must be provided
+
+    Both 'temp' [k] and ('wavenumber' [cm^{-1}] or 'wavelength' [um]) must be provided
 
 Returns:
   torch.Tensor:
-    attenuation [1/m], single scattering albedo and scattering phase function
-    The shape of the output tensor is (nwave, ncol, nlyr, 1)
+    The shape of the output tensor is (nwave, ncol, nlyr, *),
     where nwave is the number of wavelengths,
     ncol is the number of columns,
-    nlyr is the number of layers,
-    1 is for attenuation coefficients,
-    and nmom is the number of scattering moments.
+    nlyr is the number of layers.
+    The last dimension is the optical properties arranged
+    in the order of attenuation [1/m], single scattering albedo and scattering phase function.
 
 Examples:
   .. code-block:: python
@@ -202,18 +203,18 @@ Multi-band opacity data
 Args:
   conc (torch.Tensor): concentration of the species in mol/m^3
 
-  kwargs (dict[str, torch.Tensor]): keyword arguments.
+  kwargs (dict[str, torch.Tensor]): keyword arguments
+
     Both 'temp' [k] and 'pres' [pa] must be provided
 
 Returns:
   torch.Tensor:
-    attenuation [1/m], single scattering albedo and scattering phase function
-    The shape of the output tensor is (nwave, ncol, nlyr, 1)
+    The shape of the output tensor is (nwave, ncol, nlyr, 1),
     where nwave is the number of wavelengths,
     ncol is the number of columns,
-    nlyr is the number of layers,
-    1 is for attenuation coefficients,
-    and nmom is the number of scattering moments.
+    nlyr is the number of layers.
+    The last dimension is the optical properties arranged
+    in the order of attenuation [1/m], single scattering albedo and scattering phase function.
 
 Examples:
   .. code-block:: python
@@ -230,20 +231,20 @@ Four-column opacity data
 Args:
   conc (torch.Tensor): concentration of the species in mol/m^3
 
-  kwargs (dict[str, torch.Tensor]): keyword arguments.
+  kwargs (dict[str, torch.Tensor]): keyword arguments
+
     Either 'wavelength' or 'wavenumber' must be provided
     if 'wavelength' is provided, the unit is um.
-    if 'wavenumber' is provided, the unit is cm^-1.
+    if 'wavenumber' is provided, the unit is cm^{-1}.
 
 Returns:
   torch.Tensor:
-    attenuation [1/m], single scattering albedo and scattering phase function
-    The shape of the output tensor is (nwave, ncol, nlyr, 2 + nmom)
+    The shape of the output tensor is (nwave, ncol, nlyr, 2+nmom),
     where nwave is the number of wavelengths,
     ncol is the number of columns,
-    nlyr is the number of layers,
-    2 is for attenuation and scattering coefficients,
-    and nmom is the number of scattering moments.
+    nlyr is the number of layers.
+    The last dimension is the optical properties arranged
+    in the order of attenuation [1/m], single scattering albedo and scattering phase function, where nmom is the number of scattering moments.
 
 Examples:
   .. code-block:: python
@@ -260,18 +261,20 @@ Line-by-line absorption data computed by RFM
 Args:
   conc (torch.Tensor): concentration of the species in mol/m^3
   kwargs (dict[str, torch.Tensor]): keyword arguments
+
     Either 'wavelength' or 'wavenumber' must be provided
-    if 'wavelength' is provided, the unit is nm.
-    if 'wavenumber' is provided, the unit is cm^-1.
+    if 'wavelength' is provided, the unit is um.
+    if 'wavenumber' is provided, the unit is cm^{-1}.
 
 Returns:
-  torch.Tensor: attenuation [1/m], single scattering albedo and scattering phase function
-    The shape of the output tensor is (nwave, ncol, nlyr, 2 + nmom)
+  torch.Tensor:
+    The shape of the output tensor is (nwave, ncol, nlyr, 1),
     where nwave is the number of wavelengths,
     ncol is the number of columns,
-    nlyr is the number of layers,
-    2 is for attenuation and scattering coefficients,
-    and nmom is the number of moments.
+    nlyr is the number of layers.
+    The last dimension is the optical properties arranged
+    in the order of attenuation [1/m], single scattering albedo and scattering phase function.
+
 
 Examples:
   .. code-block:: python
