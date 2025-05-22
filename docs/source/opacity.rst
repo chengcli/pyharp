@@ -1,5 +1,5 @@
-How to set opacity sources
-==========================
+How to define opacity sources
+=============================
 
 At the core of Pyharp is the way of managing and using different flavors of opacities.
 We define a distinct opacity source by the file format of the data it uses to compute the

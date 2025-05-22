@@ -1,62 +1,10 @@
 API Reference
 =============
 
-Global States
--------------
+.. toctree::
+   :maxdepth: 2
 
-The following functions are used to set and get global states in the Pyharp package.
-
-.. autofunction:: pyharp.species_names
-.. autofunction:: pyharp.species_weights
-.. autofunction:: pyharp.shared
-.. autofunction:: pyharp.set_search_paths
-.. autofunction:: pyharp.get_search_paths
-.. autofunction:: pyharp.find_resource
-
-Radiation Classes
------------------
-
-The following classes are used to configure and compute radiative transfer.
-
-.. autoclass:: pyharp.RadiationOptions
-   :members:
-
-.. autoclass:: pyharp.RadiationBandOptions
-   :members:
-
-.. autoclass:: pyharp.cpp.RadiationBand
-   :members: __init__, forward
-
-.. autoclass:: pyharp.cpp.Radiation
-   :members: __init__, forward
-
-Opacity Classes
----------------
-
-.. autoclass:: pyharp.opacity.AttenuatorOptions
-   :members:
-
-.. autoclass:: pyharp.opacity.cpp.FourColumn
-   :members: __init__, forward
-
-.. autoclass:: pyharp.opacity.cpp.MultiBand
-   :members: __init__, forward
-
-.. autoclass:: pyharp.opacity.cpp.WaveTemp
-   :members: __init__, forward
-
-.. autoclass:: pyharp.opacity.cpp.RFM
-   :members: __init__, forward
-
-.. autoclass:: pyharp.opacity.cpp.JITOpacity
-   :members: __init__, forward
-
-Helper Functions
-----------------
-
-The following functions are auxiliary (helper) functions frequently used in radiative transfer problems.
-
-.. autofunction:: pyharp.bbflux_wavenumber
-.. autofunction:: pyharp.bbflux_wavelength
-.. autofunction:: pyharp.calc_dz_hypsometric
-.. autofunction:: pyharp.interpn
+   global_states
+   radiation_classes
+   opacity_classes
+   helper_functions
