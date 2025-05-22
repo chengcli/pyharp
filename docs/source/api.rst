@@ -48,6 +48,9 @@ Opacity Classes
 .. autoclass:: pyharp.opacity.cpp.RFM
    :members: __init__, forward
 
+.. autoclass:: pyharp.opacity.cpp.JITOpacity
+   :members: __init__, forward
+
 Helper Functions
 ----------------
 

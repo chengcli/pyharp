@@ -4,6 +4,7 @@
 // harp
 #include <harp/opacity/attenuator_options.hpp>
 #include <harp/opacity/fourcolumn.hpp>
+#include <harp/opacity/jit_opacity.hpp>
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/rfm.hpp>
@@ -43,7 +44,7 @@ Examples:
       .ADD_OPTION(std::string, harp::AttenuatorOptions, type, R"doc(
 Set or get the type of the opacity source format
 
-Valid options are, ``user``, ``rfm-lbl``, ``rfm-ck``, ``four-column``, ``wavetemp``, ``multiband``.
+Valid options are, ``jit``, ``rfm-lbl``, ``rfm-ck``, ``four-column``, ``wavetemp``, ``multiband``.
 See :ref:`opacity_choices` for more details.
 
 Args:
@@ -113,6 +114,25 @@ Examples:
     >>> op = AttenuatorOptions().species_ids([1, 2])
         )doc")
 
+      .ADD_OPTION(std::vector<std::string>, harp::AttenuatorOptions, jit_kwargs,
+                  R"doc(
+Set or get the list of kwargs to pass to the JIT module
+
+Args:
+  jit_kwargs (list[str]): list of kwargs to pass to the JIT module
+
+Returns:
+  AttenuatorOptions | list[str]: class object if argument is not empty, otherwise the list of kwargs to pass to the JIT module
+
+Examples:
+  .. code-block:: python
+
+    >>> import torch
+    >>> from pyharp.opacity import AttenuatorOptions
+    >>> op = AttenuatorOptions().jit_kwargs(['temp', 'wavelength'])
+    >>> print(op.jit_kwargs())
+        )doc")
+
       .ADD_OPTION(std::vector<double>, harp::AttenuatorOptions, fractions,
                   R"doc(
 Set or get fractions of species in cia calculatioin
@@ -129,29 +149,30 @@ Examples:
     >>> import torch
     >>> from pyharp.opacity import AttenuatorOptions
     >>> op = AttenuatorOptions().fractions([0.9, 0.1])
-        )doc")
+        )doc");
 
-      .ADD_OPTION(torch::nn::AnyModule, harp::AttenuatorOptions, user, R"doc(
-Enroll a user-supplied opacity source
+  ADD_HARP_MODULE(JITOpacity, AttenuatorOptions, R"doc(
+JIT opacity model
+
 Args:
-  user (torch.nn.Module): user-supplied opacity source
+  conc (torch.Tensor): concentration of the species in mol/m^3
+  kwargs (dict[str, torch.Tensor]): keyword arguments passed to the JIT model
+    The keyword arguments must be provided in the form of a dictionary.
+    The keys of the dictionary are the names of the input tensors
+    and the values are the corresponding tensors.
+    Since the JIT model only accepts positional arguments,
+    the keyword arguments are passed according to the order of the keys in the dictionary.
 
 Returns:
-  AttenuatorOptions | torch.nn.Module: class object if argument is not empty, otherwise the user-supplied opacity source
-
-Examples:
-  .. code-block:: python
-
-    >>> import torch
-    >>> from pyharp.opacity import AttenuatorOptions
-    >>> op = AttenuatorOptions().user(torch.nn.Module())
-        )doc");
+  torch.Tensor: results of the JIT opacity model
+        )doc",
+                  py::arg("conc"), py::arg("kwargs"));
 
   ADD_HARP_MODULE(WaveTemp, AttenuatorOptions, R"doc(
 Wave-Temp opacity data
 
 Args:
-  conc (torch.Tensor): concentration of the species in mol/cm^3
+  conc (torch.Tensor): concentration of the species in mol/m^3
 
   kwargs (dict[str, torch.Tensor]): keyword arguments.
     Both 'temp' [k] and ('wavenumber' [cm^{-1}] or 'wavelength' [num]) must be provided
@@ -179,7 +200,7 @@ Examples:
 Multi-band opacity data
 
 Args:
-  conc (torch.Tensor): concentration of the species in mol/cm^3
+  conc (torch.Tensor): concentration of the species in mol/m^3
 
   kwargs (dict[str, torch.Tensor]): keyword arguments.
     Both 'temp' [k] and 'pres' [pa] must be provided
@@ -207,7 +228,7 @@ Examples:
 Four-column opacity data
 
 Args:
-  conc (torch.Tensor): concentration of the species in mol/cm^3
+  conc (torch.Tensor): concentration of the species in mol/m^3
 
   kwargs (dict[str, torch.Tensor]): keyword arguments.
     Either 'wavelength' or 'wavenumber' must be provided
@@ -237,7 +258,7 @@ Examples:
 Line-by-line absorption data computed by RFM
 
 Args:
-  conc (torch.Tensor): concentration of the species in mol/cm^3
+  conc (torch.Tensor): concentration of the species in mol/m^3
   kwargs (dict[str, torch.Tensor]): keyword arguments
     Either 'wavelength' or 'wavenumber' must be provided
     if 'wavelength' is provided, the unit is nm.
