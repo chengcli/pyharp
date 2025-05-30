@@ -1,5 +1,5 @@
-Working with opacity class
-==========================
+Working with the opacity class
+==============================
 
 At the core of Pyharp is the way of managing and using different flavors of opacities.
 We define a distinct opacity source by the file format of the data it uses to compute the
@@ -9,19 +9,19 @@ belong to the same opacity source category (type).
 It is also possible that user supplies a function that can compute and return the optical
 properties without using any data file. See :ref:`new_opacity` for more details.
 
-A complete list of supported opacity types is given in the table below.
+A complete list of built-in opacity types is given in the table below.
 
 .. _opacity_choices:
 
-.. list-table:: List of supported opacity types
-  :widths: 15 10 20
+.. list-table:: List of built-in opacity types
+  :widths: 12 10 20
   :header-rows: 1
 
   * - Key
     - Format
     - Description
   * - 'jit'
-    - '.pt' (saved by :func:`torch.jit.save`)
+    - '.pt' (saved by :func:`torch.jit.save` or :func:`pyharp.compile`)
     - Just-In-Time scripted opacity model
   * - 'rfm-lbl'
     - NetCDF
@@ -67,9 +67,7 @@ and preprocess the data using:
 
 .. code-block:: python
 
-   from pyharp.sonora import (
-      load_sonora_data, load_sonora_window,
-   )
+   from pyharp.sonora import load_sonora_data
    fname = "sonora_2020_feh+000_co_100.data.196"
 
    # load sonora data into a dictionary
@@ -177,7 +175,6 @@ Similar to :ref:`Example 1 <example_sonora>`, we set up the opacity class first:
 
 .. code-block:: python
 
-  from pyharp import h2_cia_legacy
   from pyharp.opacity import AttenuatorOptions, WaveTemp
   op = AttenuatorOptions().type("wavetemp")
   op.opacity_files(["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"])
@@ -217,6 +214,15 @@ One of the most powerful features of Pyharp is the ability to add a new opacity 
 
 JIT compilation scripts (compiles) a python module and saves the binary code to a file. The saved file can be loaded and used in the same way as the built-in opacity sources.
 
+The class signature and variable dimensions are strict though.
+The class must have a forward method that takes a concentration tensor and returns an opacity tensor.
+
+The concentration vector is 3D with dimensions (ncol, nlyr, nspecies), where ncol is the number of columns, nlyr is the number of layers, and nspecies is the number of species.
+
+The opacity tensor is 4D with dimensions (nwave, ncol, nlyr, nprop), where nwave is the number of wavelengths, ncol is the number of columns, nlyr is the number of layers, and nprop is the number of optical properties.
+
+The first optical property is the total extinction cross-section [m^2/mol]. The second optical property is the single scattering albedo. Starting from the third, the optical properties are phase function moments (excluding the zero-th moment).
+
 Let's define a grey opacity source that has 0.1 m^2/mol cross-section for all wavelengths:
 
 .. code-block:: python
@@ -224,15 +230,27 @@ Let's define a grey opacity source that has 0.1 m^2/mol cross-section for all wa
   import torch
 
   class GreyOpacity(torch.nn.Module):
-      species_id = 0
-      def forward(self, conc: torch.Tensor) -> torch.Tensor:
-          return (0.1 * conc[species_id]).unsqueeze(-1)
+    def __init__(self, nwave: int, nprop: int):
+        super().__init__()
+        self.nwave = nwave
+        self.nprop = nprop
 
-Then we create a model, script it, and save it to a file:
+    def forward(self, conc: torch.Tensor) -> torch.Tensor:
+        ncol, nlyr = conc.shape[0], conc.shape[1]
+        return 0.1 * torch.ones((self.nwave, ncol, nlyr, self.nprop), dtype=torch.float64)
+
+We provide the :class:`pyharp.compile` function that creates a model, scripts it, and saves it to a file:
 
 .. code-block:: python
 
-  model = GreyOpacity()
+  pyharp.compile(GreyOpacity(1,1), "grey_opacity.pt")
+
+
+This function is equivalent to the following three steps:
+
+.. code-block:: python
+
+  model = GreyOpacity(1, 1)
   scripted = torch.jit.script(model)
   scripted.save("grey_opacity.pt")
 
@@ -259,8 +277,8 @@ Summary
 -------
 
 From these examples, we can see that :class:`pyharp.opacity.AttenuatorOptions` is
-the central class that manages the opacity source.
+the central class that manages the opacity source options.
 This is a general structure of how classes in Pyharp are organized.
-There is an `Options` class that manages the parameters of a class.
+There is always an `Options` class that manages the parameters of a class.
 The actual class that does the computation is initialized from the `Options` class.
-All opacity classes with :ref:`opacity_classes` follow this pattern and :class:`pyharp.cpp.RadiationBand` and :class:`pyharp.cpp.Radiation` classes also follow this pattern.
+All opacity classes within :ref:`opacity_classes` follow this pattern and :class:`pyharp.cpp.RadiationBand` and :class:`pyharp.cpp.Radiation` classes also follow this pattern.

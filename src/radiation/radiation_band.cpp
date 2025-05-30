@@ -233,6 +233,10 @@ void RadiationBandImpl::reset() {
     register_module(name, opacities[name].ptr());
   }
 
+  // check waves are correctly set
+  TORCH_CHECK(options.ww().size() > 0, "Spectral grid ww() undefined for band ",
+              options.name());
+
   // create rtsolver
   auto [uphi, umu] = get_direction_grids<double>(ray_out);
   if (options.solver_name() == "jit") {

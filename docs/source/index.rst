@@ -3,12 +3,17 @@ Pyharp Documentation
 
 .. toctree::
     :maxdepth: 2
-    :caption: Contents:
+    :caption: Contents
     :glob:
 
-    api
     opacity
     builtin_opacities
+    radiation
+    api
+    trouble
+
+Introduction
+------------
 
 Pyharp module provides a python interface to the C++ version of the HARP (High-performance Atmospheric Radiation Package) program [1]_.
 It contains a minimum set of classes and subroutines for computing the radiative fluxes and radiances for a plane-parallel atmosphere.

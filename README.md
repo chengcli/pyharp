@@ -1,17 +1,58 @@
-# Pyharp: High-performance Atmosphere Radiation Package in Python
+# Pyharp: Python-first High-performance Atmosphere Radiation Package
 
 [![build](https://github.com/chengcli/pyharp/actions/workflows/ci.yml/badge.svg)](https://github.com/chengcli/pyharp/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://img.shields.io/badge/license-MIT-blue)
 
+Pyharp is the one-stop tool for calculating the radiation flux of planetary atmospheres,
+from terrestrial to giant planets.
+Detailed documentation and examples are available at [https://pyharp.readthedocs.io](https://pyharp.readthedocs.io).
+
 ## Installation
 
-Pyharp can be installed on either a Linux distribution or on MacOS via ``pip``:
+Pyharp can be installed via ``pip``:
 
 ```bash
 pip install pyharp
 ```
 
-You can also install it locally, which allows you to modify the source code and test it locally.
+We support Linux and Mac operation systems with Python version 3.9+.
+
+---
+
+## Supported opacities
+
+Pyharp has built-in functionalities that work with various opacity sources.
+The following table summaries off-the-shelf opacities.
+
+| Opacity Name          | Tested    | Peer Reviewed | References    |
+|-----------------------|-----------|---------------|---------------|
+| Premix H2 molecule    | YES       | NO            | [1]           |
+| H2-He continuum       | YES       | YES           | [2]           |
+| CO2 molecule          | YES       | NO            |               |
+| CO2 continuum         | YES       | NO            |               |
+| H2O molecule          | YES       | NO            |               |
+| H2O continuum         | YES       | NO            |               |
+| N2 molecule           | YES       | NO            |               |
+| N2 continuum          | YES       | NO            |               |
+| Grey (user implement) | YES       | NO            |               |
+| *(More coming)*       | ...       | ...           |               |
+
+## Supported radiative transfer solvers
+
+You can choose the backend radiative transfer solver to use by Pyharp.
+Here are the available options:
+
+| Radiative Transfer Solver | Tested    | Peer Reviewed | References |
+|---------------------------|-----------|---------------|------------|
+| DISORT                    | YES       | YES           | [1]        |
+| Two-steam (Toon-McKay)    | NO        | NO            |            |
+
+---
+
+## Development
+
+If you want to further develop Pyharp, you will need to install it locally, which allows you
+to modify the source code and test.
 Open a Linux or Mac terminal and clone this repo using the following command:
 
 ```bash
@@ -62,11 +103,12 @@ and start configuring the compile environment. Then compile the code by
 ```
 make -j4
 ```
-This comman will use 4 cores to compile the code in parallel. Once complete, all executable
-files will be placed in `build/bin`.
+This comman will use 4 cores to compile the code in parallel. Once complete, all
+executable files will be placed in `build/bin`.
 
 ### Build python package locally (dev mode)
-The python library can be installed by running the following command:
+The python library can be installed by running the following command in the root
+directory:
 ```bash
 pip install -e .
 ```
@@ -77,29 +119,16 @@ To test the installation, import pyharp in a python shell:
 import pyharp
 ```
 The build is successful if you do not see any error messages.
-Detailed documentation and examples are available at [https://pyharp.readthedocs.io](https://pyharp.readthedocs.io).
-
----
-
-## Supported Opacities
-| Opacity Name  | Tested    | Peer Reviewed | Reference |
-|---------------|-----------|---------------|-----------|
-| rfm-lbl       | NO        | |           |
-| rfm-ck        | YES       | |           |
-| helios        | NO       | |           |
-| simple-grey   | NO       | |           |
-| freedman-mean | NO       | |           |
-| jup-gas-vis   | NO       | |           |
-| jup-gas-ir    | NO       | |           |
-| *(More coming)*| ...      | ...           |           |
 
 ---
 
 ## Contributing
 Contributions are welcome!
 Please open an issue or PR if you’d like to:
-- Add new opacity sources
-- Add command line tools or add GUI
+- Find a bug
+- Suggest new functions
+- Add examples
+- Improve documentation
 - Expand test coverage
 
 ---
