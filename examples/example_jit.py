@@ -23,14 +23,14 @@ class GreyOpacity(torch.nn.Module):
     where nwave is the number of wavelengths, ncol is the number of columns,
     nlyr is the number of layers, and nprop is the number of optical properties.
 
-    The first optical property is the total extinction coefficient.
+    The first optical property is the total extinction cross-section [m^2/mol].
     The second optical property is the single scattering albedo.
     Starting from the third, the optical properties are phase function moments
     (excluding the zero-th moment).
 
     This class is later compiled to a TorchScript file using the `pyharp.compile` function.
     """
-    def __init__(self, nwave:int, nprop:int):
+    def __init__(self, nwave: int, nprop: int):
         super().__init__()
         self.nwave = nwave
         self.nprop = nprop
