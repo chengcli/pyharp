@@ -15,7 +15,7 @@ Here are a collection of common issues and how to resolve them:
       bidir_reflectivity--surface BDRF model .... not known
         ******* ERROR >>>>>> Existing...
 
-   This is an error emitted by the :class:`disort.cpp.Disort` radiative transfer solver.
+   This is an error emitted by the :class:`pydisort.cpp.Disort` radiative transfer solver.
    It means that you forgot to turn on `lamber` flag in the YAML
    configuration file. To fix this, add the `lamber` flag to your band configuration:
 
