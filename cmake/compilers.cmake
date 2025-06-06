@@ -20,7 +20,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   set(CMAKE_CXX_FLAGS_DEBUG "-g3")
   set(CMAKE_C_FLAGS_DEBUG "-g3")
 
-  # set(CMAKE_Fortran_FLAGS_RELEASE "-O3" )
   set(KNOWN_COMPILER TRUE)
 endif()
 
@@ -31,7 +30,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS_DEBUG "-g3")
   set(CMAKE_C_FLAGS_DEBUG "-g3")
 
-  # set(CMAKE_Fortran_FLAGS_RELEASE "-O3" )
   set(KNOWN_COMPILER TRUE)
 endif()
 
