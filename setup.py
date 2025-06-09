@@ -25,7 +25,7 @@ include_dirs = [
     f"{current_dir}",
     f"{current_dir}/build",
     f"{current_dir}/build/_deps/fmt-src/include",
-    f'{current_dir}/build/_deps/disort-src',
+    f'{current_dir}/build/_deps/pydisort-src',
     f'{current_dir}/build/_deps/yaml-cpp-src/include',
 ]
 
