@@ -17,7 +17,7 @@ dependencies = [
   "requests",
   "tqdm",
   "pandas",
-  "pydisort>=1.1.6",
+  "pydisort>=1.2.1",
   "cmake<=3.30",
   "torch>=2.7.0",
 ]
