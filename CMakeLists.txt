@@ -29,8 +29,7 @@ if(NOT _ABI_RESULT EQUAL 0)
   message(FATAL_ERROR "Failed to detect Torch GLIBCXX ABI")
 endif()
 
-# Set the _GLIBCXX_USE_CXX11_ABI flag to 0 (use old ABI)
-#add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+# Set the _GLIBCXX_USE_CXX11_ABI flag
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${_ABI_OUTPUT})
 
 # Set MacOS deployment target

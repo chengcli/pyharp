@@ -87,7 +87,7 @@ Next, we specify the radiation bands, which is a list of band names.
 For each band, a dictionary entry is created with the band name as the key and its properties as the value.
 
 Each band can have its own spectral range, opacity sources, solver, integration method and flags associated with radiative transfer computation.
-In this example, we have one band, `sonora196`, which has a spectral range of 30.8 to 38300 cm :math:`^{-1}`; the opacity sources are `H2-molecule` and `H2-continuum`; the radiative transfer solver is :class:`disort.cpp.Disort`; the integration method is ``weight`` (correlated-K); and the flags passed to :class:`disort.cpp.Disort` are ``lamber``, ``quiet``, ``onlyfl`` and ``planck``, which assumes lambertian surface, quiet mode, flux-only calculation and activate planck function for the radiation source function respectively.
+In this example, we have one band, `sonora196`, which has a spectral range of 30.8 to 38300 cm :math:`^{-1}`; the opacity sources are `H2-molecule` and `H2-continuum`; the radiative transfer solver is :class:`pydisort.cpp.Disort`; the integration method is ``weight`` (correlated-K); and the flags passed to :class:`pydisort.cpp.Disort` are ``lamber``, ``quiet``, ``onlyfl`` and ``planck``, which assumes lambertian surface, quiet mode, flux-only calculation and activate planck function for the radiation source function respectively.
 
 Please see the `pydisort <https://pydisort.readthedocs.io/en/latest/>`_ documentation for more details on the available options of :class:`pydisort.DisortOptions` and their meanings.
 
