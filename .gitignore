@@ -54,3 +54,6 @@ python/*/*.txt
 
 # pkl
 *.pkl
+
+# so
+*.so
