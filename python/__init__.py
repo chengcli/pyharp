@@ -5,4 +5,4 @@ from .disort import *
 from .rfmlib import *
 from .compile import *
 
-__version__ = "1.6.7"
+__version__ = "1.6.8"

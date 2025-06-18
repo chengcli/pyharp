@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyharp"
-version = "1.6.7"
+version = "1.6.8"
 description = "High-performance Atmospheric Radiation Package"
 authors = [
   { name="Cheng Li", email="chengcli@umich.edu" }
