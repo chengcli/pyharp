@@ -1,0 +1,132 @@
+# Radiation configuration file
+#
+# Required the fields:
+#   - species: list of species
+#   - opacities: list of opacities
+#   - bands: list of bands
+#   - <band>: band configuration
+#
+# Required fields for 'species':
+#   - name: species name
+#   - composition: species atomic composition
+#
+# Required fields for 'opacities':
+#   - type: choose between the following recognized types
+#           - 'rfm-lbl': RFM line-by-line table
+#           - 'rfm-ck': correlated-k table generated from RFM line-by-line
+#           - 'h2so4_simple': simple H2SO4 shortwave opacity model
+#           - 's8_fuller': simple S8 shortwave opacity model
+#
+# Optional fields for 'opacities':
+#   - data: list of opacity data files
+#   - species: list of species used by the opacity source
+#
+# Required fields for each band:
+#   - range: band wavenumber/wavelength range
+#            If the range is in wavenumber, the unit is cm^{-1}
+#            If the range is in wavelength, the unit is um
+#   - opacities: list of opacities used by the band
+#   - integration: choose between 'wavelength', 'wavenumber', or 'weight'
+#                  If the integration is 'weight', the band is integrated
+#                  using weights from input. Otherwise, the band is integrated
+#                  using the trapezoidal rule along a wavelength
+#                  or wavenumber grid (ww).
+#   - solver: choose between 'disort' or 'twostr'
+#   - flags: a string of flags for the radiative transfer solver
+#            separated by commas
+#
+# Optional fields for each band:
+#   - ww: a list of weights (double) for spectral bins in the band
+
+species:
+  - name: CH4
+    composition: {C: 1, H: 4}
+
+  - name: H2SO4
+    composition: {H: 2, S: 1, O: 4}
+
+  - name: S8
+    composition: {S: 8}
+
+opacities:
+  H2SO4:
+    type: h2so4_simple
+    data: [h2so4.txt]
+    species: [H2SO4]
+    nmom: 4
+
+  S8:
+    type: s8_fuller
+    data: [s8_k_fuller.txt]
+    species: [S8]
+    nmom: 4
+
+  CH4:
+    type: rfm-ck
+    data: [uran-ck-<band>.nc]
+    species: [CH4]
+
+bands: [B1, B2, B3, B4]
+
+SW:
+  range: [2000., 50000.]
+  opacities: [H2SO4, S8]
+  solver: disort
+  integration: wavenumber
+  flags: lamber,quiet,onlyfl
+
+B1:
+  range: [1200., 1400.]
+  opacities: [CH4]
+  solver: disort
+  integration: weight
+  flags: lamber,quiet,onlyfl,planck
+
+B2:
+  range: [2850., 3200.]
+  opacities: [CH4]
+  solver: disort
+  integration: weight
+  flags: lamber,quiet,onlyfl,planck
+
+B3:
+  range: [4100., 4600.]
+  opacities: [CH4]
+  integration: weight
+  solver: disort
+  flags: lamber,quiet,onlyfl,planck
+
+B4:
+  range:  [5900., 6200.]
+  opacities: [CH4]
+  integration: weight
+  solver: disort
+  flags: lamber,quiet,onlyfl,planck
+
+# B5:
+#   range: [1062., 1200.]
+#   opacities: [CH4]
+#   integration: weight
+#   solver: disort
+#   flags: lamber,quiet,onlyfl,planck
+
+# B6:
+#   range: [1200., 1600.]
+#   opacities: [CH4]
+#   integration: weight
+#   solver: disort
+#   flags: lamber,quiet,onlyfl,planck
+
+# B7:
+#   range: [1600., 1900.]
+#   opacities: [CH4]
+#   integration: weight
+#   solver: disort
+#   flags: lamber,quiet,onlyfl,planck
+
+# B8:
+#   range: [1900., 2000.]
+#   opacities: [CH4]
+#   integration: weight
+#   solver: disort
+#   flags: lamber,quiet,onlyfl,planck

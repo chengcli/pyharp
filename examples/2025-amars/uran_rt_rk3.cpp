@@ -1,0 +1,282 @@
+//Next Steps
+//build with cmake .. -DNETCDF=ON      
+//Methane Short wave bands:
+//1200 to  1400 cm-1
+//2850 to 3200 cm-1
+//4100 to 4600 cm-1
+//5900 to 6200 cm-1
+//need to add methane shortwave 200-30,000 cm-1?
+
+//Methane VMR
+//2% at pole, 4% at equator (deep) Sromovsky 2012
+//1e-5 to 3e-5 Moses at 100mbar by eddy diffusion moses 2005
+//Choose GCM pressure range, run RT to equilibrium
+
+//Make plots
+
+//Long term
+//Hydrogen CIA
+//H2-He
+
+
+// C/C++
+#include <fstream>
+#include <iostream>
+
+// torch
+#include <torch/torch.h>
+
+// harp
+#include <harp/integrator/radiation_model.hpp>
+#include <harp/math/interpolation.hpp>
+#include <harp/radiation/bbflux.hpp>
+#include <harp/radiation/disort_config.hpp>
+#include <harp/radiation/radiation.hpp>
+#include <harp/utils/read_data_tensor.hpp>
+
+struct AtmosphericData {
+  int n_layers;
+  std::map<std::string, torch::Tensor> data;
+};
+
+AtmosphericData read_rfm_atm(const std::string& filename) {
+  std::ifstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Could not open file: " + filename);
+  }
+
+  AtmosphericData atm_data;
+  std::string line;
+
+  // Read the number of layers
+  std::getline(file, line);
+  std::istringstream iss(line);
+  iss >> atm_data.n_layers;
+
+  // Read the data sections
+  while (std::getline(file, line)) {
+    if (line.empty()) continue;
+
+    // Read the name of the data section
+    if (line[0] == '*') {
+      std::string name = line.substr(1);  // Remove the '*' character
+
+      // Read the data points
+      std::getline(file, line);
+      std::istringstream data_stream(line);
+      std::vector<double> data_points(atm_data.n_layers);
+      for (int i = 0; i < atm_data.n_layers; ++i) {
+        data_stream >> data_points[i];
+      }
+
+      // Store the data points in the map
+      atm_data.data[name] = torch::tensor(data_points, torch::kFloat64);
+    }
+  }
+
+  file.close();
+  return atm_data;
+}
+
+int main(int argc, char** argv) {
+  // parameters of the computational grid
+  int ncol = 10;
+  int nlyr = 100; //will automatically rebin
+  int nstr = 4;
+
+  // parameters of the amars model
+  double surf_sw_albedo = 0.3;//take to be methane cloud layer at 1bar
+  double sr_sun = 1.84810301e-7;  // angular size of the sun at uranus in steradians
+  double btemp0 = 132.542; //temp at 500mbar
+  double ttemp0 = 142.331; //temp at 1mbar
+  double solar_temp = 5772;
+  double lum_scale = 1;
+
+  /// ----- read atmosphere data -----  ///
+  auto aero_ptx = harp::read_data_tensor("aerosol_output_data.txt");
+  auto aero_p = (aero_ptx.select(1, 0) * 1e5);  // bar to pa
+  auto aero_t = aero_ptx.select(1, 1);
+  auto aero_x = aero_ptx.narrow(1, 2, 2);
+  std::cout<<"Read aerosol data\n";
+  // unit = [pa]
+
+  // log pressure grid from 1000 mbar to 1 mbar
+  auto new_P =
+      torch::logspace(log10(1000.0), log10(1.0), nlyr, 10, torch::kFloat64);
+  new_P *= 100.0;  // convert mbar to Pa
+
+  // unit = [K]
+  // isothermal temperature profile at btemp-
+  auto new_T = btemp0 * torch::ones({nlyr}, torch::kFloat64);
+
+  // unit = [mol/mol]
+  auto new_X = harp::interpn({new_P.log()}, {aero_p.log()}, aero_x);
+
+  AtmosphericData atm_data = read_rfm_atm("uran_rfm.atm");
+  std::cout<<"Read rfm.atm data\n";
+
+  auto pre = atm_data.data["PRE [mb]"] * 100.0; //mbar to Pa
+  auto tem = atm_data.data["TEM [K]"]; //significance of tmeperature in rfm?
+
+  // unit = [mol/mol]
+  // mole fraction
+  auto xfrac = torch::zeros({ncol, nlyr, 5}, torch::kFloat64);
+  xfrac.select(-1, 0) =
+      harp::interpn({new_P.log()}, {pre.log()},
+                    atm_data.data["CH4 [ppmv]"].unsqueeze(-1) * 1e-6)
+          .squeeze(-1);
+  std::cout<<"Read CH4 data\n";
+
+  xfrac.select(-1, 1) =
+      harp::interpn({new_P.log()}, {pre.log()},
+                    atm_data.data["H2O [ppmv]"].unsqueeze(-1) * 0.0)
+          .squeeze(-1);
+  std::cout<<"Read H2O data\n";
+
+  xfrac.select(-1, 2) =
+      harp::interpn({new_P.log()}, {pre.log()},
+                    atm_data.data["SO2 [ppmv]"].unsqueeze(-1) * 0.0)
+          .squeeze(-1);
+  std::cout<<"Read SO2 data\n";
+
+  // aerosols
+  xfrac.narrow(-1, 3, new_X.size(-1)) = new_X;
+  std::cout<<"Setup xfrac\n";
+
+  /// ----- done read atmosphere data -----  ///
+  std::map<std::string, torch::Tensor> atm, bc;
+  // set up model atmosphere
+  atm["pres"] = new_P.unsqueeze(0).expand({ncol, nlyr});
+  atm["temp"] = new_T.unsqueeze(0).expand({ncol, nlyr});
+
+  // read radiation configuration from yaml file
+  auto rad_op = harp::RadiationOptions::from_yaml("uran-ck.yaml");
+  std::cout<<"Read ck yaml\n";
+
+  for (auto& [name, band] : rad_op.bands()) {
+    // query weights from opacity, only valid for longwave
+    // shortwave values are defined separately
+    band.ww() = band.query_weights();
+    int nwave = name == "SW" ? 200 : band.ww().size();
+
+    auto wmin = band.disort().wave_lower()[0];
+    auto wmax = band.disort().wave_upper()[0];
+    band.disort().accur(1.e-12);
+
+    harp::disort_config(&band.disort(), nwave, ncol, nlyr, nstr);
+
+    if (name == "SW") {  // shortwave, need to update for update for all bands, dictionary
+      band.ww().resize(nwave);
+      for (int i = 0; i < nwave; ++i) {
+        band.ww()[i] = (wmax - wmin) * i / (nwave - 1) + wmin;
+      }
+      auto wave = torch::tensor(band.ww(), torch::kFloat64);
+      bc[name + "/fbeam"] =
+          lum_scale * sr_sun * harp::bbflux_wavenumber(wave, solar_temp, ncol);
+      bc[name + "/albedo"] =
+          surf_sw_albedo * torch::ones({nwave, ncol}, torch::kFloat64);
+      bc[name + "/umu0"] = 0.707 * torch::ones({ncol}, torch::kFloat64);///NEED TO CHANGE
+    } else {  // longwave
+      band.disort().wave_lower(std::vector<double>(nwave, wmin));
+      band.disort().wave_upper(std::vector<double>(nwave, wmax));
+      bc[name + "/albedo"] = 0.0 * torch::ones({nwave, ncol}, torch::kFloat64);
+      bc[name + "/temis"] = 1.0 * torch::ones({nwave, ncol}, torch::kFloat64);
+    }
+  }
+  bc["btemp"] = btemp0 * torch::ones({ncol}, torch::kFloat64);
+  bc["ttemp"] = ttemp0 * torch::ones({ncol}, torch::kFloat64);
+
+  // parameters of the amars model
+  harp::RadiationModelOptions model_op;
+  model_op.ncol(ncol);
+  model_op.nlyr(nlyr);
+  model_op.grav(8.69);
+  model_op.mean_mol_weight(0.0024);  // CO2
+  model_op.cp(26.5);    //?              // J/(kg K) for CO2
+  model_op.aero_scale(0.);//scale aerosols?
+  model_op.cSurf(200000);  // J/(m^2 K) thermal intertia of the surface
+  model_op.intg(harp::IntegratorOptions().type("rk2"));
+  model_op.kappa(2.e-2);  // m^2/s thermal diffusivity
+  model_op.rad(rad_op);
+
+  harp::RadiationModel model(model_op);
+
+  int t_lim = 1000000;
+  double tstep = 2592000;
+  int print_freq = 500;
+  std::cout<<"Start main loop\n";
+
+  for (int t_ind = 0; t_ind < t_lim; ++t_ind) {
+    //update umu0 as function of time, remember bc is dictionary
+    
+    for (int stage = 0; stage < model->pintg->stages.size(); ++stage) {
+      model->forward(xfrac, atm, bc, tstep, stage);
+    }
+    std::cout<<"After forward\n";
+    if (t_ind % print_freq == 0) {
+      std::ostringstream filename;
+      std::cout<<"Savet "<<t_ind<<"\n";
+      filename << "tp_result" << t_ind << ".txt";
+
+      // Open the file and write the data
+      std::ofstream outputFile3(filename.str());
+      std::cout<<"Output File\n";
+
+      // opacity of SW band
+      auto prop = harp::shared["radiation/SW/opacity"];
+
+      outputFile3 << "#p[Pa] T[K] netF[w/m^2] dT/dt[K/s] SW_tau1 SW_tau2 "
+                  << "B1 B2 B3 B4 " << std::endl;
+      std::cout<<"Writing to File\n";
+
+      for (int k = 0; k < nlyr; ++k) {
+        outputFile3 << atm["pres"][0][k].item<double>() << " "
+                    << atm["temp"][0][k].item<double>() << " "
+                    << harp::shared["result/netflux"][0][k].item<double>()
+                    << " " << harp::shared["result/dT_atm"][0][k].item<double>()
+                    << " "
+                    << harp::shared["radiation/SW/opacity"]
+                           .mean(0)[0][k][0]//1st dimension wavenumber, 2nd dimension column, 3rd dimension pressure level, 4th dimension phasefunction
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/SW/opacity"]
+                           .mean(0)[0][k][1]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B1/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B2/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B3/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    << " "
+                    << harp::shared["radiation/B4/opacity"]
+                           .mean(0)[0][k][0]
+                           .item<double>()
+                    // << " "
+                    // << harp::shared["radiation/B5/opacity"]
+                    //        .mean(0)[0][k][0]
+                    //        .item<double>()
+                    // << " "
+                    // << harp::shared["radiation/B6/opacity"]
+                    //        .mean(0)[0][k][0]
+                    //        .item<double>()
+                    // << " "
+                    // << harp::shared["radiation/B7/opacity"]
+                    //        .mean(0)[0][k][0]
+                    //        .item<double>()
+                    // << " "
+                    // << harp::shared["radiation/B8/opacity"]
+                    //        .mean(0)[0][k][0]
+                    //        .item<double>()
+                    << " " << std::endl;
+      }
+      outputFile3.close();
+    }
+  }
+}
