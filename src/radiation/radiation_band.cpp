@@ -138,8 +138,8 @@ std::vector<double> RadiationBandOptions::query_waves(
 std::vector<double> RadiationBandOptions::query_weights(
     std::string op_name) const {
   // assign first opacity if no name is given
-  if (opacities().find(op_name) == opacities().end()) {
-    return {};
+  if (op_name.empty()) {
+    op_name = opacities().begin()->first;
   }
 
   // cannot determine spectral weights if no opacities
