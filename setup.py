@@ -18,7 +18,10 @@ def parse_library_names(libdir):
     # add system netcdf library
     library_names.extend(['netcdf'])
 
-    return sorted(library_names)
+    # move current library name to first
+    current = [item for item in library_names if item.startswith('harp')]
+    other = [item for item in library_names if not item.startswith('harp')]
+    return current + other
 
 current_dir = os.getenv("WORKSPACE", Path().absolute())
 include_dirs = [
