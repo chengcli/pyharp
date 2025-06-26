@@ -38,7 +38,7 @@ file(GLOB src_files
     )
 
 add_library(${namel}_${buildl}
-    STATIC
+    SHARED
     ${src_files}
     )
 
