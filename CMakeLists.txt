@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
 
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_EXAMPLES "Build examples" OFF)
@@ -33,7 +32,7 @@ endif()
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${_ABI_OUTPUT})
 
 # Set MacOS deployment target
-set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
 
 # Specify the CUDA toolkit location if necessary
 #set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.0)
