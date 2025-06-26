@@ -17,6 +17,7 @@ include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}/.."
   ${CMAKE_BINARY_DIR}
   ${NETCDF_INCLUDES}
+  SYSTEM ${DISORT_INCLUDE_DIR}
   SYSTEM ${TORCH_API_INCLUDE_DIR}
   SYSTEM ${TORCH_INCLUDE_DIR}
   )
@@ -49,10 +50,13 @@ set_target_properties(${namel}_${buildl}
 
 target_link_libraries(${namel}_${buildl}
     PUBLIC
-    pydisort::disort
     fmt::fmt
     yaml-cpp::yaml-cpp
     ${NETCDF_LIBRARIES}
+    ${DISORT_LIBRARY}
+    ${TORCH_LIBRARY}
+    ${TORCH_CPU_LIBRARY}
+    ${C10_LIBRARY}
     )
 
 add_library(pyharp::harp ALIAS ${namel}_${buildl})

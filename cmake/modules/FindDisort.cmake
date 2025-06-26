@@ -47,13 +47,14 @@ if(Python3_Interpreter_FOUND)
              NORMALIZE)
 
   cmake_path(REPLACE_FILENAME disort_init_file lib OUTPUT_VARIABLE disort_lib_dir)
-  cmake_path(REMOVE_FILENAME disort_init_file OUTPUT_VARIABLE disort_include_dir)
+  cmake_path(REPLACE_FILENAME disort_init_file disort OUTPUT_VARIABLE disort_include_dir)
 
   unset(disort_init_file)
 endif()
 
+# Step 1: Find header
 find_path(
-  DISORT_INCLUDE_DIR disort.hpp
+  _DISORT_HEADER_DIR disort.hpp
   HINTS ${disort_include_dir}
         /opt/homebrew/include
         /usr/include
@@ -62,6 +63,15 @@ find_path(
         $ENV{DISORT_INC}
         $ENV{DISORT_DIR}/include
         $ENV{DISORT_ROOT}/include)
+
+# Step 2: Go one level up from the header location
+get_filename_component(DISORT_INCLUDE_DIR ${_DISORT_HEADER_DIR} DIRECTORY)
+
+# Step 3: Save to cache
+set(DISORT_INCLUDE_DIR "${DISORT_INCLUDE_DIR}" CACHE FILEPATH "Path to a file.")
+
+# Step 4: unset the internal temp variable
+unset(_DISORT_HEADER_DIR CACHE)
 
 find_library(
   DISORT_LIBRARY disort_release

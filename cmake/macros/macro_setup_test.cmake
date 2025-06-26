@@ -22,11 +22,7 @@ macro(setup_test namel)
             ${TORCH_API_INCLUDE_DIR})
 
   target_link_libraries(${namel}.${buildl}
-    PRIVATE pyharp::harp
-            gtest_main
-            ${TORCH_LIBRARY}
-            ${TORCH_CPU_LIBRARY}
-            ${C10_LIBRARY})
+    PRIVATE pyharp::harp gtest_main)
 
   add_test(NAME ${namel}.${buildl} COMMAND ${namel}.${buildl})
 endmacro()
