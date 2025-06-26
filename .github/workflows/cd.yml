@@ -3,14 +3,12 @@ name: Deploy to PyPI
 on:
   workflow_dispatch:
     inputs:
-      version_tag:
-        description: "Release version tag"
-        default: "latest"
       branch:
-        description: "Source branch"
+        description: "Branch"
+        required: true
         default: "main"
       build_os:
-        description: "Select OS to build wheels for"
+        description: "OS"
         required: true
         default: "Both"
         type: choice
@@ -18,6 +16,10 @@ on:
           - Both
           - MacOS
           - Ubuntu
+
+concurrency:
+  group: deploy-pypi-${{ github.event.inputs.branch }}
+  cancel-in-progress: true
 
 env:
   BUILD_TYPE: Release
@@ -100,7 +102,7 @@ jobs:
       - name: Upload macOS wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos-${{ matrix.os }}-${{ env.MACOS_ARCH }}-${{ matrix.python-version }}
+          name: wheels-macos-${{ matrix.python-version }}-${{ env.MACOS_ARCH }}
           path: wheelhouse/*.whl
 
   build-linux:
@@ -125,7 +127,7 @@ jobs:
           python-version: ${{ env.HOST_PYTHON }}
           cache: pip
 
-      - name: Configure wheel build env
+      - name: Configure Linux build env
         run: |
           PV=${{ matrix.python-version }}
           PV=${PV//./}
@@ -157,7 +159,7 @@ jobs:
       - name: Upload Linux Wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-ubuntu-${{ env.LINUX_ARCH }}-${{ matrix.python-version }}
+          name: wheels-linux-${{ matrix.python-version }}-${{ env.LINUX_ARCH }}
           path: wheelhouse/*.whl
 
   publish-pypi:
@@ -169,7 +171,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Download all wheels
+      - name: Download wheels
         uses: actions/download-artifact@v4
         with:
           pattern: 'wheels-*'
