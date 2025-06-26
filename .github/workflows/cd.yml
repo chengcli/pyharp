@@ -54,7 +54,7 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     env:
-      MACOSX_DEPLOYMENT_TARGET: 12.0
+      MACOSX_DEPLOYMENT_TARGET: 14.0
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -88,7 +88,7 @@ jobs:
             cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                   -DCMAKE_OSX_ARCHITECTURES=${{ env.MACOS_ARCH }} \
                   -DCMAKE_PREFIX_PATH="$TORCH_CMAKE_PREFIX_PATH"
-            cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
+            cmake --build build --config ${{ env.BUILD_TYPE }} --parallel 3
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
             export TORCH_LIB=$(python -c 'import torch; print(torch.__path__[0] + "/lib")')
             export DYLD_FALLBACK_LIBRARY_PATH="$(pwd)/build/lib:$TORCH_LIB:$DYLD_FALLBACK_LIBRARY_PATH"
@@ -149,7 +149,7 @@ jobs:
             cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                   -DPython3_EXECUTABLE=$(which python) \
                   -DCMAKE_PREFIX_PATH="$TORCH_CMAKE_PREFIX_PATH"
-            cmake --build build --parallel
+            cmake --build build --parallel 3
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
             auditwheel repair --exclude lib*.so -w {dest_dir} {wheel}
         run: |
