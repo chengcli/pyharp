@@ -33,7 +33,7 @@ endif()
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${_ABI_OUTPUT})
 
 # Set MacOS deployment target
-set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
 
 # Specify the CUDA toolkit location if necessary
 #set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.0)
@@ -82,16 +82,14 @@ message(STATUS "Include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake")
 include(${CMAKE_SOURCE_DIR}/cmake/parameters.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
+find_package(Disort REQUIRED)
 find_package(Torch REQUIRED)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fmt.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gtest.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/pydisort.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/yamlpp.cmake)
+#include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/pydisort.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up project libraries ...${ColorReset}")
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/python/VERSION" PROJECT_VERSION)
-string(STRIP "${PROJECT_VERSION}" PROJECT_VERSION)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
-               ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h @ONLY)
 configure_file(${CMAKE_SOURCE_DIR}/configure.h.in configure.h @ONLY)
 add_subdirectory(src)
 

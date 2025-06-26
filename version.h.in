@@ -1,3 +1,0 @@
-#pragma once
-
-#define PYHARP_VERSION "@PROJECT_VERSION@"
