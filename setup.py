@@ -49,11 +49,13 @@ if sys.platform == "darwin":
     extra_link_args = [
         "-Wl,-rpath,@loader_path/lib",
         "-Wl,-rpath,@loader_path/../torch/lib",
+        "-Wl,-rpath,@loader_path/../pydisort/lib",
     ]
 else:
     extra_link_args = [
         "-Wl,-rpath,$ORIGIN/lib",
         "-Wl,-rpath,$ORIGIN/../torch/lib",
+        "-Wl,-rpath,$ORIGIN/../pydisort/lib",
     ]
 
 if torch.cuda.is_available():
