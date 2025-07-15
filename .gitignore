@@ -57,3 +57,6 @@ python/*/*.txt
 
 # so
 *.so
+
+# dist
+dist/

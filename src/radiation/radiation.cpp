@@ -17,9 +17,8 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
   RadiationOptions rad;
   auto config = YAML::LoadFile(filename);
 
-  // check if bands are defined
-  TORCH_CHECK(config["bands"],
-              "'bands' is not defined in the radiation configuration file");
+  // null-op
+  if (!config["bands"]) return rad;
 
   // check if species are defined
   TORCH_CHECK(config["species"],
