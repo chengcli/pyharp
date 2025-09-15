@@ -4,6 +4,7 @@ requires = [
   "wheel",
   "numpy",
   "ninja",
+  "cmake>=3.20",
   "pydisort>=1.3.1"
 ]
 build-backend = "setuptools.build_meta"
