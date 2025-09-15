@@ -58,28 +58,15 @@ else:
         "-Wl,-rpath,$ORIGIN/../pydisort/lib",
     ]
 
-if torch.cuda.is_available():
-    ext_module = cpp_extension.CUDAExtension(
-        name='pyharp.pyharp',
-        sources=glob.glob('python/csrc/*.cpp')
-        + glob.glob('src/**/*.cu', recursive=True),
-        include_dirs=include_dirs,
-        library_dirs=lib_dirs,
-        libraries=libraries,
-        extra_compile_args={'nvcc': ['--extended-lambda'],
-                            'cc': ["-Wno-attributes"]},
-        extra_link_args=extra_link_args,
+ext_module = cpp_extension.CppExtension(
+    name='pyharp.pyharp',
+    sources=glob.glob('python/csrc/*.cpp'),
+    include_dirs=include_dirs,
+    library_dirs=lib_dirs,
+    libraries=libraries,
+    extra_compile_args=['-Wno-attributes'],
+    extra_link_args=extra_link_args,
     )
-else:
-    ext_module = cpp_extension.CppExtension(
-        name='pyharp.pyharp',
-        sources=glob.glob('python/csrc/*.cpp'),
-        include_dirs=include_dirs,
-        library_dirs=lib_dirs,
-        libraries=libraries,
-        extra_compile_args=['-Wno-attributes'],
-        extra_link_args=extra_link_args,
-        )
 
 setup(
     package_dir={"pyharp": "python"},
