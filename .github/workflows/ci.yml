@@ -69,13 +69,13 @@ jobs:
             brew install netcdf
           fi
 
-      - name: Cache CMake build
-        uses: actions/cache@v3
-        with:
-          path: ${{ github.workspace }}/build
-          key: ${{ runner.os }}-cmake-${{ env.BUILD_TYPE }}-${{ hashFiles('**/*.cmake', '**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
-          restore-keys: |
-            ${{ runner.os }}-cmake-${{ env.BUILD_TYPE }}-
+      #- name: Cache CMake build
+      #  uses: actions/cache@v3
+      #  with:
+      #    path: ${{ github.workspace }}/build
+      #    key: ${{ runner.os }}-cmake-${{ env.BUILD_TYPE }}-${{ hashFiles('**/*.cmake', '**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+      #    restore-keys: |
+      #      ${{ runner.os }}-cmake-${{ env.BUILD_TYPE }}-
 
       - name: Configure CMake
         run: |
