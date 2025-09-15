@@ -179,6 +179,7 @@ void RadiationBandImpl::reset() {
   for (auto const& [name, op] : options.opacities()) {
     if (op.type() == "jit") {
       opacities[name] = torch::nn::AnyModule(JITOpacity(op));
+      nmax_prop_ = std::max((int)nmax_prop_, 2 + op.nmom());
     } else if (op.type() == "rfm-lbl") {
       auto a = RFM(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
@@ -267,6 +268,13 @@ torch::Tensor RadiationBandImpl::forward(
   } else if (options.integration() == "wavelength") {
     (*kwargs)["wavenumber"] = 1.e4 / ww;
     (*kwargs)["wavelength"] = ww;
+  } else if (options.integration() == "weight") {
+    if (options.solver_name() == "disort") {
+      auto wmin = torch::tensor(options.disort().wave_lower(), ww.options());
+      auto wmax = torch::tensor(options.disort().wave_upper(), ww.options());
+      (*kwargs)["wavenumber"] = 0.5 * (wmin + wmax);
+      (*kwargs)["wavelength"] = 1.e4 / (*kwargs)["wavenumber"];
+    }
   }
 
   // bin optical properties
