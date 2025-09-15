@@ -35,7 +35,7 @@ class GreyOpacity(torch.nn.Module):
         self.nwave = nwave
         self.nprop = nprop
 
-    def forward(self, conc: torch.Tensor) -> torch.Tensor:
+    def forward(self, conc: torch.Tensor, temp: torch.Tensor) -> torch.Tensor:
         """
         Args:
             conc: Tensor of shape (ncol, nlyr, nspecies) representing concentrations.
@@ -51,7 +51,10 @@ pyharp.compile(GreyOpacity(1,1), "grey_opacity.pt")
 # user it later
 op = AttenuatorOptions().type("jit")
 op.opacity_files(["grey_opacity.pt"])
+op.jit_kwargs(["temp"])
 
 ab = JITOpacity(op)
 conc = torch.ones(3, 5)
-print(ab.forward(conc, {}))
+
+temp = 300.0 * torch.ones(3)
+print(ab.forward(conc, {"temp": temp}))

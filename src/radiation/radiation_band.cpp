@@ -179,6 +179,7 @@ void RadiationBandImpl::reset() {
   for (auto const& [name, op] : options.opacities()) {
     if (op.type() == "jit") {
       opacities[name] = torch::nn::AnyModule(JITOpacity(op));
+      nmax_prop_ = std::max((int)nmax_prop_, 2 + op.nmom());
     } else if (op.type() == "rfm-lbl") {
       auto a = RFM(op);
       nmax_prop_ = std::max((int)nmax_prop_, 1);
