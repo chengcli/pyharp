@@ -1,14 +1,50 @@
 #pragma once
 
-// harp
-#include <harp/add_arg.h>
+// yaml
+#include <yaml-cpp/yaml.h>
 
 // torch
 #include <torch/nn/modules/container/any.h>
 
+// harp
+#include <harp/add_arg.h>
+
 namespace harp {
 
 struct AttenuatorOptions {
+  AttenuatorOptions() = default;
+  static AttenuatorOptions from_yaml(YAML::Node const& config,
+                                     std::string bd_name = "");
+
+  void report(std::ostream& os) const {
+    os << "* type = " << type() << "\n";
+    os << "* bname = " << bname() << "\n";
+    os << "* opacity_files = ";
+    for (auto const& f : opacity_files()) os << f << ", ";
+    os << "\n";
+    os << "* species_ids = ";
+    for (auto const& s : species_ids()) os << s << ", ";
+    os << "\n";
+    os << "* jit_kwargs = ";
+    for (auto const& kw : jit_kwargs()) os << kw << ", ";
+    os << "\n";
+    os << "* scale = " << scale() << "\n";
+    os << "* metallicity = " << metallicity() << "\n";
+    os << "* fractions = ";
+    for (auto const& f : fractions()) os << f << ", ";
+    os << "\n";
+    os << "* kappa_a = " << kappa_a() << "\n";
+    os << "* kappa_b = " << kappa_b() << "\n";
+    os << "* kappa_cut = " << kappa_cut() << "\n";
+    os << "* diameter = " << diameter() << "\n";
+    os << "* xsection = " << xsection() << "\n";
+    os << "* ssa = " << ssa() << "\n";
+    os << "* ff = " << ff() << "\n";
+    os << "* g1 = " << g1() << "\n";
+    os << "* g2 = " << g2() << "\n";
+    os << "* nmom = " << nmom() << "\n";
+  }
+
   //! type of the opacity source
   ADD_ARG(std::string, type) = "";
 

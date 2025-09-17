@@ -131,7 +131,9 @@ Examples:
 
       .def("__repr__",
            [](const harp::RadiationBandOptions &a) {
-             return fmt::format("RadiationBandOptions{}", a);
+             std::stringstream ss;
+             a.report(ss);
+             return fmt::format("RadiationBandOptions(\n{})", ss.str());
            })
 
       .def("query_waves", &harp::RadiationBandOptions::query_waves, R"doc(
@@ -319,7 +321,9 @@ Examples:
 
       .def("__repr__",
            [](const harp::RadiationOptions &a) {
-             return fmt::format("RadiationOptions{}", a);
+             std::stringstream ss;
+             a.report(ss);
+             return fmt::format("RadiationOptions(\n{})", ss.str());
            })
 
       .def_static("from_yaml", &harp::RadiationOptions::from_yaml, R"doc(

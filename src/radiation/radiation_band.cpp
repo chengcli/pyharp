@@ -13,6 +13,7 @@
 #include <harp/opacity/rfm.hpp>
 #include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
+#include <harp/utils/parse_yaml_input.hpp>
 #include <harp/utils/read_dimvar_netcdf.hpp>
 #include <harp/utils/read_var_pt.hpp>
 #include <harp/utils/strings.hpp>
@@ -20,7 +21,6 @@
 #include "flux_utils.hpp"
 #include "get_direction_grids.hpp"
 #include "parse_radiation_direction.hpp"
-#include "parse_yaml_input.hpp"
 #include "radiation.hpp"
 #include "radiation_band.hpp"
 #include "radiation_formatter.hpp"
@@ -40,46 +40,11 @@ RadiationBandOptions RadiationBandOptions::from_yaml(std::string const& bd_name,
   for (auto const& op : band["opacities"]) {
     std::string op_name = op.as<std::string>();
 
-    AttenuatorOptions a;
-    a.bname(bd_name);
-
     TORCH_CHECK(config["opacities"][op_name], op_name,
                 " not found in opacities");
     auto it = config["opacities"][op_name];
 
-    TORCH_CHECK(it["type"], "'type' not found in opacity ", op_name);
-    a.type(it["type"].as<std::string>());
-
-    if (it["data"]) {
-      a.opacity_files(it["data"].as<std::vector<std::string>>());
-      for (auto& f : a.opacity_files()) {
-        replace_pattern_inplace(f, "<band>", bd_name);
-      }
-    }
-
-    if (it["species"]) {
-      for (auto const& sp : it["species"]) {
-        auto sp_name = sp.as<std::string>();
-
-        // index sp_name in species
-        auto jt =
-            std::find(species_names.begin(), species_names.end(), sp_name);
-
-        TORCH_CHECK(jt != species_names.end(), "species ", sp_name,
-                    " not found in species list");
-        a.species_ids().push_back(jt - species_names.begin());
-      }
-    }
-
-    if (it["nmom"]) {
-      a.nmom(it["nmom"].as<int>());
-    }
-
-    if (it["fractions"]) {
-      a.fractions(it["fractions"].as<std::vector<double>>());
-    }
-
-    my.opacities()[op_name] = a;
+    my.opacities()[op_name] = AttenuatorOptions::from_yaml(it, bd_name);
   }
 
   auto [wmin, wmax] = parse_wave_range(band);

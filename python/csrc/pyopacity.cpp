@@ -38,7 +38,9 @@ Examples:
 
       .def("__repr__",
            [](const harp::AttenuatorOptions &a) {
-             return fmt::format("AttenuatorOptions{}", a);
+             std::stringstream ss;
+             a.report(ss);
+             return fmt::format("AttenuatorOptions(\n{})", ss.str());
            })
 
       .ADD_OPTION(std::string, harp::AttenuatorOptions, type, R"doc(
