@@ -37,6 +37,24 @@ extern std::unordered_map<std::string, torch::Tensor> shared;
  *  - "four-column": Four-column opacity table
  */
 struct RadiationBandOptions {
+  void report(std::ostream& os) const {
+    os << "* name = " << name() << "\n";
+    os << "* outdirs = " << outdirs() << "\n";
+    os << "* solver_name = " << solver_name() << "\n";
+    os << "* [ opacities:\n";
+    for (auto const& [k, v] : opacities()) {
+      os << "  - " << k << ":\n";
+      v.report(os);
+    }
+    os << "  ]\n";
+    os << "* disort:\n";
+    disort().report(os);
+    os << "* ww = ";
+    for (auto const& w : ww()) os << w << ", ";
+    os << "\n";
+    os << "* integration = " << integration() << "\n";
+  }
+
   //! \brief Create a `RadiationBandOptions` object from a YAML file
   /*!
    * This function reads a YAML file and creates a `RadiationBandOptions`

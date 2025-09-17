@@ -52,6 +52,16 @@ struct RadiationOptions {
    */
   static RadiationOptions from_yaml(std::string const& filename);
 
+  void report(std::ostream& os) const {
+    os << "* outdirs = " << outdirs() << "\n";
+    os << "* [ bands:\n";
+    for (auto const& [k, v] : bands()) {
+      os << "  - " << k << ":\n";
+      v.report(os);
+    }
+    os << "  ]\n";
+  }
+
   RadiationOptions() = default;
 
   ADD_ARG(std::string, outdirs) = "";
