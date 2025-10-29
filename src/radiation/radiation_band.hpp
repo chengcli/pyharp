@@ -107,6 +107,7 @@ struct RadiationBandOptions {
   ADD_ARG(std::string, name) = "B1";
   ADD_ARG(std::string, outdirs) = "";
   ADD_ARG(std::string, solver_name) = "disort";
+  ADD_ARG(int, l2l_order) = 2;
 
   ADD_ARG(AttenuatorDict, opacities) = {};
   ADD_ARG(disort::DisortOptions, disort);
