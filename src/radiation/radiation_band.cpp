@@ -290,14 +290,7 @@ torch::Tensor RadiationBandImpl::forward(
   std::string spec_name = "radiation/" + options.name() + "/spectra";
 
   // run rt solver
-  if (kwargs->find("temp") != kwargs->end()) {
-    Layer2LevelOptions l2l;
-    l2l.order(options.l2l_order());
-    l2l.lower(kExtrapolate).upper(kExtrapolate).check_positivity(true);
-    shared[spec_name] = rtsolver.forward(
-        prop, bc, options.name(),
-        std::make_optional(layer2level(dz, kwargs->at("temp"), l2l)));
-  } else if (kwargs->find("tempf") != kwargs->end()) {
+  if (kwargs->find("tempf") != kwargs->end()) {
     int nlyr = prop.size(-1);
     int nlev = kwargs->at("tempf").size(-1);
     TORCH_CHECK(nlev == nlyr + 1, "'tempf' size must be nlyr + 1 = ", nlyr + 1,
@@ -308,6 +301,13 @@ torch::Tensor RadiationBandImpl::forward(
     }
     shared[spec_name] = rtsolver.forward(
         prop, bc, options.name(), std::make_optional(kwargs->at("tempf")));
+  } else if (kwargs->find("temp") != kwargs->end()) {
+    Layer2LevelOptions l2l;
+    l2l.order(options.l2l_order());
+    l2l.lower(kExtrapolate).upper(kExtrapolate).check_positivity(true);
+    shared[spec_name] = rtsolver.forward(
+        prop, bc, options.name(),
+        std::make_optional(layer2level(dz, kwargs->at("temp"), l2l)));
   } else {
     shared[spec_name] = rtsolver.forward(prop, bc, options.name());
   }
