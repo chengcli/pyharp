@@ -5,7 +5,7 @@ requires = [
   "build",
   "numpy",
   "ninja",
-  "pydisort>=1.3.3",
+  "pydisort>=1.3.6",
   "cmake>=3.20",
   "torch<=2.7.1,>=2.7.0",
 ]
@@ -23,7 +23,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
   "numpy",
-  "pydisort>=1.3.3",
+  "pydisort>=1.3.6",
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -56,7 +56,7 @@ packages = ["pyharp", "pyharp.api", "pyharp.sonora", "pyharp.h2_cia_legacy"]
 include-package-data = false
 
 [tool.setuptools.package-data]
-"pyharp" = ["harp/**/*", "lib/*.so", "lib/*.dylib"]
+"pyharp" = ["harp/**/*", "lib/*.so", "lib/*.dylib", "*.pyi", "py.typed"]
 "pyharp.sonora" = ["sonora2020_*.txt"]
 "pyharp.h2_cia_legacy" = ["H2-H2-*.pt", "H2-He-*.pt"]
 
