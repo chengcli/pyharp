@@ -22,11 +22,11 @@ void bind_radiation(py::module &m) {
             &harp::bbflux_wavenumber),
         py::arg("wn1"), py::arg("wn2"), py::arg("temp") = 1);
 
-  m.def("bbflux_wavelength", &harp::bbflux_wavelength,
-        py::arg("wave"), py::arg("temp"), py::arg("ncol") = 1);
+  m.def("bbflux_wavelength", &harp::bbflux_wavelength, py::arg("wave"),
+        py::arg("temp"), py::arg("ncol") = 1);
 
-  m.def("calc_dz_hypsometric", &harp::calc_dz_hypsometric,
-        py::arg("pres"), py::arg("temp"), py::arg("g_ov_R"));
+  m.def("calc_dz_hypsometric", &harp::calc_dz_hypsometric, py::arg("pres"),
+        py::arg("temp"), py::arg("g_ov_R"));
 
   auto pyRadiationBandOptions =
       py::class_<harp::RadiationBandOptions>(m, "RadiationBandOptions");
@@ -81,11 +81,9 @@ void bind_radiation(py::module &m) {
 
       .ADD_OPTION(harp::RadiationBandDict, harp::RadiationOptions, bands);
 
-  ADD_HARP_MODULE(Radiation, RadiationOptions,
-                  py::arg("conc"), py::arg("dz"), py::arg("bc"),
-                  py::arg("kwargs"));
+  ADD_HARP_MODULE(Radiation, RadiationOptions, py::arg("conc"), py::arg("dz"),
+                  py::arg("bc"), py::arg("kwargs"));
 
-  ADD_HARP_MODULE(RadiationBand, RadiationBandOptions,
-                  py::arg("conc"), py::arg("dz"), py::arg("bc"),
-                  py::arg("kwargs"));
+  ADD_HARP_MODULE(RadiationBand, RadiationBandOptions, py::arg("conc"),
+                  py::arg("dz"), py::arg("bc"), py::arg("kwargs"));
 }

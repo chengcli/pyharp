@@ -7,7 +7,6 @@
 namespace py = pybind11;
 
 void bind_math(py::module &m) {
-  m.def("interpn", &harp::interpn,
-        py::arg("query"), py::arg("coords"), py::arg("lookup"),
-        py::arg("extrapolate") = false);
+  m.def("interpn", &harp::interpn, py::arg("query"), py::arg("coords"),
+        py::arg("lookup"), py::arg("extrapolate") = false);
 }

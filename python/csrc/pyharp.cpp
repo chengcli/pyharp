@@ -20,13 +20,12 @@ PYBIND11_MODULE(pyharp, m) {
   bind_math(m);
   bind_constants(m);
 
-  m.def(
-      "species_names",
-      []() -> const std::vector<std::string> & { return harp::species_names; });
+  m.def("species_names", []() -> const std::vector<std::string> & {
+    return harp::species_names;
+  });
 
-  m.def(
-      "species_weights",
-      []() -> const std::vector<double> & { return harp::species_weights; });
+  m.def("species_weights",
+        []() -> const std::vector<double> & { return harp::species_weights; });
 
   m.def(
       "shared",
@@ -54,9 +53,8 @@ PYBIND11_MODULE(pyharp, m) {
       },
       py::arg("path"));
 
-  m.def(
-      "get_search_paths",
-      []() { return harp::deserialize_search_paths(harp::search_paths); });
+  m.def("get_search_paths",
+        []() { return harp::deserialize_search_paths(harp::search_paths); });
 
   m.def(
       "add_resource_directory",
@@ -66,6 +64,5 @@ PYBIND11_MODULE(pyharp, m) {
       },
       py::arg("path"), py::arg("prepend") = true);
 
-  m.def("find_resource", &harp::find_resource,
-        py::arg("filename"));
+  m.def("find_resource", &harp::find_resource, py::arg("filename"));
 }

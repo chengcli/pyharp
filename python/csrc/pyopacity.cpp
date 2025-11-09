@@ -44,18 +44,17 @@ void bind_opacity(py::module &parent) {
 
       .ADD_OPTION(std::vector<double>, harp::AttenuatorOptions, fractions);
 
-  ADD_HARP_MODULE(JITOpacity, AttenuatorOptions,
-                  py::arg("conc"), py::arg("kwargs"));
+  ADD_HARP_MODULE(JITOpacity, AttenuatorOptions, py::arg("conc"),
+                  py::arg("kwargs"));
 
-  ADD_HARP_MODULE(WaveTemp, AttenuatorOptions,
-                  py::arg("conc"), py::arg("kwargs"));
+  ADD_HARP_MODULE(WaveTemp, AttenuatorOptions, py::arg("conc"),
+                  py::arg("kwargs"));
 
-  ADD_HARP_MODULE(MultiBand, AttenuatorOptions,
-                  py::arg("conc"), py::arg("kwargs"));
+  ADD_HARP_MODULE(MultiBand, AttenuatorOptions, py::arg("conc"),
+                  py::arg("kwargs"));
 
-  ADD_HARP_MODULE(FourColumn, AttenuatorOptions,
-                  py::arg("conc"), py::arg("kwargs"));
+  ADD_HARP_MODULE(FourColumn, AttenuatorOptions, py::arg("conc"),
+                  py::arg("kwargs"));
 
-  ADD_HARP_MODULE(RFM, AttenuatorOptions,
-                  py::arg("conc"), py::arg("kwargs"));
+  ADD_HARP_MODULE(RFM, AttenuatorOptions, py::arg("conc"), py::arg("kwargs"));
 }
