@@ -10,7 +10,7 @@ import torch
 class AttenuatorOptions:
     """
     Set opacity band options.
-    
+
     Returns:
         pyharp.AttenuatorOptions: class object
 
@@ -19,28 +19,28 @@ class AttenuatorOptions:
         >>> from pyharp.opacity import AttenuatorOptions
         >>> op = AttenuatorOptions().band_options(['band1', 'band2'])
     """
-    
+
     def __init__(self) -> None:
         """Create a new AttenuatorOptions instance."""
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     @overload
     def type(self) -> str:
         """
         Get the type of the opacity source format.
-        
+
         Returns:
             str: type of the opacity source
         """
         ...
-    
+
     @overload
     def type(self, value: str) -> "AttenuatorOptions":
         """
         Set the type of the opacity source format.
-        
+
         Valid options are: ``jit``, ``rfm-lbl``, ``rfm-ck``, ``four-column``, ``wavetemp``, ``multiband``.
 
         Args:
@@ -56,17 +56,17 @@ class AttenuatorOptions:
             >>> print(op)
         """
         ...
-    
+
     @overload
     def bname(self) -> str:
         """
         Get the name of the band that the opacity is associated with.
-        
+
         Returns:
             str: band name
         """
         ...
-    
+
     @overload
     def bname(self, value: str) -> "AttenuatorOptions":
         """
@@ -84,17 +84,17 @@ class AttenuatorOptions:
             >>> op = AttenuatorOptions().bname('band1')
         """
         ...
-    
+
     @overload
     def opacity_files(self) -> list[str]:
         """
         Get the list of opacity data files.
-        
+
         Returns:
             list[str]: list of opacity data files
         """
         ...
-    
+
     @overload
     def opacity_files(self, value: list[str]) -> "AttenuatorOptions":
         """
@@ -112,17 +112,17 @@ class AttenuatorOptions:
             >>> op = AttenuatorOptions().opacity_files(['file1', 'file2'])
         """
         ...
-    
+
     @overload
     def species_ids(self) -> list[int]:
         """
         Get the list of dependent species indices.
-        
+
         Returns:
             list[int]: list of dependent species indices
         """
         ...
-    
+
     @overload
     def species_ids(self, value: list[int]) -> "AttenuatorOptions":
         """
@@ -140,17 +140,17 @@ class AttenuatorOptions:
             >>> op = AttenuatorOptions().species_ids([1, 2])
         """
         ...
-    
+
     @overload
     def jit_kwargs(self) -> list[str]:
         """
         Get the list of kwargs to pass to the JIT module.
-        
+
         Returns:
             list[str]: list of kwargs
         """
         ...
-    
+
     @overload
     def jit_kwargs(self, value: list[str]) -> "AttenuatorOptions":
         """
@@ -169,17 +169,17 @@ class AttenuatorOptions:
             >>> print(op.jit_kwargs())
         """
         ...
-    
+
     @overload
     def fractions(self) -> list[float]:
         """
         Get fractions of species in cia calculation.
-        
+
         Returns:
             list[float]: list of species fractions
         """
         ...
-    
+
     @overload
     def fractions(self, value: list[float]) -> "AttenuatorOptions":
         """
@@ -201,32 +201,32 @@ class AttenuatorOptions:
 class JITOpacity:
     """
     JIT opacity model.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp.opacity import JITOpacity, AttenuatorOptions
         >>> op = JITOpacity(AttenuatorOptions())
     """
-    
+
     options: AttenuatorOptions
-    
+
     @overload
     def __init__(self) -> None:
         """Construct a new default module."""
         ...
-    
+
     @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a JITOpacity instance.
-        
+
         Args:
             options (AttenuatorOptions): Attenuator options
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using JIT model.
@@ -249,32 +249,32 @@ class JITOpacity:
 class WaveTemp:
     """
     Wave-Temp opacity data.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp.opacity import WaveTemp, AttenuatorOptions
         >>> op = WaveTemp(AttenuatorOptions())
     """
-    
+
     options: AttenuatorOptions
-    
+
     @overload
     def __init__(self) -> None:
         """Construct a new default module."""
         ...
-    
+
     @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a WaveTemp instance.
-        
+
         Args:
             options (AttenuatorOptions): Attenuator options
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using Wave-Temp data.
@@ -300,32 +300,32 @@ class WaveTemp:
 class MultiBand:
     """
     Multi-band opacity data.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp.opacity import MultiBand, AttenuatorOptions
         >>> op = MultiBand(AttenuatorOptions())
     """
-    
+
     options: AttenuatorOptions
-    
+
     @overload
     def __init__(self) -> None:
         """Construct a new default module."""
         ...
-    
+
     @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a MultiBand instance.
-        
+
         Args:
             options (AttenuatorOptions): Attenuator options
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using multi-band data.
@@ -351,32 +351,32 @@ class MultiBand:
 class FourColumn:
     """
     Four-column opacity data.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp.opacity import FourColumn, AttenuatorOptions
         >>> op = FourColumn(AttenuatorOptions())
     """
-    
+
     options: AttenuatorOptions
-    
+
     @overload
     def __init__(self) -> None:
         """Construct a new default module."""
         ...
-    
+
     @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a FourColumn instance.
-        
+
         Args:
             options (AttenuatorOptions): Attenuator options
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using four-column data.
@@ -404,32 +404,32 @@ class FourColumn:
 class RFM:
     """
     Line-by-line absorption data computed by RFM.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp.opacity import RFM, AttenuatorOptions
         >>> op = RFM(AttenuatorOptions())
     """
-    
+
     options: AttenuatorOptions
-    
+
     @overload
     def __init__(self) -> None:
         """Construct a new default module."""
         ...
-    
+
     @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a RFM instance.
-        
+
         Args:
             options (AttenuatorOptions): Attenuator options
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using RFM line-by-line absorption data.

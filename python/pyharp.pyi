@@ -12,7 +12,7 @@ import torch
 def species_names() -> list[str]:
     """
     Retrieves the list of species names.
-    
+
     Returns:
         list[str]: List of species names
     """
@@ -21,7 +21,7 @@ def species_names() -> list[str]:
 def species_weights() -> list[float]:
     """
     Retrieves the list of species molecular weights [kg/mol].
-    
+
     Returns:
         list[float]: List of species molecular weights in kg/mol
     """
@@ -42,9 +42,9 @@ def shared() -> Iterator[torch.Tensor]:
     Examples:
         >>> import pyharp
         >>> import torch
-        
+
         # ... after calling the forward method
-        
+
         # loop over the shared data
         >>> for data in pyharp.shared():
         >>>     print(type(data), data.size())  # prints the shared data
@@ -64,9 +64,9 @@ def get_shared(key: str) -> torch.Tensor:
     Example:
         >>> import pyharp
         >>> import torch
-        
+
         # ... after calling the forward method
-        
+
         # get the shared data
         >>> data = pyharp.get_shared("radiation/band1/total_flux")
         >>> print(type(data), data.size())  # prints the shared data
@@ -85,7 +85,7 @@ def set_search_paths(path: str) -> str:
 
     Example:
         >>> import pyharp
-        
+
         # set the search paths
         >>> pyharp.set_search_paths("/path/to/resource/files")
     """
@@ -100,7 +100,7 @@ def get_search_paths() -> str:
 
     Example:
         >>> import pyharp
-        
+
         # get the search paths
         >>> pyharp.get_search_paths()
     """
@@ -119,7 +119,7 @@ def add_resource_directory(path: str, prepend: bool = True) -> str:
 
     Example:
         >>> import pyharp
-        
+
         # add a resource directory
         >>> pyharp.add_resource_directory("/path/to/resource/files")
     """
@@ -137,7 +137,7 @@ def find_resource(filename: str) -> str:
 
     Example:
         >>> import pyharp
-        
+
         # find a resource file
         >>> path = pyharp.find_resource("example.txt")
         >>> print(path)  # /path/to/resource/files/example.txt
@@ -161,7 +161,7 @@ def bbflux_wavenumber(wave: torch.Tensor, temp: float, ncol: int = 1) -> torch.T
     Examples:
         >>> import torch
         >>> from pyharp import bbflux_wavenumber
-        
+
         >>> wave = torch.tensor([1.0, 2.0, 3.0])
         >>> temp = 300.0
         >>> flux = bbflux_wavenumber(wave, temp)
@@ -271,24 +271,24 @@ def interpn(
 class RadiationBandOptions:
     """
     Options for radiation band configuration.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp import RadiationBandOptions
         >>> op = RadiationBandOptions().name('band1').outdirs('outdir')
     """
-    
+
     def __init__(self) -> None:
         """
         Create a new RadiationBandOptions instance.
-        
+
         Returns:
             RadiationBandOptions: class object
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def query_waves(self, op_name: str = "") -> list[float]:
         """
         Query the spectral grids.
@@ -300,7 +300,7 @@ class RadiationBandOptions:
             list[float]: spectral grids
         """
         ...
-    
+
     def query_weights(self, op_name: str = "") -> list[float]:
         """
         Query the weights.
@@ -312,12 +312,12 @@ class RadiationBandOptions:
             list[float]: weights
         """
         ...
-    
+
     @overload
     def name(self) -> str:
         """Get radiation band name."""
         ...
-    
+
     @overload
     def name(self, value: str) -> "RadiationBandOptions":
         """
@@ -330,12 +330,12 @@ class RadiationBandOptions:
             RadiationBandOptions: class object
         """
         ...
-    
+
     @overload
     def outdirs(self) -> str:
         """Get outgoing ray directions."""
         ...
-    
+
     @overload
     def outdirs(self, value: str) -> "RadiationBandOptions":
         """
@@ -348,12 +348,12 @@ class RadiationBandOptions:
             RadiationBandOptions: class object
         """
         ...
-    
+
     @overload
     def solver_name(self) -> str:
         """Get solver name."""
         ...
-    
+
     @overload
     def solver_name(self, value: str) -> "RadiationBandOptions":
         """
@@ -366,12 +366,12 @@ class RadiationBandOptions:
             RadiationBandOptions: class object
         """
         ...
-    
+
     @overload
     def ww(self) -> list[float]:
         """Get wavelength, wavenumber or weights for a wave grid."""
         ...
-    
+
     @overload
     def ww(self, value: list[float]) -> "RadiationBandOptions":
         """
@@ -384,12 +384,12 @@ class RadiationBandOptions:
             RadiationBandOptions: class object
         """
         ...
-    
+
     @overload
     def integration(self) -> str:
         """Get integration method."""
         ...
-    
+
     @overload
     def integration(self, value: str) -> "RadiationBandOptions":
         """
@@ -402,17 +402,17 @@ class RadiationBandOptions:
             RadiationBandOptions: class object
         """
         ...
-    
+
     @overload
     def disort(self):
         """
         Get disort options.
-        
+
         Returns:
             pydisort.DisortOptions: disort options
         """
         ...
-    
+
     @overload
     def disort(self, value) -> "RadiationBandOptions":
         """
@@ -432,17 +432,17 @@ class RadiationBandOptions:
             >>> print(op)
         """
         ...
-    
+
     @overload
     def opacities(self):
         """
         Get opacities.
-        
+
         Returns:
             dict: opacities dictionary
         """
         ...
-    
+
     @overload
     def opacities(self, value: dict) -> "RadiationBandOptions":
         """
@@ -459,24 +459,24 @@ class RadiationBandOptions:
 class RadiationOptions:
     """
     Options for radiation configuration.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp import RadiationOptions
         >>> op = RadiationOptions().band_options(['band1', 'band2'])
     """
-    
+
     def __init__(self) -> None:
         """
         Create a new RadiationOptions instance.
-        
+
         Returns:
             RadiationOptions: class object
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     @staticmethod
     def from_yaml(filename: str) -> "RadiationOptions":
         """
@@ -489,12 +489,12 @@ class RadiationOptions:
             RadiationOptions: class object
         """
         ...
-    
+
     @overload
     def outdirs(self) -> str:
         """Get outgoing ray directions."""
         ...
-    
+
     @overload
     def outdirs(self, value: str) -> "RadiationOptions":
         """
@@ -507,17 +507,17 @@ class RadiationOptions:
             RadiationOptions: class object
         """
         ...
-    
+
     @overload
     def bands(self):
         """
         Get radiation band options.
-        
+
         Returns:
             dict: radiation band options dictionary
         """
         ...
-    
+
     @overload
     def bands(self, value: dict) -> "RadiationOptions":
         """
@@ -534,32 +534,32 @@ class RadiationOptions:
 class Radiation:
     """
     Calculate the net radiation flux.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp import RadiationOptions
         >>> op = RadiationOptions().band_options(['band1', 'band2'])
     """
-    
+
     options: RadiationOptions
-    
+
     @overload
     def __init__(self) -> None:
         """Construct a new default module."""
         ...
-    
+
     @overload
     def __init__(self, options: RadiationOptions) -> None:
         """
         Create a Radiation instance.
-        
+
         Args:
             options (RadiationOptions): Radiation options
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def forward(
         self,
         conc: torch.Tensor,
@@ -584,32 +584,32 @@ class Radiation:
 class RadiationBand:
     """
     Calculate the net radiation flux for a band.
-    
+
     Examples:
         >>> import torch
         >>> from pyharp import RadiationBandOptions
         >>> op = RadiationBandOptions().band_options(['band1', 'band2'])
     """
-    
+
     options: RadiationBandOptions
-    
+
     @overload
     def __init__(self) -> None:
         """Construct a new default module."""
         ...
-    
+
     @overload
     def __init__(self, options: RadiationBandOptions) -> None:
         """
         Create a RadiationBand instance.
-        
+
         Args:
             options (RadiationBandOptions): Radiation band options
         """
         ...
-    
+
     def __repr__(self) -> str: ...
-    
+
     def forward(
         self,
         conc: torch.Tensor,
