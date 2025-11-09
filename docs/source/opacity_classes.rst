@@ -6,17 +6,17 @@ Opacity Classes
 .. autoclass:: pyharp.opacity.AttenuatorOptions
    :members:
 
-.. autoclass:: pyharp.opacity.cpp.FourColumn
+.. autoclass:: pyharp.opacity.FourColumn
    :members: __init__, forward
 
-.. autoclass:: pyharp.opacity.cpp.MultiBand
+.. autoclass:: pyharp.opacity.MultiBand
    :members: __init__, forward
 
-.. autoclass:: pyharp.opacity.cpp.WaveTemp
+.. autoclass:: pyharp.opacity.WaveTemp
    :members: __init__, forward
 
-.. autoclass:: pyharp.opacity.cpp.RFM
+.. autoclass:: pyharp.opacity.RFM
    :members: __init__, forward
 
-.. autoclass:: pyharp.opacity.cpp.JITOpacity
+.. autoclass:: pyharp.opacity.JITOpacity
    :members: __init__, forward
