@@ -56,7 +56,7 @@ packages = ["pyharp", "pyharp.api", "pyharp.sonora", "pyharp.h2_cia_legacy"]
 include-package-data = false
 
 [tool.setuptools.package-data]
-"pyharp" = ["harp/**/*", "lib/*.so", "lib/*.dylib"]
+"pyharp" = ["harp/**/*", "lib/*.so", "lib/*.dylib", "*.pyi", "py.typed"]
 "pyharp.sonora" = ["sonora2020_*.txt"]
 "pyharp.h2_cia_legacy" = ["H2-H2-*.pt", "H2-He-*.pt"]
 
