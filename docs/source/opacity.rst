@@ -114,7 +114,7 @@ We use the convention that the last dimension for the temperature structure
 is layers and the second to last dimension is columns.
 
 
-Finally, we call the :meth:`forward <pyharp.opacity.cpp.MultiBand.forward>` method to compute the optical properties.
+Finally, we call the :meth:`forward <pyharp.opacity.MultiBand.forward>` method to compute the optical properties.
 
 .. code-block:: python
 
@@ -254,7 +254,7 @@ This function is equivalent to the following three steps:
   scripted = torch.jit.script(model)
   scripted.save("grey_opacity.pt")
 
-We use the :class:`pyharp.opacity.cpp.JITOpacity` class to load the JIT compiled model from the ``.pt`` file:
+We use the :class:`pyharp.opacity.JITOpacity` class to load the JIT compiled model from the ``.pt`` file:
 
 .. code-block:: python
 
@@ -281,4 +281,4 @@ the central class that manages the opacity source options.
 This is a general structure of how classes in Pyharp are organized.
 There is always an `Options` class that manages the parameters of a class.
 The actual class that does the computation is initialized from the `Options` class.
-All opacity classes within :ref:`opacity_classes` follow this pattern and :class:`pyharp.cpp.RadiationBand` and :class:`pyharp.cpp.Radiation` classes also follow this pattern.
+All opacity classes within :ref:`opacity_classes` follow this pattern and :class:`pyharp.RadiationBand` and :class:`pyharp.Radiation` classes also follow this pattern.

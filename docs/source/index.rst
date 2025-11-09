@@ -76,8 +76,8 @@ We use this entry to calculate its molecular weight.
 Next, we specify the opacity sources, which are dictionary entries with the name of the opacity source as the key and its properties as the value.
 In this case, we have two opacity sources:
 
-#. `H2-molecule`, which is a :class:`pyharp.opacity.cpp.MultiBand` molecular opacity source with the data file `sonora_2020_feh+000_co_100.data.196.pt` and the dependent species is `H2mix`. We use these information to retrieve the opacity data from the file and calculate species indices in a tensor data.
-#. `H2-continuum`, which is a :class:`pyharp.opacity.cpp.WaveTemp` continuum opacity source with the data files `H2-H2-eq.xiz.pt` and `H2-He-eq.xiz.pt` and the dependent species is also `H2mix`. The data files for continuum absorption are shipped with Pyharp package. The following statement loads the data file directory such that Pyharp can find them:
+#. `H2-molecule`, which is a :class:`pyharp.opacity.MultiBand` molecular opacity source with the data file `sonora_2020_feh+000_co_100.data.196.pt` and the dependent species is `H2mix`. We use these information to retrieve the opacity data from the file and calculate species indices in a tensor data.
+#. `H2-continuum`, which is a :class:`pyharp.opacity.WaveTemp` continuum opacity source with the data files `H2-H2-eq.xiz.pt` and `H2-He-eq.xiz.pt` and the dependent species is also `H2mix`. The data files for continuum absorption are shipped with Pyharp package. The following statement loads the data file directory such that Pyharp can find them:
 
   .. code-block:: python
 
@@ -87,7 +87,7 @@ Next, we specify the radiation bands, which is a list of band names.
 For each band, a dictionary entry is created with the band name as the key and its properties as the value.
 
 Each band can have its own spectral range, opacity sources, solver, integration method and flags associated with radiative transfer computation.
-In this example, we have one band, `sonora196`, which has a spectral range of 30.8 to 38300 cm :math:`^{-1}`; the opacity sources are `H2-molecule` and `H2-continuum`; the radiative transfer solver is :class:`pydisort.cpp.Disort`; the integration method is ``weight`` (correlated-K); and the flags passed to :class:`pydisort.cpp.Disort` are ``lamber``, ``quiet``, ``onlyfl`` and ``planck``, which assumes lambertian surface, quiet mode, flux-only calculation and activate planck function for the radiation source function respectively.
+In this example, we have one band, `sonora196`, which has a spectral range of 30.8 to 38300 cm :math:`^{-1}`; the opacity sources are `H2-molecule` and `H2-continuum`; the radiative transfer solver is :class:`pydisort.Disort`; the integration method is ``weight`` (correlated-K); and the flags passed to :class:`pydisort.Disort` are ``lamber``, ``quiet``, ``onlyfl`` and ``planck``, which assumes lambertian surface, quiet mode, flux-only calculation and activate planck function for the radiation source function respectively.
 
 Please see the `pydisort <https://pydisort.readthedocs.io/en/latest/>`_ documentation for more details on the available options of :class:`pydisort.DisortOptions` and their meanings.
 
@@ -196,7 +196,7 @@ So, generally, we need to loop over the bands and configure them one by one.
 There is no rule for dividing or defining the bands. However, each band must have the same number of spectral points, absorbers, radiation flags and opacity sources.
 The radiative transfer calculation is computed in parallel for every spectral point within each band, but sequentially over bands. So, there is a performance penalty when the number of bands is too large.
 
-Since the :mod:`pyharp.sonora` dataset is homogeneous despite that it contains opacities for 196 wavenumber bands, we can group all of them in a single band, `sonora196`, with two opacity sources, `H2-molecule`, that is of type :class:`pyharp.opacity.cpp.MultiBand` and `H2-continuum`, that is of type :class:`pyharp.opacity.cpp.WaveTemp`.
+Since the :mod:`pyharp.sonora` dataset is homogeneous despite that it contains opacities for 196 wavenumber bands, we can group all of them in a single band, `sonora196`, with two opacity sources, `H2-molecule`, that is of type :class:`pyharp.opacity.MultiBand` and `H2-continuum`, that is of type :class:`pyharp.opacity.WaveTemp`.
 This improves the computational efficiency as the 196 radiative transfer calculations are performed in parallel.
 
 .. code-block:: python
@@ -236,7 +236,7 @@ Specifically, we need to define the albedo, emissivity, temperature of the surfa
 Some boundary conditions are band-dependent, which is reflected in the keys of the `bc` dictionary.
 Others are band-independent, such as the temperature of the surface and the top of the atmosphere.
 
-Here comes the ``forward`` method of :class:`pyharp.cpp.Radiation`, which takes the concentration (in mol m :math:`^{-3}`), layer thickness (in m), boundary conditions and atmospheric state (pressure in pa and temperature in K) as inputs and returns the radiative fluxes.
+Here comes the ``forward`` method of :class:`pyharp.Radiation`, which takes the concentration (in mol m :math:`^{-3}`), layer thickness (in m), boundary conditions and atmospheric state (pressure in pa and temperature in K) as inputs and returns the radiative fluxes.
 
 Throughout the Pyharp code, we will be using SI units unless otherwise specified.
 

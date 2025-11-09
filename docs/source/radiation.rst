@@ -1,4 +1,4 @@
 Working with the radiation class
 ================================
 
-The :class:`pyharp.cpp.Radiation`
+The :class:`pyharp.Radiation`
