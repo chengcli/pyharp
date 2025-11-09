@@ -402,6 +402,59 @@ class RadiationBandOptions:
             RadiationBandOptions: class object
         """
         ...
+    
+    @overload
+    def disort(self):
+        """
+        Get disort options.
+        
+        Returns:
+            pydisort.DisortOptions: disort options
+        """
+        ...
+    
+    @overload
+    def disort(self, value) -> "RadiationBandOptions":
+        """
+        Set disort options.
+
+        Args:
+            value (pydisort.DisortOptions): disort options
+
+        Returns:
+            RadiationBandOptions: class object
+
+        Examples:
+            >>> import torch
+            >>> from pyharp import RadiationBandOptions
+            >>> from pydisort import DisortOptions
+            >>> op = RadiationBandOptions().disort(DisortOptions().nwave(10))
+            >>> print(op)
+        """
+        ...
+    
+    @overload
+    def opacities(self):
+        """
+        Get opacities.
+        
+        Returns:
+            dict: opacities dictionary
+        """
+        ...
+    
+    @overload
+    def opacities(self, value: dict) -> "RadiationBandOptions":
+        """
+        Set opacities.
+
+        Args:
+            value (dict): opacities
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
 
 class RadiationOptions:
     """
@@ -454,6 +507,29 @@ class RadiationOptions:
             RadiationOptions: class object
         """
         ...
+    
+    @overload
+    def bands(self):
+        """
+        Get radiation band options.
+        
+        Returns:
+            dict: radiation band options dictionary
+        """
+        ...
+    
+    @overload
+    def bands(self, value: dict) -> "RadiationOptions":
+        """
+        Set radiation band options.
+
+        Args:
+            value (dict): radiation band options
+
+        Returns:
+            RadiationOptions: class object
+        """
+        ...
 
 class Radiation:
     """
@@ -465,6 +541,14 @@ class Radiation:
         >>> op = RadiationOptions().band_options(['band1', 'band2'])
     """
     
+    options: RadiationOptions
+    
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+    
+    @overload
     def __init__(self, options: RadiationOptions) -> None:
         """
         Create a Radiation instance.
@@ -474,7 +558,9 @@ class Radiation:
         """
         ...
     
-    def __call__(
+    def __repr__(self) -> str: ...
+    
+    def forward(
         self,
         conc: torch.Tensor,
         dz: torch.Tensor,
@@ -505,6 +591,14 @@ class RadiationBand:
         >>> op = RadiationBandOptions().band_options(['band1', 'band2'])
     """
     
+    options: RadiationBandOptions
+    
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+    
+    @overload
     def __init__(self, options: RadiationBandOptions) -> None:
         """
         Create a RadiationBand instance.
@@ -514,7 +608,9 @@ class RadiationBand:
         """
         ...
     
-    def __call__(
+    def __repr__(self) -> str: ...
+    
+    def forward(
         self,
         conc: torch.Tensor,
         dz: torch.Tensor,

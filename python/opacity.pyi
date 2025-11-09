@@ -208,6 +208,14 @@ class JITOpacity:
         >>> op = JITOpacity(AttenuatorOptions())
     """
     
+    options: AttenuatorOptions
+    
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+    
+    @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a JITOpacity instance.
@@ -217,7 +225,9 @@ class JITOpacity:
         """
         ...
     
-    def __call__(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def __repr__(self) -> str: ...
+    
+    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using JIT model.
 
@@ -246,6 +256,14 @@ class WaveTemp:
         >>> op = WaveTemp(AttenuatorOptions())
     """
     
+    options: AttenuatorOptions
+    
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+    
+    @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a WaveTemp instance.
@@ -255,7 +273,9 @@ class WaveTemp:
         """
         ...
     
-    def __call__(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def __repr__(self) -> str: ...
+    
+    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using Wave-Temp data.
 
@@ -287,6 +307,14 @@ class MultiBand:
         >>> op = MultiBand(AttenuatorOptions())
     """
     
+    options: AttenuatorOptions
+    
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+    
+    @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a MultiBand instance.
@@ -296,7 +324,9 @@ class MultiBand:
         """
         ...
     
-    def __call__(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def __repr__(self) -> str: ...
+    
+    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using multi-band data.
 
@@ -328,6 +358,14 @@ class FourColumn:
         >>> op = FourColumn(AttenuatorOptions())
     """
     
+    options: AttenuatorOptions
+    
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+    
+    @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a FourColumn instance.
@@ -337,7 +375,9 @@ class FourColumn:
         """
         ...
     
-    def __call__(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def __repr__(self) -> str: ...
+    
+    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using four-column data.
 
@@ -371,6 +411,14 @@ class RFM:
         >>> op = RFM(AttenuatorOptions())
     """
     
+    options: AttenuatorOptions
+    
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+    
+    @overload
     def __init__(self, options: AttenuatorOptions) -> None:
         """
         Create a RFM instance.
@@ -380,7 +428,9 @@ class RFM:
         """
         ...
     
-    def __call__(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def __repr__(self) -> str: ...
+    
+    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using RFM line-by-line absorption data.
 
