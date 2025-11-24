@@ -29,7 +29,7 @@ class HeliosImpl : public torch::nn::Cloneable<HeliosImpl> {
   AttenuatorOptions options;
 
   //! Constructor to initialize the layer
-  HeliosImpl() = default;
+  HeliosImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
   explicit HeliosImpl(AttenuatorOptions const& options_);
   void reset() override;
 

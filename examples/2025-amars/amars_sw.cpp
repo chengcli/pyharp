@@ -47,23 +47,23 @@ void interpolate_mixing_ratios(const std::vector<double>& dense_grid,
 disort::DisortOptions disort_options(int nwave, int ncol, int nlyr) {
   disort::DisortOptions op;
 
-  op.header("running amars RT");
-  op.flags(
+  op->header("running amars RT");
+  op->flags(
       "lamber,quiet,onlyfl,"
       "intensity_correction,old_intensity_correction");
   //"intensity_correction,old_intensity_correction,"
   //"print-input,print-phase-function");
 
-  op.nwave(nwave);
-  op.ncol(ncol);
+  op->nwave(nwave);
+  op->ncol(ncol);
 
-  op.ds().nlyr = nlyr;
-  op.ds().nstr = 8;
-  op.ds().nmom = 8;
+  op->ds().nlyr = nlyr;
+  op->ds().nstr = 8;
+  op->ds().nmom = 8;
 
-  op.ds().nphi = 1;
-  op.ds().ntau = 1;
-  op.ds().numu = 1;
+  op->ds().nphi = 1;
+  op->ds().ntau = 1;
+  op->ds().numu = 1;
 
   return op;
 }
@@ -223,10 +223,10 @@ int main(int argc, char** argv) {
   harp::species_names = {"S8", "H2SO4"};
   harp::species_weights = {256.e-3, 98.e-3};
 
-  op.species_ids({0}).opacity_files({"s8_k_fuller.txt"});
+  op->species_ids({0}).opacity_files({"s8_k_fuller.txt"});
   harp::FourColumn s8(op);
 
-  op.species_ids({1}).opacity_files({"h2so4.txt"});
+  op->species_ids({1}).opacity_files({"h2so4.txt"});
   harp::FourColumn h2so4(op);
 
   auto wave = short_wavenumber_grid(nwave);

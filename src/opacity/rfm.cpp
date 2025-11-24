@@ -19,23 +19,24 @@ namespace harp {
 extern std::vector<std::string> species_names;
 
 RFMImpl::RFMImpl(AttenuatorOptions const& options_) : options(options_) {
-  TORCH_CHECK(options.opacity_files().size() == 1,
+  TORCH_CHECK(options->opacity_files().size() == 1,
               "Only one opacity file is allowed");
 
-  TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
+  TORCH_CHECK(options->species_ids().size() == 1,
+              "Only one species is allowed");
 
-  TORCH_CHECK(options.species_ids()[0] >= 0,
-              "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options->species_ids()[0] >= 0,
+              "Invalid species_id: ", options->species_ids()[0]);
 
   TORCH_CHECK(
-      options.type().empty() || (options.type().compare(0, 3, "rfm") == 0),
-      "Mismatch opacity type: ", options.type());
+      options->type().empty() || (options->type().compare(0, 3, "rfm") == 0),
+      "Mismatch opacity type: ", options->type());
 
   reset();
 }
 
 void RFMImpl::reset() {
-  auto full_path = find_resource(options.opacity_files()[0]);
+  auto full_path = find_resource(options->opacity_files()[0]);
 
   // data table shape (nwave, npres, ntemp)
   size_t kshape[3];
@@ -108,7 +109,7 @@ void RFMImpl::reset() {
   // data
   kdata = torch::empty({(int)kshape[0], (int)kshape[1], (int)kshape[2], 1},
                        torch::kFloat64);
-  auto name = species_names[options.species_ids()[0]];
+  auto name = species_names[options->species_ids()[0]];
 
   err = nc_inq_varid(fileid, name.c_str(), &varid);
   TORCH_CHECK(err == NC_NOERR, nc_strerror(err));
@@ -158,13 +159,13 @@ torch::Tensor RFMImpl::forward(
   auto out = interpn({wave, lnp, tempa}, {kwave, klnp, ktempa}, kdata);
 
   // Check species id in range
-  TORCH_CHECK(
-      options.species_ids()[0] >= 0 && options.species_ids()[0] < conc.size(2),
-      "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options->species_ids()[0] >= 0 &&
+                  options->species_ids()[0] < conc.size(2),
+              "Invalid species_id: ", options->species_ids()[0]);
 
   // ln(m*2/kmol) -> 1/m
   return 1.E-3 * out.exp() *
-         conc.select(-1, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);
+         conc.select(-1, options->species_ids()[0]).unsqueeze(0).unsqueeze(-1);
 }
 
 }  // namespace harp

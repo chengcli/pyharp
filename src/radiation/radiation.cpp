@@ -9,16 +9,15 @@
 
 namespace harp {
 
-std::unordered_map<std::string, torch::Tensor> shared;
 std::vector<std::string> species_names;
 std::vector<double> species_weights;
 
-RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
-  RadiationOptions rad;
+RadiationOptions RadiationOptionsImpl::from_yaml(std::string const& filename) {
+  auto op = std::make_shared<RadiationOptionsImpl>();
   auto config = YAML::LoadFile(filename);
 
   // null-op
-  if (!config["bands"]) return rad;
+  if (!config["bands"]) return op;
 
   // check if species are defined
   TORCH_CHECK(config["species"],
@@ -40,11 +39,12 @@ RadiationOptions RadiationOptions::from_yaml(std::string const& filename) {
   }
 
   for (auto bd : config["bands"]) {
-    auto bd_name = bd.as<std::string>();
-    rad.bands()[bd_name] = RadiationBandOptions::from_yaml(bd_name, config);
+    auto bd_name = bd["name"].as<std::string>();
+    op->bands().push_back(
+        RadiationBandOptionsImpl::from_yaml(filename, bd_name));
   }
 
-  return rad;
+  return op;
 }
 
 RadiationImpl::RadiationImpl(RadiationOptions const& options_)
@@ -53,14 +53,17 @@ RadiationImpl::RadiationImpl(RadiationOptions const& options_)
 }
 
 void RadiationImpl::reset() {
-  for (auto& [name, bop] : options.bands()) {
+  for (auto const& bop : options->bands()) {
     // set default outgoing radiation directions
-    if (!options.outdirs().empty()) {
-      bop.outdirs(options.outdirs());
+    if (!options->outdirs().empty()) {
+      bop->outdirs(options->outdirs());
     }
-    bands[name] = RadiationBand(bop);
-    register_module(name, bands[name]);
+    bands.push_back(RadiationBand(bop));
+    register_module(bop->name(), bands.back());
   }
+
+  // spectra holder
+  spectra = register_buffer("spectra", torch::Tensor());
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> RadiationImpl::forward(
@@ -70,16 +73,17 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> RadiationImpl::forward(
   torch::Tensor total_flux;
   bool first_band = true;
 
-  for (auto& [name, band] : bands) {
-    std::string name1 = "radiation/" + name + "/total_flux";
-    shared[name1] = band->forward(conc, dz, bc, kwargs);
+  std::vector<torch::Tensor> spectrum;
+  for (auto& band : bands) {
+    spectrum.push_back(band->forward(conc, dz, bc, kwargs));
     if (first_band) {
-      total_flux = shared[name1].clone();
+      total_flux = spectrum[0].clone();
       first_band = false;
     } else {
-      total_flux += shared[name1];
+      total_flux += spectrum.back();
     }
   }
+  spectra.set_(torch::stack(spectrum, 0));
 
   auto net_flux = cal_net_flux(total_flux);
 

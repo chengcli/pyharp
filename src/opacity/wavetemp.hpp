@@ -26,7 +26,7 @@ class WaveTempImpl : public torch::nn::Cloneable<WaveTempImpl> {
   AttenuatorOptions options;
 
   //! Constructor to initialize the layer
-  WaveTempImpl() = default;
+  WaveTempImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
   explicit WaveTempImpl(AttenuatorOptions const& options_);
   void reset() override;
 

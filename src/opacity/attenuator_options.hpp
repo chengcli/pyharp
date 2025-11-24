@@ -1,20 +1,18 @@
 #pragma once
 
-// yaml
-#include <yaml-cpp/yaml.h>
-
-// torch
-#include <torch/nn/modules/container/any.h>
-
 // harp
 #include <harp/add_arg.h>
 
 namespace harp {
 
-struct AttenuatorOptions {
-  AttenuatorOptions() = default;
-  static AttenuatorOptions from_yaml(YAML::Node const& config,
-                                     std::string bd_name = "");
+struct AttenuatorOptionsImpl {
+  static std::shared_ptr<AttenuatorOptionsImpl> create() {
+    return std::make_shared<AttenuatorOptionsImpl>();
+  }
+
+  static std::shared_ptr<AttenuatorOptionsImpl> from_yaml(
+      std::string const& filename, std::string const& op_name,
+      std::string bd_name = "");
 
   void report(std::ostream& os) const {
     os << "* type = " << type() << "\n";
@@ -28,20 +26,8 @@ struct AttenuatorOptions {
     os << "* jit_kwargs = ";
     for (auto const& kw : jit_kwargs()) os << kw << ", ";
     os << "\n";
-    os << "* scale = " << scale() << "\n";
-    os << "* metallicity = " << metallicity() << "\n";
     os << "* fractions = ";
     for (auto const& f : fractions()) os << f << ", ";
-    os << "\n";
-    os << "* kappa_a = " << kappa_a() << "\n";
-    os << "* kappa_b = " << kappa_b() << "\n";
-    os << "* kappa_cut = " << kappa_cut() << "\n";
-    os << "* diameter = " << diameter() << "\n";
-    os << "* xsection = " << xsection() << "\n";
-    os << "* ssa = " << ssa() << "\n";
-    os << "* ff = " << ff() << "\n";
-    os << "* g1 = " << g1() << "\n";
-    os << "* g2 = " << g2() << "\n";
     os << "* nmom = " << nmom() << "\n";
   }
 
@@ -60,51 +46,13 @@ struct AttenuatorOptions {
   //! list of kwargs to pass to the JIT module
   ADD_ARG(std::vector<std::string>, jit_kwargs) = {};
 
-  //! opacity scale
-  ADD_ARG(double, scale) = 1.0;
-
-  //// Hydrogen Atmosphere Parameters  /////
-
-  //! metallicity (used in Freedman mean opacities)
-  ADD_ARG(double, metallicity) = 0.0;
-
-  //// Continuum Parameters  /////
-
-  //! number fraction of species in cia calculation
-  ADD_ARG(std::vector<double>, fractions) = { 1.0 };
-
-  //! kappa_a (used in xiz semigrey opacity)
-  ADD_ARG(double, kappa_a) = 0.0;
-
-  //! kappa_b (used in xiz semigrey opacity)
-  ADD_ARG(double, kappa_b) = 0.0;
-
-  //! kappa_cut (used in xiz semigrey opacity)
-  ADD_ARG(double, kappa_cut) = 0.0;
-
-  //// Particle Parameters  /////
-
-  //! particle diameter in [um]
-  ADD_ARG(double, diameter) = 1.0;
-
-  //! particle extinction cross section in [cm^2]
-  ADD_ARG(double, xsection) = 0.0;
-
-  //! single scattering albedo
-  ADD_ARG(double, ssa) = 0.0;
-
-  //! fraction parameter in double Henyey-Greenstein phase function
-  ADD_ARG(double, ff) = 0.0;
-
-  //! asymmetry parameter-1 in Henyey-Greenstein phase function
-  ADD_ARG(double, g1) = 0.0;
-
-  //! asymmetry parameter-2 in Henyey-Greenstein phase function
-  ADD_ARG(double, g2) = 0.0;
+  //! number fraction of species in CIA calculation
+  ADD_ARG(std::vector<double>, fractions) = {};
 
   //! number of scattering moments
   ADD_ARG(int, nmom) = 0;
 };
+using AttenuatorOptions = std::shared_ptr<AttenuatorOptionsImpl>;
 
 }  // namespace harp
 

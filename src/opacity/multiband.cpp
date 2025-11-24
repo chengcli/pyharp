@@ -21,24 +21,25 @@ namespace harp {
 
 MultiBandImpl::MultiBandImpl(AttenuatorOptions const& options_)
     : options(options_) {
-  TORCH_CHECK(options.opacity_files().size() == 1,
+  TORCH_CHECK(options->opacity_files().size() == 1,
               "Only one opacity file is allowed");
 
-  TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
+  TORCH_CHECK(options->species_ids().size() == 1,
+              "Only one species is allowed");
 
-  TORCH_CHECK(options.species_ids()[0] >= 0,
-              "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options->species_ids()[0] >= 0,
+              "Invalid species_id: ", options->species_ids()[0]);
 
-  TORCH_CHECK(options.type().empty() ||
-                  (options.type().compare(0, 9, "multiband") == 0),
-              "Mismatch opacity type: ", options.type(),
+  TORCH_CHECK(options->type().empty() ||
+                  (options->type().compare(0, 9, "multiband") == 0),
+              "Mismatch opacity type: ", options->type(),
               " expecting 'multiband'");
 
   reset();
 }
 
 void MultiBandImpl::reset() {
-  auto full_path = find_resource(options.opacity_files()[0]);
+  auto full_path = find_resource(options->opacity_files()[0]);
 
   // Load the file
   torch::jit::script::Module container = torch::jit::load(full_path);
@@ -83,7 +84,7 @@ torch::Tensor MultiBandImpl::forward(
 
   // ln(cm^2 / molecule) -> 1/m
   return 1.e-4 * constants::Avogadro * out.exp() *
-         conc.select(-1, options.species_ids()[0]).unsqueeze(0).unsqueeze(-1);
+         conc.select(-1, options->species_ids()[0]).unsqueeze(0).unsqueeze(-1);
 }
 
 }  // namespace harp

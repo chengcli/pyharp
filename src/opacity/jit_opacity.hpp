@@ -20,7 +20,7 @@ class JITOpacityImpl : public torch::nn::Cloneable<JITOpacityImpl> {
   //! options with which this `JITOpacityImpl` was constructed
   AttenuatorOptions options;
 
-  JITOpacityImpl() = default;
+  JITOpacityImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
   explicit JITOpacityImpl(AttenuatorOptions const& options_);
   void reset() override;
 

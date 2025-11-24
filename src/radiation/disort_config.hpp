@@ -12,14 +12,15 @@ namespace harp {
  * It only sets the dimensions inside disort.
  * It does not turn on any flags.
  *
- * \param disort existing DisortOptions
  * \param nwave number of waves
  * \param ncol number of columns
  * \param nlyr number of layers
  * \param nstr number of streams
+ *
+ * \return DisortOptions
  */
-void disort_config(disort::DisortOptions *disort, int nwave, int ncol, int nlyr,
-                   int nstr = 8);
+disort::DisortOptions create_disort_config(int nwave, int ncol, int nlyr,
+                                           int nstr = 8);
 
 //! \brief create disort options for shortwave grid
 /*!
@@ -38,18 +39,19 @@ void disort_config(disort::DisortOptions *disort, int nwave, int ncol, int nlyr,
  * Example:
  *
  * ```cpp
- * auto op = disort_flux_sw(nwave, ncol, nlyr);
- * op.flags("print-input,print-phase-function");
+ * auto op = create_disort_config_sw(nwave, ncol, nlyr);
+ * op->flags("print-input,print-phase-function");
  * ```
  *
  * \param nwave number of waves
  * \param ncol number of columns
  * \param nlyr number of layers
  * \param nstr number of streams
- * \return disort options
+ *
+ * \return DisortOptions
  */
-disort::DisortOptions disort_config_sw(int nwave, int ncol, int nlyr,
-                                       int nstr = 8);
+disort::DisortOptions create_disort_config_sw(int nwave, int ncol, int nlyr,
+                                              int nstr = 8);
 
 //! \brief create disort options for longwave grid
 /*!
@@ -69,8 +71,8 @@ disort::DisortOptions disort_config_sw(int nwave, int ncol, int nlyr,
  * Example:
  *
  * ```cpp
- * auto op = disort_flux_lw(nwave, ncol, nlyr);
- * op.flags("print-input,print-phase-function");
+ * auto op = create_disort_config_lw(wmin, wmax, nwave, ncol, nlyr);
+ * op->flags("print-input,print-phase-function");
  * ```
  *
  * \param wmin minimum wavenumber
@@ -78,9 +80,11 @@ disort::DisortOptions disort_config_sw(int nwave, int ncol, int nlyr,
  * \param nwave number of wavenumbers
  * \param ncol number of columns
  * \param nlyr number of layers
- * \return disort options
+ *
+ * \return DisortOptions
  */
-disort::DisortOptions disort_config_lw(double wmin, double wmax, int nwave,
-                                       int ncol, int nlyr, int nstr = 8);
+disort::DisortOptions create_disort_config_lw(double wmin, double wmax,
+                                              int nwave, int ncol, int nlyr,
+                                              int nstr = 8);
 
 }  // namespace harp

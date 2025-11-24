@@ -32,6 +32,9 @@ struct RadiationModelOptions {
 
 class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
  public:
+  //! data fields
+  std::map<std::string, torch::Tensor> results;
+
   //! options with which this `RadiationModel` was constructed
   RadiationModelOptions options;
 

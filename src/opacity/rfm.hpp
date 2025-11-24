@@ -30,7 +30,7 @@ class RFMImpl : public torch::nn::Cloneable<RFMImpl> {
   AttenuatorOptions options;
 
   //! Constructor to initialize the layer
-  RFMImpl() = default;
+  RFMImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
   explicit RFMImpl(AttenuatorOptions const& options_);
   void reset() override;
 

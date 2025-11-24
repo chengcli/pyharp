@@ -6,9 +6,6 @@
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
-// yaml
-#include <yaml-cpp/yaml.h>
-
 // disort
 #include <disort/disort.hpp>
 
@@ -21,7 +18,6 @@
 namespace harp {
 
 using AttenuatorDict = std::map<std::string, AttenuatorOptions>;
-extern std::unordered_map<std::string, torch::Tensor> shared;
 
 //! \brief Options for initializing a `RadiationBand` object
 /*!
@@ -32,27 +28,17 @@ extern std::unordered_map<std::string, torch::Tensor> shared;
  * that calculates the cumulative radiative flux in the band.
  *
  * The `RadiationBand` object recognizes the following opacity source types:
+ *  - "jit": user-defined opacity module
  *  - "rfm-lbl": line-by-line opacity defined on wavenumber grid
  *  - "rfm-ck": correlated-k opacity table computed from rfm line-by-line table
- *  - "four-column": Four-column opacity table
+ *  - "multiband-ck": multi-band correlated-k opacity table
+ *  - "wavetemp": opacity table defined on wavenumber and temperature grid (CIA)
+ *  - "fourcolumn": Four-column opacity table (aerosol)
+ *  - "helios": Helios opacity table
  */
-struct RadiationBandOptions {
-  void report(std::ostream& os) const {
-    os << "* name = " << name() << "\n";
-    os << "* outdirs = " << outdirs() << "\n";
-    os << "* solver_name = " << solver_name() << "\n";
-    os << "* [ opacities:\n";
-    for (auto const& [k, v] : opacities()) {
-      os << "  - " << k << ":\n";
-      v.report(os);
-    }
-    os << "  ]\n";
-    os << "* disort:\n";
-    disort().report(os);
-    os << "* ww = ";
-    for (auto const& w : ww()) os << w << ", ";
-    os << "\n";
-    os << "* integration = " << integration() << "\n";
+struct RadiationBandOptionsImpl {
+  static std::shared_ptr<RadiationBandOptionsImpl> create() {
+    return std::make_shared<RadiationBandOptionsImpl>();
   }
 
   //! \brief Create a `RadiationBandOptions` object from a YAML file
@@ -62,47 +48,42 @@ struct RadiationBandOptions {
    *  - "range": two float values defining the range of the band
    *  - "opacities": list of opacity sources
    *  - "solver": name of the radiative transfer solver
-   *  - "integration": integration method ("wavenumber", "wavelength", or
-   *                   "weight")
    *
    * It can optionally contain the following fields:
    *  - "flags": radiative transfer solver flags passed to the solver
    *
    * The returned `RadiationBandOptions` object will be partially filled
-   * with the information from the YAML file. The YAML file does not
-   * contain settings for the following variables:
-   *  - number of spectral grids, default to 1
-   *  - number of radiation streams, default to 4
-   *  - number of columns, default to 1
-   *  - number of layers, default to 1
+   * with the information from the YAML file.
    *
-   * Thus, another call, such as, `get_num_waves`, is needed to set
-   * these variables if they are different from the defaults.
+   * Another call to set wavenumber or weight
+   * is needed to make it a complete `RadiationBandOptions` object.
    *
+   * \param filename name of the YAML file
    * \param bd_name name of the band
-   * \param config YAML configuration node
    * \return `RadiationBandOptions` object
    */
-  static RadiationBandOptions from_yaml(std::string const& bd_name,
-                                        YAML::Node const& config);
+  static std::shared_ptr<RadiationBandOptionsImpl> from_yaml(
+      std::string const& filename, std::string const& bd_name);
 
-  //! \brief query the spectral grids
-  /*!
-   * This function queries the spectral grids of the first opacity source
-   * An empty vector is returned if the subroutine cannot determine the
-   * spectral grids.
-   */
-  std::vector<double> query_waves(std::string op_name = "") const;
-
-  //! \brief query the spectral weights
-  /*!
-   * This function queries the spectral grid weights from the opacity source
-   * An empty vector is returned if the subroutine cannot determine the
-   * spectral weights.
-   */
-  std::vector<double> query_weights(std::string op_name = "") const;
-
-  RadiationBandOptions() = default;
+  void report(std::ostream& os) const {
+    os << "* name = " << name() << "\n";
+    os << "* outdirs = " << outdirs() << "\n";
+    os << "* solver_name = " << solver_name() << "\n";
+    os << "* [ opacities:\n";
+    for (auto const& [k, v] : opacities()) {
+      os << "  - " << k << ":\n";
+      v->report(os);
+    }
+    os << "  ]\n";
+    os << "* disort:\n";
+    disort()->report(os);
+    os << "* wavenumber = [";
+    for (auto const& w : wavenumber()) os << w << ", ";
+    os << "]\n";
+    os << "* weight = [ ";
+    for (auto const& w : weight()) os << w << ", ";
+    os << "]\n";
+  }
 
   ADD_ARG(std::string, name) = "B1";
   ADD_ARG(std::string, outdirs) = "";
@@ -112,16 +93,18 @@ struct RadiationBandOptions {
   ADD_ARG(AttenuatorDict, opacities) = {};
   ADD_ARG(disort::DisortOptions, disort);
 
-  ADD_ARG(std::vector<double>, ww) = {};
-
-  /// integration method: "wavenumber", "wavelength", or "weight"
-  ADD_ARG(std::string, integration) = "wavenumber";
+  ADD_ARG(std::vector<double>, wavenumber);
+  ADD_ARG(std::vector<double>, weight);
 };
+using RadiationBandOptions = std::shared_ptr<RadiationBandOptionsImpl>;
 
 class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
  public:
-  //! spectral wavenumber, wavelength, or grid weights
-  torch::Tensor ww;
+  //! bin optical properties
+  torch::Tensor prop;
+
+  //! bin spectrum
+  torch::Tensor spectra;
 
   //! all opacities
   std::map<std::string, torch::nn::AnyModule> opacities;
@@ -133,7 +116,9 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   RadiationBandOptions options;
 
   //! Constructor to initialize the layers
-  RadiationBandImpl() = default;
+  RadiationBandImpl() {
+    options = std::make_shared<RadiationBandOptionsImpl>();
+  }
   explicit RadiationBandImpl(RadiationBandOptions const& options_);
   void reset() override;
   void pretty_print(std::ostream& out) const override;
@@ -152,10 +137,6 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
    *
    * This function modifies the input `kwargs` by adding/modifiying the
    * wavelength and wavenumber grid to it.
-   *
-   * This function exports the following tensor variables:
-   *  - radiation/<band_name>/opacity
-   *  - radiation/<band_name>/spectra
    *
    * \param conc mole concentration [mol/m^3] (ncol, nlyr, nspecies)
    * \param dz layer thickness (nlyr) or (ncol, nlyr)
@@ -177,8 +158,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
                         std::map<std::string, torch::Tensor>* kwargs);
 
  private:
-  //! maximum number of optical property fields
-  int64_t nmax_prop_ = 1;
+  int nmax_prop_ = 1;
 };
 TORCH_MODULE(RadiationBand);
 

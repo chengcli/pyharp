@@ -9,9 +9,6 @@
 
 namespace harp {
 
-//! dump of shared data to other modules
-extern std::unordered_map<std::string, torch::Tensor> shared;
-
 RadiationModelImpl::RadiationModelImpl(RadiationModelOptions const& options_)
     : options(options_) {
   reset();
@@ -65,7 +62,7 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
 
   auto [netflux, dnflux, upflux] = prad->forward(conc, dz, &bc, &atm);
   // radiative flux
-  shared["result/netflux"] = netflux;
+  results["netflux"] = netflux;
 
   // add thermal diffusion flux
   auto vec = atm["temp"].sizes().vec();
@@ -80,7 +77,7 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
 
   auto surf_forcing = dnflux - constants::stefanBoltzmann * bc["btemp"].pow(4);
   auto dT_surf = surf_forcing * (dt / options.cSurf());
-  shared["result/dT_surf"] = dT_surf;
+  results["dT_surf"] = dT_surf;
 
   // unit = [kg/m^3]
   auto rho = (atm["pres"] * options.mean_mol_weight()) /
@@ -93,14 +90,14 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
 
   // thermal diffusion flux
   auto thermal_flux = -options.kappa() * rhoh * options.cp() * dTdz;
-  shared["result/thermal_diffusion_flux"] = thermal_flux;
+  results["thermal_diffusion_flux"] = thermal_flux;
 
   auto dT_atm = -dt / (rho * options.cp() * dz) *
                 (netflux.narrow(-1, 1, options.nlyr()) +
                  thermal_flux.narrow(-1, 1, options.nlyr()) -
                  netflux.narrow(-1, 0, options.nlyr()) -
                  thermal_flux.narrow(-1, 0, options.nlyr()));
-  shared["result/dT_atm"] = dT_atm;
+  results["dT_atm"] = dT_atm;
 
   // -------- (3) multi-stage averaging --------
   atm["temp"].copy_(pintg->forward(stage, atemp0_, atemp1_, dT_atm));

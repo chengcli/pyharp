@@ -26,7 +26,7 @@ class FourColumnImpl : public torch::nn::Cloneable<FourColumnImpl> {
   AttenuatorOptions options;
 
   //! Constructor to initialize the layer
-  FourColumnImpl() = default;
+  FourColumnImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
   explicit FourColumnImpl(AttenuatorOptions const& options_);
   void reset() override;
 

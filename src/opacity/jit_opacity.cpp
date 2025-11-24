@@ -9,9 +9,9 @@ namespace harp {
 
 JITOpacityImpl::JITOpacityImpl(AttenuatorOptions const& options_)
     : options(options_) {
-  TORCH_CHECK(options.opacity_files().size() > 0,
+  TORCH_CHECK(options->opacity_files().size() > 0,
               "JIT opacities must have more than one file");
-  module = torch::jit::load(options.opacity_files()[0]);
+  module = torch::jit::load(options->opacity_files()[0]);
   reset();
 }
 
@@ -23,7 +23,7 @@ torch::Tensor JITOpacityImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   std::vector<torch::jit::IValue> inputs;
   inputs.push_back(conc);
-  for (auto key : options.jit_kwargs()) {
+  for (auto key : options->jit_kwargs()) {
     if (kwargs.count(key) > 0) {
       inputs.push_back(kwargs.at(key));
     } else {

@@ -1,6 +1,9 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
+// torch
+#include <torch/torch.h>
+
 // harp
 #include <harp/utils/parse_yaml_input.hpp>
 
@@ -10,23 +13,29 @@ namespace harp {
 
 extern std::vector<std::string> species_names;
 
-AttenuatorOptions AttenuatorOptions::from_yaml(YAML::Node const& config,
-                                               std::string bd_name) {
-  AttenuatorOptions op;
-  op.bname(bd_name);
+AttenuatorOptions AttenuatorOptionsImpl::from_yaml(std::string const& filename,
+                                                   std::string const& op_name,
+                                                   std::string bd_name) {
+  auto op = std::make_shared<AttenuatorOptionsImpl>();
+  op->bname(bd_name);
 
-  TORCH_CHECK(config["type"], "'type' missing in opacity config");
-  op.type(config["type"].as<std::string>());
+  auto config = YAML::LoadFile(filename);
+  TORCH_CHECK(config["opacities"][op_name], op_name, " not found in opacities");
 
-  if (config["data"]) {
-    op.opacity_files(config["data"].as<std::vector<std::string>>());
-    for (auto& f : op.opacity_files()) {
+  auto my = config["opacities"][op_name];
+
+  TORCH_CHECK(my["type"], "'type' missing in opacity", op_name);
+  op->type(my["type"].as<std::string>());
+
+  if (my["data"]) {
+    op->opacity_files(my["data"].as<std::vector<std::string>>());
+    for (auto& f : op->opacity_files()) {
       replace_pattern_inplace(f, "<band>", bd_name);
     }
   }
 
-  if (config["species"]) {
-    for (auto const& sp : config["species"]) {
+  if (my["species"]) {
+    for (auto const& sp : my["species"]) {
       auto sp_name = sp.as<std::string>();
 
       // index sp_name in species
@@ -34,30 +43,12 @@ AttenuatorOptions AttenuatorOptions::from_yaml(YAML::Node const& config,
 
       TORCH_CHECK(jt != species_names.end(), "species ", sp_name,
                   " not found in species list");
-      op.species_ids().push_back(jt - species_names.begin());
+      op->species_ids().push_back(jt - species_names.begin());
     }
   }
 
-  if (config["jit_kwargs"]) {
-    op.jit_kwargs(config["jit_kwargs"].as<std::vector<std::string>>());
-  }
-
-  if (config["fractions"]) {
-    op.fractions(config["fractions"].as<std::vector<double>>());
-  }
-
-  op.scale(config["scale"].as<double>(1.0));
-  op.metallicity(config["metallicity"].as<double>(0.0));
-  op.kappa_a(config["kappa_a"].as<double>(0.0));
-  op.kappa_b(config["kappa_b"].as<double>(0.0));
-  op.kappa_cut(config["kappa_cut"].as<double>(0.0));
-  op.diameter(config["diameter"].as<double>(0.0));
-  op.xsection(config["xsection"].as<double>(0.0));
-  op.ssa(config["ssa"].as<double>(0.0));
-  op.ff(config["ff"].as<double>(0.0));
-  op.g1(config["g1"].as<double>(0.0));
-  op.g2(config["g2"].as<double>(0.0));
-  op.nmom(config["nmom"].as<int>(0));
+  op->jit_kwargs(my["jit_kwargs"].as<std::vector<std::string>>());
+  op->nmom(my["nmom"].as<int>(0));
 
   return op;
 }

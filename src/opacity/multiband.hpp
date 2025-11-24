@@ -29,7 +29,7 @@ class MultiBandImpl : public torch::nn::Cloneable<MultiBandImpl> {
   AttenuatorOptions options;
 
   //! Constructor to initialize the layer
-  MultiBandImpl() = default;
+  MultiBandImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
   explicit MultiBandImpl(AttenuatorOptions const& options_);
   void reset() override;
 

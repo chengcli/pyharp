@@ -16,6 +16,6 @@ struct fmt::formatter<harp::AttenuatorOptions> {
   auto format(const harp::AttenuatorOptions& p, FormatContext& ctx) const {
     return fmt::format_to(ctx.out(),
                           "(type = {}; opacity_files = {}; species_ids = {})",
-                          p.type(), p.opacity_files(), p.species_ids());
+                          p->type(), p->opacity_files(), p->species_ids());
   }
 };
