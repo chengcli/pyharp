@@ -19,6 +19,8 @@ from pyharp import (
         disort_config,
         )
 
+torch.set_default_dtype(torch.float64)
+
 def preprocess_sonora(fname: str):
     # dictionary of data
     data = load_sonora_data(fname)
@@ -61,14 +63,11 @@ def construct_atm(pmax: float, pmin: float,
 def init_radiation(config_file: str) -> Radiation:
     rad_op = RadiationOptions.from_yaml(config_file)
     wmin, wmax = load_sonora_window()
-    print('wmin = ', wmin)
-    print('wmax = ', wmax)
 
-    for [name, band] in rad_op.bands().items():
-        if name == "sonora196":
-            bop = band.options
-            bop.weight(bop.opacities["H2-molecule"].query_weight())
-            ng = int(bop.nwave() / len(wmin))
+    for band in rad_op.bands():
+        if band.name() == "sonora196":
+            band.weight(band.opacities()["H2-molecule"].query_weight())
+            ng = int(band.nwave() / len(wmin))
 
             band.disort().accur(1.0e-4)
 
@@ -78,14 +77,11 @@ def init_radiation(config_file: str) -> Radiation:
             data = [wmax] * ng
             band.disort().wave_upper([x for col in zip(*data) for x in col])
 
-            print('wave_lower = ', band.disort().wave_lower())
-            print('wave_upper = ', band.disort().wave_upper())
-
-            bop.wavenumber(0.5 * (band.disort().wave_lower() +
-                                  band.disort().wave_upper()))
-            print('wavenumber = ', bop.wavenumber())
+            wave_lower = np.array(band.disort().wave_lower())
+            wave_upper = np.array(band.disort().wave_upper())
+            band.wavenumber(0.5 * (wave_lower + wave_upper))
         else:
-            raise ValueError(f"Unknown band: {name}")
+            raise ValueError(f"Unknown band: {band.name()}")
 
     return Radiation(rad_op)
 
@@ -93,13 +89,13 @@ def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
            atm: dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     ncol = conc.shape[0]
     bc = {}
-    for [name, band] in rad.options.bands().items():
-        nwave = len(band.ww())
-        bc[name + "/albedo"] = torch.ones((nwave, ncol), dtype=torch.float64)
-        bc[name + "/temis"] = torch.zeros((nwave, ncol), dtype=torch.float64)
+    for band in rad.options.bands():
+        nwave = band.nwave()
+        bc[band.name() + "/albedo"] = torch.ones((nwave, ncol))
+        bc[band.name() + "/temis"] = torch.zeros((nwave, ncol))
 
-    bc["btemp"] = torch.zeros((ncol), dtype=torch.float64)
-    bc["ttemp"] = torch.zeros((ncol), dtype=torch.float64)
+    bc["btemp"] = torch.zeros((ncol,))
+    bc["ttemp"] = torch.zeros((ncol,))
 
     return rad.forward(conc, dz, bc, atm)
 

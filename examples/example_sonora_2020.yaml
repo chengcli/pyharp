@@ -7,6 +7,7 @@ opacities:
     type: multiband-ck
     data: ["sonora_2020_feh+000_co_100.data.196.pt"]
     species: [H2mix]
+    verbose: true
 
   H2-continuum:
     type: wavetemp
@@ -23,5 +24,6 @@ bands:
     range: [30.8, 38300.] # wavenumber
     opacities: [H2-molecule, H2-continuum]
     solver: disort
-    nwave: 196
+    nwave: 1568
     flags: lamber,quiet,onlyfl,planck
+    verbose: true

@@ -46,7 +46,13 @@ void bind_radiation(py::module &m) {
       .ADD_OPTION(std::vector<double>, harp::RadiationBandOptionsImpl,
                   wavenumber)
       .ADD_OPTION(std::vector<double>, harp::RadiationBandOptionsImpl, weight)
-      .ADD_OPTION(harp::OpacityDict, harp::RadiationBandOptionsImpl, opacities);
+      .ADD_OPTION(harp::OpacityDict, harp::RadiationBandOptionsImpl, opacities)
+      .ADD_OPTION(int, harp::RadiationBandOptionsImpl, l2l_order)
+      .ADD_OPTION(int, harp::RadiationBandOptionsImpl, nwave)
+      .ADD_OPTION(int, harp::RadiationBandOptionsImpl, ncol)
+      .ADD_OPTION(int, harp::RadiationBandOptionsImpl, nlyr)
+      .ADD_OPTION(int, harp::RadiationBandOptionsImpl, nstr)
+      .ADD_OPTION(bool, harp::RadiationBandOptionsImpl, verbose);
 
   auto pyRadiationOptions =
       py::class_<harp::RadiationOptionsImpl, harp::RadiationOptions>(

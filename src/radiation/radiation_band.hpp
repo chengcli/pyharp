@@ -88,6 +88,7 @@ struct RadiationBandOptionsImpl {
     os << "* weight = [ ";
     for (auto const& w : weight()) os << w << ", ";
     os << "]\n";
+    os << "* verbose = " << (verbose() ? "true" : "false") << "\n";
   }
 
   ADD_ARG(std::string, name) = "B1";
@@ -105,6 +106,7 @@ struct RadiationBandOptionsImpl {
 
   ADD_ARG(std::vector<double>, wavenumber);
   ADD_ARG(std::vector<double>, weight);
+  ADD_ARG(bool, verbose) = false;
 };
 using RadiationBandOptions = std::shared_ptr<RadiationBandOptionsImpl>;
 

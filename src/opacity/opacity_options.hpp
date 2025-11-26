@@ -29,6 +29,7 @@ struct OpacityOptionsImpl {
     os << "* fractions = ";
     for (auto const& f : fractions()) os << f << ", ";
     os << "* nmom = " << nmom() << "\n";
+    os << "* verbose = " << (verbose() ? "true" : "false") << "\n";
   }
 
   std::vector<double> query_wavenumber() const;
@@ -54,6 +55,9 @@ struct OpacityOptionsImpl {
 
   //! number of scattering moments
   ADD_ARG(int, nmom) = 0;
+
+  //! verbose flag
+  ADD_ARG(bool, verbose) = false;
 };
 using OpacityOptions = std::shared_ptr<OpacityOptionsImpl>;
 

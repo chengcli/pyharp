@@ -48,26 +48,41 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
   }
 
   TORCH_CHECK(found, "band ", bd_name, " not found in ", filename);
+  op->verbose(band["verbose"].as<bool>(false));
 
   TORCH_CHECK(band["opacities"], "opacities not found in band ", bd_name);
 
   for (auto const& opa : band["opacities"]) {
     std::string op_name = opa.as<std::string>();
+    if (op->verbose()) {
+      std::cout << "  Loading opacity '" << op_name << "' for band '" << bd_name
+                << "'..." << std::endl;
+    }
     op->opacities()[op_name] =
         OpacityOptionsImpl::from_yaml(filename, op_name, bd_name);
   }
 
   auto [wmin, wmax] = parse_wave_range(band);
+  if (op->verbose()) {
+    std::cout << "  Wavenumber range: " << wmin << " - " << wmax << " cm-1"
+              << std::endl;
+  }
 
   // number of radiation waves
   TORCH_CHECK(band["nwave"], "'nwave' not found in band ", bd_name);
   op->nwave(band["nwave"].as<int>());
+  if (op->verbose()) {
+    std::cout << "  Number of waves: " << op->nwave() << std::endl;
+  }
 
   // number of radiation streams (default 4)
   op->nstr(band["nstr"].as<int>(4));
+  if (op->verbose()) {
+    std::cout << "  Number of streams: " << op->nstr() << std::endl;
+  }
 
   // number of columns and layers
-  TORCH_CHECK(config["geomtry"], "'geometry' not found in ", filename);
+  TORCH_CHECK(config["geometry"], "'geometry' not found in ", filename);
   TORCH_CHECK(config["geometry"]["cells"], "'cells' not found in geometry");
   auto cells = config["geometry"]["cells"];
   TORCH_CHECK(cells["nx1"], "'nx1' not found in cells");
@@ -88,6 +103,9 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     op->disort()->wave_upper(std::vector<double>(op->nwave(), wmax));
     if (band["flags"]) {
       op->disort()->flags(trim_copy(band["flags"].as<std::string>()));
+    }
+    if (op->verbose()) {
+      std::cout << "  Solver flags: " << op->disort()->flags() << std::endl;
     }
   } else if (op->solver_name() == "twostr") {
     TORCH_CHECK(false, "twostr solver not implemented");
@@ -182,7 +200,11 @@ torch::Tensor RadiationBandImpl::forward(
   int nlyr = conc.size(1);
 
   // check if dimensions are consistent
-  TORCH_CHECK(dz.size(0) == nlyr, "'dz' size(", dz.size(0),
+  if (dz.dim() > 1) {
+    TORCH_CHECK(dz.size(0) == ncol, "'dz' size(", dz.size(0),
+                ") inconsistent with 'conc' ncol(", ncol, ")");
+  }
+  TORCH_CHECK(dz.size(-1) == nlyr, "'dz' size(", dz.size(-1),
               ") inconsistent with 'conc' nlyr(", nlyr, ")");
   TORCH_CHECK(options->ncol() == ncol, "'conc' ncol(", ncol,
               ") inconsistent with options ncol(", options->ncol(), ")");
@@ -199,10 +221,18 @@ torch::Tensor RadiationBandImpl::forward(
   } else {
     nwave = options->weight().size();
   }
+  if (options->verbose()) {
+    std::cout << "  Calculating " << nwave << " waves..." << std::endl;
+  }
+
+  // check nwave consistency
+  TORCH_CHECK(nwave == options->nwave(),
+              "'nwave' inconsistent with options nwave(", options->nwave(),
+              "), got ", nwave);
 
   prop.zero_();
 
-  for (auto& [_, a] : opacities) {
+  for (auto& [aname, a] : opacities) {
     auto kdata = a.forward(conc, *kwargs);
     int nprop = kdata.size(-1);
 
@@ -222,6 +252,11 @@ torch::Tensor RadiationBandImpl::forward(
           (kdata.select(-1, disort::ISS) * kdata.select(-1, disort::IEX))
               .unsqueeze(-1);
     }
+
+    if (options->verbose()) {
+      std::cout << "  Calculating opacity contribution from: " << aname
+                << std::endl;
+    }
   }
 
   // average phase moments
@@ -229,15 +264,25 @@ torch::Tensor RadiationBandImpl::forward(
   if (nprop > 2) {
     prop.narrow(-1, disort::IPM, nprop - 2) /=
         (prop.select(-1, disort::ISS).unsqueeze(-1) + 1e-10);
+    if (options->verbose()) {
+      std::cout << "  Averaging phase moments." << std::endl;
+    }
   }
 
   // average single scattering albedo
   if (nprop > 1) {
     prop.select(-1, disort::ISS) /= (prop.select(-1, disort::IEX) + 1e-10);
+    if (options->verbose()) {
+      std::cout << "  Averaging single scattering albedo." << std::endl;
+    }
   }
 
   // attenuation coefficients -> optical thickness
   prop.select(-1, disort::IEX) *= dz.unsqueeze(0);
+  if (options->verbose()) {
+    std::cout << "  Converting attenuation coefficients to optical thickness."
+              << std::endl;
+  }
 
   // run rt solver
   if (kwargs->find("tempf") != kwargs->end()) {
@@ -249,8 +294,13 @@ torch::Tensor RadiationBandImpl::forward(
     if (torch::any(kwargs->at("tempf") < 0).item<bool>()) {
       TORCH_CHECK(false, "Negative values found in 'tempf'");
     }
+
     spectrum.set_(rtsolver.forward(prop, bc, options->name(),
                                    std::make_optional(kwargs->at("tempf"))));
+    if (options->verbose()) {
+      std::cout << "  Done running rt solver with level temperatures."
+                << std::endl;
+    }
   } else if (kwargs->find("temp") != kwargs->end()) {
     Layer2LevelOptions l2l;
     l2l.order(options->l2l_order());
@@ -258,8 +308,23 @@ torch::Tensor RadiationBandImpl::forward(
     spectrum.set_(rtsolver.forward(
         prop, bc, options->name(),
         std::make_optional(layer2level(dz, kwargs->at("temp"), l2l))));
+
+    if (options->verbose()) {
+      std::cout
+          << "  Done running rt solver with interpolated layer temperatures."
+          << std::endl;
+    }
   } else {
+    if (options->verbose()) {
+      std::cout << "  No temperatures provided" << std::endl;
+    }
+
     spectrum.set_(rtsolver.forward(prop, bc, options->name()));
+
+    if (options->verbose()) {
+      std::cout << "  Done running rt solver without temperatures."
+                << std::endl;
+    }
   }
 
   // accumulate flux from flux spectrum
