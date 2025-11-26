@@ -61,6 +61,8 @@ void bind_radiation(py::module &m) {
            })
       .def_static("from_yaml", &harp::RadiationOptionsImpl::from_yaml,
                   py::arg("filename"))
+      .def("ncol", &harp::RadiationOptionsImpl::ncol)
+      .def("nlyr", &harp::RadiationOptionsImpl::nlyr)
       .ADD_OPTION(std::string, harp::RadiationOptionsImpl, outdirs)
       .ADD_OPTION(std::vector<harp::RadiationBandOptions>,
                   harp::RadiationOptionsImpl, bands);

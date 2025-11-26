@@ -14,10 +14,14 @@ opacities:
     data: ["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"]
     species: [H2mix]
 
+geometry:
+  cells:
+    nx1: 100
+
 bands:
   - name: sonora196
     range: [30.8, 38300.] # wavenumber
     opacities: [H2-molecule, H2-continuum]
     solver: disort
-    integration: weight
+    nwave: 196
     flags: lamber,quiet,onlyfl,planck

@@ -1,6 +1,9 @@
 // torch
 #include <torch/extension.h>
 
+// disort
+#include <disort/index.h>
+
 // harp
 #include <harp/radiation/radiation.hpp>
 #include <harp/utils/find_resource.hpp>
@@ -14,6 +17,13 @@ void bind_constants(py::module &m);
 
 PYBIND11_MODULE(pyharp, m) {
   m.attr("__name__") = "pyharp";
+
+  m.attr("kIEX") = (int)disort::PropertyIndex::IEX;
+  m.attr("kISS") = (int)disort::PropertyIndex::ISS;
+  m.attr("kIPM") = (int)disort::PropertyIndex::IPM;
+
+  m.attr("kIUP") = (int)disort::DirectionIndex::IUP;
+  m.attr("kIDN") = (int)disort::DirectionIndex::IDN;
 
   bind_opacity(m);
   bind_radiation(m);

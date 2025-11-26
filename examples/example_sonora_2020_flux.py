@@ -58,27 +58,32 @@ def construct_atm(pmax: float, pmin: float,
     #print("atm temp = ", atm['temp'])
     return atm
 
-def configure_bands(config_file: str,
-                    ncol: int = 1,
-                    nlyr: int = 100,
-                    nstr: int = 4) -> Radiation:
+def init_radiation(config_file: str) -> Radiation:
     rad_op = RadiationOptions.from_yaml(config_file)
     wmin, wmax = load_sonora_window()
+    print('wmin = ', wmin)
+    print('wmax = ', wmax)
 
     for [name, band] in rad_op.bands().items():
         if name == "sonora196":
-            band.ww(band.query_weights("H2-molecule"))
-            nwave = len(band.ww())
-            ng = int(nwave / len(wmin))
+            bop = band.options
+            bop.weight(bop.opacities["H2-molecule"].query_weight())
+            ng = int(bop.nwave() / len(wmin))
 
             band.disort().accur(1.0e-4)
-            disort_config(band.disort(), nstr, nlyr, ncol, nwave)
 
             data = [wmin] * ng
             band.disort().wave_lower([x for col in zip(*data) for x in col])
 
             data = [wmax] * ng
             band.disort().wave_upper([x for col in zip(*data) for x in col])
+
+            print('wave_lower = ', band.disort().wave_lower())
+            print('wave_upper = ', band.disort().wave_upper())
+
+            bop.wavenumber(0.5 * (band.disort().wave_lower() +
+                                  band.disort().wave_upper()))
+            print('wavenumber = ', bop.wavenumber())
         else:
             raise ValueError(f"Unknown band: {name}")
 
@@ -165,13 +170,13 @@ if __name__ == "__main__":
     if not os.path.exists(fname + ".pt"):
         preprocess_sonora(fname)
 
-    # construct atmosphere model
-    atm = construct_atm(1000.e5, 10., ncol=1, nlyr=100)
-
     # configure radiation model
-    config_file = "example_sonora_2020.yaml"
-    rad = configure_bands(config_file, ncol=1,
-                          nlyr=atm['pres'].shape[-1], nstr=8)
+    rad = init_radiation("example_sonora_2020.yaml")
+
+    # construct atmosphere model
+    atm = construct_atm(1000.e5, 10.,
+                        ncol=rad.options.ncol(),
+                        nlyr=rad.options.nlyr())
 
     # calculate concentration and layer thickness
     mean_mol_weight = pyharp.species_weights()[0]
@@ -185,10 +190,6 @@ if __name__ == "__main__":
     conc.unsqueeze_(-1)
 
     # run rt
-    wmin = rad.get_module("sonora196").options.disort().wave_lower()
-    wmax = rad.get_module("sonora196").options.disort().wave_upper()
-    atm['wavenumber'] = 0.5 * (torch.tensor(wmin) + torch.tensor(wmax))
-
     netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)
     print("netflux = ", netflux)
     print("surface flux = ", dnflux)

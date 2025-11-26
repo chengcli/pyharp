@@ -1,9 +1,10 @@
 // yaml
 #include <yaml-cpp/yaml.h>
 
-// harp
-#include <harp/index.h>
+// disort
+#include <disort/index.h>
 
+// harp
 #include <harp/opacity/fourcolumn.hpp>
 #include <harp/opacity/helios.hpp>
 #include <harp/opacity/jit_opacity.hpp>
@@ -33,9 +34,21 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
   auto op = std::make_shared<RadiationBandOptionsImpl>();
 
   // band configuration
-  TORCH_CHECK(config[bd_name], "band ", bd_name, " not found in ", filename);
+  TORCH_CHECK(config["bands"], "'bands' not found in ", filename);
 
-  auto band = config[bd_name];
+  YAML::Node band;
+  bool found = false;
+  for (auto const& bd : config["bands"]) {
+    auto name = bd["name"].as<std::string>();
+    if (name == bd_name) {
+      band = static_cast<YAML::Node>(bd);
+      found = true;
+      break;
+    }
+  }
+
+  TORCH_CHECK(found, "band ", bd_name, " not found in ", filename);
+
   TORCH_CHECK(band["opacities"], "opacities not found in band ", bd_name);
 
   for (auto const& opa : band["opacities"]) {
@@ -194,19 +207,19 @@ torch::Tensor RadiationBandImpl::forward(
     int nprop = kdata.size(-1);
 
     // attenuation coefficients
-    prop.select(-1, index::IEX) += kdata.select(-1, index::IEX);
+    prop.select(-1, disort::IEX) += kdata.select(-1, disort::IEX);
 
     // attenuation weighted single scattering albedo
     if (nprop > 1) {
-      prop.select(-1, index::ISS) +=
-          kdata.select(-1, index::ISS) * kdata.select(-1, index::IEX);
+      prop.select(-1, disort::ISS) +=
+          kdata.select(-1, disort::ISS) * kdata.select(-1, disort::IEX);
     }
 
     // attenuation + single scattering albedo weighted phase moments
     if (nprop > 2) {
-      prop.narrow(-1, index::IPM, nprop - 2) +=
-          kdata.narrow(-1, index::IPM, nprop - 2) *
-          (kdata.select(-1, index::ISS) * kdata.select(-1, index::IEX))
+      prop.narrow(-1, disort::IPM, nprop - 2) +=
+          kdata.narrow(-1, disort::IPM, nprop - 2) *
+          (kdata.select(-1, disort::ISS) * kdata.select(-1, disort::IEX))
               .unsqueeze(-1);
     }
   }
@@ -214,17 +227,17 @@ torch::Tensor RadiationBandImpl::forward(
   // average phase moments
   int nprop = prop.size(-1);
   if (nprop > 2) {
-    prop.narrow(-1, index::IPM, nprop - 2) /=
-        (prop.select(-1, index::ISS).unsqueeze(-1) + 1e-10);
+    prop.narrow(-1, disort::IPM, nprop - 2) /=
+        (prop.select(-1, disort::ISS).unsqueeze(-1) + 1e-10);
   }
 
   // average single scattering albedo
   if (nprop > 1) {
-    prop.select(-1, index::ISS) /= (prop.select(-1, index::IEX) + 1e-10);
+    prop.select(-1, disort::ISS) /= (prop.select(-1, disort::IEX) + 1e-10);
   }
 
   // attenuation coefficients -> optical thickness
-  prop.select(-1, index::IEX) *= dz.unsqueeze(0);
+  prop.select(-1, disort::IEX) *= dz.unsqueeze(0);
 
   // run rt solver
   if (kwargs->find("tempf") != kwargs->end()) {

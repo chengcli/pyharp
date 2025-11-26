@@ -61,6 +61,28 @@ struct RadiationOptionsImpl {
     os << "  ]\n";
   }
 
+  int ncol() const {
+    if (bands().empty()) return 0;
+    int v = bands().front()->ncol();
+    for (auto const& b : bands()) {
+      TORCH_CHECK(b->ncol() == v, "number of columns in band ", b->name(), " (",
+                  b->ncol(), ") does not match that of the first band (", v,
+                  ")");
+    }
+    return v;
+  }
+
+  int nlyr() const {
+    if (bands().empty()) return 0;
+    int v = bands().front()->nlyr();
+    for (auto const& b : bands()) {
+      TORCH_CHECK(b->nlyr() == v, "number of layers in band ", b->name(), " (",
+                  b->nlyr(), ") does not match that of the first band (", v,
+                  ")");
+    }
+    return v;
+  }
+
   ADD_ARG(std::string, outdirs) = "";
   ADD_ARG(std::vector<RadiationBandOptions>, bands);
 };
