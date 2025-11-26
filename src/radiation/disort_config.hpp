@@ -15,12 +15,12 @@ namespace harp {
  * \param nwave number of waves
  * \param ncol number of columns
  * \param nlyr number of layers
- * \param nstr number of streams
+ * \param nstr number of streams, default is 4
  *
  * \return DisortOptions
  */
 disort::DisortOptions create_disort_config(int nwave, int ncol, int nlyr,
-                                           int nstr = 8);
+                                           int nstr = 4);
 
 //! \brief create disort options for shortwave grid
 /*!
@@ -46,12 +46,12 @@ disort::DisortOptions create_disort_config(int nwave, int ncol, int nlyr,
  * \param nwave number of waves
  * \param ncol number of columns
  * \param nlyr number of layers
- * \param nstr number of streams
+ * \param nstr number of streams, default is 4
  *
  * \return DisortOptions
  */
 disort::DisortOptions create_disort_config_sw(int nwave, int ncol, int nlyr,
-                                              int nstr = 8);
+                                              int nstr = 4);
 
 //! \brief create disort options for longwave grid
 /*!
@@ -80,11 +80,12 @@ disort::DisortOptions create_disort_config_sw(int nwave, int ncol, int nlyr,
  * \param nwave number of wavenumbers
  * \param ncol number of columns
  * \param nlyr number of layers
+ * \param nstr number of streams, default is 4
  *
  * \return DisortOptions
  */
 disort::DisortOptions create_disort_config_lw(double wmin, double wmax,
                                               int nwave, int ncol, int nlyr,
-                                              int nstr = 8);
+                                              int nstr = 4);
 
 }  // namespace harp

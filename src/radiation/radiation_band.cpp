@@ -17,6 +17,7 @@
 #include <harp/utils/read_var_pt.hpp>
 #include <harp/utils/strings.hpp>
 
+#include "disort_config.hpp"
 #include "flux_utils.hpp"
 #include "get_direction_grids.hpp"
 #include "parse_radiation_direction.hpp"
@@ -47,19 +48,19 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
 
   // number of radiation waves
   TORCH_CHECK(band["nwave"], "'nwave' not found in band ", bd_name);
-  int nwave = band["nwave"].as<int>();
+  op->nwave(band["nwave"].as<int>());
 
-  // number of radiation streams
-  TORCH_CHECK(band["nstr"], "'nstr' not found in band ", bd_name);
-  int nstr = band["nstr"].as<int>();
+  // number of radiation streams (default 4)
+  op->nstr(band["nstr"].as<int>(4));
 
   // number of columns and layers
   TORCH_CHECK(config["geomtry"], "'geometry' not found in ", filename);
   TORCH_CHECK(config["geometry"]["cells"], "'cells' not found in geometry");
   auto cells = config["geometry"]["cells"];
   TORCH_CHECK(cells["nx1"], "'nx1' not found in cells");
-  int nlyr = cells["nx1"].as<int>();
-  int ncol = cells["nx2"].as<int>(1) * cells["nx3"].as<int>(1);
+
+  op->nlyr(cells["nx1"].as<int>());
+  op->ncol(cells["nx2"].as<int>(1) * cells["nx3"].as<int>(1));
 
   op->name(bd_name);
 
@@ -67,10 +68,11 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
 
   op->solver_name(band["solver"].as<std::string>());
   if (op->solver_name() == "disort") {
-    op->disort() = create_disort_config(nwave, ncol, nlyr, nstr);
+    op->disort() =
+        create_disort_config(op->nwave(), op->ncol(), op->nlyr(), op->nstr());
     op->disort()->header("running disort " + bd_name);
-    op->disort()->wave_lower(std::vector<double>(nwave, wmin));
-    op->disort()->wave_upper(std::vector<double>(nwave, wmax));
+    op->disort()->wave_lower(std::vector<double>(op->nwave(), wmin));
+    op->disort()->wave_upper(std::vector<double>(op->nwave(), wmax));
     if (band["flags"]) {
       op->disort()->flags(trim_copy(band["flags"].as<std::string>()));
     }
@@ -96,33 +98,35 @@ void RadiationBandImpl::reset() {
   }
 
   // create opacities
+  int nmax_prop = 1;
+
   for (auto const& [name, op] : options->opacities()) {
     if (op->type() == "jit") {
       opacities[name] = torch::nn::AnyModule(JITOpacity(op));
-      nmax_prop_ = std::max((int)nmax_prop_, 2 + op->nmom());
+      nmax_prop = std::max(nmax_prop, 2 + op->nmom());
     } else if (op->type() == "rfm-lbl") {
       auto a = RFM(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "rfm-ck") {
       auto a = RFM(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "multiband-ck") {
       auto a = MultiBand(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "wavetemp") {
       auto a = WaveTemp(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "fourcolumn") {
       auto a = FourColumn(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 2 + a->options->nmom());
+      nmax_prop = std::max(nmax_prop, 2 + a->options->nmom());
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "helios") {
       auto a = Helios(op);
-      nmax_prop_ = std::max((int)nmax_prop_, 1);
+      nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else {
       TORCH_CHECK(false, "Unknown opacity type: ", op->type());
@@ -142,11 +146,19 @@ void RadiationBandImpl::reset() {
     TORCH_CHECK(false, "Unknown solver: ", options->solver_name());
   }
 
-  // create optical properties holder
-  prop = register_buffer("prop", torch::tensor({0.}, torch::kFloat64));
+  // check either wavenumber or weight is set
+  TORCH_CHECK(options->wavenumber().size() > 0 || options->weight().size() > 0,
+              "Either 'wavenumber' or 'weight' must be set in band ",
+              options->name());
 
-  // create bin spectra holder
-  spectra = register_buffer("spectra", torch::tensor({0.}, torch::kFloat64));
+  // create optical properties holder
+  prop =
+      register_buffer("prop", torch::zeros({options->nwave(), options->ncol(),
+                                            options->nlyr(), nmax_prop},
+                                           torch::kFloat64));
+
+  // create bin spectrum holder
+  spectrum = register_buffer("spectrum", torch::tensor({0.}, torch::kFloat64));
 }
 
 torch::Tensor RadiationBandImpl::forward(
@@ -156,9 +168,13 @@ torch::Tensor RadiationBandImpl::forward(
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
 
-  TORCH_CHECK(options->wavenumber().size() > 0 || options->weight().size() > 0,
-              "Either 'wavenumber' or 'weight' must be set in band ",
-              options->name());
+  // check if dimensions are consistent
+  TORCH_CHECK(dz.size(0) == nlyr, "'dz' size(", dz.size(0),
+              ") inconsistent with 'conc' nlyr(", nlyr, ")");
+  TORCH_CHECK(options->ncol() == ncol, "'conc' ncol(", ncol,
+              ") inconsistent with options ncol(", options->ncol(), ")");
+  TORCH_CHECK(options->nlyr() == nlyr, "'conc' nlyr(", nlyr,
+              ") inconsistent with options nlyr(", options->nlyr(), ")");
 
   // add wavelength or wavenumber to kwargs, overwrite existing values
   int nwave = 0;
@@ -171,7 +187,7 @@ torch::Tensor RadiationBandImpl::forward(
     nwave = options->weight().size();
   }
 
-  prop.set_(torch::zeros({nwave, ncol, nlyr, nmax_prop_}, conc.options()));
+  prop.zero_();
 
   for (auto& [_, a] : opacities) {
     auto kdata = a.forward(conc, *kwargs);
@@ -220,27 +236,28 @@ torch::Tensor RadiationBandImpl::forward(
     if (torch::any(kwargs->at("tempf") < 0).item<bool>()) {
       TORCH_CHECK(false, "Negative values found in 'tempf'");
     }
-    spectra.set_(rtsolver.forward(prop, bc, options->name(),
-                                  std::make_optional(kwargs->at("tempf"))));
+    spectrum.set_(rtsolver.forward(prop, bc, options->name(),
+                                   std::make_optional(kwargs->at("tempf"))));
   } else if (kwargs->find("temp") != kwargs->end()) {
     Layer2LevelOptions l2l;
     l2l.order(options->l2l_order());
     l2l.lower(kExtrapolate).upper(kExtrapolate).check_positivity(true);
-    spectra.set_(rtsolver.forward(
+    spectrum.set_(rtsolver.forward(
         prop, bc, options->name(),
         std::make_optional(layer2level(dz, kwargs->at("temp"), l2l))));
   } else {
-    spectra.set_(rtsolver.forward(prop, bc, options->name()));
+    spectrum.set_(rtsolver.forward(prop, bc, options->name()));
   }
 
-  // accumulate flux from flux spectra
+  // accumulate flux from flux spectrum
   torch::Tensor result;
   if (options->weight().size() > 0) {
-    result = cal_total_flux(
-        spectra, torch::tensor(options->weight(), spectra.options()), "weight");
+    result = sum_spectrum(spectrum,
+                          torch::tensor(options->weight(), spectrum.options()),
+                          "weight");
   } else {
-    result = cal_total_flux(
-        spectra, torch::tensor(options->wavenumber(), spectra.options()),
+    result = sum_spectrum(
+        spectrum, torch::tensor(options->wavenumber(), spectrum.options()),
         "wavenumber");
   }
   return result;

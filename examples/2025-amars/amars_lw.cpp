@@ -16,28 +16,32 @@ int main(int argc, char** argv) {
   harp::species_names = {"CO2", "H2O"};
   harp::species_weights = {44.0e-3, 18.0e-3};
 
-  int ncol = 1;
-  int nlyr = 40;
-
-  double wmin = 1.;
-  double wmax = 150.;
-
   auto op_co2 = harp::AttenuatorOptionsImpl::create();
-  (*op1).type("rfm-ck").species_ids({0}).opacity_files({"amarsw-ck-B1.nc"});
+  (*op_co2).type("rfm-ck").species_ids({0}).opacity_files({"amarsw-ck-B1.nc"});
 
   auto op_h2o = harp::AttenuatorOptionsImpl::create();
-  (*op2).type("rfm-ck").species_ids({1}).opacity_files({"amarsw-ck-B1.nc"});
+  (*op_h2o).type("rfm-ck").species_ids({1}).opacity_files({"amarsw-ck-B1.nc"});
 
   auto lw_op = harp::RadiationBandOptionsImpl::create();
   (*lw_op).name("lw").solver_name("disort").opacities({
-      {"CO2", op1},
-      {"H2O", op2},
+      {"CO2", op_co2},
+      {"H2O", op_h2o},
   });
 
-  // lw_op.integration() = "weight";
+  int nwave = op_co2->query_wavenumber().size();
+  int ncol = 1;
+  int nlyr = 40;
+  double wmin = 1.;
+  double wmax = 150.;
 
-  int nwave = op_co2->query_waves().size();
-  lw_op.disort() = harp::create_disort_config_lw(wmin, wmax, nwave, ncol, nlyr);
+  lw_op->nwave(nwave);
+  lw_op->ncol(ncol);
+  lw_op->nlyr(r0);
+
+  lw_op->disort() =
+      harp::create_disort_config_lw(wmin, wmax, nwave, ncol, nlyr);
+  lw_op->weight() = op_co2->query_weight();
+
   harp::RadiationBand lw(lw_op);
 
   auto conc = atm_concentration(ncol, nlyr, harp::species_names.size());

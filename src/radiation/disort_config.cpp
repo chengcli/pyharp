@@ -24,9 +24,9 @@ disort::DisortOptions create_disort_config_sw(int nwave, int ncol, int nlyr,
       .header("running disort shortwave")
       .flags(
           "lamber,quiet,onlyfl,"
-          "intensity_correction,old_intensity_correction")
+          "intensity_correction,old_intensity_correction");
 
-          return op;
+  return op;
 }
 
 disort::DisortOptions create_disort_config_lw(double wmin, double wmax,
@@ -34,10 +34,11 @@ disort::DisortOptions create_disort_config_lw(double wmin, double wmax,
                                               int nstr) {
   auto op = create_disort_config(nwave, ncol, nlyr, nstr);
 
-  (*op).header("running disort longwave");
-  .flags(
-      "lamber,quiet,onlyfl,planck,"
-      "intensity_correction,old_intensity_correction")
+  (*op)
+      .header("running disort longwave")
+      .flags(
+          "lamber,quiet,onlyfl,planck,"
+          "intensity_correction,old_intensity_correction")
       .wave_lower(std::vector<double>(nwave, wmin))
       .wave_upper(std::vector<double>(nwave, wmax));
 

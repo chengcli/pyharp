@@ -69,6 +69,11 @@ struct RadiationBandOptionsImpl {
     os << "* name = " << name() << "\n";
     os << "* outdirs = " << outdirs() << "\n";
     os << "* solver_name = " << solver_name() << "\n";
+    os << "* l2l_order = " << l2l_order() << "\n";
+    os << "* nwave = " << nwave() << "\n";
+    os << "* ncol = " << ncol() << "\n";
+    os << "* nlyr = " << nlyr() << "\n";
+    os << "* nstr = " << nstr() << "\n";
     os << "* [ opacities:\n";
     for (auto const& [k, v] : opacities()) {
       os << "  - " << k << ":\n";
@@ -90,6 +95,11 @@ struct RadiationBandOptionsImpl {
   ADD_ARG(std::string, solver_name) = "disort";
   ADD_ARG(int, l2l_order) = 2;
 
+  ADD_ARG(int, nwave) = 0;
+  ADD_ARG(int, ncol) = 0;
+  ADD_ARG(int, nlyr) = 0;
+  ADD_ARG(int, nstr) = 4;
+
   ADD_ARG(AttenuatorDict, opacities) = {};
   ADD_ARG(disort::DisortOptions, disort);
 
@@ -104,7 +114,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   torch::Tensor prop;
 
   //! bin spectrum
-  torch::Tensor spectra;
+  torch::Tensor spectrum;
 
   //! all opacities
   std::map<std::string, torch::nn::AnyModule> opacities;
@@ -156,9 +166,6 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   torch::Tensor forward(torch::Tensor conc, torch::Tensor dz,
                         std::map<std::string, torch::Tensor>* bc,
                         std::map<std::string, torch::Tensor>* kwargs);
-
- private:
-  int nmax_prop_ = 1;
 };
 TORCH_MODULE(RadiationBand);
 
