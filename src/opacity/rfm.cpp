@@ -18,7 +18,7 @@ namespace harp {
 
 extern std::vector<std::string> species_names;
 
-RFMImpl::RFMImpl(AttenuatorOptions const& options_) : options(options_) {
+RFMImpl::RFMImpl(OpacityOptions const& options_) : options(options_) {
   TORCH_CHECK(options->opacity_files().size() == 1,
               "Only one opacity file is allowed");
 

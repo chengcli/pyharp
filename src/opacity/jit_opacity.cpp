@@ -7,7 +7,7 @@
 
 namespace harp {
 
-JITOpacityImpl::JITOpacityImpl(AttenuatorOptions const& options_)
+JITOpacityImpl::JITOpacityImpl(OpacityOptions const& options_)
     : options(options_) {
   TORCH_CHECK(options->opacity_files().size() > 0,
               "JIT opacities must have more than one file");

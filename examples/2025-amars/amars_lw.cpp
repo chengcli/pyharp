@@ -12,14 +12,21 @@ torch::Tensor atm_concentration(int ncol, int nlyr, int nspecies) {
   return conc;
 }
 
+//! \brief Main function for testing AMARS longwave radiation
+/*!
+ * This is an example program that illustrates how to manually set up
+ * opacity sources and run a radiative transfer calculation.
+ * Normally, you would initialize the model from a yaml configuration file.
+ * However, this example shows the internal mechanisms more clearly.
+ */
 int main(int argc, char** argv) {
   harp::species_names = {"CO2", "H2O"};
   harp::species_weights = {44.0e-3, 18.0e-3};
 
-  auto op_co2 = harp::AttenuatorOptionsImpl::create();
+  auto op_co2 = harp::OpacityOptionsImpl::create();
   (*op_co2).type("rfm-ck").species_ids({0}).opacity_files({"amarsw-ck-B1.nc"});
 
-  auto op_h2o = harp::AttenuatorOptionsImpl::create();
+  auto op_h2o = harp::OpacityOptionsImpl::create();
   (*op_h2o).type("rfm-ck").species_ids({1}).opacity_files({"amarsw-ck-B1.nc"});
 
   auto lw_op = harp::RadiationBandOptionsImpl::create();
@@ -36,7 +43,7 @@ int main(int argc, char** argv) {
 
   lw_op->nwave(nwave);
   lw_op->ncol(ncol);
-  lw_op->nlyr(r0);
+  lw_op->nlyr(nlyr);
 
   lw_op->disort() =
       harp::create_disort_config_lw(wmin, wmax, nwave, ncol, nlyr);
@@ -50,12 +57,12 @@ int main(int argc, char** argv) {
   bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64);
   bc["btemp"] = torch::ones({nwave, ncol}, torch::kFloat64) * 300.0;
 
-  std::map<std::string, torch::Tensor> kwargs;
-  kwargs["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 10.e5;
-  kwargs["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 300.0;
+  std::map<std::string, torch::Tensor> atm;
+  atm["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 10.e5;
+  atm["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 300.0;
 
   auto dz = torch::ones({ncol, nlyr}, torch::kFloat64);
-  auto flux = lw->forward(conc, dz, &bc, &kwargs);
+  auto flux = lw->forward(conc, dz, &bc, &atm);
   std::cout << "result = " << flux << std::endl;
   // std::cout << harp::shared.at("radiation/lw/spectra") << std::endl;
 }

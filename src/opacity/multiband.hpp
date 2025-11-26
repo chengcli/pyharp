@@ -8,7 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include "attenuator_options.hpp"
+#include "opacity_options.hpp"
 
 namespace harp {
 
@@ -26,11 +26,11 @@ class MultiBandImpl : public torch::nn::Cloneable<MultiBandImpl> {
   torch::Tensor kdata;
 
   //! options with which this `MultiBandImpl` was constructed
-  AttenuatorOptions options;
+  OpacityOptions options;
 
   //! Constructor to initialize the layer
-  MultiBandImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
-  explicit MultiBandImpl(AttenuatorOptions const& options_);
+  MultiBandImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  explicit MultiBandImpl(OpacityOptions const& options_);
   void reset() override;
 
   //! Get optical properties

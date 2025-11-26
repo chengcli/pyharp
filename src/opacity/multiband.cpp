@@ -19,7 +19,7 @@
 
 namespace harp {
 
-MultiBandImpl::MultiBandImpl(AttenuatorOptions const& options_)
+MultiBandImpl::MultiBandImpl(OpacityOptions const& options_)
     : options(options_) {
   TORCH_CHECK(options->opacity_files().size() == 1,
               "Only one opacity file is allowed");

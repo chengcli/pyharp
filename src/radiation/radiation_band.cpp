@@ -41,7 +41,7 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
   for (auto const& opa : band["opacities"]) {
     std::string op_name = opa.as<std::string>();
     op->opacities()[op_name] =
-        AttenuatorOptionsImpl::from_yaml(filename, op_name, bd_name);
+        OpacityOptionsImpl::from_yaml(filename, op_name, bd_name);
   }
 
   auto [wmin, wmax] = parse_wave_range(band);

@@ -11,7 +11,7 @@ namespace harp {
 
 extern std::vector<double> species_weights;
 
-FourColumnImpl::FourColumnImpl(AttenuatorOptions const& options_)
+FourColumnImpl::FourColumnImpl(OpacityOptions const& options_)
     : options(options_) {
   TORCH_CHECK(options->opacity_files().size() == 1,
               "Only one opacity file is allowed");

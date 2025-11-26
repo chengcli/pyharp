@@ -8,7 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include "attenuator_options.hpp"
+#include "opacity_options.hpp"
 
 namespace harp {
 
@@ -23,11 +23,11 @@ class FourColumnImpl : public torch::nn::Cloneable<FourColumnImpl> {
   torch::Tensor kdata;
 
   //! options with which this `FourColumnImpl` was constructed
-  AttenuatorOptions options;
+  OpacityOptions options;
 
   //! Constructor to initialize the layer
-  FourColumnImpl() { options = std::make_shared<AttenuatorOptionsImpl>(); }
-  explicit FourColumnImpl(AttenuatorOptions const& options_);
+  FourColumnImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  explicit FourColumnImpl(OpacityOptions const& options_);
   void reset() override;
 
   //! Get optical properties

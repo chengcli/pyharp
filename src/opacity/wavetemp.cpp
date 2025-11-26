@@ -17,8 +17,7 @@
 
 namespace harp {
 
-WaveTempImpl::WaveTempImpl(AttenuatorOptions const& options_)
-    : options(options_) {
+WaveTempImpl::WaveTempImpl(OpacityOptions const& options_) : options(options_) {
   TORCH_CHECK(options->species_ids().size() == 1,
               "Only one species is allowed");
 

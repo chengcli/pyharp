@@ -10,14 +10,14 @@
 #include <disort/disort.hpp>
 
 // harp
-#include <harp/opacity/attenuator_options.hpp>
+#include <harp/opacity/opacity_options.hpp>
 
 // arg
 #include <harp/add_arg.h>
 
 namespace harp {
 
-using AttenuatorDict = std::map<std::string, AttenuatorOptions>;
+using OpacityDict = std::map<std::string, OpacityOptions>;
 
 //! \brief Options for initializing a `RadiationBand` object
 /*!
@@ -100,7 +100,7 @@ struct RadiationBandOptionsImpl {
   ADD_ARG(int, nlyr) = 0;
   ADD_ARG(int, nstr) = 4;
 
-  ADD_ARG(AttenuatorDict, opacities) = {};
+  ADD_ARG(OpacityDict, opacities) = {};
   ADD_ARG(disort::DisortOptions, disort);
 
   ADD_ARG(std::vector<double>, wavenumber);

@@ -5,12 +5,12 @@
 
 namespace harp {
 
-struct AttenuatorOptionsImpl {
-  static std::shared_ptr<AttenuatorOptionsImpl> create() {
-    return std::make_shared<AttenuatorOptionsImpl>();
+struct OpacityOptionsImpl {
+  static std::shared_ptr<OpacityOptionsImpl> create() {
+    return std::make_shared<OpacityOptionsImpl>();
   }
 
-  static std::shared_ptr<AttenuatorOptionsImpl> from_yaml(
+  static std::shared_ptr<OpacityOptionsImpl> from_yaml(
       std::string const& filename, std::string const& op_name,
       std::string bd_name = "");
 
@@ -30,6 +30,9 @@ struct AttenuatorOptionsImpl {
     for (auto const& f : fractions()) os << f << ", ";
     os << "* nmom = " << nmom() << "\n";
   }
+
+  std::vector<double> query_wavenumber() const;
+  std::vector<double> query_weight() const;
 
   //! type of the opacity source
   ADD_ARG(std::string, type) = "";
@@ -52,7 +55,7 @@ struct AttenuatorOptionsImpl {
   //! number of scattering moments
   ADD_ARG(int, nmom) = 0;
 };
-using AttenuatorOptions = std::shared_ptr<AttenuatorOptionsImpl>;
+using OpacityOptions = std::shared_ptr<OpacityOptionsImpl>;
 
 }  // namespace harp
 
