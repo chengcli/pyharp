@@ -11,12 +11,10 @@ from pyharp.sonora import (
         save_sonora_multiband,
         )
 from pyharp import (
-        h2_cia_legacy,
         constants,
         RadiationOptions,
         Radiation,
-        calc_dz_hypsometric,
-        disort_config,
+        calc_dz_hypsometric
         )
 
 torch.set_default_dtype(torch.float64)
@@ -104,10 +102,10 @@ def plot_optical_depth(fname: str,
                        conc: torch.Tensor,
                        atm: dict[str, torch.Tensor],
                        dz: torch.Tensor):
-    ab_mol = rad.get_module("sonora196").get_module("H2-molecule")
+    ab_mol = rad.module("sonora196.H2-molecule")
     tauc_mol = ab_mol.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
 
-    ab_cia = rad.get_module("sonora196").get_module("H2-continuum")
+    ab_cia = rad.module("sonora196.H2-continuum")
     tauc_cia = ab_cia.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
 
     sonora = torch.jit.load(fname + ".pt")
@@ -181,7 +179,6 @@ if __name__ == "__main__":
     dz = calc_dz_hypsometric(atm["pres"], atm["temp"],
                              torch.tensor(mean_mol_weight * grav / constants.Rgas)
                              )
-    print("dz = ", dz)
     conc = atm["pres"] / (atm["temp"] * constants.Rgas)
     conc.unsqueeze_(-1)
 
@@ -190,11 +187,13 @@ if __name__ == "__main__":
     print("netflux = ", netflux)
     print("surface flux = ", dnflux)
     print("toa flux = ", upflux)
+    print(rad.spectra.shape)
 
     # plot optical depth
-    #plot_optical_depth(fname, rad, conc, atm, dz)
-    #plt.tight_layout()
-    #plt.savefig("sonora_2020_optical_depth.png", dpi=300)
+    atm["wavenumber"] = torch.tensor(rad.options.bands()[0].wavenumber())
+    plot_optical_depth(fname, rad, conc, atm, dz)
+    plt.tight_layout()
+    plt.savefig("sonora_2020_optical_depth.png", dpi=300)
     plot_flux(atm, netflux)
     plt.tight_layout()
     plt.savefig("sonora_2020_flux.png", dpi=300)

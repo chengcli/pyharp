@@ -63,7 +63,7 @@ void RadiationImpl::reset() {
   }
 
   // spectra holder
-  spectra = register_buffer("spectra", torch::Tensor());
+  spectra = register_buffer("spectra", torch::tensor({0}, torch::kFloat64));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> RadiationImpl::forward(
@@ -83,6 +83,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> RadiationImpl::forward(
       total_flux += spectrum.back();
     }
   }
+
   spectra.set_(torch::stack(spectrum, 0));
 
   auto net_flux = cal_net_flux(total_flux);
