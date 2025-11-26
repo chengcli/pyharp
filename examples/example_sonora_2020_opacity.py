@@ -5,12 +5,12 @@ import numpy as np
 from pyharp import constants as const
 from pyharp import calc_dz_hypsometric
 from pyharp.sonora import load_sonora_data
-from pyharp.opacity import MultiBand, AttenuatorOptions
+from pyharp.opacity import MultiBand, OpacityOptions
 from matplotlib import pyplot as plt
 
 def setup_sonora_opacity():
     fname = "sonora_2020_feh+000_co_100.data.196.pt"
-    op = AttenuatorOptions().type("multiband-ck")
+    op = OpacityOptions().type("multiband-ck")
     op.opacity_files([fname])
     op.species_ids([0])
     ab = MultiBand(op)

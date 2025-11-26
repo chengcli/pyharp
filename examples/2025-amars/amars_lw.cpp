@@ -55,14 +55,14 @@ int main(int argc, char** argv) {
 
   std::map<std::string, torch::Tensor> bc;
   bc["albedo"] = torch::ones({nwave, ncol}, torch::kFloat64);
-  bc["btemp"] = torch::ones({nwave, ncol}, torch::kFloat64) * 300.0;
+  bc["btemp"] = torch::ones({ncol}, torch::kFloat64) * 300.0;
 
   std::map<std::string, torch::Tensor> atm;
   atm["pres"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 10.e5;
   atm["temp"] = torch::ones({ncol, nlyr}, torch::kFloat64) * 300.0;
 
-  auto dz = torch::ones({ncol, nlyr}, torch::kFloat64);
+  auto dz = torch::ones({nlyr}, torch::kFloat64);
   auto flux = lw->forward(conc, dz, &bc, &atm);
+  std::cout << "spectrum shape = " << lw->spectrum.sizes() << std::endl;
   std::cout << "result = " << flux << std::endl;
-  // std::cout << harp::shared.at("radiation/lw/spectra") << std::endl;
 }

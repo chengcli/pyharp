@@ -3,10 +3,10 @@
 import torch
 import numpy as np
 from pyharp import h2_cia_legacy, find_resource
-from pyharp.opacity import AttenuatorOptions, WaveTemp
+from pyharp.opacity import OpacityOptions, WaveTemp
 
 def setup_h2_cia_legacy_opacity():
-    op = AttenuatorOptions().type("wavetemp")
+    op = OpacityOptions().type("wavetemp")
     op.opacity_files(["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"])
     op.fractions([0.9, 0.1])
     op.species_ids([0])
