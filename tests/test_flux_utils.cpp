@@ -11,7 +11,7 @@ TEST(FluxUtilsTest, CalTotalFluxWave) {
   torch::Tensor wave = torch::rand({5});
 
   // Calculate the total flux using the wave grid
-  torch::Tensor total_flux = harp::cal_total_flux(flux, wave, "wavenumber");
+  torch::Tensor total_flux = harp::sum_spectrum(flux, wave, "wavenumber");
 
   std::cout << "total_flux: " << total_flux << std::endl;
 
@@ -26,7 +26,7 @@ TEST(FluxUtilsTest, CalTotalFluxWeight) {
   torch::Tensor weight = torch::rand({5});
 
   // Calculate the total flux using the weight tensor
-  torch::Tensor total_flux = harp::cal_total_flux(flux, weight, "weight");
+  torch::Tensor total_flux = harp::sum_spectrum(flux, weight, "weight");
 
   std::cout << "total_flux: " << total_flux << std::endl;
 
@@ -41,7 +41,7 @@ TEST(FluxUtilsTest, CalTotalFluxInvalidInput) {
   torch::Tensor wave = torch::rand({5});
 
   // Check for invalid input
-  EXPECT_THROW(harp::cal_total_flux(flux, wave, "invalid"), c10::Error);
+  EXPECT_THROW(harp::sum_spectrum(flux, wave, "invalid"), c10::Error);
 }
 
 TEST(FluxUtilsTest, CalNetFlux) {

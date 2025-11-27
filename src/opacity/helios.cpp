@@ -13,24 +13,25 @@
 
 namespace harp {
 
-HeliosImpl::HeliosImpl(AttenuatorOptions const& options_) : options(options_) {
-  TORCH_CHECK(options.opacity_files().size() == 1,
+HeliosImpl::HeliosImpl(OpacityOptions const& options_) : options(options_) {
+  TORCH_CHECK(options->opacity_files().size() == 1,
               "Only one opacity file is allowed");
 
-  TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
+  TORCH_CHECK(options->species_ids().size() == 1,
+              "Only one species is allowed");
 
-  TORCH_CHECK(options.species_ids()[0] >= 0,
-              "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options->species_ids()[0] >= 0,
+              "Invalid species_id: ", options->species_ids()[0]);
 
   TORCH_CHECK(
-      options.type().empty() || (options.type().compare(0, 3, "helios") == 0),
-      "Mismatch opacity type: ", options.type());
+      options->type().empty() || (options->type().compare(0, 3, "helios") == 0),
+      "Mismatch opacity type: ", options->type());
 
   reset();
 }
 
 void HeliosImpl::reset() {
-  auto full_path = find_resource(options.opacity_files()[0]);
+  auto full_path = find_resource(options->opacity_files()[0]);
 
   std::ifstream file(full_path.c_str(), std::ios::in);
   if (!file.is_open()) {

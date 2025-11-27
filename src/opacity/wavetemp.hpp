@@ -8,7 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include "attenuator_options.hpp"
+#include "opacity_options.hpp"
 
 namespace harp {
 
@@ -23,11 +23,11 @@ class WaveTempImpl : public torch::nn::Cloneable<WaveTempImpl> {
   std::vector<torch::Tensor> kdata;
 
   //! options with which this `WaveTempImpl` was constructed
-  AttenuatorOptions options;
+  OpacityOptions options;
 
   //! Constructor to initialize the layer
-  WaveTempImpl() = default;
-  explicit WaveTempImpl(AttenuatorOptions const& options_);
+  WaveTempImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  explicit WaveTempImpl(OpacityOptions const& options_);
   void reset() override;
 
   //! Get optical properties

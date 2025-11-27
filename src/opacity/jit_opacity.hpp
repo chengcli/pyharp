@@ -9,7 +9,7 @@
 #include <torch/script.h>
 
 // harp
-#include "attenuator_options.hpp"
+#include "opacity_options.hpp"
 
 namespace harp {
 
@@ -18,10 +18,10 @@ class JITOpacityImpl : public torch::nn::Cloneable<JITOpacityImpl> {
   torch::jit::script::Module module;
 
   //! options with which this `JITOpacityImpl` was constructed
-  AttenuatorOptions options;
+  OpacityOptions options;
 
-  JITOpacityImpl() = default;
-  explicit JITOpacityImpl(AttenuatorOptions const& options_);
+  JITOpacityImpl() : options(OpacityOptionsImpl::create()) {}
+  explicit JITOpacityImpl(OpacityOptions const& options_);
   void reset() override;
 
   torch::Tensor forward(torch::Tensor conc,

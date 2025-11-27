@@ -11,13 +11,13 @@ from pyharp.sonora import (
         save_sonora_multiband,
         )
 from pyharp import (
-        h2_cia_legacy,
         constants,
         RadiationOptions,
         Radiation,
-        calc_dz_hypsometric,
-        disort_config,
+        calc_dz_hypsometric
         )
+
+torch.set_default_dtype(torch.float64)
 
 def preprocess_sonora(fname: str):
     # dictionary of data
@@ -58,29 +58,28 @@ def construct_atm(pmax: float, pmin: float,
     #print("atm temp = ", atm['temp'])
     return atm
 
-def configure_bands(config_file: str,
-                    ncol: int = 1,
-                    nlyr: int = 100,
-                    nstr: int = 4) -> Radiation:
+def init_radiation(config_file: str) -> Radiation:
     rad_op = RadiationOptions.from_yaml(config_file)
     wmin, wmax = load_sonora_window()
 
-    for [name, band] in rad_op.bands().items():
-        if name == "sonora196":
-            band.ww(band.query_weights("H2-molecule"))
-            nwave = len(band.ww())
-            ng = int(nwave / len(wmin))
+    for band in rad_op.bands():
+        if band.name() == "sonora196":
+            band.weight(band.opacities()["H2-molecule"].query_weight())
+            ng = int(band.nwave() / len(wmin))
 
             band.disort().accur(1.0e-4)
-            disort_config(band.disort(), nstr, nlyr, ncol, nwave)
 
             data = [wmin] * ng
             band.disort().wave_lower([x for col in zip(*data) for x in col])
 
             data = [wmax] * ng
             band.disort().wave_upper([x for col in zip(*data) for x in col])
+
+            wave_lower = np.array(band.disort().wave_lower())
+            wave_upper = np.array(band.disort().wave_upper())
+            band.wavenumber(0.5 * (wave_lower + wave_upper))
         else:
-            raise ValueError(f"Unknown band: {name}")
+            raise ValueError(f"Unknown band: {band.name()}")
 
     return Radiation(rad_op)
 
@@ -88,13 +87,13 @@ def run_rt(rad: Radiation, conc: torch.Tensor, dz: torch.Tensor,
            atm: dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     ncol = conc.shape[0]
     bc = {}
-    for [name, band] in rad.options.bands().items():
-        nwave = len(band.ww())
-        bc[name + "/albedo"] = torch.ones((nwave, ncol), dtype=torch.float64)
-        bc[name + "/temis"] = torch.zeros((nwave, ncol), dtype=torch.float64)
+    for band in rad.options.bands():
+        nwave = band.nwave()
+        bc[band.name() + "/albedo"] = torch.ones((nwave, ncol))
+        bc[band.name() + "/temis"] = torch.zeros((nwave, ncol))
 
-    bc["btemp"] = torch.zeros((ncol), dtype=torch.float64)
-    bc["ttemp"] = torch.zeros((ncol), dtype=torch.float64)
+    bc["btemp"] = torch.zeros((ncol,))
+    bc["ttemp"] = torch.zeros((ncol,))
 
     return rad.forward(conc, dz, bc, atm)
 
@@ -103,10 +102,10 @@ def plot_optical_depth(fname: str,
                        conc: torch.Tensor,
                        atm: dict[str, torch.Tensor],
                        dz: torch.Tensor):
-    ab_mol = rad.get_module("sonora196").get_module("H2-molecule")
+    ab_mol = rad.module("sonora196.H2-molecule")
     tauc_mol = ab_mol.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
 
-    ab_cia = rad.get_module("sonora196").get_module("H2-continuum")
+    ab_cia = rad.module("sonora196.H2-continuum")
     tauc_cia = ab_cia.forward(conc, atm).squeeze(-1) * dz.unsqueeze(0)
 
     sonora = torch.jit.load(fname + ".pt")
@@ -165,13 +164,13 @@ if __name__ == "__main__":
     if not os.path.exists(fname + ".pt"):
         preprocess_sonora(fname)
 
-    # construct atmosphere model
-    atm = construct_atm(1000.e5, 10., ncol=1, nlyr=100)
-
     # configure radiation model
-    config_file = "example_sonora_2020.yaml"
-    rad = configure_bands(config_file, ncol=1,
-                          nlyr=atm['pres'].shape[-1], nstr=8)
+    rad = init_radiation("example_sonora_2020.yaml")
+
+    # construct atmosphere model
+    atm = construct_atm(1000.e5, 10.,
+                        ncol=rad.options.ncol(),
+                        nlyr=rad.options.nlyr())
 
     # calculate concentration and layer thickness
     mean_mol_weight = pyharp.species_weights()[0]
@@ -180,24 +179,21 @@ if __name__ == "__main__":
     dz = calc_dz_hypsometric(atm["pres"], atm["temp"],
                              torch.tensor(mean_mol_weight * grav / constants.Rgas)
                              )
-    print("dz = ", dz)
     conc = atm["pres"] / (atm["temp"] * constants.Rgas)
     conc.unsqueeze_(-1)
 
     # run rt
-    wmin = rad.get_module("sonora196").options.disort().wave_lower()
-    wmax = rad.get_module("sonora196").options.disort().wave_upper()
-    atm['wavenumber'] = 0.5 * (torch.tensor(wmin) + torch.tensor(wmax))
-
     netflux, dnflux, upflux = run_rt(rad, conc, dz, atm)
     print("netflux = ", netflux)
     print("surface flux = ", dnflux)
     print("toa flux = ", upflux)
+    print(rad.spectra.shape)
 
     # plot optical depth
-    #plot_optical_depth(fname, rad, conc, atm, dz)
-    #plt.tight_layout()
-    #plt.savefig("sonora_2020_optical_depth.png", dpi=300)
+    atm["wavenumber"] = torch.tensor(rad.options.bands()[0].wavenumber())
+    plot_optical_depth(fname, rad, conc, atm, dz)
+    plt.tight_layout()
+    plt.savefig("sonora_2020_optical_depth.png", dpi=300)
     plot_flux(atm, netflux)
     plt.tight_layout()
     plt.savefig("sonora_2020_flux.png", dpi=300)

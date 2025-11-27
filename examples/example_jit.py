@@ -5,7 +5,7 @@ from pyharp import (
         RadiationOptions,
         Radiation,
         )
-from pyharp.opacity import AttenuatorOptions, JITOpacity
+from pyharp.opacity import OpacityOptions, JITOpacity
 
 class GreyOpacity(torch.nn.Module):
     """
@@ -49,7 +49,7 @@ class GreyOpacity(torch.nn.Module):
 pyharp.compile(GreyOpacity(1,1), "grey_opacity.pt")
 
 # user it later
-op = AttenuatorOptions().type("jit")
+op = OpacityOptions().type("jit")
 op.opacity_files(["grey_opacity.pt"])
 op.jit_kwargs(["temp"])
 

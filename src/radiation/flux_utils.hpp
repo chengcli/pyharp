@@ -16,7 +16,7 @@ namespace harp {
  *    \int_{a}^{b} F(\lambda) d\lambda = \sum_{i=0}^{n-1} F(\lambda_i) w_i
  * \f]
  *
- * This function calculates the total flux by integrating the flux over the
+ * This function calculates sums over wave by integrating over the
  * given wave grid or using specified weights.
  *
  * The first argument is a multi-dimensional spectral flux tensor. Its first
@@ -34,8 +34,8 @@ namespace harp {
  * \param input The type of the second argument, either "wave" or "weight"
  * \return The integrated total flux
  */
-torch::Tensor cal_total_flux(torch::Tensor flux, torch::Tensor wave_or_weight,
-                             std::string input);
+torch::Tensor sum_spectrum(torch::Tensor flux, torch::Tensor wave_or_weight,
+                           std::string input);
 
 //! \brief Calculate net flux
 /*!

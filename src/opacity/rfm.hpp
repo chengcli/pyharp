@@ -8,7 +8,7 @@
 #include <torch/nn/modules/container/any.h>
 
 // harp
-#include "attenuator_options.hpp"
+#include "opacity_options.hpp"
 
 namespace harp {
 
@@ -27,11 +27,11 @@ class RFMImpl : public torch::nn::Cloneable<RFMImpl> {
   torch::Tensor kreftem;
 
   //! options with which this `RFMImpl` was constructed
-  AttenuatorOptions options;
+  OpacityOptions options;
 
   //! Constructor to initialize the layer
-  RFMImpl() = default;
-  explicit RFMImpl(AttenuatorOptions const& options_);
+  RFMImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  explicit RFMImpl(OpacityOptions const& options_);
   void reset() override;
 
   //! Get optical properties

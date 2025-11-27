@@ -15,10 +15,9 @@ struct fmt::formatter<harp::RadiationBandOptions> {
 
   template <typename FormatContext>
   auto format(const harp::RadiationBandOptions& p, FormatContext& ctx) const {
-    return fmt::format_to(
-        ctx.out(),
-        "(name = {}; solver_name = {}; opacities = {}; integration = {})",
-        p.name(), p.solver_name(), p.opacities(), p.integration());
+    return fmt::format_to(ctx.out(),
+                          "(name = {}; solver_name = {}; opacities = {})",
+                          p->name(), p->solver_name(), p->opacities());
   }
 };
 
@@ -28,6 +27,6 @@ struct fmt::formatter<harp::RadiationOptions> {
 
   template <typename FormatContext>
   auto format(const harp::RadiationOptions& p, FormatContext& ctx) const {
-    return fmt::format_to(ctx.out(), "(bands = {})", p.bands());
+    return fmt::format_to(ctx.out(), "(bands = {})", p->bands());
   }
 };

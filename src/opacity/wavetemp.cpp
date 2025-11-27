@@ -17,29 +17,30 @@
 
 namespace harp {
 
-WaveTempImpl::WaveTempImpl(AttenuatorOptions const& options_)
-    : options(options_) {
-  TORCH_CHECK(options.species_ids().size() == 1, "Only one species is allowed");
+WaveTempImpl::WaveTempImpl(OpacityOptions const& options_) : options(options_) {
+  TORCH_CHECK(options->species_ids().size() == 1,
+              "Only one species is allowed");
 
-  TORCH_CHECK(options.species_ids()[0] >= 0,
-              "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options->species_ids()[0] >= 0,
+              "Invalid species_id: ", options->species_ids()[0]);
 
-  TORCH_CHECK(
-      options.type().empty() || (options.type().compare(0, 8, "wavetemp") == 0),
-      "Mismatch opacity type: ", options.type(), " expecting 'wavetemp'");
+  TORCH_CHECK(options->type().empty() ||
+                  (options->type().compare(0, 8, "wavetemp") == 0),
+              "Mismatch opacity type: ", options->type(),
+              " expecting 'wavetemp'");
 
-  TORCH_CHECK(options.fractions().size() == options.opacity_files().size(),
+  TORCH_CHECK(options->fractions().size() == options->opacity_files().size(),
               "`fractions` and `opacity_files` must have the same size");
 
   reset();
 }
 
 void WaveTempImpl::reset() {
-  kwave.resize(options.opacity_files().size());
-  ktemp.resize(options.opacity_files().size());
-  kdata.resize(options.opacity_files().size());
+  kwave.resize(options->opacity_files().size());
+  ktemp.resize(options->opacity_files().size());
+  kdata.resize(options->opacity_files().size());
 
-  auto full_path = find_resource(options.opacity_files()[0]);
+  auto full_path = find_resource(options->opacity_files()[0]);
 
   // Load the file
   torch::jit::script::Module container = torch::jit::load(full_path);
@@ -48,8 +49,8 @@ void WaveTempImpl::reset() {
   ktemp[0] = container.attr("temp").toTensor();
   kdata[0] = container.attr("kappa").toTensor().unsqueeze(-1);
 
-  for (int n = 1; n < options.opacity_files().size(); ++n) {
-    full_path = find_resource(options.opacity_files()[n]);
+  for (int n = 1; n < options->opacity_files().size(); ++n) {
+    full_path = find_resource(options->opacity_files()[n]);
     container = torch::jit::load(full_path);
     kwave[n] = container.attr("wavenumber").toTensor();
     ktemp[n] = container.attr("temp").toTensor();
@@ -78,12 +79,12 @@ torch::Tensor WaveTempImpl::forward(
   }
 
   // Check species id in range
-  TORCH_CHECK(options.species_ids()[0] < conc.size(-1),
-              "Invalid species_id: ", options.species_ids()[0]);
+  TORCH_CHECK(options->species_ids()[0] < conc.size(-1),
+              "Invalid species_id: ", options->species_ids()[0]);
 
-  auto x0 = conc.select(-1, options.species_ids()[0]);
+  auto x0 = conc.select(-1, options->species_ids()[0]);
   auto amagat = constants::Avogadro * x0 / constants::Lo;
-  auto amagat_self = amagat * options.fractions()[0];
+  auto amagat_self = amagat * options->fractions()[0];
 
   int nwave = wave.size(0);
   int ncol = conc.size(0);
@@ -99,7 +100,7 @@ torch::Tensor WaveTempImpl::forward(
   for (int n = 1; n < kdata.size(); n++) {
     nwave = kwave[n].size(0);
     auto data_other = interpn({wave1, temp1}, {kwave[n], ktemp[n]}, kdata[n]);
-    auto amagat_other = amagat * options.fractions()[n];
+    auto amagat_other = amagat * options->fractions()[n];
     result += data_other.exp() *
               (amagat_self * amagat_other).unsqueeze(0).unsqueeze(-1);
   }
