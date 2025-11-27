@@ -41,12 +41,12 @@ T deg2rad(T phi) {
  * where theta is the polar angle and phi is the azimuthal angle,
  * both in degrees.
  *
- * The returned tensor contains:
- * - mu = cos(theta) in the first element
- * - phi in radians in the second element
+ * The function converts the angles as follows:
+ * - theta is converted to mu = cos(deg2rad(theta))
+ * - phi is converted from degrees to radians
  *
  * \param str A direction string in the format "(theta,phi)"
- * \return A 1D tensor of shape (2,) containing [mu, phi]
+ * \return A 1D tensor of shape (2,) containing [mu, phi_radians]
  */
 torch::Tensor parse_radiation_direction(std::string const &str);
 
@@ -57,8 +57,10 @@ torch::Tensor parse_radiation_direction(std::string const &str);
  * format "(theta,phi)" where theta is the polar angle and phi is the
  * azimuthal angle, both in degrees.
  *
+ * Each direction is converted using parse_radiation_direction.
+ *
  * \param str A string containing multiple direction specifications
- * \return A 2D tensor of shape (n, 2) where each row contains [mu, phi]
+ * \return A 2D tensor of shape (n, 2) where each row contains [mu, phi_radians]
  */
 torch::Tensor parse_radiation_directions(std::string const &str);
 }  // namespace harp
