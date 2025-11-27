@@ -239,7 +239,7 @@ Let's define a grey opacity source that has 0.1 m^2/mol cross-section for all wa
         ncol, nlyr = conc.shape[0], conc.shape[1]
         return 0.1 * torch.ones((self.nwave, ncol, nlyr, self.nprop), dtype=torch.float64)
 
-We provide the :class:`pyharp.compile` function that creates a model, scripts it, and saves it to a file:
+We provide the :func:`pyharp.compile` function that creates a model, scripts it, and saves it to a file:
 
 .. code-block:: python
 
