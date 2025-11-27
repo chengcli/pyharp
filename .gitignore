@@ -22,6 +22,7 @@ data/*.py
 
 # doc
 docs/doxygen
+docs/_build/
 
 # python
 *egg-info*

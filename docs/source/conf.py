@@ -33,7 +33,7 @@ autodoc_typehints = "both"
 add_function_parentheses = False
 
 # Adjust the path accordingly
-sys.path.insert(0, os.path.abspath("../python"))
+sys.path.insert(0, os.path.abspath("../../python"))
 
 # -- General configuration
 
