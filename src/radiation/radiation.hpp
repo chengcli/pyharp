@@ -100,7 +100,7 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
   RadiationOptions options;
 
   //! Constructor to initialize the layers
-  RadiationImpl() { options = std::make_shared<RadiationOptionsImpl>(); }
+  RadiationImpl() : options(RadiationOptionsImpl::create()) {}
   explicit RadiationImpl(RadiationOptions const& options_);
   void reset() override;
 

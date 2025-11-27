@@ -29,7 +29,7 @@ class HeliosImpl : public torch::nn::Cloneable<HeliosImpl> {
   OpacityOptions options;
 
   //! Constructor to initialize the layer
-  HeliosImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  HeliosImpl() : options(OpacityOptionsImpl::create()) {}
   explicit HeliosImpl(OpacityOptions const& options_);
   void reset() override;
 

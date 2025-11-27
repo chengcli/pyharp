@@ -20,7 +20,7 @@ class JITOpacityImpl : public torch::nn::Cloneable<JITOpacityImpl> {
   //! options with which this `JITOpacityImpl` was constructed
   OpacityOptions options;
 
-  JITOpacityImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  JITOpacityImpl() : options(OpacityOptionsImpl::create()) {}
   explicit JITOpacityImpl(OpacityOptions const& options_);
   void reset() override;
 

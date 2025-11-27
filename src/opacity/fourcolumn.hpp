@@ -26,7 +26,7 @@ class FourColumnImpl : public torch::nn::Cloneable<FourColumnImpl> {
   OpacityOptions options;
 
   //! Constructor to initialize the layer
-  FourColumnImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  FourColumnImpl() : options(OpacityOptionsImpl::create()) {}
   explicit FourColumnImpl(OpacityOptions const& options_);
   void reset() override;
 

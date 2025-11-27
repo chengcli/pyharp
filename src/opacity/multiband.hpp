@@ -29,7 +29,7 @@ class MultiBandImpl : public torch::nn::Cloneable<MultiBandImpl> {
   OpacityOptions options;
 
   //! Constructor to initialize the layer
-  MultiBandImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  MultiBandImpl() : options(OpacityOptionsImpl::create()) {}
   explicit MultiBandImpl(OpacityOptions const& options_);
   void reset() override;
 

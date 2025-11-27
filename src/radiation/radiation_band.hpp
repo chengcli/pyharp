@@ -128,9 +128,7 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
   RadiationBandOptions options;
 
   //! Constructor to initialize the layers
-  RadiationBandImpl() {
-    options = std::make_shared<RadiationBandOptionsImpl>();
-  }
+  RadiationBandImpl() : options(RadiationBandOptionsImpl::create()) {}
   explicit RadiationBandImpl(RadiationBandOptions const& options_);
   void reset() override;
   void pretty_print(std::ostream& out) const override;
