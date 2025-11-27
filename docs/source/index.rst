@@ -126,7 +126,6 @@ Last, we load Pyharp classes and functions. Pyharp uses a minimal set of classes
           RadiationOptions,
           Radiation,
           calc_dz_hypsometric,
-          disort_config,
           )
 
 That's all you need for the header of the program.
@@ -208,14 +207,16 @@ This improves the computational efficiency as the 196 radiative transfer calcula
       rad_op = RadiationOptions.from_yaml(config_file)
       wmin, wmax = load_sonora_window()
 
-      for [name, band] in rad_op.bands().items():
-          if name == "sonora196":
-              band.ww(band.query_weights("H2-molecule"))
-              nwave = len(band.ww())
+      for band in rad_op.bands():
+          if band.name() == "sonora196":
+              # Query wavenumber and weight from the opacity source
+              op = band.opacities()["H2-molecule"]
+              band.wavenumber(list(op.query_wavenumber()))
+              band.weight(list(op.query_weight()))
+              nwave = len(band.wavenumber())
               ng = int(nwave / len(wmin))
 
               band.disort().accur(1.0e-4)
-              disort_config(band.disort(), nstr, nlyr, ncol, nwave)
 
               data = [wmin] * ng
               band.disort().wave_lower([x for col in zip(*data) for x in col])
@@ -223,7 +224,7 @@ This improves the computational efficiency as the 196 radiative transfer calcula
               data = [wmax] * ng
               band.disort().wave_upper([x for col in zip(*data) for x in col])
           else:
-              raise ValueError(f"Unknown band: {name}")
+              raise ValueError(f"Unknown band: {band.name()}")
 
       return Radiation(rad_op)
 
@@ -246,10 +247,10 @@ Throughout the Pyharp code, we will be using SI units unless otherwise specified
              atm: dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
       ncol = conc.shape[0]
       bc = {}
-      for [name, band] in rad.options.bands().items():
-          nwave = len(band.ww())
-          bc[name + "/albedo"] = torch.ones((nwave, ncol), dtype=torch.float64)
-          bc[name + "/temis"] = torch.zeros((nwave, ncol), dtype=torch.float64)
+      for band in rad.options.bands():
+          nwave = len(band.wavenumber())
+          bc[band.name() + "/albedo"] = torch.ones((nwave, ncol), dtype=torch.float64)
+          bc[band.name() + "/temis"] = torch.zeros((nwave, ncol), dtype=torch.float64)
 
       bc["btemp"] = torch.zeros((ncol), dtype=torch.float64)
       bc["ttemp"] = torch.zeros((ncol), dtype=torch.float64)
