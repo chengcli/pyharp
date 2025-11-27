@@ -7,24 +7,42 @@ This module provides various opacity models for calculating atmospheric opacitie
 from typing import overload
 import torch
 
-class AttenuatorOptions:
+class OpacityOptions:
     """
-    Set opacity band options.
+    Set opacity options.
 
     Returns:
-        pyharp.AttenuatorOptions: class object
+        pyharp.OpacityOptions: class object
 
     Examples:
         >>> import torch
-        >>> from pyharp.opacity import AttenuatorOptions
-        >>> op = AttenuatorOptions().band_options(['band1', 'band2'])
+        >>> from pyharp.opacity import OpacityOptions
+        >>> op = OpacityOptions().type('rfm-lbl')
     """
 
     def __init__(self) -> None:
-        """Create a new AttenuatorOptions instance."""
+        """Create a new OpacityOptions instance."""
         ...
 
     def __repr__(self) -> str: ...
+
+    def query_wavenumber(self) -> list[float]:
+        """
+        Query the wavenumber grid from opacity files.
+
+        Returns:
+            list[float]: wavenumber grid [cm^-1]
+        """
+        ...
+
+    def query_weight(self) -> list[float]:
+        """
+        Query the spectral weights from opacity files.
+
+        Returns:
+            list[float]: spectral weights
+        """
+        ...
 
     @overload
     def type(self) -> str:
@@ -37,22 +55,22 @@ class AttenuatorOptions:
         ...
 
     @overload
-    def type(self, value: str) -> "AttenuatorOptions":
+    def type(self, value: str) -> "OpacityOptions":
         """
         Set the type of the opacity source format.
 
-        Valid options are: ``jit``, ``rfm-lbl``, ``rfm-ck``, ``four-column``, ``wavetemp``, ``multiband``.
+        Valid options are: ``jit``, ``rfm-lbl``, ``rfm-ck``, ``fourcolumn``, ``wavetemp``, ``multiband-ck``, ``helios``.
 
         Args:
             value (str): type of the opacity source
 
         Returns:
-            AttenuatorOptions: class object
+            OpacityOptions: class object
 
         Examples:
             >>> import torch
-            >>> from pyharp.opacity import AttenuatorOptions
-            >>> op = AttenuatorOptions().type('rfm-lbl')
+            >>> from pyharp.opacity import OpacityOptions
+            >>> op = OpacityOptions().type('rfm-lbl')
             >>> print(op)
         """
         ...
@@ -68,7 +86,7 @@ class AttenuatorOptions:
         ...
 
     @overload
-    def bname(self, value: str) -> "AttenuatorOptions":
+    def bname(self, value: str) -> "OpacityOptions":
         """
         Set the name of the band that the opacity is associated with.
 
@@ -76,12 +94,12 @@ class AttenuatorOptions:
             value (str): name of the band that the opacity is associated with
 
         Returns:
-            AttenuatorOptions: class object
+            OpacityOptions: class object
 
         Examples:
             >>> import torch
-            >>> from pyharp.opacity import AttenuatorOptions
-            >>> op = AttenuatorOptions().bname('band1')
+            >>> from pyharp.opacity import OpacityOptions
+            >>> op = OpacityOptions().bname('band1')
         """
         ...
 
@@ -96,7 +114,7 @@ class AttenuatorOptions:
         ...
 
     @overload
-    def opacity_files(self, value: list[str]) -> "AttenuatorOptions":
+    def opacity_files(self, value: list[str]) -> "OpacityOptions":
         """
         Set the list of opacity data files.
 
@@ -104,12 +122,12 @@ class AttenuatorOptions:
             value (list[str]): list of opacity data files
 
         Returns:
-            AttenuatorOptions: class object
+            OpacityOptions: class object
 
         Examples:
             >>> import torch
-            >>> from pyharp.opacity import AttenuatorOptions
-            >>> op = AttenuatorOptions().opacity_files(['file1', 'file2'])
+            >>> from pyharp.opacity import OpacityOptions
+            >>> op = OpacityOptions().opacity_files(['file1', 'file2'])
         """
         ...
 
@@ -124,7 +142,7 @@ class AttenuatorOptions:
         ...
 
     @overload
-    def species_ids(self, value: list[int]) -> "AttenuatorOptions":
+    def species_ids(self, value: list[int]) -> "OpacityOptions":
         """
         Set the list of dependent species indices.
 
@@ -132,12 +150,12 @@ class AttenuatorOptions:
             value (list[int]): list of dependent species indices
 
         Returns:
-            AttenuatorOptions: class object
+            OpacityOptions: class object
 
         Examples:
             >>> import torch
-            >>> from pyharp.opacity import AttenuatorOptions
-            >>> op = AttenuatorOptions().species_ids([1, 2])
+            >>> from pyharp.opacity import OpacityOptions
+            >>> op = OpacityOptions().species_ids([1, 2])
         """
         ...
 
@@ -152,7 +170,7 @@ class AttenuatorOptions:
         ...
 
     @overload
-    def jit_kwargs(self, value: list[str]) -> "AttenuatorOptions":
+    def jit_kwargs(self, value: list[str]) -> "OpacityOptions":
         """
         Set the list of kwargs to pass to the JIT module.
 
@@ -160,12 +178,12 @@ class AttenuatorOptions:
             value (list[str]): list of kwargs to pass to the JIT module
 
         Returns:
-            AttenuatorOptions: class object
+            OpacityOptions: class object
 
         Examples:
             >>> import torch
-            >>> from pyharp.opacity import AttenuatorOptions
-            >>> op = AttenuatorOptions().jit_kwargs(['temp', 'wavelength'])
+            >>> from pyharp.opacity import OpacityOptions
+            >>> op = OpacityOptions().jit_kwargs(['temp', 'wavelength'])
             >>> print(op.jit_kwargs())
         """
         ...
@@ -181,7 +199,7 @@ class AttenuatorOptions:
         ...
 
     @overload
-    def fractions(self, value: list[float]) -> "AttenuatorOptions":
+    def fractions(self, value: list[float]) -> "OpacityOptions":
         """
         Set fractions of species in cia calculation.
 
@@ -189,12 +207,35 @@ class AttenuatorOptions:
             value (list[float]): list of species fractions
 
         Returns:
-            AttenuatorOptions: class object
+            OpacityOptions: class object
 
         Examples:
             >>> import torch
-            >>> from pyharp.opacity import AttenuatorOptions
-            >>> op = AttenuatorOptions().fractions([0.9, 0.1])
+            >>> from pyharp.opacity import OpacityOptions
+            >>> op = OpacityOptions().fractions([0.9, 0.1])
+        """
+        ...
+
+    @overload
+    def verbose(self) -> bool:
+        """
+        Get verbose flag.
+
+        Returns:
+            bool: verbose flag
+        """
+        ...
+
+    @overload
+    def verbose(self, value: bool) -> "OpacityOptions":
+        """
+        Set verbose flag.
+
+        Args:
+            value (bool): verbose flag
+
+        Returns:
+            OpacityOptions: class object
         """
         ...
 
@@ -204,11 +245,11 @@ class JITOpacity:
 
     Examples:
         >>> import torch
-        >>> from pyharp.opacity import JITOpacity, AttenuatorOptions
-        >>> op = JITOpacity(AttenuatorOptions())
+        >>> from pyharp.opacity import JITOpacity, OpacityOptions
+        >>> op = JITOpacity(OpacityOptions())
     """
 
-    options: AttenuatorOptions
+    options: OpacityOptions
 
     @overload
     def __init__(self) -> None:
@@ -216,24 +257,48 @@ class JITOpacity:
         ...
 
     @overload
-    def __init__(self, options: AttenuatorOptions) -> None:
+    def __init__(self, options: OpacityOptions) -> None:
         """
         Create a JITOpacity instance.
 
         Args:
-            options (AttenuatorOptions): Attenuator options
+            options (OpacityOptions): Opacity options
         """
         ...
 
     def __repr__(self) -> str: ...
 
-    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
+    def forward(self, conc: torch.Tensor, atm: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using JIT model.
 
         Args:
             conc (torch.Tensor): concentration of the species in mol/m^3
-            kwargs (dict[str, torch.Tensor]): keyword arguments passed to the JIT model
+            atm (dict[str, torch.Tensor]): atmospheric parameters passed to the JIT model
 
                 The keyword arguments must be provided in the form of a dictionary.
                 The keys of the dictionary are the names of the input tensors
@@ -252,11 +317,11 @@ class WaveTemp:
 
     Examples:
         >>> import torch
-        >>> from pyharp.opacity import WaveTemp, AttenuatorOptions
-        >>> op = WaveTemp(AttenuatorOptions())
+        >>> from pyharp.opacity import WaveTemp, OpacityOptions
+        >>> op = WaveTemp(OpacityOptions())
     """
 
-    options: AttenuatorOptions
+    options: OpacityOptions
 
     @overload
     def __init__(self) -> None:
@@ -264,25 +329,49 @@ class WaveTemp:
         ...
 
     @overload
-    def __init__(self, options: AttenuatorOptions) -> None:
+    def __init__(self, options: OpacityOptions) -> None:
         """
         Create a WaveTemp instance.
 
         Args:
-            options (AttenuatorOptions): Attenuator options
+            options (OpacityOptions): Opacity options
         """
         ...
 
     def __repr__(self) -> str: ...
 
-    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
+    def forward(self, conc: torch.Tensor, atm: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using Wave-Temp data.
 
         Args:
             conc (torch.Tensor): concentration of the species in mol/m^3
 
-            kwargs (dict[str, torch.Tensor]): keyword arguments.
+            atm (dict[str, torch.Tensor]): atmospheric parameters.
 
                 Both 'temp' [k] and ('wavenumber' [cm^{-1}] or 'wavelength' [um]) must be provided
 
@@ -303,11 +392,11 @@ class MultiBand:
 
     Examples:
         >>> import torch
-        >>> from pyharp.opacity import MultiBand, AttenuatorOptions
-        >>> op = MultiBand(AttenuatorOptions())
+        >>> from pyharp.opacity import MultiBand, OpacityOptions
+        >>> op = MultiBand(OpacityOptions())
     """
 
-    options: AttenuatorOptions
+    options: OpacityOptions
 
     @overload
     def __init__(self) -> None:
@@ -315,25 +404,49 @@ class MultiBand:
         ...
 
     @overload
-    def __init__(self, options: AttenuatorOptions) -> None:
+    def __init__(self, options: OpacityOptions) -> None:
         """
         Create a MultiBand instance.
 
         Args:
-            options (AttenuatorOptions): Attenuator options
+            options (OpacityOptions): Opacity options
         """
         ...
 
     def __repr__(self) -> str: ...
 
-    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
+    def forward(self, conc: torch.Tensor, atm: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using multi-band data.
 
         Args:
             conc (torch.Tensor): concentration of the species in mol/m^3
 
-            kwargs (dict[str, torch.Tensor]): keyword arguments
+            atm (dict[str, torch.Tensor]): atmospheric parameters
 
                 Both 'temp' [k] and 'pres' [pa] must be provided
 
@@ -354,11 +467,11 @@ class FourColumn:
 
     Examples:
         >>> import torch
-        >>> from pyharp.opacity import FourColumn, AttenuatorOptions
-        >>> op = FourColumn(AttenuatorOptions())
+        >>> from pyharp.opacity import FourColumn, OpacityOptions
+        >>> op = FourColumn(OpacityOptions())
     """
 
-    options: AttenuatorOptions
+    options: OpacityOptions
 
     @overload
     def __init__(self) -> None:
@@ -366,25 +479,49 @@ class FourColumn:
         ...
 
     @overload
-    def __init__(self, options: AttenuatorOptions) -> None:
+    def __init__(self, options: OpacityOptions) -> None:
         """
         Create a FourColumn instance.
 
         Args:
-            options (AttenuatorOptions): Attenuator options
+            options (OpacityOptions): Opacity options
         """
         ...
 
     def __repr__(self) -> str: ...
 
-    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
+    def forward(self, conc: torch.Tensor, atm: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using four-column data.
 
         Args:
             conc (torch.Tensor): concentration of the species in mol/m^3
 
-            kwargs (dict[str, torch.Tensor]): keyword arguments
+            atm (dict[str, torch.Tensor]): atmospheric parameters
 
                 Either 'wavelength' or 'wavenumber' must be provided
                 if 'wavelength' is provided, the unit is um.
@@ -407,11 +544,11 @@ class RFM:
 
     Examples:
         >>> import torch
-        >>> from pyharp.opacity import RFM, AttenuatorOptions
-        >>> op = RFM(AttenuatorOptions())
+        >>> from pyharp.opacity import RFM, OpacityOptions
+        >>> op = RFM(OpacityOptions())
     """
 
-    options: AttenuatorOptions
+    options: OpacityOptions
 
     @overload
     def __init__(self) -> None:
@@ -419,24 +556,48 @@ class RFM:
         ...
 
     @overload
-    def __init__(self, options: AttenuatorOptions) -> None:
+    def __init__(self, options: OpacityOptions) -> None:
         """
         Create a RFM instance.
 
         Args:
-            options (AttenuatorOptions): Attenuator options
+            options (OpacityOptions): Opacity options
         """
         ...
 
     def __repr__(self) -> str: ...
 
-    def forward(self, conc: torch.Tensor, kwargs: dict[str, torch.Tensor]) -> torch.Tensor:
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
+    def forward(self, conc: torch.Tensor, atm: dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Calculate opacity using RFM line-by-line absorption data.
 
         Args:
             conc (torch.Tensor): concentration of the species in mol/m^3
-            kwargs (dict[str, torch.Tensor]): keyword arguments
+            atm (dict[str, torch.Tensor]): atmospheric parameters
 
                 Either 'wavelength' or 'wavenumber' must be provided
                 if 'wavelength' is provided, the unit is um.

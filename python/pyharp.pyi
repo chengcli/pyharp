@@ -5,8 +5,17 @@ This module provides Python bindings to the C++ HARP library for
 atmospheric radiation calculations.
 """
 
-from typing import Iterator, overload
+from typing import overload
 import torch
+
+# Index constants for optical properties
+kIEX: int  # extinction cross section index
+kISS: int  # single scattering albedo index
+kIPM: int  # phase moments index
+
+# Index constants for flux direction
+kIUP: int  # upward flux index
+kIDN: int  # downward flux index
 
 # Module-level functions
 def species_names() -> list[str]:
@@ -24,52 +33,6 @@ def species_weights() -> list[float]:
 
     Returns:
         list[float]: List of species molecular weights in kg/mol
-    """
-    ...
-
-def shared() -> Iterator[torch.Tensor]:
-    """
-    Pyharp module deposits data -- tensors -- to a shared dictionary, which can be accessed by other modules.
-    This function returns an iterator over the shared data.
-
-    After running the forward method of the :class:`RadiationBand`, the shared data with the following keys are available:
-
-      - "radiation/<band_name>/total_flux": total flux in a band
-
-    Yields:
-        torch.Tensor: shared data of the pyharp module
-
-    Examples:
-        >>> import pyharp
-        >>> import torch
-
-        # ... after calling the forward method
-
-        # loop over the shared data
-        >>> for data in pyharp.shared():
-        >>>     print(type(data), data.size())  # prints the shared data
-    """
-    ...
-
-def get_shared(key: str) -> torch.Tensor:
-    """
-    Get the shared data by key.
-
-    Args:
-        key (str): The key of the shared data.
-
-    Returns:
-        torch.Tensor: The shared data.
-
-    Example:
-        >>> import pyharp
-        >>> import torch
-
-        # ... after calling the forward method
-
-        # get the shared data
-        >>> data = pyharp.get_shared("radiation/band1/total_flux")
-        >>> print(type(data), data.size())  # prints the shared data
     """
     ...
 
@@ -289,30 +252,6 @@ class RadiationBandOptions:
 
     def __repr__(self) -> str: ...
 
-    def query_waves(self, op_name: str = "") -> list[float]:
-        """
-        Query the spectral grids.
-
-        Args:
-            op_name (str): opacity name
-
-        Returns:
-            list[float]: spectral grids
-        """
-        ...
-
-    def query_weights(self, op_name: str = "") -> list[float]:
-        """
-        Query the weights.
-
-        Args:
-            op_name (str): opacity name
-
-        Returns:
-            list[float]: weights
-        """
-        ...
-
     @overload
     def name(self) -> str:
         """Get radiation band name."""
@@ -368,17 +307,17 @@ class RadiationBandOptions:
         ...
 
     @overload
-    def ww(self) -> list[float]:
-        """Get wavelength, wavenumber or weights for a wave grid."""
+    def l2l_order(self) -> int:
+        """Get layer-to-level interpolation order."""
         ...
 
     @overload
-    def ww(self, value: list[float]) -> "RadiationBandOptions":
+    def l2l_order(self, value: int) -> "RadiationBandOptions":
         """
-        Set wavelength, wavenumber or weights for a wave grid.
+        Set layer-to-level interpolation order.
 
         Args:
-            value (list[float]): wavenumbers/wavelengths/weights
+            value (int): interpolation order
 
         Returns:
             RadiationBandOptions: class object
@@ -386,17 +325,125 @@ class RadiationBandOptions:
         ...
 
     @overload
-    def integration(self) -> str:
-        """Get integration method."""
+    def nwave(self) -> int:
+        """Get number of spectral waves."""
         ...
 
     @overload
-    def integration(self, value: str) -> "RadiationBandOptions":
+    def nwave(self, value: int) -> "RadiationBandOptions":
         """
-        Set integration method.
+        Set number of spectral waves.
 
         Args:
-            value (str): integration method
+            value (int): number of waves
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    @overload
+    def ncol(self) -> int:
+        """Get number of columns."""
+        ...
+
+    @overload
+    def ncol(self, value: int) -> "RadiationBandOptions":
+        """
+        Set number of columns.
+
+        Args:
+            value (int): number of columns
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    @overload
+    def nlyr(self) -> int:
+        """Get number of layers."""
+        ...
+
+    @overload
+    def nlyr(self, value: int) -> "RadiationBandOptions":
+        """
+        Set number of layers.
+
+        Args:
+            value (int): number of layers
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    @overload
+    def nstr(self) -> int:
+        """Get number of streams."""
+        ...
+
+    @overload
+    def nstr(self, value: int) -> "RadiationBandOptions":
+        """
+        Set number of streams.
+
+        Args:
+            value (int): number of streams
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    @overload
+    def wavenumber(self) -> list[float]:
+        """Get wavenumber grid [cm^-1]."""
+        ...
+
+    @overload
+    def wavenumber(self, value: list[float]) -> "RadiationBandOptions":
+        """
+        Set wavenumber grid.
+
+        Args:
+            value (list[float]): wavenumber grid [cm^-1]
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    @overload
+    def weight(self) -> list[float]:
+        """Get spectral weights."""
+        ...
+
+    @overload
+    def weight(self, value: list[float]) -> "RadiationBandOptions":
+        """
+        Set spectral weights.
+
+        Args:
+            value (list[float]): spectral weights
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    @overload
+    def verbose(self) -> bool:
+        """Get verbose flag."""
+        ...
+
+    @overload
+    def verbose(self, value: bool) -> "RadiationBandOptions":
+        """
+        Set verbose flag.
+
+        Args:
+            value (bool): verbose flag
 
         Returns:
             RadiationBandOptions: class object
@@ -439,7 +486,7 @@ class RadiationBandOptions:
         Get opacities.
 
         Returns:
-            dict: opacities dictionary
+            dict: opacities dictionary mapping name to OpacityOptions
         """
         ...
 
@@ -449,7 +496,7 @@ class RadiationBandOptions:
         Set opacities.
 
         Args:
-            value (dict): opacities
+            value (dict): opacities dictionary
 
         Returns:
             RadiationBandOptions: class object
@@ -463,7 +510,7 @@ class RadiationOptions:
     Examples:
         >>> import torch
         >>> from pyharp import RadiationOptions
-        >>> op = RadiationOptions().band_options(['band1', 'band2'])
+        >>> op = RadiationOptions.from_yaml("config.yaml")
     """
 
     def __init__(self) -> None:
@@ -490,6 +537,24 @@ class RadiationOptions:
         """
         ...
 
+    def ncol(self) -> int:
+        """
+        Get number of columns from all bands.
+
+        Returns:
+            int: number of columns
+        """
+        ...
+
+    def nlyr(self) -> int:
+        """
+        Get number of layers from all bands.
+
+        Returns:
+            int: number of layers
+        """
+        ...
+
     @overload
     def outdirs(self) -> str:
         """Get outgoing ray directions."""
@@ -509,22 +574,22 @@ class RadiationOptions:
         ...
 
     @overload
-    def bands(self):
+    def bands(self) -> list[RadiationBandOptions]:
         """
         Get radiation band options.
 
         Returns:
-            dict: radiation band options dictionary
+            list[RadiationBandOptions]: list of radiation band options
         """
         ...
 
     @overload
-    def bands(self, value: dict) -> "RadiationOptions":
+    def bands(self, value: list[RadiationBandOptions]) -> "RadiationOptions":
         """
         Set radiation band options.
 
         Args:
-            value (dict): radiation band options
+            value (list[RadiationBandOptions]): list of radiation band options
 
         Returns:
             RadiationOptions: class object
@@ -537,11 +602,13 @@ class Radiation:
 
     Examples:
         >>> import torch
-        >>> from pyharp import RadiationOptions
-        >>> op = RadiationOptions().band_options(['band1', 'band2'])
+        >>> from pyharp import RadiationOptions, Radiation
+        >>> op = RadiationOptions.from_yaml("config.yaml")
+        >>> rad = Radiation(op)
     """
 
     options: RadiationOptions
+    spectra: torch.Tensor
 
     @overload
     def __init__(self) -> None:
@@ -560,24 +627,51 @@ class Radiation:
 
     def __repr__(self) -> str: ...
 
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule (e.g., "band_name.opacity_name")
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
     def forward(
         self,
         conc: torch.Tensor,
         dz: torch.Tensor,
         bc: dict[str, torch.Tensor],
-        kwargs: dict[str, torch.Tensor]
-    ) -> torch.Tensor:
+        atm: dict[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Calculate the net radiation flux.
 
         Args:
-            conc (torch.Tensor): concentration [mol/m^3]
-            dz (torch.Tensor): height [m]
+            conc (torch.Tensor): concentration [mol/m^3] (ncol, nlyr, nspecies)
+            dz (torch.Tensor): layer thickness [m] (nlyr) or (ncol, nlyr)
             bc (dict[str, torch.Tensor]): boundary conditions
-            kwargs (dict[str, torch.Tensor]): additional arguments
+            atm (dict[str, torch.Tensor]): atmospheric parameters (temp, pres, etc.)
 
         Returns:
-            torch.Tensor: net flux [w/m^2]
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                - net flux [W/m^2] (ncol, nlyr+1)
+                - surface downward flux [W/m^2] (ncol)
+                - TOA upward flux [W/m^2] (ncol)
         """
         ...
 
@@ -587,11 +681,14 @@ class RadiationBand:
 
     Examples:
         >>> import torch
-        >>> from pyharp import RadiationBandOptions
-        >>> op = RadiationBandOptions().band_options(['band1', 'band2'])
+        >>> from pyharp import RadiationBandOptions, RadiationBand
+        >>> op = RadiationBandOptions().name('band1')
+        >>> band = RadiationBand(op)
     """
 
     options: RadiationBandOptions
+    prop: torch.Tensor
+    spectrum: torch.Tensor
 
     @overload
     def __init__(self) -> None:
@@ -610,24 +707,48 @@ class RadiationBand:
 
     def __repr__(self) -> str: ...
 
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
     def forward(
         self,
         conc: torch.Tensor,
         dz: torch.Tensor,
         bc: dict[str, torch.Tensor],
-        kwargs: dict[str, torch.Tensor]
+        atm: dict[str, torch.Tensor]
     ) -> torch.Tensor:
         """
         Calculate the net radiation flux for a band.
 
         Args:
-            conc (torch.Tensor): concentration [mol/m^3]
-            dz (torch.Tensor): height [m]
+            conc (torch.Tensor): concentration [mol/m^3] (ncol, nlyr, nspecies)
+            dz (torch.Tensor): layer thickness [m] (nlyr) or (ncol, nlyr)
             bc (dict[str, torch.Tensor]): boundary conditions
-            kwargs (dict[str, torch.Tensor]): additional arguments
+            atm (dict[str, torch.Tensor]): atmospheric parameters (temp, pres, etc.)
 
         Returns:
-            torch.Tensor: [W/m^2] (ncol, nlyr+1)
+            torch.Tensor: total flux [W/m^2] (ncol, nlyr+1, 2)
         """
         ...
 

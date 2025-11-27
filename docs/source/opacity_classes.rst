@@ -3,7 +3,7 @@
 Opacity Classes
 ---------------
 
-.. autoclass:: pyharp.opacity.AttenuatorOptions
+.. autoclass:: pyharp.opacity.OpacityOptions
    :members:
 
 .. autoclass:: pyharp.opacity.FourColumn
