@@ -10,7 +10,6 @@ from pyharp import (
     bbflux_wavenumber,
     RadiationOptions,
     Radiation,
-    disort_config,
     read_rfm_atm,
 )
 
@@ -71,19 +70,23 @@ if __name__ == "__main__":
     rad_op = RadiationOptions.from_yaml("amars-ck.yaml")
 
     # configure bands
-    for [name, band] in rad_op.bands().items():
-        band.ww(band.query_weights())
-        nwave = len(band.ww()) if name != "SW" else 200
+    for band in rad_op.bands():
+        name = band.name()
+        # Query wavenumber and weight from the opacity sources
+        op = list(band.opacities().values())[0] if band.opacities() else None
+        if op and name != "SW":
+            band.wavenumber(list(op.query_wavenumber()))
+            band.weight(list(op.query_weight()))
+        nwave = len(band.wavenumber()) if name != "SW" else 200
 
         wmin = band.disort().wave_lower()[0]
         wmax = band.disort().wave_upper()[0]
 
         band.disort().accur(1.0e-12)
-        disort_config(band.disort(), nstr, nlyr, ncol, nwave)
 
         if name == "SW":  # shortwave
-            band.ww(np.linspace(wmin, wmax, nwave))
-            wave = tensor(band.ww(), dtype=torch.float64)
+            band.wavenumber(list(np.linspace(wmin, wmax, nwave)))
+            wave = tensor(band.wavenumber(), dtype=torch.float64)
             bc[name + "/fbeam"] = (
                 lum_scale * sr_sun * bbflux_wavenumber(wave, solar_temp)
             )

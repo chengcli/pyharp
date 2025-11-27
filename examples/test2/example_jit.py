@@ -4,10 +4,9 @@ from pyharp import (
         h2_cia_legacy,
         RadiationOptions,
         Radiation,
-        disort_config
         )
 import numpy as np
-from pyharp.opacity import AttenuatorOptions, JITOpacity
+from pyharp.opacity import OpacityOptions, JITOpacity
 
 torch.set_default_dtype(torch.float64)
 
@@ -74,19 +73,18 @@ rad_op = RadiationOptions.from_yaml('amars-ck.yaml')
 
 dz = torch.ones(nlyr)*1000.0
 
-for name, band in rad_op.bands().items():
+for band in rad_op.bands():
     wmin = band.disort().wave_lower()[0]
     wmax = band.disort().wave_upper()[0]
 
     band.disort().accur(1.0e-12)
-    disort_config(band.disort(), nstr, nlyr, ncol, nwave)
-    band.ww(np.linspace(wmin, wmax, nwave))
-    wave = torch.tensor(band.ww(), dtype=torch.float64)
-    print(band.ww())
+    band.wavenumber(list(np.linspace(wmin, wmax, nwave)))
+    wave = torch.tensor(band.wavenumber(), dtype=torch.float64)
+    print(band.wavenumber())
     bc = {}
-    bc[name + "/fbeam"] = torch.tensor(55.).expand(nwave,ncol)
-    bc[name + "/albedo"] = 0.3 * torch.ones((nwave,ncol))
-    bc[name + "/umu0"] = torch.ones((ncol,))
+    bc[band.name() + "/fbeam"] = torch.tensor(55.).expand(nwave,ncol)
+    bc[band.name() + "/albedo"] = 0.3 * torch.ones((nwave,ncol))
+    bc[band.name() + "/umu0"] = torch.ones((ncol,))
 
 print(rad_op)
 print(conc.shape)

@@ -80,17 +80,17 @@ This will generate a file called
 ``sonora_2020_feh+000_co_100.data.196.pt`` in the current directory.
 
 Then, we specify the fileds ``type``, ``opacity_files``, and ``species_ids``
-of the :class:`pyharp.opacity.AttenuatorOptions` class.
+of the :class:`pyharp.opacity.OpacityOptions` class.
 ``species_ids`` is a list of integers that specify the index of the
 dependent species in a multi-dimensional concentration array.
 We will talk about the concentration array later.
 
 .. code-block:: python
 
-   from pyharp import MultiBand, AttenuatorOptions
+   from pyharp import MultiBand, OpacityOptions
 
    # create sonora opacity
-   op = AttenuatorOptions().type("multiband-ck")
+   op = OpacityOptions().type("multiband-ck")
    op.opacity_files(["sonora_2020_feh+000_co_100.data.196.pt"])
    op.species_ids([0])
    ab = MultiBand(op)
@@ -175,8 +175,8 @@ Similar to :ref:`Example 1 <example_sonora>`, we set up the opacity class first:
 
 .. code-block:: python
 
-  from pyharp.opacity import AttenuatorOptions, WaveTemp
-  op = AttenuatorOptions().type("wavetemp")
+  from pyharp.opacity import OpacityOptions, WaveTemp
+  op = OpacityOptions().type("wavetemp")
   op.opacity_files(["H2-H2-eq.xiz.pt", "H2-He-eq.xiz.pt"])
   op.fractions([0.9, 0.1])
   op.species_ids([0])
@@ -258,9 +258,9 @@ We use the :class:`pyharp.opacity.JITOpacity` class to load the JIT compiled mod
 
 .. code-block:: python
 
-  from pyharp.opacity import AttenuatorOptions, JITOpacity
+  from pyharp.opacity import OpacityOptions, JITOpacity
 
-  op = AttenuatorOptions().type("jit")
+  op = OpacityOptions().type("jit")
   op.opacity_files(["grey_opacity.pt"])
 
   ab = JITOpacity(op)
@@ -276,7 +276,7 @@ Finally, calculating the opacity is the same as before:
 Summary
 -------
 
-From these examples, we can see that :class:`pyharp.opacity.AttenuatorOptions` is
+From these examples, we can see that :class:`pyharp.opacity.OpacityOptions` is
 the central class that manages the opacity source options.
 This is a general structure of how classes in Pyharp are organized.
 There is always an `Options` class that manages the parameters of a class.

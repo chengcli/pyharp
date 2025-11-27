@@ -8,12 +8,12 @@ from pyharp.sonora import (
         load_sonora_data,
         load_sonora_atm,
         )
-from pyharp.opacity import MultiBand, AttenuatorOptions
+from pyharp.opacity import MultiBand, OpacityOptions
 from matplotlib import pyplot as plt
 
 def setup_sonora_opacity():
     fname = "sonora_2020_feh+000_co_100.data.196.pt"
-    op = AttenuatorOptions().type("multiband-ck")
+    op = OpacityOptions().type("multiband-ck")
     op.opacity_files([fname])
     op.species_ids([0])
     ab = MultiBand(op)
@@ -106,7 +106,7 @@ def plot_opacity(case: str='kcross'):
 
 def test_sonora2020():
     fname = "sonora_2020_feh+000_co_100.data.196.pt"
-    op = AttenuatorOptions().type("multiband-ck")
+    op = OpacityOptions().type("multiband-ck")
     op.opacity_files([fname])
     op.species_ids([0])
 
