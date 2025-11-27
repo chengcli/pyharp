@@ -1,0 +1,369 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Working with the opacity class &mdash; pyharp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=97e5f83b" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Built-in opacity sources" href="builtin_opacities.html" />
+    <link rel="prev" title="Pyharp Documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            pyharp
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with the opacity class</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#example-1-compute-sonora2020-molecular-opacities">Example 1. Compute Sonora2020 molecular opacities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-2-compute-hydrogen-continuum-opacities">Example 2. Compute Hydrogen continuum opacities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-3-add-a-new-opacity">Example 3. Add a new opacity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#summary">Summary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="builtin_opacities.html">Built-in opacity sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="radiation.html">Working with the radiation class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="trouble.html">Troubleshooting</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">pyharp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Working with the opacity class</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/opacity.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="working-with-the-opacity-class">
+<h1>Working with the opacity class<a class="headerlink" href="#working-with-the-opacity-class" title="Link to this heading"></a></h1>
+<p>At the core of Pyharp is the way of managing and using different flavors of opacities.
+We define a distinct opacity source by the file format of the data it uses to compute the
+optical properties. If you have two opacity sources that share the same file format, they
+belong to the same opacity source category (type).</p>
+<p>It is also possible that user supplies a function that can compute and return the optical
+properties without using any data file. See <a class="reference internal" href="#new-opacity"><span class="std std-ref">Example 3. Add a new opacity</span></a> for more details.</p>
+<p>A complete list of built-in opacity types is given in the table below.</p>
+<span id="opacity-choices"></span><table class="docutils align-default" id="id1">
+<caption><span class="caption-text">List of built-in opacity types</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 28.6%" />
+<col style="width: 23.8%" />
+<col style="width: 47.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Key</p></th>
+<th class="head"><p>Format</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>‘jit’</p></td>
+<td><p>‘.pt’ (saved by <code class="xref py py-func docutils literal notranslate"><span class="pre">torch.jit.save</span></code> or <code class="xref py py-func docutils literal notranslate"><span class="pre">pyharp.compile</span></code>)</p></td>
+<td><p>Just-In-Time scripted opacity model</p></td>
+</tr>
+<tr class="row-odd"><td><p>‘rfm-lbl’</p></td>
+<td><p>NetCDF</p></td>
+<td><p>Line-by-line absorption data computed by RFM</p></td>
+</tr>
+<tr class="row-even"><td><p>‘rfm-ck’</p></td>
+<td><p>NetCDF</p></td>
+<td><p>Correlated-k absorption computed from line-by-line data</p></td>
+</tr>
+<tr class="row-odd"><td><p>‘multiband-ck’</p></td>
+<td><p>‘.pt’ (saved by <code class="xref py py-func docutils literal notranslate"><span class="pre">torch.jit.save</span></code>)</p></td>
+<td><p>Three-dimensional correlated-k opacity lookup table. The axis are</p>
+<ol class="arabic simple">
+<li><p>wave-mapped correlated-k axis (gaussian quadrature points),</p></li>
+<li><p>log pressure in [pa], 3) temperature [k]</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-even"><td><p>‘wavetemp’</p></td>
+<td><p>‘.pt’ (saved by <code class="xref py py-func docutils literal notranslate"><span class="pre">torch.jit.save</span></code>)</p></td>
+<td><p>Two-dimensional continuum opacity lookup table. The axis are:</p>
+<ol class="arabic simple">
+<li><p>wavelength [um] or wavenumber [cm^{-1}]</p></li>
+<li><p>temperature [K]</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-odd"><td><p>‘fourcolumn’</p></td>
+<td><p>Ascii</p></td>
+<td><p>One-dimensional opacity lookup table. Each row is a data entry. Four columns are:</p>
+<ol class="arabic simple">
+<li><p>wavelength [um] or wavenumber [cm^{-1}]</p></li>
+<li><p>mass extinction cross-section [m^2/kg]</p></li>
+<li><p>single scattering albedo</p></li>
+<li><p>Henyey-Greenstein asymmetry factor (g)</p></li>
+</ol>
+</td>
+</tr>
+</tbody>
+</table>
+<p>We give a few examples showing how to use these opacity class to load and compute optical properties.</p>
+<section id="example-1-compute-sonora2020-molecular-opacities">
+<span id="example-sonora"></span><h2>Example 1. Compute Sonora2020 molecular opacities<a class="headerlink" href="#example-1-compute-sonora2020-molecular-opacities" title="Link to this heading"></a></h2>
+<p>Make sure you have download the Sonora2020 database using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>fetch-sonora
+</pre></div>
+</div>
+<p>and preprocess the data using:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp.sonora</span> <span class="kn">import</span> <span class="n">load_sonora_data</span>
+<span class="n">fname</span> <span class="o">=</span> <span class="s2">&quot;sonora_2020_feh+000_co_100.data.196&quot;</span>
+
+<span class="c1"># load sonora data into a dictionary</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">load_sonora_data</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+
+<span class="c1"># save it to pt file</span>
+<span class="n">save_sonora_multiband</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">clean</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This will generate a file called
+<code class="docutils literal notranslate"><span class="pre">sonora_2020_feh+000_co_100.data.196.pt</span></code> in the current directory.</p>
+<p>Then, we specify the fileds <code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">opacity_files</span></code>, and <code class="docutils literal notranslate"><span class="pre">species_ids</span></code>
+of the <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.opacity.OpacityOptions</span></code> class.
+<code class="docutils literal notranslate"><span class="pre">species_ids</span></code> is a list of integers that specify the index of the
+dependent species in a multi-dimensional concentration array.
+We will talk about the concentration array later.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp</span> <span class="kn">import</span> <span class="n">MultiBand</span><span class="p">,</span> <span class="n">OpacityOptions</span>
+
+<span class="c1"># create sonora opacity</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">OpacityOptions</span><span class="p">()</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="s2">&quot;multiband-ck&quot;</span><span class="p">)</span>
+<span class="n">op</span><span class="o">.</span><span class="n">opacity_files</span><span class="p">([</span><span class="s2">&quot;sonora_2020_feh+000_co_100.data.196.pt&quot;</span><span class="p">])</span>
+<span class="n">op</span><span class="o">.</span><span class="n">species_ids</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">ab</span> <span class="o">=</span> <span class="n">MultiBand</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Optical properties are usually a function of temperature and pressure.
+We set up an atmosphere grid of temperature and pressure values.
+The opacity class will compute the optical properties for each grid point
+of temperature and pressure.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># set up atmosphere grid</span>
+<span class="n">temp</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">100.0</span><span class="p">,</span> <span class="mf">300.0</span><span class="p">,</span> <span class="mf">600.0</span><span class="p">])</span>
+<span class="n">pres</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.1e5</span><span class="p">,</span> <span class="mf">1.0e5</span><span class="p">,</span> <span class="mf">10.0e5</span><span class="p">,</span> <span class="mf">100.e5</span><span class="p">])</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">temp</span><span class="p">,</span> <span class="n">pres</span><span class="p">,</span> <span class="n">indexing</span><span class="o">=</span><span class="s1">&#39;ij&#39;</span><span class="p">)</span>
+<span class="n">atm</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;temp&#39;</span><span class="p">:</span> <span class="n">X</span><span class="p">,</span> <span class="s1">&#39;pres&#39;</span><span class="p">:</span> <span class="n">Y</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>The shape of <cite>X</cite> and <cite>Y</cite> is (3, 4), which is interpreted as having 3 columns
+and 4 layers.
+We use the convention that the last dimension for the temperature structure
+is layers and the second to last dimension is columns.</p>
+<p>Finally, we call the <code class="xref py py-meth docutils literal notranslate"><span class="pre">forward</span></code> method to compute the optical properties.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conc</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">atm</span><span class="p">[</span><span class="s1">&#39;pres&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">ab</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="n">atm</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The returned <cite>result</cite> is a <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code> with shape (1568, 3, 4, 1).
+Pyharp is strict with the shape of the input and output tensors.
+In this case, the first dimension of the result is the number of spectral grids (1568).
+<code class="xref py py-mod docutils literal notranslate"><span class="pre">pyharp.sonora</span></code> contains a database of 196 bands within each there are 8
+correlated-k gaussian quadrature points. They multiply to 1568.
+The second dimension is the number of columns of atmospheres (3).
+The third dimension is the number of layers in each column (4).
+The last dimension is the number of optical properties in the order of extinction coefficient,
+single scattering albedo, and phase function moments.</p>
+<p>The dimensions of result calculated by the <code class="docutils literal notranslate"><span class="pre">forward</span></code> method of an opacity class will alway be (waves, columns, layers, properties).
+In the example above, the last dimension is degenerate because <code class="xref py py-mod docutils literal notranslate"><span class="pre">pyharp.sonora</span></code> only treats the molecular absorption.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">forward</span></code> method of an opacity class takes two arguments:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">conc</span></code>: a tensor of shape (columns, layers, species), where the last dimension is the number of species.
+When an opacity source depends on the concentrations of species,
+the <code class="docutils literal notranslate"><span class="pre">species_ids</span></code> field supplies the indices of the species and
+the class object retrieves their concentrations from these indices
+mapped in the last dimension. In our case, the dependent species has an index of 0.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">atm</span></code>: a dictionary of tensors that provides auxiliary data to the opacity
+calculation such as temperature and pressure.
+Different opacity classes may require different auxiliary data.
+In the case of molecular absorption, the absorption cross-section depends on temperature (<code class="docutils literal notranslate"><span class="pre">temp</span></code>) and pressure (<code class="docutils literal notranslate"><span class="pre">pres</span></code>).
+Pyharp will panic and throw an error message if the required auxiliary data is not provided.</p></li>
+</ol>
+<p>By choosing different values for the <cite>conc</cite> argument, the <code class="docutils literal notranslate"><span class="pre">forward</span></code> method can be multi-purpose:</p>
+<ol class="arabic simple">
+<li><p>if <cite>conc</cite> is one, the returned <cite>result</cite> is interpreted as the extinction coefficient in m^2/mol</p></li>
+<li><p>if <cite>conc</cite> is concentration in mol/m^3, the return <cite>result</cite> is interpreted as the extinction coefficient in 1/m.
+You can further multiply it by the layer thickness in m to get the optical thickness of the layer.</p></li>
+</ol>
+</section>
+<section id="example-2-compute-hydrogen-continuum-opacities">
+<h2>Example 2. Compute Hydrogen continuum opacities<a class="headerlink" href="#example-2-compute-hydrogen-continuum-opacities" title="Link to this heading"></a></h2>
+<p>Here is another demonstration of computing the hydrogen continuum opacities.
+The data files have been preprocessed and are shipped when you install Pyharp.
+To include them, use:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp</span> <span class="kn">import</span> <span class="n">h2_cia_legacy</span>
+</pre></div>
+</div>
+<p>You can find out the absolute path of the data files using:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp</span> <span class="kn">import</span> <span class="n">find_resource</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">find_resource</span><span class="p">(</span><span class="s2">&quot;H2-H2-eq.xiz.pt&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Similar to <a class="reference internal" href="#example-sonora"><span class="std std-ref">Example 1</span></a>, we set up the opacity class first:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp.opacity</span> <span class="kn">import</span> <span class="n">OpacityOptions</span><span class="p">,</span> <span class="n">WaveTemp</span>
+<span class="n">op</span> <span class="o">=</span> <span class="n">OpacityOptions</span><span class="p">()</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="s2">&quot;wavetemp&quot;</span><span class="p">)</span>
+<span class="n">op</span><span class="o">.</span><span class="n">opacity_files</span><span class="p">([</span><span class="s2">&quot;H2-H2-eq.xiz.pt&quot;</span><span class="p">,</span> <span class="s2">&quot;H2-He-eq.xiz.pt&quot;</span><span class="p">])</span>
+<span class="n">op</span><span class="o">.</span><span class="n">fractions</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
+<span class="n">op</span><span class="o">.</span><span class="n">species_ids</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">ab</span> <span class="o">=</span> <span class="n">WaveTemp</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For this example, hydrogen-hydrogen continuum and hydrogen-helium continuum
+are stored in two separate files. The fractions of the two molecules are 0.9 and 0.1 respectively within the species id 0.</p>
+<p>The continumm absorption is a function of temperature and wavenumber.
+Set these fields up like:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="n">atm</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="s1">&#39;temp&#39;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">100.0</span><span class="p">,</span> <span class="mf">300.0</span><span class="p">,</span> <span class="mf">600.0</span><span class="p">])</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+  <span class="s1">&#39;wavenumber&#39;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="mi">10000</span><span class="p">),</span> <span class="mi">10</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Last, we call the <code class="docutils literal notranslate"><span class="pre">forward</span></code> method to compute the optical properties:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conc</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">atm</span><span class="p">[</span><span class="s1">&#39;temp&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">ab</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="n">atm</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Be aware that we have used the <code class="xref py py-meth docutils literal notranslate"><span class="pre">torch.Tensor.unsqueeze</span></code> method to add back the degenerate dimension.</p>
+</section>
+<section id="example-3-add-a-new-opacity">
+<span id="new-opacity"></span><h2>Example 3. Add a new opacity<a class="headerlink" href="#example-3-add-a-new-opacity" title="Link to this heading"></a></h2>
+<p>One of the most powerful features of Pyharp is the ability to add a new opacity source easily. This is fasciliated by the Just-In-Time (JIT) compilation feature of PyTorch.</p>
+<p>JIT compilation scripts (compiles) a python module and saves the binary code to a file. The saved file can be loaded and used in the same way as the built-in opacity sources.</p>
+<p>The class signature and variable dimensions are strict though.
+The class must have a forward method that takes a concentration tensor and returns an opacity tensor.</p>
+<p>The concentration vector is 3D with dimensions (ncol, nlyr, nspecies), where ncol is the number of columns, nlyr is the number of layers, and nspecies is the number of species.</p>
+<p>The opacity tensor is 4D with dimensions (nwave, ncol, nlyr, nprop), where nwave is the number of wavelengths, ncol is the number of columns, nlyr is the number of layers, and nprop is the number of optical properties.</p>
+<p>The first optical property is the total extinction cross-section [m^2/mol]. The second optical property is the single scattering albedo. Starting from the third, the optical properties are phase function moments (excluding the zero-th moment).</p>
+<p>Let’s define a grey opacity source that has 0.1 m^2/mol cross-section for all wavelengths:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="k">class</span> <span class="nc">GreyOpacity</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nwave</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">nprop</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+      <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">nwave</span> <span class="o">=</span> <span class="n">nwave</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">nprop</span> <span class="o">=</span> <span class="n">nprop</span>
+
+  <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conc</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+      <span class="n">ncol</span><span class="p">,</span> <span class="n">nlyr</span> <span class="o">=</span> <span class="n">conc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">conc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+      <span class="k">return</span> <span class="mf">0.1</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">nwave</span><span class="p">,</span> <span class="n">ncol</span><span class="p">,</span> <span class="n">nlyr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nprop</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We provide the <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.compile</span></code> function that creates a model, scripts it, and saves it to a file:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pyharp</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">GreyOpacity</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;grey_opacity.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This function is equivalent to the following three steps:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">GreyOpacity</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">scripted</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">scripted</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;grey_opacity.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We use the <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.opacity.JITOpacity</span></code> class to load the JIT compiled model from the <code class="docutils literal notranslate"><span class="pre">.pt</span></code> file:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp.opacity</span> <span class="kn">import</span> <span class="n">OpacityOptions</span><span class="p">,</span> <span class="n">JITOpacity</span>
+
+<span class="n">op</span> <span class="o">=</span> <span class="n">OpacityOptions</span><span class="p">()</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="s2">&quot;jit&quot;</span><span class="p">)</span>
+<span class="n">op</span><span class="o">.</span><span class="n">opacity_files</span><span class="p">([</span><span class="s2">&quot;grey_opacity.pt&quot;</span><span class="p">])</span>
+
+<span class="n">ab</span> <span class="o">=</span> <span class="n">JITOpacity</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Finally, calculating the opacity is the same as before:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conc</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">ab</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="p">{})</span>
+</pre></div>
+</div>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading"></a></h2>
+<p>From these examples, we can see that <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.opacity.OpacityOptions</span></code> is
+the central class that manages the opacity source options.
+This is a general structure of how classes in Pyharp are organized.
+There is always an <cite>Options</cite> class that manages the parameters of a class.
+The actual class that does the computation is initialized from the <cite>Options</cite> class.
+All opacity classes within <a class="reference internal" href="opacity_classes.html#opacity-classes"><span class="std std-ref">Opacity Classes</span></a> follow this pattern and <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.RadiationBand</span></code> and <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.Radiation</span></code> classes also follow this pattern.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Pyharp Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="builtin_opacities.html" class="btn btn-neutral float-right" title="Built-in opacity sources" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Cheng Li.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

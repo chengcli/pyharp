@@ -1,0 +1,409 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pyharp Documentation &mdash; pyharp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=97e5f83b" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="_static/copybutton.js?v=f281be69"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Working with the opacity class" href="opacity.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            pyharp
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="opacity.html">Working with the opacity class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="builtin_opacities.html">Built-in opacity sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="radiation.html">Working with the radiation class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="trouble.html">Troubleshooting</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">pyharp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Pyharp Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="pyharp-documentation">
+<h1>Pyharp Documentation<a class="headerlink" href="#pyharp-documentation" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="opacity.html">Working with the opacity class</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="opacity.html#example-1-compute-sonora2020-molecular-opacities">Example 1. Compute Sonora2020 molecular opacities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="opacity.html#example-2-compute-hydrogen-continuum-opacities">Example 2. Compute Hydrogen continuum opacities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="opacity.html#example-3-add-a-new-opacity">Example 3. Add a new opacity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="opacity.html#summary">Summary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="builtin_opacities.html">Built-in opacity sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="builtin_opacities.html#sonora2020-molecular-opacities">Sonora2020 molecular opacities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="builtin_opacities.html#hydrogen-and-helium-continuum">Hydrogen and Helium continuum</a></li>
+<li class="toctree-l2"><a class="reference internal" href="builtin_opacities.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="radiation.html">Working with the radiation class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="global_states.html">Global States</a></li>
+<li class="toctree-l2"><a class="reference internal" href="radiation_classes.html">Radiation Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="opacity_classes.html">Opacity Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="helper_functions.html">Helper Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="trouble.html">Troubleshooting</a></li>
+</ul>
+</div>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p>Pyharp module provides a python interface to the C++ version of the HARP (High-performance Atmospheric Radiation Package) program <a class="footnote-reference brackets" href="#id3" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>.
+It contains a minimum set of classes and subroutines for computing the radiative fluxes and radiances for a plane-parallel atmosphere.
+Pyharp is designed with efficiency – all heavy computations are implemented in C/C++ and wraped with a thin python interface.
+It can be used standalone to compute multi-column radiative transfer or as a module in other larger programs, both in C/C++ and Python.
+Significant changes have been made to the original <a class="reference external" href="https://github.com/luminoctum/athena-harp">HARP</a> code as the backend data structure has changed from <code class="docutils literal notranslate"><span class="pre">Athena</span></code> to <code class="docutils literal notranslate"><span class="pre">PyTorch</span></code>.</p>
+<p>Pyharp treats the radiative transfer problem as layers of computation, akin to a neural network, where the first layer – the input – is the atmospheric state; the second layer is the optical properties, and the final layer – the output – is the radiative fluxes or radiances.
+Each layer is represented by a class, which contains one important method: <code class="docutils literal notranslate"><span class="pre">forward</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">forward</span></code> method takes <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code> data as inputs and also returns <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code> data as outputs. This design allows for chaining multiple layers together to perform a sophisticated computation as well as easy integration with other modules, such as neural networks or JIT (Just-In-Time) compilation.</p>
+<p>Having both input and output as tensors makes the data flow through the layers transparent, mimicking the paradigm of functional programming.</p>
+<p>Automatic differentiation is available when the input tensor has the <code class="xref py py-attr docutils literal notranslate"><span class="pre">torch.Tensor.requires_grad</span></code> attribute set to <code class="docutils literal notranslate"><span class="pre">True</span></code>. This allows for the computation of gradients with respect to the input tensor, which is useful for optimization tasks.</p>
+<p>The following example gives a practical demonstration of how to use the Pyharp module.</p>
+</section>
+<section id="example-of-calculating-the-radiative-fluxes-of-jupiter">
+<h2>Example of calculating the radiative fluxes of Jupiter<a class="headerlink" href="#example-of-calculating-the-radiative-fluxes-of-jupiter" title="Link to this heading"></a></h2>
+<section id="radiation-configuration-file">
+<h3>Radiation configuration file<a class="headerlink" href="#radiation-configuration-file" title="Link to this heading"></a></h3>
+<p>The program starts with writing a radiation configuration file in YAML format.
+Radiative transfer is a physical calculation regarding the interaction of radiation with molecule and matter. We specify the species, their composition and radiation bands in a configuration file that looks like this:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">species</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">H2mix</span>
+<span class="w">    </span><span class="nt">composition</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">H</span><span class="p">:</span><span class="w"> </span><span class="nv">1.9</span><span class="p p-Indicator">,</span><span class="nt"> He</span><span class="p">:</span><span class="w"> </span><span class="nv">0.1</span><span class="p p-Indicator">}</span>
+
+<span class="nt">opacities</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">H2-molecule</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">multiband-ck</span>
+<span class="w">    </span><span class="nt">data</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;sonora_2020_feh+000_co_100.data.196.pt&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">species</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">H2mix</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="nt">H2-continuum</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wavetemp</span>
+<span class="w">    </span><span class="nt">fractions</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0.9</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.1</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">data</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;H2-H2-eq.xiz.pt&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;H2-He-eq.xiz.pt&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">species</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">H2mix</span><span class="p p-Indicator">]</span>
+
+<span class="nt">bands</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sonora196</span><span class="p p-Indicator">]</span>
+
+<span class="nt">sonora196</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">range</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">30.8</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">38300.</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># wavenumber</span>
+<span class="w">  </span><span class="nt">opacities</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">H2-molecule</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">H2-continuum</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">solver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">disort</span>
+<span class="w">  </span><span class="nt">integration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">weight</span>
+<span class="w">  </span><span class="nt">flags</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lamber,quiet,onlyfl,planck</span>
+</pre></div>
+</div>
+<p><cite>YAML</cite> is a human-readable data serialization standard that is commonly used for configuration files.
+The major fields can be specified in numbers, floats, strings, lists and dictionaries.</p>
+<p>In this example, the Pyharp module has one species, <cite>H2mix</cite>, and the atomic composition of it is specified as a dictionary with the key as the name of the atom and the value as its abundance.
+We use this entry to calculate its molecular weight.</p>
+<p>Next, we specify the opacity sources, which are dictionary entries with the name of the opacity source as the key and its properties as the value.
+In this case, we have two opacity sources:</p>
+<ol class="arabic simple">
+<li><p><cite>H2-molecule</cite>, which is a <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.opacity.MultiBand</span></code> molecular opacity source with the data file <cite>sonora_2020_feh+000_co_100.data.196.pt</cite> and the dependent species is <cite>H2mix</cite>. We use these information to retrieve the opacity data from the file and calculate species indices in a tensor data.</p></li>
+<li><p><cite>H2-continuum</cite>, which is a <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.opacity.WaveTemp</span></code> continuum opacity source with the data files <cite>H2-H2-eq.xiz.pt</cite> and <cite>H2-He-eq.xiz.pt</cite> and the dependent species is also <cite>H2mix</cite>. The data files for continuum absorption are shipped with Pyharp package. The following statement loads the data file directory such that Pyharp can find them:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp</span> <span class="kn">import</span> <span class="n">h2_cia_legacy</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Next, we specify the radiation bands, which is a list of band names.
+For each band, a dictionary entry is created with the band name as the key and its properties as the value.</p>
+<p>Each band can have its own spectral range, opacity sources, solver, integration method and flags associated with radiative transfer computation.
+In this example, we have one band, <cite>sonora196</cite>, which has a spectral range of 30.8 to 38300 cm <span class="math notranslate nohighlight">\(^{-1}\)</span>; the opacity sources are <cite>H2-molecule</cite> and <cite>H2-continuum</cite>; the radiative transfer solver is <code class="xref py py-class docutils literal notranslate"><span class="pre">pydisort.Disort</span></code>; the integration method is <code class="docutils literal notranslate"><span class="pre">weight</span></code> (correlated-K); and the flags passed to <code class="xref py py-class docutils literal notranslate"><span class="pre">pydisort.Disort</span></code> are <code class="docutils literal notranslate"><span class="pre">lamber</span></code>, <code class="docutils literal notranslate"><span class="pre">quiet</span></code>, <code class="docutils literal notranslate"><span class="pre">onlyfl</span></code> and <code class="docutils literal notranslate"><span class="pre">planck</span></code>, which assumes lambertian surface, quiet mode, flux-only calculation and activate planck function for the radiation source function respectively.</p>
+<p>Please see the <a class="reference external" href="https://pydisort.readthedocs.io/en/latest/">pydisort</a> documentation for more details on the available options of <code class="xref py py-class docutils literal notranslate"><span class="pre">pydisort.DisortOptions</span></code> and their meanings.</p>
+</section>
+<section id="load-modules">
+<h3>Load modules<a class="headerlink" href="#load-modules" title="Link to this heading"></a></h3>
+<p>Then, we create a python file and load system modules include <code class="xref py py-mod docutils literal notranslate"><span class="pre">torch</span></code>, <code class="xref py py-mod docutils literal notranslate"><span class="pre">numpy</span></code> and <code class="xref py py-mod docutils literal notranslate"><span class="pre">os</span></code>.
+These provide basic data structures and functions for numerical computation and file handling.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+</pre></div>
+</div>
+<p>We will download the <code class="xref py py-mod docutils literal notranslate"><span class="pre">pyharp.sonora</span></code> opacity dataset and preprocess it to a format that can be used by the Pyharp module.
+These are the submodule functions we need.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pyharp.sonora</span> <span class="kn">import</span> <span class="p">(</span>
+        <span class="n">load_sonora_data</span><span class="p">,</span>
+        <span class="n">load_sonora_window</span><span class="p">,</span>
+        <span class="n">save_sonora_multiband</span><span class="p">,</span>
+        <span class="p">)</span>
+</pre></div>
+</div>
+<p>Last, we load Pyharp classes and functions. Pyharp uses a minimal set of classes and functions that are used to configure the radiation model and run the radiative transfer calculation.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pyharp</span>
+<span class="kn">from</span> <span class="nn">pyharp</span> <span class="kn">import</span> <span class="p">(</span>
+        <span class="n">h2_cia_legacy</span><span class="p">,</span>
+        <span class="n">constants</span><span class="p">,</span>
+        <span class="n">RadiationOptions</span><span class="p">,</span>
+        <span class="n">Radiation</span><span class="p">,</span>
+        <span class="n">calc_dz_hypsometric</span><span class="p">,</span>
+        <span class="p">)</span>
+</pre></div>
+</div>
+<p>That’s all you need for the header of the program.</p>
+</section>
+<section id="pre-process-sonora2020-data">
+<h3>Pre-process sonora2020 data<a class="headerlink" href="#pre-process-sonora2020-data" title="Link to this heading"></a></h3>
+<p>The <code class="xref py py-mod docutils literal notranslate"><span class="pre">pyharp.sonora</span></code> data is a large dataset that contains the opacity data for hydrogen and helium atmospheres.
+We first download a sample of it via the script</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>fetch-sonora<span class="w"> </span>--feh<span class="o">=</span>+000<span class="w"> </span>--co<span class="o">=</span><span class="m">100</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">fetch-sonora</span></code> script is a command line tool shipped with Pyharp that downloads the <code class="xref py py-mod docutils literal notranslate"><span class="pre">pyharp.sonora</span></code> data from the Zenodo archive.
+This command will download a file named <cite>sonora_2020_feh+000_co_100.data.196.tar.gz</cite> in the current directory. The <code class="docutils literal notranslate"><span class="pre">feh</span></code> argument specifies the metallicity of the atmosphere and the <code class="docutils literal notranslate"><span class="pre">co</span></code> argument specifies the carbon-to-oxygen ratio (solar).
+You can check out the various options of the <code class="docutils literal notranslate"><span class="pre">fetch-sonora</span></code> script by running</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>fetch-sonora<span class="w"> </span>-h
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">preprocess_sonora</span><span class="p">(</span><span class="n">fname</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="c1"># returns dictionary of data</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">load_sonora_data</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+
+    <span class="c1"># save to &quot;.pt&quot; file</span>
+    <span class="n">save_sonora_multiband</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">clean</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The above code block transforms the downloaded data into a <code class="docutils literal notranslate"><span class="pre">.pt</span></code> file, which is a binary format used by PyTorch for storing tensors and models.</p>
+</section>
+<section id="construct-atmosphere">
+<h3>Construct atmosphere<a class="headerlink" href="#construct-atmosphere" title="Link to this heading"></a></h3>
+<p>The following function constructs a simple atmosphere model with a given pressure and temperature point in the troposphere. It constructs an adiabatic atmosphere with a temperature profile that decreases with height, and an isothermal atmosphere with a constant temperature at a specified value.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">construct_atm</span><span class="p">(</span><span class="n">pmax</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">pmin</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+                  <span class="n">ncol</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+                  <span class="n">nlyr</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+    <span class="n">p1bar</span><span class="p">,</span> <span class="n">T1bar</span><span class="p">,</span> <span class="n">Tmin</span> <span class="o">=</span> <span class="mf">1.e5</span><span class="p">,</span> <span class="mf">169.</span><span class="p">,</span> <span class="mf">135.</span>
+    <span class="n">pres</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">pmax</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">pmin</span><span class="p">),</span> <span class="n">nlyr</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+    <span class="c1"># adibatic</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">T1bar</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="n">pres</span> <span class="o">/</span> <span class="n">p1bar</span><span class="p">,</span> <span class="mf">2.</span> <span class="o">/</span> <span class="mf">7.</span><span class="p">)</span>
+
+    <span class="c1"># isothermal</span>
+    <span class="n">temp</span><span class="o">.</span><span class="n">clip_</span><span class="p">(</span><span class="nb">min</span><span class="o">=</span><span class="n">Tmin</span><span class="p">)</span>
+
+    <span class="n">atm</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;pres&#39;</span> <span class="p">:</span> <span class="p">(</span><span class="n">pres</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">*</span> <span class="n">pres</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">ncol</span><span class="p">,</span> <span class="n">nlyr</span><span class="p">),</span>
+        <span class="s1">&#39;temp&#39;</span> <span class="p">:</span> <span class="p">(</span><span class="n">temp</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">*</span> <span class="n">temp</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">ncol</span><span class="p">,</span> <span class="n">nlyr</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">atm</span>
+</pre></div>
+</div>
+</section>
+<section id="configure-radiation-bands">
+<h3>Configure radiation bands<a class="headerlink" href="#configure-radiation-bands" title="Link to this heading"></a></h3>
+<p>This function is where we configure the entire radiation model.
+Pyharp allows for multiple bands to be configured in a single radiation model.
+So, generally, we need to loop over the bands and configure them one by one.</p>
+<p>There is no rule for dividing or defining the bands. However, each band must have the same number of spectral points, absorbers, radiation flags and opacity sources.
+The radiative transfer calculation is computed in parallel for every spectral point within each band, but sequentially over bands. So, there is a performance penalty when the number of bands is too large.</p>
+<p>Since the <code class="xref py py-mod docutils literal notranslate"><span class="pre">pyharp.sonora</span></code> dataset is homogeneous despite that it contains opacities for 196 wavenumber bands, we can group all of them in a single band, <cite>sonora196</cite>, with two opacity sources, <cite>H2-molecule</cite>, that is of type <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.opacity.MultiBand</span></code> and <cite>H2-continuum</cite>, that is of type <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.opacity.WaveTemp</span></code>.
+This improves the computational efficiency as the 196 radiative transfer calculations are performed in parallel.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">configure_bands</span><span class="p">(</span><span class="n">config_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                    <span class="n">ncol</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+                    <span class="n">nlyr</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+                    <span class="n">nstr</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Radiation</span><span class="p">:</span>
+    <span class="n">rad_op</span> <span class="o">=</span> <span class="n">RadiationOptions</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+    <span class="n">wmin</span><span class="p">,</span> <span class="n">wmax</span> <span class="o">=</span> <span class="n">load_sonora_window</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">band</span> <span class="ow">in</span> <span class="n">rad_op</span><span class="o">.</span><span class="n">bands</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">band</span><span class="o">.</span><span class="n">name</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;sonora196&quot;</span><span class="p">:</span>
+            <span class="c1"># Query wavenumber and weight from the opacity source</span>
+            <span class="n">op</span> <span class="o">=</span> <span class="n">band</span><span class="o">.</span><span class="n">opacities</span><span class="p">()[</span><span class="s2">&quot;H2-molecule&quot;</span><span class="p">]</span>
+            <span class="n">band</span><span class="o">.</span><span class="n">wavenumber</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">query_wavenumber</span><span class="p">()))</span>
+            <span class="n">band</span><span class="o">.</span><span class="n">weight</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">query_weight</span><span class="p">()))</span>
+            <span class="n">nwave</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">band</span><span class="o">.</span><span class="n">wavenumber</span><span class="p">())</span>
+            <span class="n">ng</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">nwave</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">wmin</span><span class="p">))</span>
+
+            <span class="n">band</span><span class="o">.</span><span class="n">disort</span><span class="p">()</span><span class="o">.</span><span class="n">accur</span><span class="p">(</span><span class="mf">1.0e-4</span><span class="p">)</span>
+
+            <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">wmin</span><span class="p">]</span> <span class="o">*</span> <span class="n">ng</span>
+            <span class="n">band</span><span class="o">.</span><span class="n">disort</span><span class="p">()</span><span class="o">.</span><span class="n">wave_lower</span><span class="p">([</span><span class="n">x</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">data</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">col</span><span class="p">])</span>
+
+            <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">wmax</span><span class="p">]</span> <span class="o">*</span> <span class="n">ng</span>
+            <span class="n">band</span><span class="o">.</span><span class="n">disort</span><span class="p">()</span><span class="o">.</span><span class="n">wave_upper</span><span class="p">([</span><span class="n">x</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">data</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">col</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown band: </span><span class="si">{</span><span class="n">band</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">Radiation</span><span class="p">(</span><span class="n">rad_op</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="run-radiative-transfer">
+<h3>Run radiative transfer<a class="headerlink" href="#run-radiative-transfer" title="Link to this heading"></a></h3>
+<p>The last step is to run the radiative transfer model.
+The crucial part of the code is to define the boundary conditions, <cite>bc</cite>, of the radiative transfer equations.
+Specifically, we need to define the albedo, emissivity, temperature of the surfaces bounding the atmosphere.
+Some boundary conditions are band-dependent, which is reflected in the keys of the <cite>bc</cite> dictionary.
+Others are band-independent, such as the temperature of the surface and the top of the atmosphere.</p>
+<p>Here comes the <code class="docutils literal notranslate"><span class="pre">forward</span></code> method of <code class="xref py py-class docutils literal notranslate"><span class="pre">pyharp.Radiation</span></code>, which takes the concentration (in mol m <span class="math notranslate nohighlight">\(^{-3}\)</span>), layer thickness (in m), boundary conditions and atmospheric state (pressure in pa and temperature in K) as inputs and returns the radiative fluxes.</p>
+<p>Throughout the Pyharp code, we will be using SI units unless otherwise specified.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">run_rt</span><span class="p">(</span><span class="n">rad</span><span class="p">:</span> <span class="n">Radiation</span><span class="p">,</span> <span class="n">conc</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">dz</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+           <span class="n">atm</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+    <span class="n">ncol</span> <span class="o">=</span> <span class="n">conc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">bc</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">band</span> <span class="ow">in</span> <span class="n">rad</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">bands</span><span class="p">():</span>
+        <span class="n">nwave</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">band</span><span class="o">.</span><span class="n">wavenumber</span><span class="p">())</span>
+        <span class="n">bc</span><span class="p">[</span><span class="n">band</span><span class="o">.</span><span class="n">name</span><span class="p">()</span> <span class="o">+</span> <span class="s2">&quot;/albedo&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">nwave</span><span class="p">,</span> <span class="n">ncol</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">bc</span><span class="p">[</span><span class="n">band</span><span class="o">.</span><span class="n">name</span><span class="p">()</span> <span class="o">+</span> <span class="s2">&quot;/temis&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">nwave</span><span class="p">,</span> <span class="n">ncol</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+    <span class="n">bc</span><span class="p">[</span><span class="s2">&quot;btemp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ncol</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="n">bc</span><span class="p">[</span><span class="s2">&quot;ttemp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ncol</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">rad</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">conc</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">bc</span><span class="p">,</span> <span class="n">atm</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="the-main-program">
+<h3>The main program<a class="headerlink" href="#the-main-program" title="Link to this heading"></a></h3>
+<p>This is the main program that calls the above functions and runs the radiative transfer model.
+The <code class="docutils literal notranslate"><span class="pre">run_rt</span></code> function produces three radiative fluxes:</p>
+<ol class="arabic simple">
+<li><p>net flux at each atmospheric layer</p></li>
+<li><p>downward flux to the surface</p></li>
+<li><p>upward flux at the top of the atmosphere</p></li>
+</ol>
+<p>The first two fluxes are important for forcing the atmospheric circulation and the
+coupling between the atmosphere and the surface, while the last one is important for the
+energy balance of the planet.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># prepare sonora2020 opacity data</span>
+    <span class="n">fname</span> <span class="o">=</span> <span class="s2">&quot;sonora_2020_feh+000_co_100.data.196&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">fname</span> <span class="o">+</span> <span class="s2">&quot;.pt&quot;</span><span class="p">):</span>
+        <span class="n">preprocess_sonora</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+
+    <span class="c1"># configure atmosphere model</span>
+    <span class="n">atm</span> <span class="o">=</span> <span class="n">construct_atm</span><span class="p">(</span><span class="mf">100.e5</span><span class="p">,</span> <span class="mf">10.</span><span class="p">,</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">nlyr</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+
+    <span class="c1"># configure radiation model</span>
+    <span class="n">config_file</span> <span class="o">=</span> <span class="s2">&quot;example_sonora_2020.yaml&quot;</span>
+    <span class="n">rad</span> <span class="o">=</span> <span class="n">configure_bands</span><span class="p">(</span><span class="n">config_file</span><span class="p">,</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                          <span class="n">nlyr</span><span class="o">=</span><span class="n">atm</span><span class="p">[</span><span class="s1">&#39;pres&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">nstr</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">rad</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+
+    <span class="c1"># calculate concentration and layer thickness</span>
+    <span class="n">mean_mol_weight</span> <span class="o">=</span> <span class="n">pyharp</span><span class="o">.</span><span class="n">species_weights</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;mean mol weight = &quot;</span><span class="p">,</span> <span class="n">mean_mol_weight</span><span class="p">)</span>
+    <span class="n">grav</span> <span class="o">=</span> <span class="mf">24.8</span> <span class="c1"># m/s^2</span>
+    <span class="n">dz</span> <span class="o">=</span> <span class="n">calc_dz_hypsometric</span><span class="p">(</span><span class="n">atm</span><span class="p">[</span><span class="s2">&quot;pres&quot;</span><span class="p">],</span> <span class="n">atm</span><span class="p">[</span><span class="s2">&quot;temp&quot;</span><span class="p">],</span>
+                             <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">mean_mol_weight</span> <span class="o">*</span> <span class="n">grav</span> <span class="o">/</span> <span class="n">constants</span><span class="o">.</span><span class="n">Rgas</span><span class="p">)</span>
+                             <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;dz = &quot;</span><span class="p">,</span> <span class="n">dz</span><span class="p">)</span>
+    <span class="n">conc</span> <span class="o">=</span> <span class="n">atm</span><span class="p">[</span><span class="s2">&quot;pres&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">atm</span><span class="p">[</span><span class="s2">&quot;temp&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">constants</span><span class="o">.</span><span class="n">Rgas</span><span class="p">)</span>
+    <span class="n">conc</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># run rt</span>
+    <span class="n">netflux</span><span class="p">,</span> <span class="n">dnflux</span><span class="p">,</span> <span class="n">upflux</span> <span class="o">=</span> <span class="n">run_rt</span><span class="p">(</span><span class="n">rad</span><span class="p">,</span> <span class="n">conc</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">atm</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;netflux = &quot;</span><span class="p">,</span> <span class="n">netflux</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;surface flux = &quot;</span><span class="p">,</span> <span class="n">dnflux</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;toa flux = &quot;</span><span class="p">,</span> <span class="n">upflux</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The complete python code can be downloaded from this <a class="reference external" href="_static/example_sonora_2020_flux.py">link</a> and the yaml configuration file from this <a class="reference external" href="_static/example_sonora_2020.yaml">link</a>.</p>
+</section>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id3" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Li, C., Le, T., Zhang, X., &amp; Yung, Y. L. (2018). A high-performance atmospheric radiation package: With applications to the radiative energy budgets of giant planets. Journal of Quantitative Spectroscopy and Radiative Transfer, 217, 353-362.</p>
+</aside>
+</aside>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="opacity.html" class="btn btn-neutral float-right" title="Working with the opacity class" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Cheng Li.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
