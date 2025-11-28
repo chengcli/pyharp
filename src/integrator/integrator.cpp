@@ -94,7 +94,8 @@ bool IntegratorImpl::stop(int steps, double current_time) {
 torch::Tensor IntegratorImpl::forward(int s, torch::Tensor u0, torch::Tensor u1,
                                       torch::Tensor u2) {
   if (s < 0 || s >= stages.size()) {
-    throw std::runtime_error("Invalid stage");
+    throw std::runtime_error("Invalid stage: s = " + std::to_string(s) +
+                             ", valid range = [0, " + std::to_string(stages.size()) + ")");
   }
 
   auto out = torch::empty_like(u0);
