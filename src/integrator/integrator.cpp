@@ -71,7 +71,8 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[3].wght1(1.);
     stages[3].wght2(1. / 2.);
   } else {
-    throw std::runtime_error("Integrator not implemented: requested type '" + options->type() + "'");
+    throw std::runtime_error("Integrator not implemented: requested type '" +
+                             options->type() + "'");
   }
 
   reset();
@@ -95,7 +96,8 @@ torch::Tensor IntegratorImpl::forward(int s, torch::Tensor u0, torch::Tensor u1,
                                       torch::Tensor u2) {
   if (s < 0 || s >= stages.size()) {
     throw std::runtime_error("Invalid stage: s = " + std::to_string(s) +
-                             ", valid range = [0, " + std::to_string(stages.size()) + ")");
+                             ", valid range = [0, " +
+                             std::to_string(stages.size()) + ")");
   }
 
   auto out = torch::empty_like(u0);
