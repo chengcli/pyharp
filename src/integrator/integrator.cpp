@@ -71,7 +71,7 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[3].wght1(1.);
     stages[3].wght2(1. / 2.);
   } else {
-    throw std::runtime_error("Integrator not implemented");
+    throw std::runtime_error("Integrator not implemented: requested type '" + options->type() + "'");
   }
 
   reset();
