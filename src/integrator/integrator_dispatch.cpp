@@ -13,7 +13,7 @@ void call_average3_cpu(at::TensorIterator& iter, double w1, double w2,
                        double w3) {
   int grain_size = iter.numel() / at::get_num_threads();
 
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_averag3_cpu", [&] {
+  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_average3_cpu", [&] {
     at::native::cpu_kernel(
         iter,
         [&](scalar_t in1, scalar_t in2, scalar_t in3) -> scalar_t {
