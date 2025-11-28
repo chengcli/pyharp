@@ -26,7 +26,7 @@ class WaveTempImpl : public torch::nn::Cloneable<WaveTempImpl> {
   OpacityOptions options;
 
   //! Constructor to initialize the layer
-  WaveTempImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  WaveTempImpl() : options(OpacityOptionsImpl::create()) {}
   explicit WaveTempImpl(OpacityOptions const& options_);
   void reset() override;
 

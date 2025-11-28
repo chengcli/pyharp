@@ -1,23 +1,37 @@
+// yaml
+#include <yaml-cpp/yaml.h>
+
 // harp
 #include "integrator.hpp"
-
-#include "integrator_formatter.hpp"
+#include "integrator_dispatch.hpp"
 
 namespace harp {
 
-void call_average3_cpu(at::TensorIterator& iter, double w1, double w2,
-                       double w3);
-void call_average3_cuda(at::TensorIterator& iter, double w1, double w2,
-                        double w3);
+IntegratorOptions IntegratorOptionsImpl::from_yaml(
+    std::string const& filename) {
+  auto op = IntegratorOptionsImpl::create();
+
+  auto config = YAML::LoadFile(filename);
+  if (!config["integration"]) return op;
+
+  op->type() = config["integration"]["type"].as<std::string>("rk3");
+  op->cfl() = config["integration"]["cfl"].as<double>(0.9);
+  op->tlim() = config["integration"]["tlim"].as<double>(1.e9);
+  op->nlim() = config["integration"]["nlim"].as<int>(-1);
+  op->ncycle_out() = config["integration"]["ncycle_out"].as<int>(1);
+  op->restart() = config["integration"]["restart"].as<std::string>("");
+
+  return op;
+}
 
 IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
-    : options(options_) {
-  if (options.type() == "rk1" || options.type() == "euler") {
+    : options(options_), current_redo(0) {
+  if (options->type() == "rk1" || options->type() == "euler") {
     stages.resize(1);
     stages[0].wght0(0.0);
     stages[0].wght1(1.0);
     stages[0].wght2(1.0);
-  } else if (options.type() == "rk2") {
+  } else if (options->type() == "rk2") {
     stages.resize(2);
     stages[0].wght0(0.0);
     stages[0].wght1(1.0);
@@ -26,7 +40,7 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[1].wght0(0.5);
     stages[1].wght1(0.5);
     stages[1].wght2(0.5);
-  } else if (options.type() == "rk3") {
+  } else if (options->type() == "rk3") {
     stages.resize(3);
     stages[0].wght0(0.0);
     stages[0].wght1(1.0);
@@ -39,7 +53,7 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[2].wght0(1. / 3.);
     stages[2].wght1(2. / 3.);
     stages[2].wght2(2. / 3.);
-  } else if (options.type() == "rk3s4") {
+  } else if (options->type() == "rk3s4") {
     stages.resize(4);
     stages[0].wght0(0.5);
     stages[0].wght1(0.5);
@@ -57,16 +71,33 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[3].wght1(1.);
     stages[3].wght2(1. / 2.);
   } else {
-    TORCH_CHECK(false, "Integrator type not implemented: ", options.type());
+    throw std::runtime_error("Integrator not implemented: requested type '" +
+                             options->type() + "'");
   }
 
   reset();
 }
 
+void IntegratorImpl::reset() {}
+
+bool IntegratorImpl::stop(int steps, double current_time) {
+  if (options->nlim() >= 0 && steps >= options->nlim()) {
+    return true;  // stop if number of steps exceeds nlim
+  }
+
+  if (options->tlim() >= 0 && current_time >= options->tlim()) {
+    return true;  // stop if time exceeds tlim
+  }
+
+  return false;  // otherwise, continue integration
+}
+
 torch::Tensor IntegratorImpl::forward(int s, torch::Tensor u0, torch::Tensor u1,
                                       torch::Tensor u2) {
   if (s < 0 || s >= stages.size()) {
-    TORCH_CHECK(false, "Invalid stage: ", s);
+    throw std::runtime_error("Invalid stage: s = " + std::to_string(s) +
+                             ", valid range = [0, " +
+                             std::to_string(stages.size()) + ")");
   }
 
   auto out = torch::empty_like(u0);
@@ -77,17 +108,8 @@ torch::Tensor IntegratorImpl::forward(int s, torch::Tensor u0, torch::Tensor u1,
                   .add_input(u2)
                   .build();
 
-  if (u0.is_cpu()) {
-    call_average3_cpu(iter, stages[s].wght0(), stages[s].wght1(),
-                      stages[s].wght2());
-  } else if (u0.is_cuda()) {
-    TORCH_CHECK(false, "CUDA not implemented yet. Please use CPU for now.");
-    // call_average3_cuda(iter, stages[s].wght0(), stages[s].wght1(),
-    //                    stages[s].wght2());
-  } else {
-    return stages[s].wght0() * u0 + stages[s].wght1() * u1 +
-           stages[s].wght2() * u2;
-  }
+  at::native::call_average3(out.device().type(), iter, stages[s].wght0(),
+                            stages[s].wght1(), stages[s].wght2());
 
   return out;
 }

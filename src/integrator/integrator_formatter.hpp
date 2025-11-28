@@ -1,5 +1,8 @@
 #pragma once
 
+// C/C++
+#include <sstream>
+
 // fmt
 #include <fmt/format.h>
 
@@ -13,7 +16,7 @@ struct fmt::formatter<harp::IntegratorWeight> {
 
   // Define the format function for IntegratorOptions
   template <typename FormatContext>
-  auto format(const harp::IntegratorWeight& p, FormatContext& ctx) {
+  auto format(const harp::IntegratorWeight& p, FormatContext& ctx) const {
     return fmt::format_to(ctx.out(), "({}, {}, {})", p.wght0(), p.wght1(),
                           p.wght2());
   }
@@ -26,7 +29,9 @@ struct fmt::formatter<harp::IntegratorOptions> {
 
   // Define the format function for IntegratorOptions
   template <typename FormatContext>
-  auto format(const harp::IntegratorOptions& p, FormatContext& ctx) {
-    return fmt::format_to(ctx.out(), "(type = {})", p.type());
+  auto format(const harp::IntegratorOptions& p, FormatContext& ctx) const {
+    std::stringstream ss;
+    p->report(ss);
+    return fmt::format_to(ctx.out(), "{}", ss.str());
   }
 };

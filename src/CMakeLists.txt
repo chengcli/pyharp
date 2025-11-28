@@ -61,6 +61,33 @@ target_link_libraries(${namel}_${buildl}
 
 add_library(pyharp::harp ALIAS ${namel}_${buildl})
 
+# CUDA source codes
+if (CUDAToolkit_FOUND)
+  file(GLOB cu_src_files
+      integrator/*.cu
+      )
+
+  add_library(${namel}_cuda_${buildl}
+      SHARED
+      ${cu_src_files}
+      )
+
+  set_target_properties(${namel}_cuda_${buildl}
+      PROPERTIES
+      CUDA_SEPARABLE_COMPILATION ON
+      )
+
+  target_link_libraries(${namel}_cuda_${buildl}
+      PUBLIC
+      CUDA::cudart
+      CUDA::cudart_static
+      ${TORCH_CUDA_LIBRARY}
+      ${C10_CUDA_LIBRARY}
+      )
+
+  add_library(pyharp::harp_cu ALIAS ${namel}_cuda_${buildl})
+endif()
+
 set(HARP_INCLUDE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}/.."
   CACHE INTERNAL "harp include directory")

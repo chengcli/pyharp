@@ -30,7 +30,7 @@ class RFMImpl : public torch::nn::Cloneable<RFMImpl> {
   OpacityOptions options;
 
   //! Constructor to initialize the layer
-  RFMImpl() { options = std::make_shared<OpacityOptionsImpl>(); }
+  RFMImpl() : options(OpacityOptionsImpl::create()) {}
   explicit RFMImpl(OpacityOptions const& options_);
   void reset() override;
 
