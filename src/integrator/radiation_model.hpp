@@ -16,7 +16,11 @@
 
 namespace harp {
 
-struct RadiationModelOptions {
+struct RadiationModelOptionsImpl {
+  static std::shared_ptr<RadiationModelOptionsImpl> create() {
+    return std::make_shared<RadiationModelOptionsImpl>();
+  }
+
   ADD_ARG(int, ncol) = 1;                    //! number of columns
   ADD_ARG(int, nlyr) = 1;                    //! number of layers
   ADD_ARG(double, grav) = 3.711;             //! m/s^2
@@ -29,6 +33,7 @@ struct RadiationModelOptions {
   ADD_ARG(RadiationOptions, rad);  //! radiation model options
   ADD_ARG(IntegratorOptions, intg);  //! integrator options
 };
+using RadiationModelOptions = std::shared_ptr<RadiationModelOptionsImpl>;
 
 class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
  public:
@@ -43,7 +48,7 @@ class RadiationModelImpl : public torch::nn::Cloneable<RadiationModelImpl> {
   Radiation prad = nullptr;
 
   //! Constructor to initialize the layers
-  RadiationModelImpl() = default;
+  RadiationModelImpl() : options(RadiationModelOptionsImpl::create()) {}
   explicit RadiationModelImpl(RadiationModelOptions const& options_);
   void reset() override;
 

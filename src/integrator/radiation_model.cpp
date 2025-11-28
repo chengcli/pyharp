@@ -16,22 +16,22 @@ RadiationModelImpl::RadiationModelImpl(RadiationModelOptions const& options_)
 
 void RadiationModelImpl::reset() {
   // set up integrator
-  pintg = register_module("intg", Integrator(options.intg()));
+  pintg = register_module("intg", Integrator(options->intg()));
 
   // set up radiation model
-  prad = register_module("rad", Radiation(options.rad()));
+  prad = register_module("rad", Radiation(options->rad()));
 
   // set up stage registers
   atemp0_ = register_buffer(
       "atemp0",
-      torch::zeros({options.ncol(), options.nlyr()}, torch::kFloat64));
+      torch::zeros({options->ncol(), options->nlyr()}, torch::kFloat64));
   atemp1_ = register_buffer(
       "atemp1",
-      torch::zeros({options.ncol(), options.nlyr()}, torch::kFloat64));
+      torch::zeros({options->ncol(), options->nlyr()}, torch::kFloat64));
   btemp0_ = register_buffer("btemp0",
-                            torch::zeros({options.ncol()}, torch::kFloat64));
+                            torch::zeros({options->ncol()}, torch::kFloat64));
   btemp1_ = register_buffer("btemp1",
-                            torch::zeros({options.ncol()}, torch::kFloat64));
+                            torch::zeros({options->ncol()}, torch::kFloat64));
 }
 
 int RadiationModelImpl::forward(torch::Tensor xfrac,
@@ -48,8 +48,8 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
 
   auto dz =
       calc_dz_hypsometric(atm["pres"], atm["temp"],
-                          torch::tensor({options.mean_mol_weight() *
-                                         options.grav() / constants::Rgas}));
+                          torch::tensor({options->mean_mol_weight() *
+                                         options->grav() / constants::Rgas}));
 
   // -------- (2) run one time step --------
   auto conc = xfrac.clone();
@@ -57,7 +57,7 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
       atm["pres"].unsqueeze(-1) / (constants::Rgas * atm["temp"].unsqueeze(-1));
 
   // aerosols
-  conc.narrow(-1, 3, 2) *= options.aero_scale() * atm["pres"].unsqueeze(-1) /
+  conc.narrow(-1, 3, 2) *= options->aero_scale() * atm["pres"].unsqueeze(-1) /
                            (constants::Rgas * atm["temp"].unsqueeze(-1));
 
   auto [netflux, dnflux, upflux] = prad->forward(conc, dz, &bc, &atm);
@@ -68,19 +68,19 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
   auto vec = atm["temp"].sizes().vec();
   vec.back() += 1;
   auto dTdz = torch::zeros(vec, atm["temp"].options());
-  dTdz.narrow(-1, 1, options.nlyr() - 1) =
+  dTdz.narrow(-1, 1, options->nlyr() - 1) =
       2. *
-      (atm["temp"].narrow(-1, 1, options.nlyr() - 1) -
-       atm["temp"].narrow(-1, 0, options.nlyr() - 1)) /
-      (dz.narrow(-1, 1, options.nlyr() - 1) +
-       dz.narrow(-1, 0, options.nlyr() - 1));
+      (atm["temp"].narrow(-1, 1, options->nlyr() - 1) -
+       atm["temp"].narrow(-1, 0, options->nlyr() - 1)) /
+      (dz.narrow(-1, 1, options->nlyr() - 1) +
+       dz.narrow(-1, 0, options->nlyr() - 1));
 
   auto surf_forcing = dnflux - constants::stefanBoltzmann * bc["btemp"].pow(4);
-  auto dT_surf = surf_forcing * (dt / options.cSurf());
+  auto dT_surf = surf_forcing * (dt / options->cSurf());
   results["dT_surf"] = dT_surf;
 
   // unit = [kg/m^3]
-  auto rho = (atm["pres"] * options.mean_mol_weight()) /
+  auto rho = (atm["pres"] * options->mean_mol_weight()) /
              (constants::Rgas * atm["temp"]);
 
   // density at levels
@@ -89,14 +89,14 @@ int RadiationModelImpl::forward(torch::Tensor xfrac,
   auto rhoh = layer2level(dz, rho.log(), l2l).exp();
 
   // thermal diffusion flux
-  auto thermal_flux = -options.kappa() * rhoh * options.cp() * dTdz;
+  auto thermal_flux = -options->kappa() * rhoh * options->cp() * dTdz;
   results["thermal_diffusion_flux"] = thermal_flux;
 
-  auto dT_atm = -dt / (rho * options.cp() * dz) *
-                (netflux.narrow(-1, 1, options.nlyr()) +
-                 thermal_flux.narrow(-1, 1, options.nlyr()) -
-                 netflux.narrow(-1, 0, options.nlyr()) -
-                 thermal_flux.narrow(-1, 0, options.nlyr()));
+  auto dT_atm = -dt / (rho * options->cp() * dz) *
+                (netflux.narrow(-1, 1, options->nlyr()) +
+                 thermal_flux.narrow(-1, 1, options->nlyr()) -
+                 netflux.narrow(-1, 0, options->nlyr()) -
+                 thermal_flux.narrow(-1, 0, options->nlyr()));
   results["dT_atm"] = dT_atm;
 
   // -------- (3) multi-stage averaging --------

@@ -6,11 +6,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_EXAMPLES "Build examples" OFF)
+option(CUDA "Enable CUDA support" OFF)
 option(NETCDF "Build with netcdf support" ON)
 
 project(pyharp
   LANGUAGES CXX C
   DESCRIPTION "library for radiative transfer in planetary atmospheres")
+
+# Try to enable CUDA
+if (CUDA)
+  enable_language(CUDA)
+endif()
 
 # search for <Package>_ROOT
 cmake_policy(SET CMP0074 NEW)
@@ -33,12 +39,6 @@ add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${_ABI_OUTPUT})
 
 # Set MacOS deployment target
 set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
-
-# Specify the CUDA toolkit location if necessary
-#set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-12.0)
-set(CMAKE_CUDA_ARCHITECTURES 61 86 89)
-set(CMAKE_CUDA_STANDARD 17)
-set(BUILD_SHARED_LIBS OFF)
 
 # make colorful output
 string(ASCII 27 Esc)
@@ -88,12 +88,23 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gtest.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/yamlpp.cmake)
 #include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/pydisort.cmake)
 
+if (CMAKE_CUDA_COMPILER)
+  find_package(CUDAToolkit REQUIRED)
+else()
+  set(CUDAToolkit_FOUND OFF)
+endif()
+
+if (CUDAToolkit_FOUND)
+  set(CMAKE_CUDA_ARCHITECTURES 61 86 89)
+  set(CMAKE_CUDA_STANDARD 17)
+endif()
+
 message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up project libraries ...${ColorReset}")
 configure_file(${CMAKE_SOURCE_DIR}/configure.h.in configure.h @ONLY)
 add_subdirectory(src)
 
-message(STATUS "${Blue}${PROJECT_NAME}-5. Setting up unit tests ...${ColorReset}")
 if (BUILD_TESTS)
+  message(STATUS "${Blue}${PROJECT_NAME}-5. Setting up unit tests ...${ColorReset}")
   add_subdirectory(tests)
 endif()
 
