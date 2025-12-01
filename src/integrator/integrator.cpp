@@ -7,20 +7,27 @@
 
 namespace harp {
 
-IntegratorOptions IntegratorOptionsImpl::from_yaml(
-    std::string const& filename) {
+IntegratorOptions IntegratorOptionsImpl::from_yaml(std::string const& filename,
+                                                   bool verbose) {
   auto op = IntegratorOptionsImpl::create();
+  op->verbose() = verbose;
 
   auto config = YAML::LoadFile(filename);
   if (!config["integration"]) return op;
+  return from_yaml(config["integration"], verbose);
+}
 
-  op->type() = config["integration"]["type"].as<std::string>("rk3");
-  op->cfl() = config["integration"]["cfl"].as<double>(0.9);
-  op->tlim() = config["integration"]["tlim"].as<double>(1.e9);
-  op->nlim() = config["integration"]["nlim"].as<int>(-1);
-  op->ncycle_out() = config["integration"]["ncycle_out"].as<int>(1);
-  op->restart() = config["integration"]["restart"].as<std::string>("");
+IntegratorOptions IntegratorOptionsImpl::from_yaml(YAML::Node const& node,
+                                                   bool verbose) {
+  auto op = IntegratorOptionsImpl::create();
 
+  op->type() = node["type"].as<std::string>("rk3");
+  op->cfl() = node["cfl"].as<double>(0.9);
+  op->tlim() = node["tlim"].as<double>(1.e9);
+  op->nlim() = node["nlim"].as<int>(-1);
+  op->ncycle_out() = node["ncycle_out"].as<int>(1);
+  op->restart() = node["restart"].as<std::string>("");
+  op->verbose() = node["verbose"].as<bool>(verbose);
   return op;
 }
 
@@ -100,7 +107,7 @@ torch::Tensor IntegratorImpl::forward(int s, torch::Tensor u0, torch::Tensor u1,
                              std::to_string(stages.size()) + ")");
   }
 
-  auto out = torch::empty_like(u0);
+  /*auto out = torch::empty_like(u0);
   auto iter = at::TensorIteratorConfig()
                   .add_output(out)
                   .add_input(u0)
@@ -109,8 +116,18 @@ torch::Tensor IntegratorImpl::forward(int s, torch::Tensor u0, torch::Tensor u1,
                   .build();
 
   at::native::call_average3(out.device().type(), iter, stages[s].wght0(),
-                            stages[s].wght1(), stages[s].wght2());
-
+                            stages[s].wght1(), stages[s].wght2());*/
+  auto out =
+      stages[s].wght0() * u0 + stages[s].wght1() * u1 + stages[s].wght2() * u2;
   return out;
 }
+
+std::shared_ptr<IntegratorImpl> IntegratorImpl::create(
+    IntegratorOptions const& opts, torch::nn::Module* p,
+    std::string const& name) {
+  TORCH_CHECK(p, "[Integrator] Parent module is null");
+  TORCH_CHECK(opts, "[Integrator] Options pointer is null");
+  return p->register_module(name, Integrator(opts));
+}
+
 }  // namespace harp

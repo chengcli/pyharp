@@ -12,6 +12,10 @@
 // according to:
 // https://gkeyll.readthedocs.io/en/latest/dev/ssp-rk.html
 
+namespace YAML {
+class Node;
+}  // namespace YAML
+
 namespace harp {
 struct IntegratorWeight {
   void report(std::ostream& os) const {
@@ -29,7 +33,9 @@ struct IntegratorOptionsImpl {
     return std::make_shared<IntegratorOptionsImpl>();
   }
   static std::shared_ptr<IntegratorOptionsImpl> from_yaml(
-      std::string const& filename);
+      std::string const& filename, bool verbose = false);
+  static std::shared_ptr<IntegratorOptionsImpl> from_yaml(
+      YAML::Node const& node, bool verbose = false);
 
   void report(std::ostream& os) const {
     os << "* type = " << type() << "\n"
@@ -38,6 +44,7 @@ struct IntegratorOptionsImpl {
        << "* nlim = " << nlim() << "\n"
        << "* ncycle_out = " << ncycle_out() << "\n"
        << "* max_redo = " << max_redo() << "\n"
+       << "* verbose = " << verbose() << "\n"
        << "* restart = " << restart() << "\n";
   }
 
@@ -47,12 +54,27 @@ struct IntegratorOptionsImpl {
   ADD_ARG(int, nlim) = -1;
   ADD_ARG(int, ncycle_out) = 1;
   ADD_ARG(int, max_redo) = 5;
+  ADD_ARG(bool, verbose) = false;
   ADD_ARG(std::string, restart) = "";
 };
 using IntegratorOptions = std::shared_ptr<IntegratorOptionsImpl>;
 
 class IntegratorImpl : public torch::nn::Cloneable<IntegratorImpl> {
  public:
+  //! Create and register an `Integrator` module
+  /*!
+   * This function registers the created module as a submodule
+   * of the given parent module `p`.
+   *
+   * \param[in] opts  options for creating the `Integrator` module
+   * \param[in] p     parent module for registering the created module
+   * \param[in] name  name for registering the created module
+   * \return          created `Integrator` module
+   */
+  static std::shared_ptr<IntegratorImpl> create(
+      IntegratorOptions const& opts, torch::nn::Module* p,
+      std::string const& name = "intg");
+
   int current_redo = 0;
 
   //! options with which this `Integrator` was constructed
