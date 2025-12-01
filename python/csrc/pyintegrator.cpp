@@ -31,8 +31,10 @@ void bind_integrator(py::module &m) {
           m, "IntegratorOptions");
 
   pyIntegratorOptions.def(py::init<>())
-      .def_static("from_yaml", &harp::IntegratorOptionsImpl::from_yaml,
-                  py::arg("filename"))
+      .def_static("from_yaml",
+                  py::overload_cast<std::string const &, bool>(
+                      &harp::IntegratorOptionsImpl::from_yaml),
+                  py::arg("filename"), py::arg("verbose") = false)
       .def("__repr__",
            [](const harp::IntegratorOptions &a) {
              std::stringstream ss;
