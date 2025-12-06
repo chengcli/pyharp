@@ -16,7 +16,9 @@
       .def_readonly("options", &harp::m_name##Impl::options) \
       .def("__repr__",                                       \
            [](const harp::m_name##Impl &a) {                 \
-             return fmt::format(#m_name "{}", a.options);    \
+             std::stringstream ss;                           \
+             a.options->report(ss);                          \
+             return fmt::format(#m_name "(\n{})", ss.str()); \
            })                                                \
       .def("module",                                         \
            [](harp::m_name##Impl &self, std::string name) {  \
