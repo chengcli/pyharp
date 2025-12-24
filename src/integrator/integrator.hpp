@@ -19,6 +19,7 @@ class Node;
 namespace harp {
 struct IntegratorWeight {
   void report(std::ostream& os) const {
+    os << "-- stage weights --\n";
     os << "* wght0 = " << wght0() << "\n"
        << "* wght1 = " << wght1() << "\n"
        << "* wght2 = " << wght2() << "\n";
@@ -38,6 +39,7 @@ struct IntegratorOptionsImpl {
       YAML::Node const& node, bool verbose = false);
 
   void report(std::ostream& os) const {
+    os << "-- integrator options --\n";
     os << "* type = " << type() << "\n"
        << "* cfl = " << cfl() << "\n"
        << "* tlim = " << tlim() << "\n"
