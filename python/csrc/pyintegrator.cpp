@@ -46,8 +46,7 @@ void bind_integrator(py::module &m) {
       .ADD_OPTION(double, harp::IntegratorOptionsImpl, tlim)
       .ADD_OPTION(int, harp::IntegratorOptionsImpl, nlim)
       .ADD_OPTION(int, harp::IntegratorOptionsImpl, ncycle_out)
-      .ADD_OPTION(int, harp::IntegratorOptionsImpl, max_redo)
-      .ADD_OPTION(std::string, harp::IntegratorOptionsImpl, restart);
+      .ADD_OPTION(int, harp::IntegratorOptionsImpl, max_redo);
 
   ADD_HARP_MODULE(Integrator, IntegratorOptions, py::arg("stage"),
                   py::arg("u0"), py::arg("u1"), py::arg("u2"))
