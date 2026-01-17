@@ -26,7 +26,6 @@ IntegratorOptions IntegratorOptionsImpl::from_yaml(YAML::Node const& node,
   op->tlim() = node["tlim"].as<double>(1.e9);
   op->nlim() = node["nlim"].as<int>(-1);
   op->ncycle_out() = node["ncycle_out"].as<int>(1);
-  op->restart() = node["restart"].as<std::string>("");
   op->verbose() = node["verbose"].as<bool>(verbose);
   return op;
 }

@@ -44,8 +44,7 @@ struct IntegratorOptionsImpl {
        << "* nlim = " << nlim() << "\n"
        << "* ncycle_out = " << ncycle_out() << "\n"
        << "* max_redo = " << max_redo() << "\n"
-       << "* verbose = " << verbose() << "\n"
-       << "* restart = " << restart() << "\n";
+       << "* verbose = " << verbose() << "\n";
   }
 
   ADD_ARG(std::string, type) = "rk3";
@@ -55,7 +54,6 @@ struct IntegratorOptionsImpl {
   ADD_ARG(int, ncycle_out) = 1;
   ADD_ARG(int, max_redo) = 5;
   ADD_ARG(bool, verbose) = false;
-  ADD_ARG(std::string, restart) = "";
 };
 using IntegratorOptions = std::shared_ptr<IntegratorOptionsImpl>;
 
