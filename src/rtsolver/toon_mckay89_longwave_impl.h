@@ -1,8 +1,15 @@
+#pragma once
+
 // C/C++
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
+// harp
+#include "dtridgl_impl.h"
+
+namespace harp {
 
 template <typename T>
 void toon_mckay89_longwave(int nlay, int nlev, const T *be, const T *tau_in,
@@ -76,6 +83,12 @@ void toon_mckay89_longwave(int nlay, int nlev, const T *be, const T *tau_in,
   T *lw_up_g = (T *)get_mem(nlev, sizeof(T), mem, &offset);
   T *lw_down_g = (T *)get_mem(nlev, sizeof(T), mem, &offset);
 
+  if (offset > memsize) {
+    fprintf(stderr,
+            "Error: Memory allocation failed in toon_mckay89_shortwave\n");
+    exit(EXIT_FAILURE);
+  }
+
   // === Precomputations ===
 
   for (int k = 0; k < nlay; ++k) dtau_in[k] = tau_in[k + 1] - tau_in[k];
@@ -118,7 +131,12 @@ void toon_mckay89_longwave(int nlay, int nlev, const T *be, const T *tau_in,
   T bottom = Bsurf + B1[nlay - 1] * ubari;
 
   // === Solve tridiagonal system (not shown again for brevity) ===
-  dtridgl(l, Af, Bf, Cf, Df, xk);
+  dtridgl(l, Af, Bf, Cf, Df, xk, mem, offset);
+  if (offset > memsize) {
+    fprintf(stderr,
+            "Error: Memory allocation failed in toon_mckay89_shortwave\n");
+    exit(EXIT_FAILURE);
+  }
 
   // === Calculate xk1, xk2 from xkk ===
   for (int n = 0; n < nlay; ++n) {
@@ -150,8 +168,8 @@ void toon_mckay89_longwave(int nlay, int nlev, const T *be, const T *tau_in,
   }
 
   // === Gaussian quadrature integration ===
-  memset(flx_up, 0, nlev * sizeof(T), mem, &offset);
-  memset(flx_down, 0, nlev * sizeof(T), mem, &offset);
+  memset(flx_up, 0, nlev * sizeof(T));
+  memset(flx_down, 0, nlev * sizeof(T));
 
   for (int m = 0; m < nmu; ++m) {
     for (int k = 0; k < nlay; ++k) {
@@ -184,3 +202,5 @@ void toon_mckay89_longwave(int nlay, int nlev, const T *be, const T *tau_in,
     }
   }
 }
+
+}  // namespace harp

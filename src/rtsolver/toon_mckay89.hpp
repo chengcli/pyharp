@@ -56,7 +56,7 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
    * Based on Elsie Lee's implementation in Exo-FMS_column_ck, which was
    * based on CHIMERA code by Mike Line.
    * Ported by Xi Zhang to Eigen
-   * Proted by Cheng Li to torch
+   * Ported by Cheng Li to torch
    * Reference: Toon, O.B., 1989, JGR, 94,16287-16301.
    */
   torch::Tensor shortwave_solver(torch::Tensor Finc, torch::Tensor mu0,
@@ -68,7 +68,7 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
    * Based on Elsie Lee's implementation in Exo-FMS_column_ck, which was
    * based on CHIMERA code by Mike Line.
    * Ported by Xi Zhang to Eigen
-   * Proted by Cheng Li to torch
+   * Ported by Cheng Li to torch
    * Reference: Toon, O.B., 1989, JGR, 94, 16287-16301.
    */
   torch::Tensor longwave_solver(torch::Tensor be, torch::Tensor dtau,

@@ -4,6 +4,11 @@
 #include <cstdlib>
 #include <cstring>
 
+// harp
+#include "dtridgl_impl.h"
+
+namespace harp {
+
 template <typename T>
 void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
                             const T *tau_in, const T *w_in, const T *g_in,
@@ -183,7 +188,12 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
   Cf[l - 1] = 0.0;
   Df[l - 1] = bsurf - Cp[nlay - 1] + w_surf_in * Cm[nlay - 1];
 
-  dtridgl(l, Af, Bf, Cf, Df, xk);
+  dtridgl(l, Af, Bf, Cf, Df, xk, mem, offset);
+  if (offset > memsize) {
+    fprintf(stderr,
+            "Error: Memory allocation failed in toon_mckay89_shortwave\n");
+    exit(EXIT_FAILURE);
+  }
 
   for (int n = 0; n < nlay; ++n) {
     xk1[n] = xk[2 * n] + xk[2 * n + 1];
@@ -204,3 +214,5 @@ void toon_mckay89_shortwave(int nlay, int nlev, T F0_in, const T *mu_in,
 
   for (int n = 0; n < nlev; ++n) flx_down[n] += dir[n];
 }
+
+}  // namespace harp
