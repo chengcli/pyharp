@@ -13,7 +13,7 @@
 namespace harp {
 
 struct ToonMcKay89OptionsImpl {
-  ToonMcKay89Options();
+  ToonMcKay89OptionsImpl() {}
   static std::shared_ptr<ToonMcKay89OptionsImpl> create() {
     return std::make_shared<ToonMcKay89OptionsImpl>();
   }
@@ -40,7 +40,7 @@ struct ToonMcKay89OptionsImpl {
   ADD_ARG(bool, zenith_correction) = false;
 };
 
-using ToonMcKay89Options = std::shared_ptr<ToonMcKay89Impl>;
+using ToonMcKay89Options = std::shared_ptr<ToonMcKay89OptionsImpl>;
 
 class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
  public:

@@ -9,6 +9,8 @@
 #include <configure.h>
 
 // harp
+#include <harp/utils/alloc.h>
+
 #include "dtridgl_impl.h"
 
 #define DTAU_IN(i) prop[(nlay - i - 1) * 3]
@@ -32,14 +34,14 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
   const T twopi = 2.0 * M_PI;
   const T ubari = 0.5;
 
-  const T *uarr = {0.0985350858, 0.3045357266, 0.5620251898, 0.8019865821,
-                   0.9601901429};
-  const T *wuarr = {0.0157479145, 0.0739088701, 0.1463869871, 0.1671746381,
-                    0.0967815902};
+  const T uarr[] = {0.0985350858, 0.3045357266, 0.5620251898, 0.8019865821,
+                    0.9601901429};
+  const T wuarr[] = {0.0157479145, 0.0739088701, 0.1463869871, 0.1671746381,
+                     0.0967815902};
 
   // --- Work Variables Allocation ---
-  dtau = alloc_from<T>(work, nlay);
-  tau = alloc_from<T>(work, nlev);
+  T *dtau = alloc_from<T>(work, nlay);
+  T *tau = alloc_from<T>(work, nlev);
   T *w0 = alloc_from<T>(work, nlay);
   T *hg = alloc_from<T>(work, nlay);
   T *B0 = alloc_from<T>(work, nlay);
@@ -173,7 +175,7 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
       g[n] = 0.0;
       h[n] = 0.0;
       xj[n] = 0.0;
-      xk_ptr[n] = 0.0;  // using xk_ptr because xk name conflict
+      xk[n] = 0.0;
       alpha1[n] = twopi * B0[n];
       alpha2[n] = twopi * B1[n];
       sigma1[n] = alpha1[n];

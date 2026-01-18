@@ -7,6 +7,8 @@
 #include <configure.h>
 
 // harp
+#include <harp/utils/alloc.h>
+
 #include "dtridgl_impl.h"
 
 #define DTAU_IN(i) prop[(nlay - i - 1) * 3]
@@ -63,14 +65,14 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
   T *xk1 = alloc_from<T>(work, nlay);
   T *xk2 = alloc_from<T>(work, nlay);
 
-  const dp sqrt3 = sqrt(3.0);
-  const dp sqrt3d2 = sqrt3 / 2.0;
-  const dp btop = 0.0, bsurf = 0.0;
+  const T sqrt3 = sqrt(3.0);
+  const T sqrt3d2 = sqrt3 / 2.0;
+  const T btop = 0.0, bsurf = 0.0;
 
   // Check for zero albedo
   bool all_zero_w = true;
   for (int i = 0; i < nlay; i++) {
-    if (w_in[i] > 1.0e-12) {
+    if (W_IN(i) > 1.0e-12) {
       all_zero_w = false;
       break;
     }
@@ -104,17 +106,17 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
     // --- General Case: Toon et al. 1989 Solver ---
 
     for (int i = 0; i < nlay; i++) {
-      dp g_sq = g_in[i] * g_in[i];
-      w0[i] = ((1.0 - g_sq) * w_in[i]) / (1.0 - w_in[i] * g_sq);
-      dtau[i] = (1.0 - w_in[i] * g_sq) * DTAU_IN(i);
-      hg[i] = g_in[i] / (1.0 + g_in[i]);
+      T g_sq = G_IN(i) * G_IN(i);
+      w0[i] = ((1.0 - g_sq) * W_IN(i)) / (1.0 - W_IN(i) * g_sq);
+      dtau[i] = (1.0 - W_IN(i) * g_sq) * DTAU_IN(i);
+      hg[i] = G_IN(i) / (1.0 + G_IN(i));
     }
 
     tau[0] = 0.0;
     for (int k = 0; k < nlay; k++) tau[k + 1] = tau[k] + dtau[k];
 
     if (mu_in[nlev - 1] == mu_in[0]) {
-      dp mu_val = mu_in[nlev - 1];
+      T mu_val = mu_in[nlev - 1];
       for (int k = 0; k < nlev; k++)
         dir[k] = F0_in * mu_val * exp(-tau[k] / mu_val);
       for (int i = 0; i < nlay; i++) mu_zm[i] = mu_val;

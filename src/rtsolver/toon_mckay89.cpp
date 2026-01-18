@@ -1,7 +1,7 @@
 // harp
 #include "toon_mckay89.hpp"
 
-#include <radiation/bbflux.hpp>
+#include <harp/radiation/bbflux.hpp>
 
 #include "rtsolver_dispatch.hpp"
 
@@ -18,6 +18,7 @@ void ToonMcKay89Impl::reset() {
 
 torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                                        std::map<std::string, torch::Tensor>* bc,
+                                       std::string bname,
                                        torch::optional<torch::Tensor> temf) {
   // check dimensions
   TORCH_CHECK(prop.dim() == 4, "ToonMcKay89::forward: prop.dim() != 4");
@@ -101,7 +102,9 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
       temp(i) = ds_.temper[i];
       be(i) = BB_integrate(ds_.temper[i], spec.wav1, spec.wav2);
     }*/
-    auto be = bbflux_wavenumber(wave, tempf.value());
+    auto wave_lo = torch::tensor(options->wave_lower(), prop.options());
+    auto wave_hi = torch::tensor(options->wave_upper(), prop.options());
+    auto be = bbflux_wavenumber(wave_lo, wave_hi, temf.value());
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)

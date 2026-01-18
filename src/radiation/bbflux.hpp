@@ -34,6 +34,10 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol = 1);
  */
 torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp);
 
+//! \brief calculate integrated blackbody flux using wavenumber
+torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
+                                torch::Tensor temp);
+
 //! \brief calculate blackbody flux using wavelength
 /*!
  * Formula:
