@@ -13,11 +13,11 @@
 
 #include "dtridgl_impl.h"
 
-#define DTAU_IN(i) prop[(nlay - i - 1) * 3]
-#define W_IN(i) prop[(nlay - i - 1) * 3 + 1]
-#define G_IN(i) prop[(nlay - i - 1) * 3 + 2]
-#define FLX_UP(i) flx[2 * (nlev - i - 1)]
-#define FLX_DN(i) flx[2 * (nlev - i - 1) + 1]
+#define DTAU_IN(i) prop[(nlay - (i) - 1) * 3]
+#define W_IN(i) prop[(nlay - (i) - 1) * 3 + 1]
+#define G_IN(i) prop[(nlay - (i) - 1) * 3 + 2]
+#define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
+#define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
 
 namespace harp {
 

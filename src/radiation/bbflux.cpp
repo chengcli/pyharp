@@ -126,8 +126,8 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
 
   // Handle different cases for wavenumbers
   for (int i = 0; i <= 1; ++i) {
-    smallv += torch::where(v[i] < VCUT, torch::ones_like(temp),
-                           torch::zeros_like(temp));
+    smallv = smallv + torch::where(v[i] < VCUT, torch::ones_like(temp),
+                                   torch::zeros_like(temp));
 
     auto vsq = v[i] * v[i];
     p[i] =
@@ -144,8 +144,8 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
 
     for (int m = 1; m <= 6; ++m) {
       auto mv = static_cast<double>(m) * v[i];
-      exm *= ex;
-      d[i] += exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / (m * m);
+      exm = exm * ex;
+      d[i] = d[i] + exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / (m * m);
     }
     d[i] *= conc;
 

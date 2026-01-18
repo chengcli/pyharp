@@ -20,7 +20,7 @@ void call_toon89_sw_cuda(at::TensorIterator& iter) {
     int nlay = at::native::ensure_nonempty_size(iter.input(1), -2);
     int mem_size = toon89_sw_space<scalar_t>(nlay);
 
-    native::gpu_mem_kernel<32, 5>(
+    native::gpu_mem_kernel<128, 5>(
         iter, [=] GPU_LAMBDA(
           char* const data[5], unsigned int strides[5], char *work) {
           auto out = reinterpret_cast<scalar_t*>(data[0] + strides[0]);
@@ -40,13 +40,13 @@ void call_toon89_lw_cuda(at::TensorIterator& iter) {
     int nlay = at::native::ensure_nonempty_size(iter.input(1), -2);
     int mem_size = toon89_sw_space<scalar_t>(nlay);
 
-    native::gpu_mem_kernel<32, 4>(
+    native::gpu_mem_kernel<128, 4>(
         iter, [=] GPU_LAMBDA(
           char* const data[4], unsigned int strides[4], char *work) {
           auto out = reinterpret_cast<scalar_t*>(data[0] + strides[0]);
           auto prop = reinterpret_cast<scalar_t*>(data[1] + strides[1]);
-          auto albedo = reinterpret_cast<scalar_t*>(data[2] + strides[2]);
-          auto be = reinterpret_cast<scalar_t*>(data[3] + strides[3]);
+          auto be = reinterpret_cast<scalar_t*>(data[2] + strides[2]);
+          auto albedo = reinterpret_cast<scalar_t*>(data[3] + strides[3]);
           toon_mckay89_longwave(nlay, be, prop, *albedo, out, work);
         });
   });

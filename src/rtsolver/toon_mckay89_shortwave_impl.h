@@ -11,11 +11,12 @@
 
 #include "dtridgl_impl.h"
 
-#define DTAU_IN(i) prop[(nlay - i - 1) * 3]
-#define W_IN(i) prop[(nlay - i - 1) * 3 + 1]
-#define G_IN(i) prop[(nlay - i - 1) * 3 + 2]
-#define FLX_UP(i) flx[2 * (nlev - i - 1)]
-#define FLX_DN(i) flx[2 * (nlev - i - 1) + 1]
+#define DTAU_IN(i) prop[(nlay - (i) - 1) * 3]
+#define W_IN(i) prop[(nlay - (i) - 1) * 3 + 1]
+#define G_IN(i) prop[(nlay - (i) - 1) * 3 + 2]
+#define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
+#define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
+#define MU_IN(i) mu_in[nlev - (i) - 1]
 
 namespace harp {
 
@@ -86,17 +87,17 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
 
   if (all_zero_w) {
     // --- Special Case: Direct Beam Only ---
-    if (mu_in[nlev - 1] == mu_in[0]) {
+    if (MU_IN(nlev - 1) == MU_IN(0)) {
       for (int k = 0; k < nlev; k++) {
-        FLX_DN(k) = F0_in * mu_in[nlev - 1] * exp(-tau_in[k] / mu_in[nlev - 1]);
+        FLX_DN(k) = F0_in * MU_IN(nlev - 1) * exp(-tau_in[k] / MU_IN(nlev - 1));
       }
     } else {
-      cum_trans[0] = tau_in[0] / mu_in[0];
+      cum_trans[0] = tau_in[0] / MU_IN(0);
       for (int k = 0; k < nlev - 1; k++) {
-        cum_trans[k + 1] = cum_trans[k] + DTAU_IN(k) / mu_in[k + 1];
+        cum_trans[k + 1] = cum_trans[k] + DTAU_IN(k) / MU_IN(k + 1);
       }
       for (int k = 0; k < nlev; k++) {
-        FLX_DN(k) = F0_in * mu_in[nlev - 1] * exp(-cum_trans[k]);
+        FLX_DN(k) = F0_in * MU_IN(nlev - 1) * exp(-cum_trans[k]);
       }
     }
     FLX_DN(nlev - 1) *= (1.0 - w_surf_in);
@@ -115,18 +116,18 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
     tau[0] = 0.0;
     for (int k = 0; k < nlay; k++) tau[k + 1] = tau[k] + dtau[k];
 
-    if (mu_in[nlev - 1] == mu_in[0]) {
-      T mu_val = mu_in[nlev - 1];
+    if (MU_IN(nlev - 1) == MU_IN(0)) {
+      T mu_val = MU_IN(nlev - 1);
       for (int k = 0; k < nlev; k++)
         dir[k] = F0_in * mu_val * exp(-tau[k] / mu_val);
       for (int i = 0; i < nlay; i++) mu_zm[i] = mu_val;
     } else {
-      cum_trans[0] = tau[0] / mu_in[0];
+      cum_trans[0] = tau[0] / MU_IN(0);
       for (int k = 0; k < nlev - 1; k++)
-        cum_trans[k + 1] = cum_trans[k] + (tau[k + 1] - tau[k]) / mu_in[k + 1];
+        cum_trans[k + 1] = cum_trans[k] + (tau[k + 1] - tau[k]) / MU_IN(k + 1);
       for (int k = 0; k < nlev; k++)
-        dir[k] = F0_in * mu_in[nlev - 1] * exp(-cum_trans[k]);
-      for (int i = 0; i < nlay; i++) mu_zm[i] = (mu_in[i] + mu_in[i + 1]) / 2.0;
+        dir[k] = F0_in * MU_IN(nlev - 1) * exp(-cum_trans[k]);
+      for (int i = 0; i < nlay; i++) mu_zm[i] = (MU_IN(i) + MU_IN(i + 1)) / 2.0;
     }
 
     for (int i = 0; i < nlay; i++) {
@@ -209,3 +210,4 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
 #undef G_IN
 #undef FLX_UP
 #undef FLX_DN
+#undef MU_IN
