@@ -34,7 +34,7 @@ file(GLOB src_files
     utils/*.cpp
     opacity/*.cpp
     radiation/*.cpp
-    #rtsolver/*.cpp
+    rtsolver/*.cpp
     integrator/*.cpp
     )
 

@@ -12,8 +12,23 @@
 
 namespace harp {
 
-struct ToonMcKay89Options {
-  ToonMcKay89Options() = default;
+struct ToonMcKay89OptionsImpl {
+  ToonMcKay89Options();
+  static std::shared_ptr<ToonMcKay89OptionsImpl> create() {
+    return std::make_shared<ToonMcKay89OptionsImpl>();
+  }
+
+  void report(std::ostream& os) const {
+    os << "* zenith_correction = " << zenith_correction() << "\n";
+
+    os << "* wave_lower = ";
+    for (auto const& v : wave_lower()) os << v << ", ";
+    os << "\n";
+
+    os << "* wave_upper = ";
+    for (auto const& v : wave_upper()) os << v << ", ";
+    os << "\n";
+  }
 
   //! set lower wavenumber(length) at each bin
   ADD_ARG(std::vector<double>, wave_lower) = {};
@@ -25,13 +40,15 @@ struct ToonMcKay89Options {
   ADD_ARG(bool, zenith_correction) = false;
 };
 
+using ToonMcKay89Options = std::shared_ptr<ToonMcKay89Impl>;
+
 class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
  public:
   //! options with which this `ToonMcKay89Impl` was constructed
   ToonMcKay89Options options;
 
   //! Constructor to initialize the layers
-  ToonMcKay89Impl() = default;
+  ToonMcKay89Impl() : options(ToonMcKay89OptionsImpl::create()) {}
   explicit ToonMcKay89Impl(ToonMcKay89Options const& options);
   void reset() override;
 
@@ -49,31 +66,6 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
                         std::map<std::string, torch::Tensor>* bc,
                         std::string bname = "",
                         torch::optional<torch::Tensor> temf = torch::nullopt);
-
- private:
-  //! \brief Toon 1989 shortwave solver
-  /*!
-   * Based on Elsie Lee's implementation in Exo-FMS_column_ck, which was
-   * based on CHIMERA code by Mike Line.
-   * Ported by Xi Zhang to Eigen
-   * Ported by Cheng Li to torch
-   * Reference: Toon, O.B., 1989, JGR, 94,16287-16301.
-   */
-  torch::Tensor shortwave_solver(torch::Tensor Finc, torch::Tensor mu0,
-                                 torch::Tensor dtau, torch::Tensor w0,
-                                 torch::Tensor g, torch::Tensor albedo);
-
-  //! \brief Toon 1989 longwave solver
-  /*!
-   * Based on Elsie Lee's implementation in Exo-FMS_column_ck, which was
-   * based on CHIMERA code by Mike Line.
-   * Ported by Xi Zhang to Eigen
-   * Ported by Cheng Li to torch
-   * Reference: Toon, O.B., 1989, JGR, 94, 16287-16301.
-   */
-  torch::Tensor longwave_solver(torch::Tensor be, torch::Tensor dtau,
-                                torch::Tensor w0, torch::Tensor g,
-                                torch::Tensor albedo);
 };
 
 }  // namespace harp
