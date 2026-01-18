@@ -67,6 +67,7 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
                         std::string bname = "",
                         torch::optional<torch::Tensor> temf = torch::nullopt);
 };
+TORCH_MODULE(ToonMcKay89);
 
 }  // namespace harp
 
