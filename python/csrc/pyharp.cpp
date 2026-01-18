@@ -15,6 +15,7 @@ void bind_opacity(py::module &m);
 void bind_math(py::module &m);
 void bind_constants(py::module &m);
 void bind_integrator(py::module &);
+void bind_rtsolver(py::module &);
 
 PYBIND11_MODULE(pyharp, m) {
   m.attr("__name__") = "pyharp";
@@ -31,6 +32,7 @@ PYBIND11_MODULE(pyharp, m) {
   bind_math(m);
   bind_constants(m);
   bind_integrator(m);
+  bind_rtsolver(m);
 
   m.def(
        "species_names",
