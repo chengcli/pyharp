@@ -11,6 +11,7 @@
 
 // harp
 #include <harp/opacity/opacity_options.hpp>
+#include <harp/rtsolver/toon_mckay89.hpp>
 
 // arg
 #include <harp/add_arg.h>
@@ -103,6 +104,7 @@ struct RadiationBandOptionsImpl {
 
   ADD_ARG(OpacityDict, opacities) = {};
   ADD_ARG(disort::DisortOptions, disort);
+  ADD_ARG(ToonMcKay89Options, toon);
 
   ADD_ARG(std::vector<double>, wavenumber);
   ADD_ARG(std::vector<double>, weight);

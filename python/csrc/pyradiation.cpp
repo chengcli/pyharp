@@ -43,6 +43,8 @@ void bind_radiation(py::module &m) {
       .ADD_OPTION(std::string, harp::RadiationBandOptionsImpl, outdirs)
       .ADD_OPTION(std::string, harp::RadiationBandOptionsImpl, solver_name)
       .ADD_OPTION(disort::DisortOptions, harp::RadiationBandOptionsImpl, disort)
+      .ADD_OPTION(harp::ToonMcKay89Options, harp::RadiationBandOptionsImpl,
+                  toon)
       .ADD_OPTION(std::vector<double>, harp::RadiationBandOptionsImpl,
                   wavenumber)
       .ADD_OPTION(std::vector<double>, harp::RadiationBandOptionsImpl, weight)

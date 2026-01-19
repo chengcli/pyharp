@@ -12,7 +12,7 @@ setup_test(test_bbflux)
 setup_test(test_flux_utils)
 #setup_test(test_yaml_input)
 setup_test(test_tridiag)
-setup_test(test_composition)
+setup_test(test_toon)
 
 # Python tests
 
