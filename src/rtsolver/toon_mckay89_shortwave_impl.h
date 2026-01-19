@@ -38,20 +38,13 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
   T *mu_zm = alloc_from<T>(work, nlay);
   T *w0 = alloc_from<T>(work, nlay);
   T *hg = alloc_from<T>(work, nlay);
-  T *g1 = alloc_from<T>(work, nlay);
-  T *g2 = alloc_from<T>(work, nlay);
-  T *g3 = alloc_from<T>(work, nlay);
-  T *g4 = alloc_from<T>(work, nlay);
-  T *lam = alloc_from<T>(work, nlay);
   T *gam = alloc_from<T>(work, nlay);
-  T *denom = alloc_from<T>(work, nlay);
   T *Am = alloc_from<T>(work, nlay);
   T *Ap = alloc_from<T>(work, nlay);
   T *Cpm1 = alloc_from<T>(work, nlay);
   T *Cmm1 = alloc_from<T>(work, nlay);
   T *Cp = alloc_from<T>(work, nlay);
   T *Cm = alloc_from<T>(work, nlay);
-  T *exptrm = alloc_from<T>(work, nlay);
   T *Ep = alloc_from<T>(work, nlay);
   T *Em = alloc_from<T>(work, nlay);
   T *E1 = alloc_from<T>(work, nlay);
@@ -131,25 +124,23 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
     }
 
     for (int i = 0; i < nlay; i++) {
-      g1[i] = sqrt3d2 * (2.0 - w0[i] * (1.0 + hg[i]));
-      g2[i] = (sqrt3d2 * w0[i]) * (1.0 - hg[i]);
-      if (g2[i] == 0.0) g2[i] = 1.0e-10;
-      g3[i] = (1.0 - sqrt3 * hg[i] * mu_zm[i]) / 2.0;
-      g4[i] = 1.0 - g3[i];
-      lam[i] = sqrt(g1[i] * g1[i] - g2[i] * g2[i]);
-      gam[i] = (g1[i] - lam[i]) / g2[i];
-      denom[i] = (lam[i] * lam[i]) - 1.0 / (mu_zm[i] * mu_zm[i]);
-      if (denom[i] == 0.0) denom[i] = 1.0e-10;
-      Ap[i] = F0_in * w0[i] *
-              (g3[i] * (g1[i] - 1.0 / mu_zm[i]) + g2[i] * g4[i]) / denom[i];
-      Am[i] = F0_in * w0[i] *
-              (g4[i] * (g1[i] + 1.0 / mu_zm[i]) + g2[i] * g3[i]) / denom[i];
+      T g1 = sqrt3d2 * (2.0 - w0[i] * (1.0 + hg[i]));
+      T g2 = (sqrt3d2 * w0[i]) * (1.0 - hg[i]);
+      if (g2 == 0.0) g2 = 1.0e-10;
+      T g3 = (1.0 - sqrt3 * hg[i] * mu_zm[i]) / 2.0;
+      T g4 = 1.0 - g3;
+      T lam = sqrt(g1 * g1 - g2 * g2);
+      gam[i] = (g1 - lam) / g2;
+      T denom = (lam * lam) - 1.0 / (mu_zm[i] * mu_zm[i]);
+      if (denom == 0.0) denom = 1.0e-10;
+      Ap[i] = F0_in * w0[i] * (g3 * (g1 - 1.0 / mu_zm[i]) + g2 * g4) / denom;
+      Am[i] = F0_in * w0[i] * (g4 * (g1 + 1.0 / mu_zm[i]) + g2 * g3) / denom;
       Cpm1[i] = Ap[i] * exp(-tau[i] / mu_zm[i]);
       Cmm1[i] = Am[i] * exp(-tau[i] / mu_zm[i]);
       Cp[i] = Ap[i] * exp(-tau[i + 1] / mu_zm[i]);
       Cm[i] = Am[i] * exp(-tau[i + 1] / mu_zm[i]);
-      exptrm[i] = fmin(lam[i] * dtau[i], 35.0);
-      Ep[i] = exp(exptrm[i]);
+      T exptrm = fmin(lam * dtau[i], 35.0);
+      Ep[i] = exp(exptrm);
       Em[i] = 1.0 / Ep[i];
       E1[i] = Ep[i] + gam[i] * Em[i];
       E2[i] = Ep[i] - gam[i] * Em[i];

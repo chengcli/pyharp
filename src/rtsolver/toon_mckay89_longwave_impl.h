@@ -56,7 +56,6 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
   T *Cp = alloc_from<T>(work, nlay);
   T *Cm = alloc_from<T>(work, nlay);
 
-  T *exptrm = alloc_from<T>(work, nlay);
   T *Ep = alloc_from<T>(work, nlay);
   T *Em = alloc_from<T>(work, nlay);
   T *E1 = alloc_from<T>(work, nlay);
@@ -119,8 +118,8 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
     Cp[k] = B0[k] + B1[k] * dtau[k] + B1[k] * term[k];
     Cm[k] = B0[k] + B1[k] * dtau[k] - B1[k] * term[k];
 
-    exptrm[k] = fmin(lam[k] * dtau[k], 35.0);
-    Ep[k] = exp(exptrm[k]);
+    T exptrm = fmin(lam[k] * dtau[k], 35.0);
+    Ep[k] = exp(exptrm);
     Em[k] = 1.0 / Ep[k];
     E1[k] = Ep[k] + gam[k] * Em[k];
     E2[k] = Ep[k] - gam[k] * Em[k];

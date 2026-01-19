@@ -42,7 +42,7 @@ void call_toon89_lw_cpu(at::TensorIterator &iter) {
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_toon89_lw_cpu", [&] {
     int nlay = at::native::ensure_nonempty_size(iter.input(0), -2);
     int grain_size = iter.numel() / at::get_num_threads();
-    int mem_size = toon89_sw_space<scalar_t>(nlay);
+    int mem_size = toon89_lw_space<scalar_t>(nlay);
     char *work = new char[mem_size];
 
     iter.for_each(

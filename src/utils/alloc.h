@@ -40,20 +40,13 @@ size_t toon89_sw_space(int nlay) {
   bump(alignof(T), nlay * sizeof(T));        // mu_zm
   bump(alignof(T), nlay * sizeof(T));        // w0
   bump(alignof(T), nlay * sizeof(T));        // hg
-  bump(alignof(T), nlay * sizeof(T));        // g1
-  bump(alignof(T), nlay * sizeof(T));        // g2
-  bump(alignof(T), nlay * sizeof(T));        // g3
-  bump(alignof(T), nlay * sizeof(T));        // g4
-  bump(alignof(T), nlay * sizeof(T));        // lam
   bump(alignof(T), nlay * sizeof(T));        // gam
-  bump(alignof(T), nlay * sizeof(T));        // denom
   bump(alignof(T), nlay * sizeof(T));        // Am
   bump(alignof(T), nlay * sizeof(T));        // Ap
   bump(alignof(T), nlay * sizeof(T));        // Cpm1
   bump(alignof(T), nlay * sizeof(T));        // Cmm1
   bump(alignof(T), nlay * sizeof(T));        // Cp
   bump(alignof(T), nlay * sizeof(T));        // Cm
-  bump(alignof(T), nlay * sizeof(T));        // exptrm
   bump(alignof(T), nlay * sizeof(T));        // Ep
   bump(alignof(T), nlay * sizeof(T));        // Em
   bump(alignof(T), nlay * sizeof(T));        // E1
@@ -93,7 +86,6 @@ size_t toon89_lw_space(int nlay) {
   bump(alignof(T), nlay * sizeof(T));        // Cmm1
   bump(alignof(T), nlay * sizeof(T));        // Cp
   bump(alignof(T), nlay * sizeof(T));        // Cm
-  bump(alignof(T), nlay * sizeof(T));        // exptrm
   bump(alignof(T), nlay * sizeof(T));        // Ep
   bump(alignof(T), nlay * sizeof(T));        // Em
   bump(alignof(T), nlay * sizeof(T));        // E1

@@ -8,16 +8,11 @@ namespace harp {
 namespace native {
 
 template <typename func_t>
-__global__ void element_kernel(int64_t numel, func_t f) {
+__global__ void element_kernel(int64_t numel, func_t f, char *work) {
   int tid = threadIdx.x;
   int idx = blockIdx.x * blockDim.x + tid;
-
-  // Shared memory allocation
-  extern __shared__ unsigned char memory[];
-  char* smem = reinterpret_cast<char*>(memory);
-
   if (idx < numel) {
-    f(idx, smem);
+    f(idx, work);
   }
 }
 
@@ -40,8 +35,8 @@ void gpu_kernel(at::TensorIterator& iter, const func_t& f) {
     });
 }
 
-template <int Threads, int Arity, typename func_t>
-void gpu_mem_kernel(at::TensorIterator& iter, int work_size, const func_t& f) {
+template <int Chunks, int Arity, typename func_t>
+void gpu_chunk_kernel(at::TensorIterator& iter, int work_size, const func_t& f) {
   TORCH_CHECK(iter.ninputs() + iter.noutputs() == Arity);
 
   std::array<char*, Arity> data;
@@ -52,49 +47,50 @@ void gpu_mem_kernel(at::TensorIterator& iter, int work_size, const func_t& f) {
   auto offset_calc = ::make_offset_calculator<Arity>(iter);
   int64_t numel = iter.numel();
 
-  dim3 block(Threads);
-  dim3 grid((numel + block.x - 1) / block.x);
-  auto stream = at::cuda::getCurrentCUDAStream();
-  size_t shared = block.x * work_size;
+  // devide numel into Chunk parts to reduce memory usage
+  // allocate working memory pool
+  char* d_workspace = nullptr;
 
-  // set attribute to allow max dynamic shared memory
-  int device;
-  cudaGetDevice(&device);
-  cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop, device);
+  // workspace size per chunk
+  int chunks = Chunks > numel ? numel : Chunks;
+  int base = numel / chunks;
+  int rem  = numel % chunks;
 
-  // query max allowed per-block shared memory
-  int max_dynamic_smem = prop.sharedMemPerBlockOptin;
-  //printf("max_dynamic_smem = %d\n", max_dynamic_smem);
+  size_t workspace_bytes = work_size * (base + (rem > 0 ? 1 : 0));
+  cudaMalloc(&d_workspace, workspace_bytes);
 
-  auto device_lambda = [=] __device__(int idx, char* smem) {
-      auto offsets = offset_calc.get(idx);
-      int tid = threadIdx.x;
-      f(data.data(), offsets.data(), smem + tid * work_size);
-    };
+  int chunk_start = 0;
 
-  // request the full size
-  auto kernelPtr = element_kernel<decltype(device_lambda)>;
-  cudaFuncSetAttribute(
-      kernelPtr,
-      cudaFuncAttributeMaxDynamicSharedMemorySize,
-      max_dynamic_smem);
+  for (int n = 0; n < chunks; n++) {
+    int64_t chunk_numel = base + (n < rem ? 1 : 0);
+    int64_t chunk_end = chunk_start + chunk_numel;  // exclusive
 
-  if (shared > (size_t)max_dynamic_smem) {
-    TORCH_CHECK(false, "Requested shared memory (", shared,
-                " bytes) exceeds device maximum (",
-                max_dynamic_smem, " bytes).");
+    dim3 block(64);
+    dim3 grid((chunk_numel + block.x - 1) / block.x);
+
+    auto device_lambda = [=] __device__(int idx, char* work) {
+        auto offsets = offset_calc.get(idx + chunk_start);
+        f(data.data(), offsets.data(), work + idx * work_size);
+      };
+
+    /*std::cout << "chunk = " << n
+              << ", chunk_start = " << chunk_start
+              << ", chunk_end = " << chunk_end
+              << ", chunk_numel = " << chunk_numel
+              << ", block = " << block.x
+              << ", grid = " << grid.x
+              << ", work_size = " << work_size
+              << std::endl;*/
+
+    element_kernel<<<grid, block>>>(chunk_numel, device_lambda, d_workspace);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    cudaDeviceSynchronize();
+
+    chunk_start = chunk_end;
   }
 
-  /*std::cout << "block = " << block.x
-            << ", grid = " << grid.x
-            << ", shared = " << shared
-            << ", work_size = " << work_size
-            << std::endl;*/
-
-  element_kernel<<<grid, block, shared, stream>>>(numel, device_lambda);
-
-  C10_CUDA_KERNEL_LAUNCH_CHECK();
+  // free working memory pool
+  cudaFree(d_workspace);
 }
 
 }  // namespace native

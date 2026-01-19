@@ -17,11 +17,11 @@ void call_toon89_sw_cuda(at::TensorIterator& iter) {
   at::cuda::CUDAGuard device_guard(iter.device());
 
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_toon89_sw_cuda", [&] {
-    int nlay = at::native::ensure_nonempty_size(iter.input(1), -2);
+    int nlay = at::native::ensure_nonempty_size(iter.input(0), -2);
     int mem_size = toon89_sw_space<scalar_t>(nlay);
 
-    native::gpu_mem_kernel<128, 5>(
-        iter, [=] GPU_LAMBDA(
+    native::gpu_chunk_kernel<8, 5>(
+        iter, mem_size, [=] GPU_LAMBDA(
           char* const data[5], unsigned int strides[5], char *work) {
           auto out = reinterpret_cast<scalar_t*>(data[0] + strides[0]);
           auto prop = reinterpret_cast<scalar_t*>(data[1] + strides[1]);
@@ -37,11 +37,11 @@ void call_toon89_lw_cuda(at::TensorIterator& iter) {
   at::cuda::CUDAGuard device_guard(iter.device());
 
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_toon89_lw_cuda", [&] {
-    int nlay = at::native::ensure_nonempty_size(iter.input(1), -2);
-    int mem_size = toon89_sw_space<scalar_t>(nlay);
+    int nlay = at::native::ensure_nonempty_size(iter.input(0), -2);
+    int mem_size = toon89_lw_space<scalar_t>(nlay);
 
-    native::gpu_mem_kernel<128, 4>(
-        iter, [=] GPU_LAMBDA(
+    native::gpu_chunk_kernel<8, 4>(
+        iter, mem_size, [=] GPU_LAMBDA(
           char* const data[4], unsigned int strides[4], char *work) {
           auto out = reinterpret_cast<scalar_t*>(data[0] + strides[0]);
           auto prop = reinterpret_cast<scalar_t*>(data[1] + strides[1]);
