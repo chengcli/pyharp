@@ -149,38 +149,38 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
     }
 
     // Matrix Setup
-    Af[1] = 0.0;
-    Bf[1] = gam[0] + 1.0;
-    Cf[1] = gam[0] - 1.0;
-    Df[1] = btop - Cmm1[0];
+    Af[0] = 0.0;
+    Bf[0] = gam[0] + 1.0;
+    Cf[0] = gam[0] - 1.0;
+    Df[0] = btop - Cmm1[0];
     int n_idx = 0;
     for (int i = 2; i <= lm2; i += 2) {
-      Af[i] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
-      Bf[i] = (E2[n_idx] + E4[n_idx]) * (gam[n_idx + 1] - 1.0);
-      Cf[i] = 2.0 * (1.0 - gam[n_idx + 1] * gam[n_idx + 1]);
-      Df[i] = (gam[n_idx + 1] - 1.0) * (Cpm1[n_idx + 1] - Cp[n_idx]) +
-              (1.0 - gam[n_idx + 1]) * (Cm[n_idx] - Cmm1[n_idx + 1]);
+      Af[i - 1] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
+      Bf[i - 1] = (E2[n_idx] + E4[n_idx]) * (gam[n_idx + 1] - 1.0);
+      Cf[i - 1] = 2.0 * (1.0 - gam[n_idx + 1] * gam[n_idx + 1]);
+      Df[i - 1] = (gam[n_idx + 1] - 1.0) * (Cpm1[n_idx + 1] - Cp[n_idx]) +
+                  (1.0 - gam[n_idx + 1]) * (Cm[n_idx] - Cmm1[n_idx + 1]);
       n_idx++;
     }
     n_idx = 0;
     for (int i = 3; i <= lm1; i += 2) {
-      Af[i] = 2.0 * (1.0 - gam[n_idx] * gam[n_idx]);
-      Bf[i] = (E1[n_idx] - E3[n_idx]) * (1.0 + gam[n_idx + 1]);
-      Cf[i] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
-      Df[i] = E3[n_idx] * (Cpm1[n_idx + 1] - Cp[n_idx]) +
-              E1[n_idx] * (Cm[n_idx] - Cmm1[n_idx + 1]);
+      Af[i - 1] = 2.0 * (1.0 - gam[n_idx] * gam[n_idx]);
+      Bf[i - 1] = (E1[n_idx] - E3[n_idx]) * (1.0 + gam[n_idx + 1]);
+      Cf[i - 1] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
+      Df[i - 1] = E3[n_idx] * (Cpm1[n_idx + 1] - Cp[n_idx]) +
+                  E1[n_idx] * (Cm[n_idx] - Cmm1[n_idx + 1]);
       n_idx++;
     }
-    Af[l] = E1[nlay - 1] - w_surf_in * E3[nlay - 1];
-    Bf[l] = E2[nlay - 1] - w_surf_in * E4[nlay - 1];
-    Cf[l] = 0.0;
-    Df[l] = bsurf - Cp[nlay - 1] + w_surf_in * Cm[nlay - 1];
+    Af[l - 1] = E1[nlay - 1] - w_surf_in * E3[nlay - 1];
+    Bf[l - 1] = E2[nlay - 1] - w_surf_in * E4[nlay - 1];
+    Cf[l - 1] = 0.0;
+    Df[l - 1] = bsurf - Cp[nlay - 1] + w_surf_in * Cm[nlay - 1];
 
     dtridgl(l, Af, Bf, Cf, Df, xk);
 
     for (int n = 0; n < nlay; n++) {
-      xk1[n] = xk[2 * n + 1] + xk[2 * n + 2];
-      xk2[n] = xk[2 * n + 1] - xk[2 * n + 2];
+      xk1[n] = xk[2 * n] + xk[2 * n + 1];
+      xk2[n] = xk[2 * n] - xk[2 * n + 1];
       if (fabs(xk2[n]) < 1e-30 * fabs(xk[2 * n + 1])) xk2[n] = 0.0;
       FLX_UP(n) = xk1[n] + gam[n] * xk2[n] + Cpm1[n];
       FLX_DN(n) = xk1[n] * gam[n] + xk2[n] + Cmm1[n];

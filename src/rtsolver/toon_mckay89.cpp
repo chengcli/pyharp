@@ -44,9 +44,9 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
   // check bc
   if (bc->find(bname + "umu0") != bc->end()) {
     TORCH_CHECK(bc->at(bname + "umu0").dim() == 1,
-                "DisortImpl::forward: bc->umu0.dim() != 1");
+                "ToonMcKay89::forward: bc->umu0.dim() != 1");
     TORCH_CHECK(bc->at(bname + "umu0").size(0) == ncol,
-                "DisortImpl::forward: bc->umu0.size(0) != ncol");
+                "ToonMcKay89::forward: bc->umu0.size(0) != ncol");
     (*bc)["umu0"] = bc->at(bname + "umu0");
   } else {
     (*bc)["umu0"] = torch::ones({1, ncol}, prop.options());
@@ -54,11 +54,11 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
   if (bc->find(bname + "fbeam") != bc->end()) {
     TORCH_CHECK(bc->at(bname + "fbeam").dim() == 2,
-                "DisortImpl::forward: bc->fbeam.dim() != 2");
+                "ToonMcKay89::forward: bc->fbeam.dim() != 2");
     TORCH_CHECK(bc->at(bname + "fbeam").size(0) == nwave,
-                "DisortImpl::forward: bc->fbeam.size(0) != nwave");
+                "ToonMcKay89::forward: bc->fbeam.size(0) != nwave");
     TORCH_CHECK(bc->at(bname + "fbeam").size(1) == ncol,
-                "DisortImpl::forward: bc->fbeam.size(1) != ncol");
+                "ToonMcKay89::forward: bc->fbeam.size(1) != ncol");
     (*bc)["fbeam"] = bc->at(bname + "fbeam");
   } else {
     (*bc)["fbeam"] = torch::zeros({nwave, ncol}, prop.options());
@@ -66,11 +66,11 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
   if (bc->find(bname + "albedo") != bc->end()) {
     TORCH_CHECK(bc->at(bname + "albedo").dim() == 2,
-                "DisortImpl::forward: bc->albedo.dim() != 2");
+                "ToonMcKay89::forward: bc->albedo.dim() != 2");
     TORCH_CHECK(bc->at(bname + "albedo").size(0) == nwave,
-                "DisortImpl::forward: bc->albedo.size(0) != nwave");
+                "ToonMcKay89::forward: bc->albedo.size(0) != nwave");
     TORCH_CHECK(bc->at(bname + "albedo").size(1) == ncol,
-                "DisortImpl::forward: bc->albedo.size(1) != ncol");
+                "ToonMcKay89::forward: bc->albedo.size(1) != ncol");
     (*bc)["albedo"] = bc->at(bname + "albedo");
   } else {
     (*bc)["albedo"] = torch::zeros({nwave, ncol}, prop.options());
