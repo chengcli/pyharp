@@ -51,6 +51,13 @@ struct RadiationOptionsImpl {
   static std::shared_ptr<RadiationOptionsImpl> from_yaml(
       std::string const& filename);
 
+  std::shared_ptr<RadiationOptionsImpl> clone() const {
+    auto op = std::make_shared<RadiationOptionsImpl>(*this);
+    for (auto& b : op->bands()) {
+      b = b->clone();
+    }
+    return op;
+  }
   void report(std::ostream& os) const {
     os << "* outdirs = " << outdirs() << "\n";
     os << "* [ bands:\n";

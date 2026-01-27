@@ -37,6 +37,9 @@ struct IntegratorOptionsImpl {
   static std::shared_ptr<IntegratorOptionsImpl> from_yaml(
       YAML::Node const& node, bool verbose = false);
 
+  std::shared_ptr<IntegratorOptionsImpl> clone() const {
+    return std::make_shared<IntegratorOptionsImpl>(*this);
+  }
   void report(std::ostream& os) const {
     os << "* type = " << type() << "\n"
        << "* cfl = " << cfl() << "\n"
