@@ -75,6 +75,11 @@ struct RadiationBandOptionsImpl {
     if (op->toon() != nullptr) {
       op->toon() = op->toon()->clone();
     }
+    auto& opacities_ref = op->opacities();
+    opacities_ref.clear();
+    for (auto const& [k, v] : opacities()) {
+      opacities_ref[k] = v->clone();
+    }
     return op;
   }
   void report(std::ostream& os) const {
