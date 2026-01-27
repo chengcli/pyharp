@@ -18,6 +18,9 @@ struct ToonMcKay89OptionsImpl {
     return std::make_shared<ToonMcKay89OptionsImpl>();
   }
 
+  std::shared_ptr<ToonMcKay89OptionsImpl> clone() const {
+    return std::make_shared<ToonMcKay89OptionsImpl>(*this);
+  }
   void report(std::ostream& os) const {
     os << "* zenith_correction = " << zenith_correction() << "\n";
 

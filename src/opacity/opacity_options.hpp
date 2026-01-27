@@ -14,6 +14,9 @@ struct OpacityOptionsImpl {
       std::string const& filename, std::string const& op_name,
       std::string bd_name = "");
 
+  std::shared_ptr<OpacityOptionsImpl> clone() const {
+    return std::make_shared<OpacityOptionsImpl>(*this);
+  }
   void report(std::ostream& os) const {
     os << "* type = " << type() << "\n";
     os << "* bname = " << bname() << "\n";

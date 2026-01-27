@@ -10,6 +10,7 @@
 #include <disort/disort.hpp>
 
 // harp
+#include <harp/harp_formatter.hpp>
 #include <harp/opacity/opacity_options.hpp>
 #include <harp/rtsolver/toon_mckay89.hpp>
 
@@ -66,6 +67,16 @@ struct RadiationBandOptionsImpl {
   static std::shared_ptr<RadiationBandOptionsImpl> from_yaml(
       std::string const& filename, std::string const& bd_name);
 
+  std::shared_ptr<RadiationBandOptionsImpl> clone() const {
+    auto op = std::make_shared<RadiationBandOptionsImpl>(*this);
+    if (op->disort() != nullptr) {
+      op->disort() = op->disort()->clone();
+    }
+    if (op->toon() != nullptr) {
+      op->toon() = op->toon()->clone();
+    }
+    return op;
+  }
   void report(std::ostream& os) const {
     os << "* name = " << name() << "\n";
     os << "* outdirs = " << outdirs() << "\n";
@@ -75,20 +86,24 @@ struct RadiationBandOptionsImpl {
     os << "* ncol = " << ncol() << "\n";
     os << "* nlyr = " << nlyr() << "\n";
     os << "* nstr = " << nstr() << "\n";
-    os << "* [ opacities:\n";
+
+    os << "* opacities: [\n";
     for (auto const& [k, v] : opacities()) {
       os << "  - " << k << ":\n";
       v->report(os);
     }
     os << "  ]\n";
-    os << "* disort:\n";
-    disort()->report(os);
-    os << "* wavenumber = [";
-    for (auto const& w : wavenumber()) os << w << ", ";
-    os << "]\n";
-    os << "* weight = [ ";
-    for (auto const& w : weight()) os << w << ", ";
-    os << "]\n";
+
+    if (solver_name() == "disort") {
+      os << "* disort:\n";
+      disort()->report(os);
+    } else if (solver_name() == "toon") {
+      os << "* toon:\n";
+      toon()->report(os);
+    }
+
+    os << "* wavenumber = " << fmt::format("{}", wavenumber()) << "\n";
+    os << "* weight = " << fmt::format("{}", weight()) << "\n";
     os << "* verbose = " << (verbose() ? "true" : "false") << "\n";
   }
 
