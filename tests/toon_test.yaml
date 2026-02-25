@@ -1,0 +1,42 @@
+# Radiation configuration file for testing the Toon-McKay89 (toon) solver.
+#
+# This file configures two shortwave bands with identical properties:
+#   - B_toon: solved with the Toon-McKay89 two-stream solver
+#   - B_disort: solved with DISORT for correctness comparison
+#
+# The aerosol opacity uses the FourColumn table format:
+#   column 1: wavenumber  [cm^-1]
+#   column 2: extinction  [m^2/mol]
+#   column 3: single scattering albedo
+#   column 4: asymmetry parameter g
+
+species:
+  - name: aerosol
+    composition: {C: 1}
+
+geometry:
+  cells:
+    nx1: 10
+
+opacities:
+  scatterer:
+    type: fourcolumn
+    data: [aerosol_test.txt]
+    species: [aerosol]
+    nmom: 4
+
+bands:
+  - name: B_toon
+    range: [200., 2000.]
+    opacities: [scatterer]
+    solver: toon
+    integration: wavenumber
+    nwave: 3
+
+  - name: B_disort
+    range: [200., 2000.]
+    opacities: [scatterer]
+    solver: disort
+    integration: wavenumber
+    nwave: 3
+    flags: lamber,quiet,onlyfl
