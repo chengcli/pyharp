@@ -203,10 +203,10 @@ def test_toon_sw_vs_disort():
         ratio = dn_toon / (dn_disort + 1e-30)
         print(f"w0={w0}, g={g}: Toon dn_surf={dn_toon:.4f}, "
               f"DISORT dn_surf={dn_disort:.4f}, ratio={ratio:.3f}")
-        #assert 0.33 < ratio < 3.0, (
-        #    f"Surface dn flux ratio outside [0.33, 3] for w0={w0}, g={g}: "
-        #    f"toon={dn_toon:.4f}, disort={dn_disort:.4f}, ratio={ratio:.3f}"
-        #)
+        assert 0.8 < ratio < 1.2, (
+            f"Surface dn flux ratio outside [0.8, 1.2] for w0={w0}, g={g}: "
+            f"toon={dn_toon:.4f}, disort={dn_disort:.4f}, ratio={ratio:.3f}"
+        )
 
 def test_toon_lw_isothermal():
     """Toon and DISORT longwave fluxes must agree for an isothermal atmosphere.
@@ -340,10 +340,10 @@ def test_toon_lw_isothermal_scattering():
             assert up_t > 0, f"Toon LW upward TOA flux non-positive for band {iw}"
             assert up_d > 0, f"DISORT LW upward TOA flux non-positive for band {iw}"
             rel_diff = abs(up_t - up_d) / (abs(up_d) + 1e-30)
-            #assert rel_diff < 0.20, (
-            #    f"Toon/DISORT LW TOA flux differ >20% for band {iw}: "
-            #    f"toon={up_t:.4f}, disort={up_d:.4f}, rel_diff={rel_diff:.3f}"
-            #)
+            assert rel_diff < 0.20, (
+                f"Toon/DISORT LW TOA flux differ >20% for band {iw}: "
+                f"toon={up_t:.4f}, disort={up_d:.4f}, rel_diff={rel_diff:.3f}"
+            )
 
 if __name__ == "__main__":
     print("test_toon_sw_pure_absorption")
