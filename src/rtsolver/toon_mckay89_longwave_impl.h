@@ -82,7 +82,6 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
 
   T *em1 = alloc_from<T>(work, nlay);
   T *em2 = alloc_from<T>(work, nlay);
-  T *em3 = alloc_from<T>(work, nlay);
   T *lw_up_g = alloc_from<T>(work, nlev);
   T *lw_down_g = alloc_from<T>(work, nlev);
 
