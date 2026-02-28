@@ -12,13 +12,6 @@ Level ordering convention (both Toon and DISORT with ``upward=True``):
   - flx[..., 0] = upward flux, flx[..., 1] = downward flux
 
 Requires pyharp >= 1.9.0 and pydisort >= 1.5.0.
-
-Implementation note
--------------------
-The pyharp and pydisort packages share PyTorch CPU dispatch stubs.  Creating
-multiple solver objects in the same Python process can leave the dispatch
-table in an inconsistent state.  Each test case therefore runs in its own
-subprocess so each solver gets a fully isolated Python environment.
 """
 
 import json
@@ -30,61 +23,6 @@ import pyharp
 import pydisort
 
 torch.set_default_dtype(torch.float64)
-
-# ---------------------------------------------------------------------------
-# Subprocess helper
-# ---------------------------------------------------------------------------
-
-# Common imports for toon-only subprocesses (no Disort object is created so
-# the CPU dispatch table stays in a consistent state).
-_TOON_IMPORTS = """\
-import json
-import torch
-import pyharp
-from pyharp.cpp import ToonMcKay89 as ToonModule
-torch.set_default_dtype(torch.float64)
-"""
-
-# Common imports for disort-only subprocesses.
-_DISORT_IMPORTS = """\
-import json
-import torch
-import pyharp
-torch.set_default_dtype(torch.float64)
-"""
-
-
-def _run_toon(code: str) -> object:
-    """Run Toon-only *code* in a fresh subprocess (no Disort object created)."""
-    proc = subprocess.run(
-        [sys.executable, "-c", _TOON_IMPORTS + code],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if proc.returncode != 0:
-        raise AssertionError(
-            f"Subprocess failed (exit {proc.returncode}):\n"
-            f"STDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
-        )
-    return json.loads(proc.stdout.strip())
-
-
-def _run_disort(code: str) -> object:
-    """Run Disort-only *code* in a fresh subprocess (no ToonMcKay89 object created)."""
-    proc = subprocess.run(
-        [sys.executable, "-c", _DISORT_IMPORTS + code],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if proc.returncode != 0:
-        raise AssertionError(
-            f"Subprocess failed (exit {proc.returncode}):\n"
-            f"STDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
-        )
-    return json.loads(proc.stdout.strip())
-
 
 # ---------------------------------------------------------------------------
 # Tests
