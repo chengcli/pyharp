@@ -22,6 +22,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                                        torch::optional<torch::Tensor> temf) {
   // check dimensions
   TORCH_CHECK(prop.dim() == 4, "ToonMcKay89::forward: prop.dim() != 4");
+  TORCH_CHECK(prop.size(3) >= 3, "ToonMcKay89::forward: prop.size(3) < 3");
 
   int nwave = prop.size(0);
   int ncol = prop.size(1);

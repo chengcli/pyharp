@@ -45,7 +45,7 @@ void bind_rtsolver(py::module &m) {
             }
 
             for (auto &[key, value] : bc) {
-              std::vector<std::string> items = {"fbeam", "albedo", "umu0"};
+              std::vector<std::string> items = {"fbeam", "albedo"};
               // broadcast dimensions to (nwave, ncol)
               if (std::find(items.begin(), items.end(), key) != items.end()) {
                 while (value.dim() < 2) {
