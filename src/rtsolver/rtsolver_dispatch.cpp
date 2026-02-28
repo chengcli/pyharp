@@ -18,10 +18,10 @@ void call_toon89_sw_cpu(at::TensorIterator &iter) {
     int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
     int grain_size = iter.numel() / at::get_num_threads();
     int mem_size = toon89_sw_space<scalar_t>(nlay);
-    char *work = new char[mem_size];
 
     iter.for_each(
         [&](char **data, const int64_t *strides, int64_t n) {
+          std::unique_ptr<char[]> work = std::make_unique<char[]>(mem_size);
           for (int i = 0; i < n; i++) {
             auto out = reinterpret_cast<scalar_t *>(data[0] + i * strides[0]);
             auto prop = reinterpret_cast<scalar_t *>(data[1] + i * strides[1]);
@@ -30,12 +30,10 @@ void call_toon89_sw_cpu(at::TensorIterator &iter) {
             auto albedo =
                 reinterpret_cast<scalar_t *>(data[4] + i * strides[4]);
             toon_mckay89_shortwave(nlay, *fbeam, umu0, prop, *albedo, out, len1,
-                                   work);
+                                   work.get());
           }
         },
         grain_size);
-
-    delete[] work;
   });
 }
 
@@ -45,22 +43,21 @@ void call_toon89_lw_cpu(at::TensorIterator &iter) {
     int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
     int grain_size = iter.numel() / at::get_num_threads();
     int mem_size = toon89_lw_space<scalar_t>(nlay);
-    char *work = new char[mem_size];
 
     iter.for_each(
         [&](char **data, const int64_t *strides, int64_t n) {
+          std::unique_ptr<char[]> work = std::make_unique<char[]>(mem_size);
           for (int i = 0; i < n; i++) {
             auto out = reinterpret_cast<scalar_t *>(data[0] + i * strides[0]);
             auto prop = reinterpret_cast<scalar_t *>(data[1] + i * strides[1]);
             auto be = reinterpret_cast<scalar_t *>(data[2] + i * strides[2]);
             auto albedo =
                 reinterpret_cast<scalar_t *>(data[3] + i * strides[3]);
-            toon_mckay89_longwave(nlay, be, prop, *albedo, out, len1, work);
+            toon_mckay89_longwave(nlay, be, prop, *albedo, out, len1,
+                                  work.get());
           }
         },
         grain_size);
-
-    delete[] work;
   });
 }
 
