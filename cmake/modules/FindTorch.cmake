@@ -107,6 +107,17 @@ find_library(
   HINTS ${torch_lib_dir}
   NO_DEFAULT_PATH)
 
+# CUPTI (needed for some PyTorch builds that reference CUPTI symbols at link time)
+find_library(
+  CUPTI_LIBRARY cupti
+  HINTS
+    /usr/local/cuda/targets/x86_64-linux/lib
+    /usr/local/cuda-12/targets/x86_64-linux/lib
+    /usr/local/cuda-12.3/targets/x86_64-linux/lib
+  NO_DEFAULT_PATH
+)
+mark_as_advanced(CUPTI_LIBRARY)
+
 find_path(
   TORCH_INCLUDE_DIR torch
   HINTS ${torch_include_dir}
@@ -181,6 +192,16 @@ if(NOT TARGET torch)
 
   target_link_libraries(torch INTERFACE ${TORCH_CPU_LIBRARY} ${C10_LIBRARY}
                                         torch_cxx11_abi)
+
+  # If this is a CUDA-enabled PyTorch, propagate CUPTI so final executables resolve symbols
+  if(TORCH_CUDA_LIBRARY AND CUPTI_LIBRARY)
+    target_link_libraries(torch INTERFACE ${CUPTI_LIBRARY})
+
+    # Optional but recommended: make runtime loader find CUPTI without LD_LIBRARY_PATH
+    get_filename_component(_cupti_dir "${CUPTI_LIBRARY}" DIRECTORY)
+    target_link_options(torch INTERFACE "-Wl,-rpath,${_cupti_dir}")
+    unset(_cupti_dir)
+  endif()
 
   if(TORCH_CUDA_LIBRARY AND C10_CUDA_LIBRARY)
     target_link_libraries(torch INTERFACE ${TORCH_CUDA_LIBRARY}
