@@ -13,9 +13,9 @@
 
 #include "dtridgl_impl.h"
 
-#define DTAU_IN(i) prop[(nlay - (i) - 1) * 3]
-#define W_IN(i) prop[(nlay - (i) - 1) * 3 + 1]
-#define G_IN(i) prop[(nlay - (i) - 1) * 3 + 2]
+#define DTAU_IN(i) prop[(nlay - (i) - 1) * len1]
+#define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
+#define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
 #define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
 #define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
 
@@ -23,7 +23,8 @@ namespace harp {
 
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
-                                          T a_surf_in, T *flx, char *work) {
+                                          T a_surf_in, T *flx, int len1,
+                                          char *work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;

@@ -11,9 +11,9 @@
 
 #include "dtridgl_impl.h"
 
-#define DTAU_IN(i) prop[(nlay - (i) - 1) * 3]
-#define W_IN(i) prop[(nlay - (i) - 1) * 3 + 1]
-#define G_IN(i) prop[(nlay - (i) - 1) * 3 + 2]
+#define DTAU_IN(i) prop[(nlay - (i) - 1) * len1]
+#define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
+#define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
 #define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
 #define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
 #define MU_IN(i) mu_in[nlev - (i) - 1]
@@ -23,7 +23,7 @@ namespace harp {
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
                                            T const *prop, T w_surf_in, T *flx,
-                                           char *work) {
+                                           int len1, char *work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;
@@ -77,6 +77,16 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
   for (int i = 0; i < nlay; i++) {
     tau_in[i + 1] = tau_in[i] + DTAU_IN(i);
   }
+
+  /* debug: print dtau_in and tau_in
+  for (int i = 0; i < nlay; i++) {
+    printf("Layer %d: DTAU_IN = %e, tau_in = %e\n", i, DTAU_IN(i), tau_in[i +
+  1]);
+  }
+  for (int i = 0; i <= nlay; i++) {
+    printf("Level %d: MU_IN = %e\n", i, MU_IN(i));
+  }
+  printf("all_zero_w = %d\n", all_zero_w);*/
 
   if (all_zero_w) {
     // --- Special Case: Direct Beam Only ---
@@ -178,6 +188,11 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
 
     dtridgl(l, Af, Bf, Cf, Df, xk);
 
+    /* diagnose xk
+    for (int i = 0; i < l; i++) {
+      printf("xk[%d] = %e\n", i, xk[i]);
+    }*/
+
     for (int n = 0; n < nlay; n++) {
       xk1[n] = xk[2 * n] + xk[2 * n + 1];
       xk2[n] = xk[2 * n] - xk[2 * n + 1];
@@ -185,12 +200,23 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
       FLX_UP(n) = xk1[n] + gam[n] * xk2[n] + Cpm1[n];
       FLX_DN(n) = xk1[n] * gam[n] + xk2[n] + Cmm1[n];
     }
+
+    /* diagnose xk1 and xk2
+    for (int n = 0; n < nlay; n++) {
+      printf("xk1[%d] = %e, xk2[%d] = %e\n", n, xk1[n], n, xk2[n]);
+    }*/
+
     FLX_UP(nlev - 1) = xk1[nlay - 1] * Ep[nlay - 1] +
                        gam[nlay - 1] * xk2[nlay - 1] * Em[nlay - 1] +
                        Cp[nlay - 1];
     FLX_DN(nlev - 1) = xk1[nlay - 1] * Ep[nlay - 1] * gam[nlay - 1] +
                        xk2[nlay - 1] * Em[nlay - 1] + Cm[nlay - 1];
     for (int k = 0; k < nlev; k++) FLX_DN(k) += dir[k];
+
+    /* diagnose FLX_UP and FLX_DN
+    for (int k = 0; k < nlev; k++) {
+      printf("Level %d: FLX_UP = %e, FLX_DN = %e\n", k, FLX_UP(k), FLX_DN(k));
+    }*/
   }
 }
 

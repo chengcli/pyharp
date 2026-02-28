@@ -15,6 +15,7 @@ namespace harp {
 void call_toon89_sw_cpu(at::TensorIterator &iter) {
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_toon89_sw_cpu", [&] {
     int nlay = at::native::ensure_nonempty_size(iter.input(0), -2);
+    int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
     int grain_size = iter.numel() / at::get_num_threads();
     int mem_size = toon89_sw_space<scalar_t>(nlay);
     char *work = new char[mem_size];
@@ -28,7 +29,7 @@ void call_toon89_sw_cpu(at::TensorIterator &iter) {
             auto fbeam = reinterpret_cast<scalar_t *>(data[3] + i * strides[3]);
             auto albedo =
                 reinterpret_cast<scalar_t *>(data[4] + i * strides[4]);
-            toon_mckay89_shortwave(nlay, *fbeam, umu0, prop, *albedo, out,
+            toon_mckay89_shortwave(nlay, *fbeam, umu0, prop, *albedo, out, len1,
                                    work);
           }
         },
@@ -41,6 +42,7 @@ void call_toon89_sw_cpu(at::TensorIterator &iter) {
 void call_toon89_lw_cpu(at::TensorIterator &iter) {
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_toon89_lw_cpu", [&] {
     int nlay = at::native::ensure_nonempty_size(iter.input(0), -2);
+    int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
     int grain_size = iter.numel() / at::get_num_threads();
     int mem_size = toon89_lw_space<scalar_t>(nlay);
     char *work = new char[mem_size];
@@ -53,7 +55,7 @@ void call_toon89_lw_cpu(at::TensorIterator &iter) {
             auto be = reinterpret_cast<scalar_t *>(data[2] + i * strides[2]);
             auto albedo =
                 reinterpret_cast<scalar_t *>(data[3] + i * strides[3]);
-            toon_mckay89_longwave(nlay, be, prop, *albedo, out, work);
+            toon_mckay89_longwave(nlay, be, prop, *albedo, out, len1, work);
           }
         },
         grain_size);
