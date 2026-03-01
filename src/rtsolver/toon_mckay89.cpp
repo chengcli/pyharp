@@ -104,10 +104,12 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
       temp(i) = ds_.temper[i];
       be(i) = BB_integrate(ds_.temper[i], spec.wav1, spec.wav2);
     }*/
-    auto wave_lo =
-        torch::tensor(options->wave_lower(), prop.options()).unsqueeze(-1);
-    auto wave_hi =
-        torch::tensor(options->wave_upper(), prop.options()).unsqueeze(-1);
+    auto wave_lo = torch::tensor(options->wave_lower(), prop.options())
+                       .unsqueeze(-1)
+                       .unsqueeze(-1);
+    auto wave_hi = torch::tensor(options->wave_upper(), prop.options())
+                       .unsqueeze(-1)
+                       .unsqueeze(-1);
 
     auto be = bbflux_wavenumber(wave_lo, wave_hi, temf.value());
 
@@ -118,7 +120,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                                           /*squash_dims=*/{2, 3})
                     .add_output(flx)
                     .add_input(prop)
-                    .add_owned_input(be.view({nwave, ncol, nlyr + 1, 1}))
+                    .add_input(be)
                     .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
                     .build();
 

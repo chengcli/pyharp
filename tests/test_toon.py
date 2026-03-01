@@ -245,7 +245,7 @@ def test_toon_lw_isothermal():
         "albedo": torch.zeros(nwave,ncol),
         "temis":  torch.zeros(nwave,ncol),
         "btemp":  torch.ones(ncol) * temp_K,
-        "ttemp":  torch.ones(ncol) * temp_K
+        "ttemp":  torch.zeros(ncol) * temp_K
     }
 
     temf = torch.ones(ncol,nlyr+1) * temp_K
@@ -309,7 +309,7 @@ def test_toon_lw_isothermal_scattering():
         "albedo": torch.zeros(nwave,ncol),
         "temis":  torch.zeros(nwave,ncol),
         "btemp":  torch.ones(ncol) * temp_K,
-        "ttemp":  torch.ones(ncol) * temp_K
+        "ttemp":  torch.zeros(ncol) * temp_K
     }
 
     temf = torch.ones(ncol,nlyr+1) * temp_K
