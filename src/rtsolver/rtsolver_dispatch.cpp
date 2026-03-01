@@ -1,3 +1,6 @@
+// C/C++
+#include <memory>
+
 // torch
 #include <ATen/Dispatch.h>
 #include <ATen/TensorIterator.h>
