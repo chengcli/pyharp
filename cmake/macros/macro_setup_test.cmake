@@ -26,5 +26,9 @@ macro(setup_test namel)
             $<IF:$<BOOL:${CUDAToolkit_FOUND}>,pyharp::harp_cu,>
             gtest_main)
 
+  if (UNIX AND NOT APPLE)
+    target_link_options(${namel}.${buildl} PRIVATE -Wl,--no-as-needed)
+  endif()
+
   add_test(NAME ${namel}.${buildl} COMMAND ${namel}.${buildl})
 endmacro()
