@@ -108,8 +108,6 @@ size_t toon89_lw_space(int nlay) {
   bump(alignof(T), nlay * sizeof(T));        // sigma1
   bump(alignof(T), nlay * sizeof(T));        // sigma2
   bump(alignof(T), nlay * sizeof(T));        // em1
-  bump(alignof(T), nlay * sizeof(T));        // em2
-  bump(alignof(T), nlay * sizeof(T));        // em3
   bump(alignof(T), nlev * sizeof(T));        // lw_up_g
   bump(alignof(T), nlev * sizeof(T));        // lw_down_g
 

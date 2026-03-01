@@ -13,9 +13,9 @@
 
 #include "dtridgl_impl.h"
 
-#define DTAU_IN(i) prop[(nlay - (i) - 1) * 3]
-#define W_IN(i) prop[(nlay - (i) - 1) * 3 + 1]
-#define G_IN(i) prop[(nlay - (i) - 1) * 3 + 2]
+#define DTAU_IN(i) prop[(nlay - (i) - 1) * len1]
+#define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
+#define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
 #define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
 #define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
 
@@ -23,7 +23,8 @@ namespace harp {
 
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
-                                          T a_surf_in, T *flx, char *work) {
+                                          T a_surf_in, T *flx, int len1,
+                                          char *work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;
@@ -81,8 +82,6 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
   T *sigma2 = alloc_from<T>(work, nlay);
 
   T *em1 = alloc_from<T>(work, nlay);
-  T *em2 = alloc_from<T>(work, nlay);
-  T *em3 = alloc_from<T>(work, nlay);
   T *lw_up_g = alloc_from<T>(work, nlev);
   T *lw_down_g = alloc_from<T>(work, nlev);
 
@@ -98,6 +97,12 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
   for (int k = 0; k < nlay; k++) {
     tau[k + 1] = tau[k] + dtau[k];
   }
+
+  /* debug: print dtau_in and tau_in
+  for (int i = 0; i < nlay; i++) {
+    printf("Layer %d: DTAU_IN = %e, tau_in = %e, be = %e\n", i, DTAU_IN(i),
+  tau[i + 1], be[i]);
+  }*/
 
   for (int k = 0; k < nlay; k++) {
     alp[k] = sqrt((1.0 - w0[k]) / (1.0 - w0[k] * hg[k]));
@@ -139,22 +144,22 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
   Df[0] = Btop - Cmm1[0];
 
   int n_idx = 0;
-  for (int i = 2; i <= lm2; i += 2) {
-    Af[i - 1] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
-    Bf[i - 1] = (E2[n_idx] + E4[n_idx]) * (gam[n_idx + 1] - 1.0);
-    Cf[i - 1] = 2.0 * (1.0 - gam[n_idx + 1] * gam[n_idx + 1]);
-    Df[i - 1] = (gam[n_idx + 1] - 1.0) * (Cpm1[n_idx + 1] - Cp[n_idx]) +
-                (1.0 - gam[n_idx + 1]) * (Cm[n_idx] - Cmm1[n_idx + 1]);
+  for (int i = 1; i < lm2; i += 2) {
+    Af[i] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
+    Bf[i] = (E2[n_idx] + E4[n_idx]) * (gam[n_idx + 1] - 1.0);
+    Cf[i] = 2.0 * (1.0 - gam[n_idx + 1] * gam[n_idx + 1]);
+    Df[i] = (gam[n_idx + 1] - 1.0) * (Cpm1[n_idx + 1] - Cp[n_idx]) +
+            (1.0 - gam[n_idx + 1]) * (Cm[n_idx] - Cmm1[n_idx + 1]);
     n_idx++;
   }
 
   n_idx = 0;
-  for (int i = 3; i <= lm1; i += 2) {
-    Af[i - 1] = 2.0 * (1.0 - gam[n_idx] * gam[n_idx]);
-    Bf[i - 1] = (E1[n_idx] - E3[n_idx]) * (1.0 + gam[n_idx + 1]);
-    Cf[i - 1] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
-    Df[i - 1] = E3[n_idx] * (Cpm1[n_idx + 1] - Cp[n_idx]) +
-                E1[n_idx] * (Cm[n_idx] - Cmm1[n_idx + 1]);
+  for (int i = 2; i < lm1; i += 2) {
+    Af[i] = 2.0 * (1.0 - gam[n_idx] * gam[n_idx]);
+    Bf[i] = (E1[n_idx] - E3[n_idx]) * (1.0 + gam[n_idx + 1]);
+    Cf[i] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
+    Df[i] = E3[n_idx] * (Cpm1[n_idx + 1] - Cp[n_idx]) +
+            E1[n_idx] * (Cm[n_idx] - Cmm1[n_idx + 1]);
     n_idx++;
   }
 
@@ -206,28 +211,28 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
     // Downward loop
     lw_down_g[0] = twopi * (1.0 - exp(-tautop / u)) * be[0];
     for (int k = 0; k < nlay; k++) {
-      em2[k] = exp(-dtau[k] / u);
+      T em2 = exp(-dtau[k] / u);
       T l_u_p1 = lam[k] * u + 1.0;
       T l_u_m1 = lam[k] * u - 1.0;
 
-      lw_down_g[k + 1] =
-          lw_down_g[k] * em2[k] + (xj[k] / l_u_p1) * (Ep[k] - em2[k]) +
-          (xk[k] / l_u_m1) * (em2[k] - em1[k]) + sigma1[k] * (1.0 - em2[k]) +
-          sigma2[k] * (u * em2[k] + dtau[k] - u);
+      lw_down_g[k + 1] = lw_down_g[k] * em2 + (xj[k] / l_u_p1) * (Ep[k] - em2) +
+                         (xk[k] / l_u_m1) * (em2 - em1[k]) +
+                         sigma1[k] * (1.0 - em2) +
+                         sigma2[k] * (u * em2 + dtau[k] - u);
     }
 
     // Upward loop
     lw_up_g[nlev - 1] = twopi * (Bsurf + B1[nlay - 1] * u);
     for (int k = nlay - 1; k >= 0; k--) {
-      em2[k] = exp(-dtau[k] / u);
-      T em3_val = em1[k] * em2[k];
+      T em2 = exp(-dtau[k] / u);
+      T em3 = em1[k] * em2;
       T l_u_m1 = lam[k] * u - 1.0;
       T l_u_p1 = lam[k] * u + 1.0;
 
-      lw_up_g[k] =
-          lw_up_g[k + 1] * em2[k] + (g[k] / l_u_m1) * (Ep[k] * em2[k] - 1.0) +
-          (h[k] / l_u_p1) * (1.0 - em3_val) + alpha1[k] * (1.0 - em2[k]) +
-          alpha2[k] * (u - (dtau[k] + u) * em2[k]);
+      lw_up_g[k] = lw_up_g[k + 1] * em2 +
+                   (g[k] / l_u_m1) * (Ep[k] * em2 - 1.0) +
+                   (h[k] / l_u_p1) * (1.0 - em3) + alpha1[k] * (1.0 - em2) +
+                   alpha2[k] * (u - (dtau[k] + u) * em2);
     }
 
     for (int k = 0; k < nlev; k++) {
