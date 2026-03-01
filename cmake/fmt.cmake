@@ -3,7 +3,7 @@ set(FETCHCONTENT_QUIET TRUE)
 
 set(PACKAGE_NAME fmt)
 set(REPO_URL "https://github.com/fmtlib/fmt")
-set(REPO_TAG "11.1.2")
+set(REPO_TAG "12.1.0")
 
 add_package(${PACKAGE_NAME} ${REPO_URL} ${REPO_TAG} "" ON)
 set(FMT_INCLUDE_DIR
