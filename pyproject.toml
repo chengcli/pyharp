@@ -4,9 +4,9 @@ requires = [
   "wheel",
   "build",
   "ninja",
-  "pydisort>=1.5.0,<1.6.0",
+  "pydisort>=1.6.0",
   "cmake>=3.20",
-  "torch<=2.7.1,>=2.7.0",
+  "torch>=2.8.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -22,7 +22,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
   "numpy",
-  "pydisort>=1.5.0,<1.6.0",
+  "pydisort>=1.6.0",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -33,6 +33,8 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
   "Topic :: Scientific/Engineering :: Atmospheric Science",
   "Topic :: Scientific/Engineering :: Physics",
