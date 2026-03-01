@@ -18,8 +18,7 @@ TEST_P(DeviceTest, simple_toon_mckay89) {
   harp::ToonMcKay89 toon(op);
   toon->to(device, dtype);
 
-  // int nwave = op->wave_lower().size();
-  int nwave = 1;
+  int nwave = op->wave_lower().size();
   int nlyr = 10;
   int ncol = 2;
   int nprop = 3;
