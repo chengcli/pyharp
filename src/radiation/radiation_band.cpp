@@ -111,6 +111,12 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     op->toon() = ToonMcKay89OptionsImpl::create();
     op->toon()->wave_lower(std::vector<double>(op->nwave(), wmin));
     op->toon()->wave_upper(std::vector<double>(op->nwave(), wmax));
+    if (band["flags"]) {
+      op->toon()->flags(trim_copy(band["flags"].as<std::string>()));
+    }
+    if (op->verbose()) {
+      std::cout << "  Solver flags: " << op->disort()->flags() << std::endl;
+    }
   } else if (op->solver_name() == "twostr") {
     TORCH_CHECK(false, "twostr solver not implemented");
   } else {

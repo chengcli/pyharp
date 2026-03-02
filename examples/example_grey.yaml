@@ -1,0 +1,43 @@
+species:
+  - name: dry
+    composition: { H: 2 }
+    cv_R: 2.5
+
+opacities:
+  grey-sw:
+    type: jit
+    data: ["grey_sw.pt"]
+    species: [dry]
+    jit_kwargs: [pres, temp]
+    parameters: { kappa_a: 1.0e-2, kappa_b: -0.5, kappa_cut: 1.0e-4, w0: 0., g: 0. }
+
+  grey-lw:
+    type: jit
+    data: ["grey_lw.pt"]
+    species: [dry]
+    jit_kwargs: [pres, temp]
+    parameters: { kappa_a: 1.6e-8, kappa_b: 1.0, kappa_cut: 1.0e-4, w0: 0., g: 0. }
+
+geometry:
+  cells:
+    nx1: 100
+
+bands:
+  - name: sw
+    range: [10000.0, 50000.0]
+    opacities: [grey-sw]
+    solver: toon
+    nwave: 1
+    surface_albedo: 0.0
+
+  - name: lw
+    range: [10.0, 10000.0]
+    opacities: [grey-lw]
+    solver: toon
+    nwave: 1
+    surface_albedo: 0.0
+    flags: planck
+
+problem:
+  stellar_flux_nadir: 1361.0
+  update_dt: 3600.0

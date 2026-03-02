@@ -79,7 +79,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
   auto flx = torch::zeros({nwave, ncol, nlyr + 1, 2}, prop.options());
 
-  if (!temf.has_value()) {  // shortwave
+  if (!options.planck()) {  // shortwave
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)
@@ -98,6 +98,9 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
     at::native::call_toon89_sw(flx.device().type(), iter);
     return flx;
   } else {  // longwave
+    TORCH_CHECK(temf.has_value(),
+                "ToonMcKay89::forward: temp is required for longwave calculation");
+
     /*Eigen::VectorXd temp(nlay + 1);
     Eigen::VectorXd be(nlay + 1);
     for (int i = 0; i < nlay + 1; ++i) {
