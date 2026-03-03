@@ -20,10 +20,13 @@ def parse_library_names(libdir):
     library_names.extend(['netcdf'])
 
     # move current library name to first
-    current = [item for item in library_names if item.startswith('harp')]
-    other = [item for item in library_names if not item.startswith('harp')]
-
-    return current + other
+    # 1) non-cuda libs first (consumers)
+    harp_non_cuda = [l for l in library_names if l.startswith("harp") and "cuda" not in l]
+    # 2) cuda libs last (providers)
+    harp_cuda = [l for l in library_names if l.startswith("harp") and "cuda" in l]
+    # 3) everything else
+    other = [l for l in library_names if not l.startswith("harp")]
+    return harp_non_cuda + other + harp_cuda
 
 site_dir = sysconfig.get_paths()["purelib"]
 
@@ -44,6 +47,7 @@ else:
     lib_dirs.extend(['/lib64/', '/usr/lib/x86_64-linux-gnu/'])
 
 libraries = parse_library_names(f"{current_dir}/build/lib")
+print('Libraries to link:', libraries)
 
 if sys.platform == "darwin":
     extra_link_args = [
@@ -52,11 +56,25 @@ if sys.platform == "darwin":
         "-Wl,-rpath,@loader_path/../pydisort/lib",
     ]
 else:
+    # ubuntu system has an aggressive linker that removes unused shared libs
+    # add cuda library explicitly if built with cuda
+    cuda_linker = []
+    cuda_libraries = [lib for lib in libraries if "cuda" in lib]
+    if cuda_libraries:
+        for lib in cuda_libraries:
+            libraries.remove(lib)
+        cuda_linker = (
+            ["-Wl,--no-as-needed"]
+            + [f"-l{lib}" for lib in cuda_libraries]
+            + ["-Wl,--as-needed"]
+            )
+
     extra_link_args = [
         "-Wl,-rpath,$ORIGIN/lib",
         "-Wl,-rpath,$ORIGIN/../torch/lib",
         "-Wl,-rpath,$ORIGIN/../pydisort/lib",
     ]
+    extra_link_args += cuda_linker
 
 ext_module = cpp_extension.CppExtension(
     name='pyharp.pyharp',
