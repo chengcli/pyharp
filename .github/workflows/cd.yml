@@ -158,14 +158,13 @@ jobs:
             pip install numpy 'cmake<=3.30' 'pydisort==1.5.0' 'torch==2.7.1'
             TORCH_CMAKE_PREFIX_PATH=$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')
             export LD_LIBRARY_PATH=$(python -c "import torch; print(torch.__path__[0] + '/lib')"):$(pwd)/build/lib:$LD_LIBRARY_PATH
-            $LD_LIBRARY_PATH
             cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                   -DPython3_EXECUTABLE=$(which python) \
                   -DCMAKE_PREFIX_PATH="$TORCH_CMAKE_PREFIX_PATH" \
                   -DCUDA=ON
             cmake --build build --parallel 3
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
-            LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/lib64:/usr/lib64:$LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/lib64:/usr/lib64:$LD_LIBRARY_PATH
             auditwheel repair --exclude lib*.so -w {dest_dir} {wheel}
         run: |
           pip install cibuildwheel
