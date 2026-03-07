@@ -142,7 +142,7 @@ jobs:
       - name: Build Linux wheel
         env:
           CIBW_PLATFORM: linux
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_X86_64_IMAGE: docker.io/pytorch/manylinux-cuda121
           CIBW_BUILD: cp${{ env.PY_VERSION }}*
           CIBW_ARCHS: ${{ env.LINUX_ARCH }}
           CIBW_SKIP: "*musllinux*"
@@ -154,7 +154,8 @@ jobs:
             $LD_LIBRARY_PATH
             cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                   -DPython3_EXECUTABLE=$(which python) \
-                  -DCMAKE_PREFIX_PATH="$TORCH_CMAKE_PREFIX_PATH"
+                  -DCMAKE_PREFIX_PATH="$TORCH_CMAKE_PREFIX_PATH" \
+                  -DCUDA=ON
             cmake --build build --parallel 3
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
             auditwheel repair --exclude lib*.so -w {dest_dir} {wheel}
