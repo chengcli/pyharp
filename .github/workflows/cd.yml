@@ -149,6 +149,12 @@ jobs:
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_BUILD: |
             export PATH="/opt/python/cp${{ env.PY_VERSION }}-cp${{ env.PY_VERSION }}/bin:$PATH"
+
+            dnf install -y epel-release 'dnf-command(config-manager)'
+            dnf config-manager --set-enabled powertools || \
+            dnf config-manager --set-enabled PowerTools || \
+            dnf config-manager --set-enabled codeready-builder-for-rhel-8-$(arch)-rpms
+
             yum install -y epel-release && yum install -y netcdf-devel
             #python -V
             #which python
