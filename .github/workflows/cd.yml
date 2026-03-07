@@ -143,20 +143,20 @@ jobs:
       - name: Build Linux wheel
         env:
           CIBW_PLATFORM: linux
-          CIBW_MANYLINUX_X86_64_IMAGE: docker.io/pytorch/manylinux-cuda121
+          CIBW_MANYLINUX_X86_64_IMAGE: docker.io/pytorch/manylinux2_28-builder:cuda12.8
           CIBW_BUILD: cp${{ env.PY_VERSION }}*
           CIBW_ARCHS: ${{ env.LINUX_ARCH }}
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_BUILD: |
             export PATH="/opt/python/cp${{ env.PY_VERSION }}-cp${{ env.PY_VERSION }}/bin:$PATH"
             yum install -y epel-release && yum install -y netcdf-devel
-            python -V
-            which python
-            pip -V
-            python -m pip config list || true
-            env | sort | grep -E '^(PIP|UV|CIBW)_' || true
-            python -m pip install -U pip setuptools wheel
-            python -m pip index versions pydisort || true
+            #python -V
+            #which python
+            #pip -V
+            #python -m pip config list || true
+            #env | sort | grep -E '^(PIP|UV|CIBW)_' || true
+            #python -m pip install -U pip setuptools wheel
+            #python -m pip index versions pydisort || true
             pip install numpy 'cmake<=3.30' 'pydisort==1.5.0' 'torch==2.7.1'
             TORCH_CMAKE_PREFIX_PATH=$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')
             export LD_LIBRARY_PATH=$(python -c "import torch; print(torch.__path__[0] + '/lib')"):$(pwd)/build/lib:$LD_LIBRARY_PATH
