@@ -155,7 +155,7 @@ jobs:
             dnf config-manager --set-enabled PowerTools || \
             dnf config-manager --set-enabled codeready-builder-for-rhel-8-$(arch)-rpms
 
-            yum install -y epel-release && yum install -y netcdf-devel
+            yum install -y epel-release && yum install -y libaec libaec-devel netcdf-devel
             #python -V
             #which python
             #pip -V
