@@ -272,6 +272,82 @@ def test_toon_lw_isothermal():
             f"toon={up_t:.4f}, disort={up_d:.4f}, rel_diff={rel_diff:.3f}"
         )
 
+def test_toon_lw_isothermal_profile_matches_disort():
+    """Isothermal longwave profiles should be flat and symmetric.
+
+    With no scattering and matching top/surface temperatures, both upward and
+    downward longwave fluxes should be nearly level-independent, and Toon
+    should closely match the DISORT reference profile.
+    """
+    nwave = 1
+    ncol = 1
+    nlyr = 10
+    nprop = 3
+    nstr = 4
+    tau = 0.3
+    temp_K = 300.0
+    wave_lo = [500.0]
+    wave_hi = [1000.0]
+
+    opt = pyharp.ToonMcKay89Options()
+    opt.wave_lower(wave_lo)
+    opt.wave_upper(wave_hi)
+    toon = pyharp.ToonMcKay89(opt)
+
+    dop = pydisort.DisortOptions()
+    dop.upward(True)
+    dop.flags("lamber,quiet,onlyfl,planck")
+    dop.wave_lower(wave_lo)
+    dop.wave_upper(wave_hi)
+    pyharp.disort_config(dop, nstr, nlyr, ncol, nwave)
+    disort = pydisort.Disort(dop)
+
+    prop = torch.zeros(nwave, ncol, nlyr, max(nprop, 2 + nstr))
+    prop[:, :, :, 0] = tau
+
+    bc = {
+        "albedo": torch.zeros(nwave, ncol),
+        "temis": torch.ones(nwave, ncol),
+        "btemp": torch.ones(ncol) * temp_K,
+        "ttemp": torch.ones(ncol) * temp_K,
+    }
+    temf = torch.ones(ncol, nlyr + 1) * temp_K
+
+    toon_result = toon(prop, temf=temf, **bc)
+    disort_result = disort(prop, temf=temf, **bc)
+
+    toon_up = toon_result[0, 0, :, 0]
+    toon_dn = toon_result[0, 0, :, 1]
+    disort_up = disort_result[0, 0, :, 0]
+    disort_dn = disort_result[0, 0, :, 1]
+
+    toon_scale = float(torch.mean(toon_up))
+    disort_scale = float(torch.mean(disort_up))
+
+    assert torch.max(torch.abs(toon_up - toon_dn)) / toon_scale < 1e-2, (
+        f"Toon isothermal LW up/down mismatch too large: "
+        f"{float(torch.max(torch.abs(toon_up - toon_dn)) / toon_scale):.3e}"
+    )
+    assert torch.max(torch.abs(toon_up - torch.mean(toon_up))) / toon_scale < 1e-2, (
+        f"Toon isothermal LW upward profile is not flat enough: "
+        f"{float(torch.max(torch.abs(toon_up - torch.mean(toon_up))) / toon_scale):.3e}"
+    )
+    assert torch.max(torch.abs(toon_dn - torch.mean(toon_dn))) / toon_scale < 1e-2, (
+        f"Toon isothermal LW downward profile is not flat enough: "
+        f"{float(torch.max(torch.abs(toon_dn - torch.mean(toon_dn))) / toon_scale):.3e}"
+    )
+
+    assert torch.max(torch.abs(disort_up - disort_dn)) / disort_scale < 1e-2, (
+        f"DISORT isothermal LW up/down mismatch too large: "
+        f"{float(torch.max(torch.abs(disort_up - disort_dn)) / disort_scale):.3e}"
+    )
+
+    toon_disort_scale = max(float(torch.max(torch.abs(disort_result))), 1e-30)
+    assert torch.max(torch.abs(toon_result - disort_result)) / toon_disort_scale < 1.5e-1, (
+        f"Toon/DISORT isothermal LW profile mismatch too large: "
+        f"{float(torch.max(torch.abs(toon_result - disort_result)) / toon_disort_scale):.3e}"
+    )
+
 def test_toon_lw_isothermal_scattering():
     """Toon and DISORT longwave fluxes must agree for an isothermal atmosphere.
 
@@ -360,6 +436,10 @@ if __name__ == "__main__":
 
     print("test_toon_lw_isothermal")
     test_toon_lw_isothermal()
+    print("PASSED")
+
+    print("test_toon_lw_isothermal_profile_matches_disort")
+    test_toon_lw_isothermal_profile_matches_disort()
     print("PASSED")
 
     print("test_toon_lw_isothermal_scattering")

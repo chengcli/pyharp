@@ -16,6 +16,7 @@
 #define DTAU_IN(i) prop[(nlay - (i) - 1) * len1]
 #define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
 #define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
+#define BE_IN(i) be[nlev - (i) - 1]
 #define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
 #define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
 
@@ -112,11 +113,11 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
 
     if (dtau[k] <= 1.0e-6) {
       B1[k] = 0.0;
-      B0[k] = 0.5 * (be[k + 1] + be[k]);
-    } else {
-      B1[k] = (be[k + 1] - be[k]) / dtau[k];
-      B0[k] = be[k];
-    }
+        B0[k] = 0.5 * (BE_IN(k + 1) + BE_IN(k));
+      } else {
+        B1[k] = (BE_IN(k + 1) - BE_IN(k)) / dtau[k];
+        B0[k] = BE_IN(k);
+      }
 
     Cpm1[k] = B0[k] + B1[k] * term[k];
     Cmm1[k] = B0[k] - B1[k] * term[k];
@@ -132,9 +133,8 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
     E4[k] = gam[k] * Ep[k] - Em[k];
   }
 
-  T tautop = dtau[0] * exp(-1.0);
-  T Btop = (1.0 - exp(-tautop / ubari)) * be[0];
-  T Bsurf = be[nlev - 1];
+  T Btop = BE_IN(0);
+  T Bsurf = BE_IN(nlev - 1);
   T bsurf_flux = Bsurf;  // Bsurf is local variable
 
   // --- Matrix Construction (1-based indices for solver) ---
@@ -209,7 +209,7 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
     T u = uarr[m];
 
     // Downward loop
-    lw_down_g[0] = twopi * (1.0 - exp(-tautop / u)) * be[0];
+    lw_down_g[0] = twopi * Btop;
     for (int k = 0; k < nlay; k++) {
       T em2 = exp(-dtau[k] / u);
       T l_u_p1 = lam[k] * u + 1.0;
@@ -247,5 +247,6 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
 #undef DTAU_IN
 #undef W_IN
 #undef G_IN
+#undef BE_IN
 #undef FLX_UP
 #undef FLX_DN
