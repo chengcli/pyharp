@@ -113,11 +113,11 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
 
     if (dtau[k] <= 1.0e-6) {
       B1[k] = 0.0;
-        B0[k] = 0.5 * (BE_IN(k + 1) + BE_IN(k));
-      } else {
-        B1[k] = (BE_IN(k + 1) - BE_IN(k)) / dtau[k];
-        B0[k] = BE_IN(k);
-      }
+      B0[k] = 0.5 * (BE_IN(k + 1) + BE_IN(k));
+    } else {
+      B1[k] = (BE_IN(k + 1) - BE_IN(k)) / dtau[k];
+      B0[k] = BE_IN(k);
+    }
 
     Cpm1[k] = B0[k] + B1[k] * term[k];
     Cmm1[k] = B0[k] - B1[k] * term[k];
