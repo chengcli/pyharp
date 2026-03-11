@@ -61,3 +61,7 @@ python/*/*.txt
 
 # dist
 dist/
+
+# agents
+AGENTS.md
+CLAUDE.md
