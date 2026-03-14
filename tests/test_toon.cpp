@@ -36,6 +36,7 @@ TEST_P(DeviceTest, simple_toon_mckay89) {
   bc["umu0"] = torch::ones({ncol}, prop.options()) * umu0;
   bc["albedo"] = torch::zeros({nwave, ncol}, prop.options());
 
+  toon.options.planck(false);
   for (auto [w0, g] : {std::make_pair(0.1, 0.5), std::make_pair(0.5, 0.5),
                        std::make_pair(0.9, 0.5)}) {
     std::cout << "w0 = " << w0 << ", g = " << g << "\n";
@@ -51,6 +52,7 @@ TEST_P(DeviceTest, simple_toon_mckay89) {
 
   auto temf = torch::ones({ncol, nlyr + 1}, prop.options()) * tem_K;
 
+  toon.options.planck(true);
   for (auto [w0, g] : {std::make_pair(0.1, 0.5), std::make_pair(0.5, 0.5),
                        std::make_pair(0.9, 0.5)}) {
     std::cout << "w0 = " << w0 << ", g = " << g << "\n";

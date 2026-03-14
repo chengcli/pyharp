@@ -21,6 +21,26 @@ struct ToonMcKay89OptionsImpl {
   std::shared_ptr<ToonMcKay89OptionsImpl> clone() const {
     return std::make_shared<ToonMcKay89OptionsImpl>(*this);
   }
+
+  std::string flags(std::string flags_str = "") const {
+    // turn on options based on flags_str
+    zenith_correction(false);
+    if (flags_str.find("zenith_correction") != std::string::npos) {
+      zenith_correction(true);
+    }
+
+    planck(false);
+    if (flags_str.find("planck") != std::string::npos) {
+      planck(true);
+    }
+
+    flags_str = "";
+    if (zenith_correction()) flags_str += "zenith_correction,";
+    if (planck()) flags_str += "planck,";
+    flags_str.pop_back();  // remove trailing comma
+    return flags_str;
+  }
+
   void report(std::ostream& os) const {
     os << "* zenith_correction = " << zenith_correction() << "\n";
 
@@ -41,6 +61,7 @@ struct ToonMcKay89OptionsImpl {
 
   //! zenith correction
   ADD_ARG(bool, zenith_correction) = false;
+  ADD_ARG(bool, planck) = false;
 };
 
 using ToonMcKay89Options = std::shared_ptr<ToonMcKay89OptionsImpl>;

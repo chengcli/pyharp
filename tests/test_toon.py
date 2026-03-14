@@ -250,6 +250,7 @@ def test_toon_lw_isothermal():
 
     temf = torch.ones(ncol,nlyr+1) * temp_K
 
+    toon.options.planck(True)
     result = toon(prop, temf=temf, **bc)
     toon_out = {
         "up_toa": result[:,:,-1,0].tolist()  # upward flux at TOA
