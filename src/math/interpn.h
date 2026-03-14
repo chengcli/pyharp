@@ -32,8 +32,8 @@ namespace harp {
  * \param nval number of values to interpolate
  */
 template <int N, typename T>
-DISPATCH_MACRO void interpn(T *val, T const *coor, T const *data, T const *axis,
-                            int64_t const *len, int ndim, int nval) {
+DISPATCH_MACRO void interpn(T* val, T const* coor, T const* data, T const* axis,
+                            int64_t const* len, int ndim, int nval) {
   int i1, i2;
   i1 = locate(axis, *coor, *len);
 
@@ -82,7 +82,7 @@ DISPATCH_MACRO void interpn(T *val, T const *coor, T const *data, T const *axis,
  * \param len sample data length
  */
 template <typename T>
-DISPATCH_MACRO T interp1(T x, T const *data, T const *axis, int64_t len) {
+DISPATCH_MACRO T interp1(T x, T const* data, T const* axis, int64_t len) {
   T value;
   interpn<1>(&value, &x, data, axis, &len, 1, 1);
   return value;

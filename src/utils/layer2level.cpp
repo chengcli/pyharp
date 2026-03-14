@@ -5,7 +5,7 @@
 
 namespace harp {
 torch::Tensor layer2level(torch::Tensor var,
-                          Layer2LevelOptions const &options) {
+                          Layer2LevelOptions const& options) {
   // increase the last dimension by 1 (lyr -> lvl)
   auto shape = var.sizes().vec();
   shape.back() += 1;
@@ -79,7 +79,7 @@ torch::Tensor layer2level(torch::Tensor var,
 }
 
 torch::Tensor layer2level(torch::Tensor dx, torch::Tensor var,
-                          Layer2LevelOptions const &options) {
+                          Layer2LevelOptions const& options) {
   int nlyr = var.size(-1);
   TORCH_CHECK(dx.size(-1) == nlyr,
               "layer2level: dx and var must have the same last dimension");

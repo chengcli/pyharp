@@ -64,7 +64,7 @@ TEST_P(DeviceTest, simple_toon_mckay89) {
   }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

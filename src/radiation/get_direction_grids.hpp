@@ -51,7 +51,7 @@ std::pair<std::vector<T>, std::vector<T>> get_direction_grids(
   for (int i = 0; i < dirs.size(0); ++i) {
     // find phi
     bool found = false;
-    for (auto &phi : uphi)
+    for (auto& phi : uphi)
       if (real_close(phi, dirs[i][0].item<T>(), 1.e-3)) {
         found = true;
         break;
@@ -60,7 +60,7 @@ std::pair<std::vector<T>, std::vector<T>> get_direction_grids(
 
     // find mu
     found = false;
-    for (auto &mu : umu)
+    for (auto& mu : umu)
       if (real_close(mu, dirs[i][1].item<T>(), 1.e-3)) {
         found = true;
         break;

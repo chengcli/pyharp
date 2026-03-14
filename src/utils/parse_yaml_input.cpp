@@ -6,7 +6,7 @@
 
 namespace harp {
 
-std::string parse_unit_with_default(YAML::Node const &node) {
+std::string parse_unit_with_default(YAML::Node const& node) {
   std::string units = node["units"] ? node["units"].as<std::string>() : "cm-1";
 
   if (units == "cm-1") {
@@ -20,7 +20,7 @@ std::string parse_unit_with_default(YAML::Node const &node) {
   }
 }
 
-std::pair<double, double> parse_wave_range(YAML::Node const &node) {
+std::pair<double, double> parse_wave_range(YAML::Node const& node) {
   if (!node["range"]) {
     throw std::runtime_error("missing spectral range");
   }
@@ -35,8 +35,8 @@ std::pair<double, double> parse_wave_range(YAML::Node const &node) {
   return std::make_pair(wmin, wmax);
 }
 
-std::string replace_pattern(std::string const &str, std::string const &pattern,
-                            std::string const &replacement) {
+std::string replace_pattern(std::string const& str, std::string const& pattern,
+                            std::string const& replacement) {
   std::string result = str;
   size_t pos = 0;
   while ((pos = result.find(pattern, pos)) != std::string::npos) {
@@ -46,8 +46,8 @@ std::string replace_pattern(std::string const &str, std::string const &pattern,
   return result;
 }
 
-void replace_pattern_inplace(std::string &str, std::string const &pattern,
-                             std::string const &replacement) {
+void replace_pattern_inplace(std::string& str, std::string const& pattern,
+                             std::string const& replacement) {
   size_t pos = 0;
   while ((pos = str.find(pattern, pos)) != std::string::npos) {
     str.replace(pos, pattern.length(), replacement);

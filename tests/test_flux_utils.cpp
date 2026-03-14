@@ -107,7 +107,7 @@ TEST(FluxUtilsTest, CalTOAFluxInvalidInput) {
   EXPECT_THROW(harp::cal_toa_flux(flux), c10::Error);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

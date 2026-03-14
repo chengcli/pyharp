@@ -48,7 +48,7 @@ T deg2rad(T phi) {
  * \param str A direction string in the format "(theta,phi)"
  * \return A 1D tensor of shape (2,) containing [mu, phi_radians]
  */
-torch::Tensor parse_radiation_direction(std::string const &str);
+torch::Tensor parse_radiation_direction(std::string const& str);
 
 //! \brief Parse multiple radiation direction strings
 /*!
@@ -62,5 +62,5 @@ torch::Tensor parse_radiation_direction(std::string const &str);
  * \param str A string containing multiple direction specifications
  * \return A 2D tensor of shape (n, 2) where each row contains [mu, phi_radians]
  */
-torch::Tensor parse_radiation_directions(std::string const &str);
+torch::Tensor parse_radiation_directions(std::string const& str);
 }  // namespace harp

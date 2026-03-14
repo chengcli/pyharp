@@ -63,7 +63,7 @@ TEST_F(YamlReadTests, RadiationBand) {
   EXPECT_EQ(false, node["ir"]["spectrum"].as<bool>());
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

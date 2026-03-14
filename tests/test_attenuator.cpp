@@ -104,7 +104,7 @@ TEST(TestOpacity, forward) {
   std::cout << "result2 = " << result2.squeeze(1).squeeze(1) << std::endl;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
 
   return RUN_ALL_TESTS();
