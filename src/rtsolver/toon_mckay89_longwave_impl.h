@@ -113,10 +113,10 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
 
     if (dtau[k] <= 1.0e-6) {
       B1[k] = 0.0;
-      B0[k] = 0.5 * (BE_IN(k + 1) + BE_IN(k));
+      B0[k] = (1.0 - w0[k]) * 0.5 * (BE_IN(k + 1) + BE_IN(k));   
     } else {
-      B1[k] = (BE_IN(k + 1) - BE_IN(k)) / dtau[k];
-      B0[k] = BE_IN(k);
+      B1[k] = (1.0 - w0[k]) * (BE_IN(k + 1) - BE_IN(k)) / dtau[k]; 
+      B0[k] = (1.0 - w0[k]) * BE_IN(k);                            
     }
 
     Cpm1[k] = B0[k] + B1[k] * term[k];
@@ -209,7 +209,7 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
     T u = uarr[m];
 
     // Downward loop
-    lw_down_g[0] = twopi * Btop;
+    lw_down_g[0] = twopi * (1.0 - w0[0]) * Btop;
     for (int k = 0; k < nlay; k++) {
       T em2 = exp(-dtau[k] / u);
       T l_u_p1 = lam[k] * u + 1.0;
