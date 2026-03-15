@@ -45,7 +45,7 @@ Here are the available options:
 | Radiative Transfer Solver | Tested    | Peer Reviewed | References |
 |---------------------------|-----------|---------------|------------|
 | DISORT                    | YES       | YES           | [1]        |
-| Two-steam (Toon-McKay)    | NO        | NO            |            |
+| Two-stream (Toon-McKay)   | YES       | YES           | [2]        |
 
 ---
 
