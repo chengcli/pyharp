@@ -43,8 +43,7 @@ if(Python3_Interpreter_FOUND)
     OUTPUT_VARIABLE disort_init_file
     OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
 
-  cmake_path(CONVERT ${disort_init_file} TO_CMAKE_PATH_LIST disort_init_file
-             NORMALIZE)
+  file(TO_CMAKE_PATH "${disort_init_file}" disort_init_file)
 
   cmake_path(REPLACE_FILENAME disort_init_file lib OUTPUT_VARIABLE disort_lib_dir)
   cmake_path(REPLACE_FILENAME disort_init_file disort OUTPUT_VARIABLE disort_include_dir)
