@@ -51,48 +51,14 @@ jobs:
           echo "tag=v${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
           echo "version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Update package version
-        if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
-        env:
-          VERSION: ${{ steps.next_version.outputs.version }}
-        run: |
-          python3 - <<'PY'
-          import pathlib
-          import re
-          import os
-
-          path = pathlib.Path("python/__init__.py")
-          content = path.read_text()
-          updated, count = re.subn(
-              r'__version__ = "[^"]+"',
-              f'__version__ = "{os.environ["VERSION"]}"',
-              content,
-              count=1,
-          )
-          if count != 1:
-              raise SystemExit("failed to update python/__init__.py version")
-          path.write_text(updated)
-          PY
-
-      - name: Commit version bump
-        if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
-        env:
-          VERSION: ${{ steps.next_version.outputs.version }}
-        run: |
-          git config user.name "bump-bot[app]"
-          git config user.email "bump-bot[app]@users.noreply.github.com"
-          git add python/__init__.py
-          git commit -m "Bump version to v${VERSION}"
-
-      - name: Push version bump commit
-        if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
-        run: git push origin HEAD:${{ github.event.pull_request.base.ref }}
-
       - name: Create and push tag
         if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
         env:
           TAG: ${{ steps.next_version.outputs.tag }}
         run: |
+          git config user.name "bump-bot[app]"
+          git config user.email "bump-bot[app]@users.noreply.github.com"
+
           if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG$"; then
             echo "Tag $TAG already exists on origin; skipping push."
             exit 0
@@ -103,19 +69,28 @@ jobs:
 
       - name: Generate Release Notes
         if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
-        uses: octokit/request-action@v2.x
         id: release_notes
-        with:
-          route: POST /repos/${{ github.repository }}/releases/generate-notes
-          tag_name: ${{ steps.next_version.outputs.tag }}
+        uses: actions/github-script@v7
         env:
-          GITHUB_TOKEN: ${{ steps.app_token.outputs.token }}
+          RELEASE_TAG: ${{ steps.next_version.outputs.tag }}
+        with:
+          github-token: ${{ steps.app_token.outputs.token }}
+          script: |
+            const response = await github.request(
+              "POST /repos/{owner}/{repo}/releases/generate-notes",
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: process.env.RELEASE_TAG,
+              }
+            );
+            core.setOutput("body", response.data.body || "");
 
       - name: Post comment on PR with release notes
         if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
         uses: actions/github-script@v7
         env:
-          RELEASE_NOTES: ${{ fromJson(steps.release_notes.outputs.data).body }}
+          RELEASE_NOTES: ${{ steps.release_notes.outputs.body }}
           RELEASE_TAG: ${{ steps.next_version.outputs.tag }}
         with:
           github-token: ${{ steps.app_token.outputs.token }}
