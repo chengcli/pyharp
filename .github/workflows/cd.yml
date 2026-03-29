@@ -47,8 +47,16 @@ jobs:
           MINOR=$(echo "$LATEST" | cut -d. -f2)
           PATCH=$(echo "$LATEST" | cut -d. -f3)
 
-          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH+1))"
-          echo "tag=v${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
+          while true; do
+            PATCH=$((PATCH+1))
+            NEXT_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            NEXT_TAG="v${NEXT_VERSION}"
+            if ! git ls-remote --tags origin "refs/tags/${NEXT_TAG}" | grep -q "refs/tags/${NEXT_TAG}$"; then
+              break
+            fi
+          done
+
+          echo "tag=${NEXT_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Create and push tag
@@ -58,11 +66,6 @@ jobs:
         run: |
           git config user.name "bump-bot[app]"
           git config user.email "bump-bot[app]@users.noreply.github.com"
-
-          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG$"; then
-            echo "Tag $TAG already exists on origin; skipping push."
-            exit 0
-          fi
 
           git tag "$TAG"
           git push origin "$TAG"
