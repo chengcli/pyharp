@@ -4,7 +4,7 @@ requires = [
   "wheel",
   "build",
   "ninja",
-  "pydisort>=1.7.0",
+  "pydisort>=1.7.1",
   "cmake>=3.20",
   "torch==2.10.0",
 ]
@@ -22,7 +22,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "numpy",
-  "pydisort>=1.7.0",
+  "pydisort>=1.7.1",
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",

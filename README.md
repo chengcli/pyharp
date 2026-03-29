@@ -15,7 +15,7 @@ Pyharp can be installed via ``pip``:
 pip install pyharp
 ```
 
-We support Linux and Mac operation systems with Python version 3.9+.
+We support Linux and Mac operation systems with Python version 3.10+.
 
 ---
 
@@ -64,7 +64,7 @@ system libraries before installing Pyharp. All following instructions are execut
 the `pyharp/` directory.
 
 ### System required for building locally
-- Python 3.9+
+- Python 3.10+
 - Linux or macOS
 - netCDF
 - python virtual environment (venv)
