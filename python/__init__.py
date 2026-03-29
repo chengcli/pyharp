@@ -1,3 +1,5 @@
+from importlib.metadata import PackageNotFoundError, version
+
 import torch
 
 from .pyharp import *
@@ -5,4 +7,7 @@ from .disort import *
 from .rfmlib import *
 from .compile import *
 
-__version__ = "2.0.2"
+try:
+    __version__ = version("pyharp")
+except PackageNotFoundError:
+    __version__ = "0.0.0"

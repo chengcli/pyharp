@@ -1,6 +1,7 @@
 [build-system]
 requires = [
   "setuptools>=61.0.0",
+  "setuptools-scm>=8",
   "wheel",
   "build",
   "ninja",
@@ -48,9 +49,6 @@ Documentation = "https://pyharp.readthedocs.io"
 fetch-sonora = "pyharp.api.fetch_sonora:main"
 fetch-cia-legacy = "pyharp.api.fetch_cia_legacy:main"
 
-[tool.setuptools.dynamic.version]
-attr = "pyharp.__version__"
-
 [tool.setuptools]
 packages = ["pyharp", "pyharp.api", "pyharp.sonora", "pyharp.h2_cia_legacy"]
 include-package-data = false
@@ -62,3 +60,6 @@ include-package-data = false
 
 [tool.setuptools.exclude-package-data]
 "pyharp" = ["csrc/**/*"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
