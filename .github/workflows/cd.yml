@@ -81,7 +81,7 @@ jobs:
           CIBW_BUILD: cp${{ env.PY_VERSION }}*
           CIBW_ARCHS: ${{ env.MACOS_ARCH }}
           CIBW_BEFORE_BUILD: |
-            pip install numpy 'cmake<=3.30' 'pydisort>=1.6.0' 'torch==2.10.0'
+            pip install numpy 'cmake<=3.30' 'pydisort>=1.7.0' 'torch==2.10.0'
             brew update
             brew install netcdf
             TORCH_CMAKE_PREFIX_PATH=$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')
@@ -155,7 +155,7 @@ jobs:
             dnf config-manager --set-enabled codeready-builder-for-rhel-8-$(arch)-rpms
 
             yum install -y libaec libaec-devel netcdf-devel
-            pip install numpy 'cmake<=3.30' 'pydisort==1.6.0' 'torch==2.10.0'
+            pip install numpy 'cmake<=3.30' 'pydisort>=1.7.0' 'torch==2.10.0'
 
             TORCH_CMAKE_PREFIX_PATH=$(python -c 'import torch.utils; print(torch.utils.cmake_prefix_path)')
             export LD_LIBRARY_PATH=$(python -c "import torch; print(torch.__path__[0] + '/lib')"):$(pwd)/build/lib:$LD_LIBRARY_PATH

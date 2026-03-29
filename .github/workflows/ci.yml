@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install numpy 'pydisort==1.6.0' 'torch==2.10.0'
+          pip install numpy 'pydisort==1.7.0' 'torch==2.10.0'
 
       - name: Install NetCDF
         run: |

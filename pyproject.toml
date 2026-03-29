@@ -4,9 +4,9 @@ requires = [
   "wheel",
   "build",
   "ninja",
-  "pydisort>=1.6.0",
+  "pydisort>=1.7.0",
   "cmake>=3.20",
-  "torch>=2.8.0",
+  "torch==2.10.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -19,18 +19,17 @@ authors = [
 ]
 license = { text="LICENSE" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "numpy",
-  "pydisort>=1.6.0",
+  "pydisort>=1.7.0",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
   "Natural Language :: English",
   "Programming Language :: C",
   "Programming Language :: C++",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
