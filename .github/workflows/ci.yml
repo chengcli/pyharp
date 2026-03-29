@@ -2,7 +2,7 @@ name: Continuous Integration
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main,nightly]
 
   push:
     branches: [main]
@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install numpy 'pydisort==1.5.0' 'torch==2.7.1'
+          pip install numpy 'pydisort==1.7.1' 'torch==2.10.0'
 
       - name: Install NetCDF
         run: |
