@@ -1,12 +1,23 @@
-name: Release
+name: Publish to PyPI
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish, for example v2.1.0"
+        required: true
+      build_os:
+        description: "OS"
+        required: true
+        default: "Both"
+        type: choice
+        options:
+          - Both
+          - MacOS
+          - Ubuntu
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: publish-pypi-${{ github.event.inputs.tag }}
   cancel-in-progress: false
 
 env:
@@ -22,6 +33,7 @@ defaults:
 jobs:
   build-macos:
     name: Build macOS Wheels
+    if: ${{ github.event.inputs.build_os == 'Both' || github.event.inputs.build_os == 'MacOS' }}
     runs-on: macos-latest
     strategy:
       fail-fast: true
@@ -34,6 +46,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.tag }}
 
       - name: Setup Host Python
         uses: actions/setup-python@v5
@@ -80,6 +93,7 @@ jobs:
 
   build-linux:
     name: Build Linux Wheels
+    if: ${{ github.event.inputs.build_os == 'Both' || github.event.inputs.build_os == 'Ubuntu' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -90,6 +104,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.tag }}
 
       - name: Setup Host Python
         uses: actions/setup-python@v5
@@ -147,14 +162,14 @@ jobs:
           name: wheels-linux-${{ matrix.python-version }}-${{ env.LINUX_ARCH }}
           path: wheelhouse/*.whl
 
-  publish-release:
-    name: Publish Release
+  publish-pypi:
+    name: Publish to PyPI
     needs: [build-macos, build-linux]
     runs-on: ubuntu-latest
     if: ${{ always() }}
     permissions:
       id-token: write
-      contents: write
+      contents: read
     steps:
       - name: Download wheels
         uses: actions/download-artifact@v4
@@ -172,18 +187,3 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
-
-      - name: Create GitHub Release
-        if: ${{ needs.build-macos.result == 'success' || needs.build-linux.result == 'success' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release edit "${GITHUB_REF_NAME}" \
-              --title "Release ${GITHUB_REF_NAME}"
-          else
-            gh release create "${GITHUB_REF_NAME}" \
-              --title "Release ${GITHUB_REF_NAME}" \
-              --generate-notes
-          fi

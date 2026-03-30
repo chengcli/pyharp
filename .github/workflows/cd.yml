@@ -33,6 +33,8 @@ jobs:
 
       - name: Determine next version
         id: next_version
+        env:
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
         run: |
           EXISTING_TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
           if [[ -n "$EXISTING_TAG" ]]; then
@@ -42,20 +44,56 @@ jobs:
             exit 0
           fi
 
+          BUMP_TYPE=$(python3 - <<'PY'
+          import json
+          import os
+
+          labels = {item["name"] for item in json.loads(os.environ["LABELS_JSON"])}
+          selected = [
+              name.split(":", 1)[1]
+              for name in ("release:major", "release:minor", "release:patch")
+              if name in labels
+          ]
+          if len(selected) > 1:
+              raise SystemExit(f"multiple release labels found: {', '.join(selected)}")
+          print(selected[0] if selected else "patch")
+          PY
+          )
+
           LATEST=$(git describe --tags --abbrev=0 || echo "v0.0.0")
           MAJOR=$(echo "$LATEST" | cut -d. -f1 | sed 's/v//')
           MINOR=$(echo "$LATEST" | cut -d. -f2)
           PATCH=$(echo "$LATEST" | cut -d. -f3)
 
+          case "$BUMP_TYPE" in
+            major)
+              MAJOR=$((MAJOR+1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR+1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH+1))
+              ;;
+            *)
+              echo "Unsupported bump type: $BUMP_TYPE"
+              exit 1
+              ;;
+          esac
+
           while true; do
-            PATCH=$((PATCH+1))
             NEXT_VERSION="${MAJOR}.${MINOR}.${PATCH}"
             NEXT_TAG="v${NEXT_VERSION}"
             if ! git ls-remote --tags origin "refs/tags/${NEXT_TAG}" | grep -q "refs/tags/${NEXT_TAG}$"; then
               break
             fi
+            PATCH=$((PATCH+1))
           done
 
+          echo "bump_type=${BUMP_TYPE}" >> "$GITHUB_OUTPUT"
           echo "tag=${NEXT_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -66,6 +104,55 @@ jobs:
         run: |
           git config user.name "bump-bot[app]"
           git config user.email "bump-bot[app]@users.noreply.github.com"
-
           git tag "$TAG"
           git push origin "$TAG"
+
+      - name: Create GitHub Release
+        if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.next_version.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "Release $TAG"
+          else
+            gh release create "$TAG" \
+              --title "Release $TAG" \
+              --generate-notes
+          fi
+
+      - name: Read release notes
+        if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
+        id: release_body
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.next_version.outputs.tag }}
+        run: |
+          {
+            echo "body<<EOF"
+            gh release view "$TAG" --json body --jq '.body'
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post comment on PR with release notes
+        if: ${{ steps.next_version.outputs.skip_bump != 'true' }}
+        uses: actions/github-script@v7
+        env:
+          RELEASE_NOTES: ${{ steps.release_body.outputs.body }}
+          RELEASE_TAG: ${{ steps.next_version.outputs.tag }}
+          BUMP_TYPE: ${{ steps.next_version.outputs.bump_type }}
+        with:
+          github-token: ${{ steps.app_token.outputs.token }}
+          script: |
+            const notes = process.env.RELEASE_NOTES;
+            const tag = process.env.RELEASE_TAG;
+            const bumpType = process.env.BUMP_TYPE;
+            await github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `Released ${tag} (${bumpType})\n\n${notes}`
+            });
