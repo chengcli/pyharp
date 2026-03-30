@@ -2,10 +2,8 @@ name: Continuous Integration
 
 on:
   pull_request:
-    branches: [main,nightly]
-
-  push:
     branches: [main]
+    types: [opened, synchronize, reopened]
 
 env:
   PYTHON_VERSION: "3.11"
