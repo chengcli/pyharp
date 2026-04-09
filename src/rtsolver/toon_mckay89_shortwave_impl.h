@@ -21,43 +21,43 @@
 namespace harp {
 
 template <typename T>
-DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const *mu_in,
-                                           T const *prop, T w_surf_in, T *flx,
-                                           int len1, char *work) {
+DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
+                                           T const* prop, T w_surf_in, T* flx,
+                                           int len1, char* work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;
   int lm1 = l - 1;
 
   // --- Memory Allocation ---
-  T *dir = alloc_from<T>(work, nlev);
-  T *tau = alloc_from<T>(work, nlev);
-  T *cum_trans = alloc_from<T>(work, nlev);
-  T *tau_in = alloc_from<T>(work, nlev);
-  T *dtau = alloc_from<T>(work, nlay);
-  T *mu_zm = alloc_from<T>(work, nlay);
-  T *w0 = alloc_from<T>(work, nlay);
-  T *hg = alloc_from<T>(work, nlay);
-  T *gam = alloc_from<T>(work, nlay);
-  T *Am = alloc_from<T>(work, nlay);
-  T *Ap = alloc_from<T>(work, nlay);
-  T *Cpm1 = alloc_from<T>(work, nlay);
-  T *Cmm1 = alloc_from<T>(work, nlay);
-  T *Cp = alloc_from<T>(work, nlay);
-  T *Cm = alloc_from<T>(work, nlay);
-  T *Ep = alloc_from<T>(work, nlay);
-  T *Em = alloc_from<T>(work, nlay);
-  T *E1 = alloc_from<T>(work, nlay);
-  T *E2 = alloc_from<T>(work, nlay);
-  T *E3 = alloc_from<T>(work, nlay);
-  T *E4 = alloc_from<T>(work, nlay);
-  T *Af = alloc_from<T>(work, l);
-  T *Bf = alloc_from<T>(work, l);
-  T *Cf = alloc_from<T>(work, l);
-  T *Df = alloc_from<T>(work, l);
-  T *xk = alloc_from<T>(work, l);
-  T *xk1 = alloc_from<T>(work, nlay);
-  T *xk2 = alloc_from<T>(work, nlay);
+  T* dir = alloc_from<T>(work, nlev);
+  T* tau = alloc_from<T>(work, nlev);
+  T* cum_trans = alloc_from<T>(work, nlev);
+  T* tau_in = alloc_from<T>(work, nlev);
+  T* dtau = alloc_from<T>(work, nlay);
+  T* mu_zm = alloc_from<T>(work, nlay);
+  T* w0 = alloc_from<T>(work, nlay);
+  T* hg = alloc_from<T>(work, nlay);
+  T* gam = alloc_from<T>(work, nlay);
+  T* Am = alloc_from<T>(work, nlay);
+  T* Ap = alloc_from<T>(work, nlay);
+  T* Cpm1 = alloc_from<T>(work, nlay);
+  T* Cmm1 = alloc_from<T>(work, nlay);
+  T* Cp = alloc_from<T>(work, nlay);
+  T* Cm = alloc_from<T>(work, nlay);
+  T* Ep = alloc_from<T>(work, nlay);
+  T* Em = alloc_from<T>(work, nlay);
+  T* E1 = alloc_from<T>(work, nlay);
+  T* E2 = alloc_from<T>(work, nlay);
+  T* E3 = alloc_from<T>(work, nlay);
+  T* E4 = alloc_from<T>(work, nlay);
+  T* Af = alloc_from<T>(work, l);
+  T* Bf = alloc_from<T>(work, l);
+  T* Cf = alloc_from<T>(work, l);
+  T* Df = alloc_from<T>(work, l);
+  T* xk = alloc_from<T>(work, l);
+  T* xk1 = alloc_from<T>(work, nlay);
+  T* xk2 = alloc_from<T>(work, nlay);
 
   const T sqrt3 = sqrt(3.0);
   const T sqrt3d2 = sqrt3 / 2.0;

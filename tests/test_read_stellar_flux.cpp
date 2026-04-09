@@ -61,7 +61,7 @@ TEST(read_stellar_flux, test_case3) {
   EXPECT_EQ(result, expected_result);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

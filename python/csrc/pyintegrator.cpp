@@ -11,13 +11,13 @@
 
 namespace py = pybind11;
 
-void bind_integrator(py::module &m) {
+void bind_integrator(py::module& m) {
   auto pyIntegratorWeight =
       py::class_<harp::IntegratorWeight>(m, "IntegratorWeight");
 
   pyIntegratorWeight.def(py::init<>())
       .def("__repr__",
-           [](const harp::IntegratorWeight &a) {
+           [](const harp::IntegratorWeight& a) {
              std::stringstream ss;
              a.report(ss);
              return fmt::format("IntegratorWeight(\n{})", ss.str());
@@ -32,11 +32,11 @@ void bind_integrator(py::module &m) {
 
   pyIntegratorOptions.def(py::init<>())
       .def_static("from_yaml",
-                  py::overload_cast<std::string const &, bool>(
+                  py::overload_cast<std::string const&, bool>(
                       &harp::IntegratorOptionsImpl::from_yaml),
                   py::arg("filename"), py::arg("verbose") = false)
       .def("__repr__",
-           [](const harp::IntegratorOptions &a) {
+           [](const harp::IntegratorOptions& a) {
              std::stringstream ss;
              a->report(ss);
              return fmt::format("IntegratorOptions(\n{})", ss.str());

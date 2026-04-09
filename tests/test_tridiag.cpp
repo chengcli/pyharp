@@ -61,7 +61,7 @@ TEST(TestTridiagSolver, test1) {
   EXPECT_NEAR(diff, 0.0f, 1e-6f);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

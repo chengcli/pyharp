@@ -6,7 +6,7 @@
 
 namespace at::native {
 
-using toon89_fn = void (*)(at::TensorIterator &iter);
+using toon89_fn = void (*)(at::TensorIterator& iter);
 
 //! \brief Toon 1989 longwave solver
 /*!

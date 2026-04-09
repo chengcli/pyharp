@@ -23,9 +23,9 @@
 namespace harp {
 
 template <typename T>
-DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
-                                          T a_surf_in, T *flx, int len1,
-                                          char *work) {
+DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
+                                          T a_surf_in, T* flx, int len1,
+                                          char* work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;
@@ -42,49 +42,49 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T *be, const T *prop,
                      0.0967815902};
 
   // --- Work Variables Allocation ---
-  T *dtau = alloc_from<T>(work, nlay);
-  T *tau = alloc_from<T>(work, nlev);
-  T *w0 = alloc_from<T>(work, nlay);
-  T *hg = alloc_from<T>(work, nlay);
-  T *B0 = alloc_from<T>(work, nlay);
-  T *B1 = alloc_from<T>(work, nlay);
-  T *lam = alloc_from<T>(work, nlay);
-  T *gam = alloc_from<T>(work, nlay);
-  T *alp = alloc_from<T>(work, nlay);
-  T *term = alloc_from<T>(work, nlay);
+  T* dtau = alloc_from<T>(work, nlay);
+  T* tau = alloc_from<T>(work, nlev);
+  T* w0 = alloc_from<T>(work, nlay);
+  T* hg = alloc_from<T>(work, nlay);
+  T* B0 = alloc_from<T>(work, nlay);
+  T* B1 = alloc_from<T>(work, nlay);
+  T* lam = alloc_from<T>(work, nlay);
+  T* gam = alloc_from<T>(work, nlay);
+  T* alp = alloc_from<T>(work, nlay);
+  T* term = alloc_from<T>(work, nlay);
 
-  T *Cpm1 = alloc_from<T>(work, nlay);
-  T *Cmm1 = alloc_from<T>(work, nlay);
-  T *Cp = alloc_from<T>(work, nlay);
-  T *Cm = alloc_from<T>(work, nlay);
+  T* Cpm1 = alloc_from<T>(work, nlay);
+  T* Cmm1 = alloc_from<T>(work, nlay);
+  T* Cp = alloc_from<T>(work, nlay);
+  T* Cm = alloc_from<T>(work, nlay);
 
-  T *Ep = alloc_from<T>(work, nlay);
-  T *Em = alloc_from<T>(work, nlay);
-  T *E1 = alloc_from<T>(work, nlay);
-  T *E2 = alloc_from<T>(work, nlay);
-  T *E3 = alloc_from<T>(work, nlay);
-  T *E4 = alloc_from<T>(work, nlay);
+  T* Ep = alloc_from<T>(work, nlay);
+  T* Em = alloc_from<T>(work, nlay);
+  T* E1 = alloc_from<T>(work, nlay);
+  T* E2 = alloc_from<T>(work, nlay);
+  T* E3 = alloc_from<T>(work, nlay);
+  T* E4 = alloc_from<T>(work, nlay);
 
-  T *Af = alloc_from<T>(work, l);
-  T *Bf = alloc_from<T>(work, l);
-  T *Cf = alloc_from<T>(work, l);
-  T *Df = alloc_from<T>(work, l);
-  T *xkk = alloc_from<T>(work, l);
-  T *xk1 = alloc_from<T>(work, nlay);
-  T *xk2 = alloc_from<T>(work, nlay);
+  T* Af = alloc_from<T>(work, l);
+  T* Bf = alloc_from<T>(work, l);
+  T* Cf = alloc_from<T>(work, l);
+  T* Df = alloc_from<T>(work, l);
+  T* xkk = alloc_from<T>(work, l);
+  T* xk1 = alloc_from<T>(work, nlay);
+  T* xk2 = alloc_from<T>(work, nlay);
 
-  T *g = alloc_from<T>(work, nlay);
-  T *h = alloc_from<T>(work, nlay);
-  T *xj = alloc_from<T>(work, nlay);
-  T *xk = alloc_from<T>(work, nlay);
-  T *alpha1 = alloc_from<T>(work, nlay);
-  T *alpha2 = alloc_from<T>(work, nlay);
-  T *sigma1 = alloc_from<T>(work, nlay);
-  T *sigma2 = alloc_from<T>(work, nlay);
+  T* g = alloc_from<T>(work, nlay);
+  T* h = alloc_from<T>(work, nlay);
+  T* xj = alloc_from<T>(work, nlay);
+  T* xk = alloc_from<T>(work, nlay);
+  T* alpha1 = alloc_from<T>(work, nlay);
+  T* alpha2 = alloc_from<T>(work, nlay);
+  T* sigma1 = alloc_from<T>(work, nlay);
+  T* sigma2 = alloc_from<T>(work, nlay);
 
-  T *em1 = alloc_from<T>(work, nlay);
-  T *lw_up_g = alloc_from<T>(work, nlev);
-  T *lw_down_g = alloc_from<T>(work, nlev);
+  T* em1 = alloc_from<T>(work, nlay);
+  T* lw_up_g = alloc_from<T>(work, nlev);
+  T* lw_down_g = alloc_from<T>(work, nlev);
 
   // Delta-Eddington Scaling
   for (int i = 0; i < nlay; i++) {

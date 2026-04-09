@@ -15,7 +15,7 @@
 
 namespace py = pybind11;
 
-void bind_opacity(py::module &parent) {
+void bind_opacity(py::module& parent) {
   auto m = parent.def_submodule("opacity", "Opacity module");
 
   auto pyOpacityOptions =
@@ -24,7 +24,7 @@ void bind_opacity(py::module &parent) {
 
   pyOpacityOptions.def(py::init<>())
       .def("__repr__",
-           [](const harp::OpacityOptions &a) {
+           [](const harp::OpacityOptions& a) {
              std::stringstream ss;
              a->report(ss);
              return fmt::format("OpacityOptions(\n{})", ss.str());
