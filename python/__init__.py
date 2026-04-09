@@ -2,7 +2,12 @@ from importlib.metadata import PackageNotFoundError, version
 
 import torch
 
-from .pyharp import *
+try:
+    from .pyharp import *
+except ModuleNotFoundError as exc:
+    if exc.name != f"{__name__}.pyharp":
+        raise
+
 from .disort import *
 from .rfmlib import *
 from .compile import *
