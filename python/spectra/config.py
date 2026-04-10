@@ -21,9 +21,20 @@ class SpectralBandConfig:
         """Return the inclusive wavenumber grid."""
         if self.resolution_cm1 <= 0:
             raise ValueError("resolution_cm1 must be positive")
-        count = int(round((self.wavenumber_max_cm1 - self.wavenumber_min_cm1) / self.resolution_cm1))
-        if count < 0:
+        span_cm1 = self.wavenumber_max_cm1 - self.wavenumber_min_cm1
+        if span_cm1 < 0:
             raise ValueError("wavenumber_max_cm1 must be >= wavenumber_min_cm1")
+        count = int(round(span_cm1 / self.resolution_cm1))
+        if not np.isclose(
+            span_cm1,
+            count * self.resolution_cm1,
+            rtol=1e-12,
+            atol=1e-12,
+        ):
+            raise ValueError(
+                "wavenumber range must be an integer multiple of resolution_cm1 "
+                "to produce an inclusive grid"
+            )
         return self.wavenumber_min_cm1 + np.arange(count + 1, dtype=np.float64) * self.resolution_cm1
 
 
