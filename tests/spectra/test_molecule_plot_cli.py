@@ -17,10 +17,8 @@ def test_overview_parser_accepts_optional_cia_and_pdf_output(tmp_path) -> None:
             "325",
             "--pressure-bar",
             "2.5",
-            "--wn-min",
-            "1000",
-            "--wn-max",
-            "1500",
+            "--wn-range",
+            "1000,1500",
             "--path-length-km",
             "3",
             "--cia-filename",
@@ -35,8 +33,7 @@ def test_overview_parser_accepts_optional_cia_and_pdf_output(tmp_path) -> None:
     assert args.species == "H2O"
     assert args.temperature_k == 325.0
     assert args.pressure_bar == 2.5
-    assert args.wn_min == 1000.0
-    assert args.wn_max == 1500.0
+    assert args.wn_range == (1000.0, 1500.0)
     assert args.path_length_km == 3.0
     assert args.cia_filename == "H2-H2_2011.cia"
     assert args.cia_pair == "H2-H2"
@@ -93,10 +90,8 @@ def test_overview_products_reuses_downloaded_line_database(monkeypatch, tmp_path
             "300",
             "--pressure-bar",
             "1",
-            "--wn-min",
-            "20",
-            "--wn-max",
-            "22",
+            "--wn-range",
+            "20,22",
             "--path-length-km",
             "1",
             "--hitran-dir",

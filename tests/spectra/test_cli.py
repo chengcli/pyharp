@@ -32,6 +32,8 @@ def test_spectrum_parser_accepts_pressure_temperature_and_outputs(tmp_path) -> N
             "1",
             "--species",
             "co2",
+            "--wn-range",
+            "100,200",
         ]
     )
     assert args.command == "spectrum"
@@ -40,6 +42,7 @@ def test_spectrum_parser_accepts_pressure_temperature_and_outputs(tmp_path) -> N
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
     assert args.species == "co2"
+    assert args.wn_range == (100.0, 200.0)
 
 
 def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
@@ -59,6 +62,8 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
             "1.5",
             "--species",
             "CO2",
+            "--wn-range",
+            "50,150",
         ]
     )
     assert args.command == "transmittance"
@@ -68,3 +73,4 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
     assert args.pressure_bar == 1.0
     assert args.path_length_m == 1.5
     assert args.species == "CO2"
+    assert args.wn_range == (50.0, 150.0)

@@ -123,7 +123,7 @@ def _build_band(*, wn_min: float, wn_max: float, resolution: float) -> SpectralB
     if resolution <= 0.0:
         raise ValueError("resolution must be positive")
     if wn_max < wn_min:
-        raise ValueError("wn-max must be >= wn-min")
+        raise ValueError("wn-range max must be >= min")
     return SpectralBandConfig("single_state", float(wn_min), float(wn_max), float(resolution))
 
 
@@ -451,6 +451,38 @@ def _render_mixture_overview(fig, axes_flat, *, products: MixtureOverviewProduct
         ax.set_xlabel("Wavenumber [cm$^{-1}$]", fontsize=10)
 
 
+def run_atm_attenuation(args: argparse.Namespace, *, wn_range: tuple[float, float]) -> None:
+    products = compute_mixture_overview_products(args, wn_range=wn_range)
+    figure_path = args.figure
+    figure_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(8.5, 4.8))
+    xlim = (products.band.wavenumber_min_cm1, products.band.wavenumber_max_cm1)
+    _plot_source_attenuation_panel(ax, products, xlim=xlim)
+    ax.set_xlabel("Wavenumber [cm$^{-1}$]", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(figure_path)
+    plt.close(fig)
+    print(f"Atmosphere attenuation figure: {figure_path}")
+    print(f"Composition: {args.composition}")
+    print(f"Grid points: {products.spectrum.wavenumber_cm1.size}")
+
+
+def run_atm_transmission(args: argparse.Namespace, *, wn_range: tuple[float, float]) -> None:
+    products = compute_mixture_overview_products(args, wn_range=wn_range)
+    figure_path = args.figure
+    figure_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(8.5, 4.8))
+    xlim = (products.band.wavenumber_min_cm1, products.band.wavenumber_max_cm1)
+    _plot_transmittance_panel(ax, products.transmittance, xlim=xlim, show_components=False, component_label="Secondary")
+    ax.set_xlabel("Wavenumber [cm$^{-1}$]", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(figure_path)
+    plt.close(fig)
+    print(f"Atmosphere transmission figure: {figure_path}")
+    print(f"Composition: {args.composition}")
+    print(f"Grid points: {products.spectrum.wavenumber_cm1.size}")
+
+
 def _page_manifest(products: MixtureOverviewProducts) -> dict[str, object]:
     return {
         "wavenumber_min_cm1": products.band.wavenumber_min_cm1,
@@ -481,6 +513,10 @@ def build_atm_overview_parser() -> argparse.ArgumentParser:
 
 def main_atm_overview() -> None:
     args = build_atm_overview_parser().parse_args()
+    run_atm_overview(args)
+
+
+def run_atm_overview(args: argparse.Namespace) -> None:
     figure_path = args.figure
     manifest_path = args.manifest or figure_path.with_suffix(".manifest.json")
     figure_path.parent.mkdir(parents=True, exist_ok=True)

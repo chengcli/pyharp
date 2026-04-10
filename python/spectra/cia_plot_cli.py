@@ -16,24 +16,42 @@ from .hitran_cia import (
 )
 
 
+def _parse_wn_range(value: str) -> tuple[float, float]:
+    lower_text, sep, upper_text = str(value).partition(",")
+    if not sep:
+        raise argparse.ArgumentTypeError("wn-range must have the form min,max")
+    try:
+        lower = float(lower_text)
+        upper = float(upper_text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("wn-range must contain numeric min,max values") from exc
+    if upper < lower:
+        raise argparse.ArgumentTypeError("wn-range max must be >= min")
+    return lower, upper
+
+
+def _wn_bounds(args: argparse.Namespace) -> tuple[float, float]:
+    return tuple(args.wn_range)
+
+
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"))
     parser.add_argument("--filename", default=None)
     parser.add_argument("--pair", default="H2-H2")
     parser.add_argument("--temperature-k", type=float, default=300.0)
-    parser.add_argument("--wn-min", type=float, default=20.0)
-    parser.add_argument("--wn-max", type=float, default=10000.0)
+    parser.add_argument("--wn-range", type=_parse_wn_range, default=(20.0, 10000.0))
     parser.add_argument("--resolution", type=float, default=1.0)
     parser.add_argument("--refresh", action="store_true")
 
 
 def _validate_and_build_grid(args: argparse.Namespace) -> np.ndarray:
+    wn_min, wn_max = _wn_bounds(args)
     if args.resolution <= 0.0:
         raise ValueError("resolution must be positive")
-    if args.wn_max < args.wn_min:
-        raise ValueError("wn-max must be >= wn-min")
-    count = int(round((args.wn_max - args.wn_min) / args.resolution))
-    return args.wn_min + np.arange(count + 1, dtype=np.float64) * args.resolution
+    if wn_max < wn_min:
+        raise ValueError("wn-range max must be >= min")
+    count = int(round((wn_max - wn_min) / args.resolution))
+    return wn_min + np.arange(count + 1, dtype=np.float64) * args.resolution
 
 
 def _resolve_filename(args: argparse.Namespace) -> str:
@@ -71,6 +89,10 @@ def build_binary_parser() -> argparse.ArgumentParser:
 
 def main_binary() -> None:
     args = build_binary_parser().parse_args()
+    run_binary(args)
+
+
+def run_binary(args: argparse.Namespace) -> None:
     grid = _validate_and_build_grid(args)
     dataset = _load_dataset(args)
     values = plot_cia_cross_section(
@@ -93,6 +115,10 @@ def build_attenuation_parser() -> argparse.ArgumentParser:
 
 def main_attenuation() -> None:
     args = build_attenuation_parser().parse_args()
+    run_attenuation(args)
+
+
+def run_attenuation(args: argparse.Namespace) -> None:
     grid = _validate_and_build_grid(args)
     dataset = _load_dataset(args)
     values = plot_cia_attenuation_coefficient(
@@ -117,6 +143,10 @@ def build_transmission_parser() -> argparse.ArgumentParser:
 
 def main_transmission() -> None:
     args = build_transmission_parser().parse_args()
+    run_transmission(args)
+
+
+def run_transmission(args: argparse.Namespace) -> None:
     if args.path_length_km <= 0.0:
         raise ValueError("path-length-km must be positive")
     grid = _validate_and_build_grid(args)

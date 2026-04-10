@@ -107,34 +107,47 @@ If you already cloned Pyharp, initialize the submodule from the repository root:
 git submodule update --init --recursive external/MT_CKD_H2O
 ```
 
-The top-level spectroscopy CLI computes one pressure-temperature state:
+The top-level spectroscopy CLI computes one pressure-temperature state. Use
+`--wn-range=min,max` for the wavenumber bounds:
 
 ```bash
-pyharp-spectra spectrum --species H2O --temperature-k 300 --pressure-bar 1
-pyharp-spectra transmittance --species H2O --path-length-m 1
+pyharp-spectra spectrum --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+pyharp-spectra transmittance --species H2O --path-length-m 1 --wn-range=20,2500
 ```
 
-Additional installed plotting helpers:
+Plotting diagnostics are available from one entry point, `pyharp-plot`:
 
-- `pyharp-plot-cia-binary`
-- `pyharp-plot-cia-attenuation`
-- `pyharp-plot-cia-transmission`
-- `pyharp-plot-molecule-xsection`
-- `pyharp-plot-molecule-attenuation`
-- `pyharp-plot-molecule-transmission`
-- `pyharp-plot-molecule-plus-cia-attenuation`
-- `pyharp-plot-molecule-plus-cia-transmission`
-- `pyharp-plot-molecule-lines`
-- `pyharp-plot-molecule-overview`
-- `pyharp-gen-molecule-overview`
-- `pyharp-gen-atm-overview`
+- `pyharp-plot binary`
+- `pyharp-plot attenuation`
+- `pyharp-plot transmission`
+- `pyharp-plot xsection`
+- `pyharp-plot overview`
+
+The target is selected by argument:
+
+- `--pair` selects a CIA pair.
+- `--species` selects a molecule.
+- `--composition` selects an atmosphere mixture.
+
+All plot commands use `--wn-range=min,max` for wavenumber bounds.
 
 Examples:
 
 ```bash
-pyharp-plot-cia-binary --pair H2-H2 --temperature-k 300 --wn-min 20 --wn-max 10000
-pyharp-plot-molecule-xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-min 20 --wn-max 2500
-pyharp-gen-atm-overview --composition H2O:0.1,H2:0.9 --wn-range=25,2500 --temperature-k 300 --pressure-bar 1
+pyharp-plot binary --pair H2-H2 --temperature-k 300 --wn-range=20,10000
+
+pyharp-plot xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+
+pyharp-plot attenuation --pair H2-H2 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
+pyharp-plot attenuation --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+pyharp-plot attenuation --composition H2O:0.1,H2:0.9 --temperature-k 300 --pressure-bar 1 --wn-range=25,2500
+
+pyharp-plot transmission --pair H2-H2 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=20,10000
+pyharp-plot transmission --species CO2 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=20,2500
+pyharp-plot transmission --composition H2O:0.1,H2:0.9 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=25,2500
+
+pyharp-plot overview --species H2O --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=20,2500
+pyharp-plot overview --composition H2O:0.1,H2:0.9 --wn-range=25,2500 --temperature-k 300 --pressure-bar 1
 ```
 
 Supported built-in HITRAN line species are `CH4`, `CO2`, `H2`, `H2O`, and
