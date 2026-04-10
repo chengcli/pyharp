@@ -56,6 +56,7 @@ class HapiLineProvider:
         self.table_name = table_name
         self.cache_dir = cache_dir
         requested_diluent = dict(diluent or {"self": 1.0})
+        self.requested_diluent = requested_diluent
         self.diluent, self.diluent_fallbacks = _resolve_effective_diluent(
             self._hapi,
             table_name=table_name,
@@ -65,6 +66,15 @@ class HapiLineProvider:
         self.min_line_strength = float(min_line_strength)
         if cache_dir is not None:
             self._hapi.db_begin(str(cache_dir))
+
+    def broadening_summary(self) -> str:
+        """Return a compact description of requested and effective broadening."""
+        requested = _format_diluent(self.requested_diluent)
+        effective = _format_diluent(self.diluent)
+        if not self.diluent_fallbacks:
+            return f"requested={requested} -> effective={effective}"
+        fallback_text = ", ".join(f"{name}->{target}" for name, target in sorted(self.diluent_fallbacks.items()))
+        return f"requested={requested} -> effective={effective} (fallback: {fallback_text})"
 
     def absorption_coefficient_cm1(
         self,
@@ -175,6 +185,10 @@ def _resolve_effective_diluent(
         return {"self": 1.0}, {}
     total = sum(effective.values())
     return ({name: value / total for name, value in effective.items()}, fallbacks)
+
+
+def _format_diluent(diluent: dict[str, float]) -> str:
+    return ",".join(f"{name}:{value:.3f}" for name, value in sorted(diluent.items()))
 
 
 def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> LineDatabase:

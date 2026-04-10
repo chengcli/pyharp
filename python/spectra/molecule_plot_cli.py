@@ -132,8 +132,8 @@ def _compute_requested_absorption_spectrum(
     if cia_dataset is _MISSING:
         cia_dataset = _load_requested_cia_dataset(args, config)
     line_db = line_db or download_hitran_lines(config, band)
+    line_provider = build_line_provider(config, line_db)
     if cia_dataset is not None:
-        line_provider = build_line_provider(config, line_db)
         spectrum = compute_absorption_spectrum_from_sources(
             species_name=config.hitran_species.name,
             wavenumber_grid_cm1=band.grid(),
@@ -150,7 +150,7 @@ def _compute_requested_absorption_spectrum(
             pressure_pa=pressure_pa,
             line_db=line_db,
         )
-    return band, config, spectrum
+    return band, config, spectrum, line_provider
 
 
 def _print_spectrum_summary(spectrum, *, include_components: bool = False) -> None:
@@ -185,8 +185,9 @@ def main_xsection() -> None:
 
 
 def run_xsection(args: argparse.Namespace) -> None:
-    _, _, spectrum = _compute_requested_absorption_spectrum(args)
+    _, _, spectrum, line_provider = _compute_requested_absorption_spectrum(args)
     plot_absorption_spectrum(spectrum, args.figure)
+    print(f"Broadening: {line_provider.broadening_summary()}")
     print(f"Species: {spectrum.species_name}")
     print(f"Grid points: {spectrum.wavenumber_cm1.size}")
     _print_positive_summary(spectrum.sigma_line_cm2_molecule, "Line cross section", "cm^2 / molecule")
@@ -214,8 +215,9 @@ def main_attenuation() -> None:
 
 
 def run_attenuation(args: argparse.Namespace) -> None:
-    _, _, spectrum = _compute_requested_absorption_spectrum(args)
+    _, _, spectrum, line_provider = _compute_requested_absorption_spectrum(args)
     plot_attenuation_spectrum(spectrum, args.figure)
+    print(f"Broadening: {line_provider.broadening_summary()}")
     _print_spectrum_summary(spectrum, include_components=True)
 
 
@@ -246,12 +248,12 @@ def build_transmission_parser(*, require_external_cia: bool = False, description
 def _compute_requested_transmittance(args: argparse.Namespace):
     if args.path_length_km <= 0.0:
         raise ValueError("path-length-km must be positive")
-    _, _, spectrum = _compute_requested_absorption_spectrum(args)
+    _, _, spectrum, line_provider = _compute_requested_absorption_spectrum(args)
     transmittance = compute_transmittance_spectrum(
         spectrum=spectrum,
         path_length_m=float(args.path_length_km) * 1000.0,
     )
-    return spectrum, transmittance
+    return spectrum, transmittance, line_provider
 
 
 def main_transmission() -> None:
@@ -260,8 +262,9 @@ def main_transmission() -> None:
 
 
 def run_transmission(args: argparse.Namespace) -> None:
-    _, transmittance = _compute_requested_transmittance(args)
+    _, transmittance, line_provider = _compute_requested_transmittance(args)
     plot_transmittance_spectrum(transmittance, args.figure)
+    print(f"Broadening: {line_provider.broadening_summary()}")
     _print_transmittance_summary(transmittance, include_components=True)
 
 
@@ -536,16 +539,17 @@ def _compute_overview_products(args: argparse.Namespace):
     line_db = download_hitran_lines(config, band)
     line_list = load_hitran_line_list(config, band, line_db=line_db)
     cia_dataset = _load_requested_cia_dataset(args, config)
-    _, _, spectrum = _compute_requested_absorption_spectrum(args, line_db=line_db, cia_dataset=cia_dataset)
+    _, _, spectrum, line_provider = _compute_requested_absorption_spectrum(args, line_db=line_db, cia_dataset=cia_dataset)
     transmittance = compute_transmittance_spectrum(
         spectrum=spectrum,
         path_length_m=float(args.path_length_km) * 1000.0,
     )
-    return band, config, line_list, spectrum, transmittance, cia_dataset
+    return band, config, line_list, spectrum, transmittance, cia_dataset, line_provider
 
 
-def _print_overview_summary(*, figure_path: Path, spectrum, transmittance, cia_dataset) -> None:
+def _print_overview_summary(*, figure_path: Path, spectrum, transmittance, cia_dataset, line_provider) -> None:
     print(f"Overview figure: {figure_path}")
+    print(f"Broadening: {line_provider.broadening_summary()}")
     print(f"Species: {spectrum.species_name}")
     print(f"Grid points: {spectrum.wavenumber_cm1.size}")
     print(f"Path length: {transmittance.path_length_m / 1000.0:.3f} km")
@@ -611,7 +615,7 @@ def run_overview_batch(args: argparse.Namespace) -> None:
                     path_length_km=args.path_length_km,
                     figure=figure_path,
                 )
-                band, config, line_list, spectrum, transmittance, cia_dataset = _compute_overview_products(page_args)
+                band, config, line_list, spectrum, transmittance, cia_dataset, line_provider = _compute_overview_products(page_args)
                 fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8.5, 11.0), squeeze=False)
                 _render_overview_page(
                     fig,
@@ -651,7 +655,7 @@ def main_overview() -> None:
 
 
 def run_overview(args: argparse.Namespace) -> None:
-    band, config, line_list, spectrum, transmittance, cia_dataset = _compute_overview_products(args)
+    band, config, line_list, spectrum, transmittance, cia_dataset, line_provider = _compute_overview_products(args)
     figure_path = args.figure
     figure_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -674,4 +678,5 @@ def run_overview(args: argparse.Namespace) -> None:
         spectrum=spectrum,
         transmittance=transmittance,
         cia_dataset=cia_dataset,
+        line_provider=line_provider,
     )

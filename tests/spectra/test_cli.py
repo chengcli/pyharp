@@ -1,4 +1,6 @@
-from pyharp.spectra.cli import build_parser, default_hitran_dir, default_output_path, project_root
+import sys
+
+from pyharp.spectra.cli import build_parser, default_hitran_dir, default_output_path, project_root, main
 
 
 def test_default_paths_are_inside_project_root() -> None:
@@ -80,3 +82,44 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
     assert args.species == "CO2"
     assert args.broadening_composition == "H2:0.85,He:0.15"
     assert args.wn_range == (50.0, 150.0)
+
+
+def test_cli_spectrum_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "pyharp-spectra",
+            "spectrum",
+            "--species",
+            "CO2",
+            "--broadening-composition",
+            "H2:0.9,He:0.1",
+            "--wn-range",
+            "20,22",
+            "--output",
+            str(tmp_path / "spec.nc"),
+            "--figure",
+            str(tmp_path / "spec.png"),
+        ],
+    )
+    monkeypatch.setattr("pyharp.spectra.cli.download_hitran_lines", lambda config, band: object())
+    monkeypatch.setattr(
+        "pyharp.spectra.cli.build_line_provider",
+        lambda config, line_db: type(
+            "Provider",
+            (),
+            {"broadening_summary": lambda self: "requested=h2:0.900,he:0.100 -> effective=air:1.000 (fallback: h2->air, he->air)"},
+        )(),
+    )
+    monkeypatch.setattr(
+        "pyharp.spectra.cli.compute_absorption_spectrum",
+        lambda **kwargs: type("Spectrum", (), {})(),
+    )
+    monkeypatch.setattr("pyharp.spectra.cli.write_spectrum_dataset", lambda spectrum, output_path: None)
+    monkeypatch.setattr("pyharp.spectra.cli.plot_absorption_spectrum", lambda spectrum, figure_path: None)
+
+    main()
+
+    out = capsys.readouterr().out
+    assert "Broadening: requested=h2:0.900,he:0.100 -> effective=air:1.000" in out

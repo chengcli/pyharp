@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from pyharp.spectra.hitran_lines import LineDatabase
-from pyharp.spectra.molecule_plot_cli import build_molecule_overview_batch_parser, build_overview_parser
+from pyharp.spectra.molecule_plot_cli import build_molecule_overview_batch_parser, build_overview_parser, run_xsection
 from pyharp.spectra.molecule_plot_cli import _compute_overview_products
 
 
@@ -142,8 +142,50 @@ def test_overview_products_reuses_downloaded_line_database(monkeypatch, tmp_path
     monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.download_hitran_lines", fake_download)
     monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.load_hitran_line_list", fake_load_line_list)
     monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._load_requested_cia_dataset", lambda args, config: None)
+    monkeypatch.setattr(
+        "pyharp.spectra.molecule_plot_cli.build_line_provider",
+        lambda config, line_db: SimpleNamespace(broadening_summary=lambda: "requested=self:1.000 -> effective=self:1.000"),
+    )
     monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.compute_absorption_spectrum", fake_compute_absorption_spectrum)
 
     _compute_overview_products(args)
 
     assert calls["download"] == 1
+
+
+def test_run_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:
+    args = SimpleNamespace(
+        hitran_dir=tmp_path / "hitran",
+        species="CO2",
+        temperature_k=300.0,
+        pressure_bar=1.0,
+        broadening_composition="H2:0.9,He:0.1",
+        wn_range=(20.0, 22.0),
+        resolution=1.0,
+        refresh_hitran=False,
+        cia_filename=None,
+        cia_pair=None,
+        cia_index_url="https://hitran.org/cia/",
+        refresh_cia=False,
+        figure=tmp_path / "co2.png",
+    )
+
+    fake_provider = SimpleNamespace(broadening_summary=lambda: "requested=h2:0.900,he:0.100 -> effective=air:1.000 (fallback: h2->air, he->air)")
+    fake_spectrum = SimpleNamespace(
+        species_name="CO2",
+        wavenumber_cm1=np.array([20.0, 21.0, 22.0]),
+        sigma_line_cm2_molecule=np.ones(3),
+        sigma_cia_cm2_molecule=np.zeros(3),
+        sigma_total_cm2_molecule=np.ones(3),
+    )
+
+    monkeypatch.setattr(
+        "pyharp.spectra.molecule_plot_cli._compute_requested_absorption_spectrum",
+        lambda *call_args, **call_kwargs: (None, None, fake_spectrum, fake_provider),
+    )
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.plot_absorption_spectrum", lambda spectrum, figure: None)
+
+    run_xsection(args)
+
+    out = capsys.readouterr().out
+    assert "Broadening: requested=h2:0.900,he:0.100 -> effective=air:1.000" in out

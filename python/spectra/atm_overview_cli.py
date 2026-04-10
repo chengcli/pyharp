@@ -190,6 +190,7 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
         )
         line_db = download_hitran_lines(config, band)
         line_provider = build_line_provider(config, line_db)
+        print(f"{species_name} broadening: {line_provider.broadening_summary()}")
         sigma_line = np.asarray(
             line_provider.cross_section_cm2_molecule(
                 wavenumber_grid_cm1=grid,

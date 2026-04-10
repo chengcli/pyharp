@@ -6,10 +6,11 @@ import argparse
 from pathlib import Path
 
 from .config import SpectroscopyConfig, SpectralBandConfig, parse_broadening_composition
+from .hitran_lines import build_line_provider, download_hitran_lines
 from .output_names import default_output_path as default_named_output_path
 from .spectrum import compute_absorption_spectrum, plot_absorption_spectrum, write_spectrum_dataset
 from .transmittance import (
-    compute_transmittance_from_config,
+    compute_transmittance_spectrum,
     plot_transmittance_spectrum,
     write_transmittance_dataset,
 )
@@ -115,14 +116,18 @@ def main() -> None:
             broadening_composition=parse_broadening_composition(args.broadening_composition),
             refresh_hitran=args.refresh_hitran,
         )
+        line_db = download_hitran_lines(config, band)
+        line_provider = build_line_provider(config, line_db)
         spectrum = compute_absorption_spectrum(
             config=config,
             band=band,
             temperature_k=args.temperature_k,
             pressure_pa=args.pressure_bar * 1.0e5,
+            line_db=line_db,
         )
         write_spectrum_dataset(spectrum, output_path)
         plot_absorption_spectrum(spectrum, figure_path)
+        print(f"Broadening: {line_provider.broadening_summary()}")
         return
     if args.command == "transmittance":
         band = _build_band(args)
@@ -135,15 +140,19 @@ def main() -> None:
             broadening_composition=parse_broadening_composition(args.broadening_composition),
             refresh_hitran=args.refresh_hitran,
         )
-        transmittance = compute_transmittance_from_config(
+        line_db = download_hitran_lines(config, band)
+        line_provider = build_line_provider(config, line_db)
+        spectrum = compute_absorption_spectrum(
             config=config,
             band=band,
             temperature_k=args.temperature_k,
             pressure_pa=args.pressure_bar * 1.0e5,
-            path_length_m=args.path_length_m,
+            line_db=line_db,
         )
+        transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
         write_transmittance_dataset(transmittance, output_path)
         plot_transmittance_spectrum(transmittance, figure_path)
+        print(f"Broadening: {line_provider.broadening_summary()}")
         return
 
 
