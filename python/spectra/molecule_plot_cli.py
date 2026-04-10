@@ -22,14 +22,31 @@ from .spectrum import compute_absorption_spectrum, compute_absorption_spectrum_f
 from .transmittance import compute_transmittance_spectrum, plot_transmittance_spectrum
 
 
+def _parse_wn_range(value: str) -> tuple[float, float]:
+    lower_text, sep, upper_text = str(value).partition(",")
+    if not sep:
+        raise argparse.ArgumentTypeError("wn-range must have the form min,max")
+    try:
+        lower = float(lower_text)
+        upper = float(upper_text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("wn-range must contain numeric min,max values") from exc
+    if upper < lower:
+        raise argparse.ArgumentTypeError("wn-range max must be >= min")
+    return lower, upper
+
+
+def _wn_bounds(args: argparse.Namespace) -> tuple[float, float]:
+    return tuple(args.wn_range)
+
+
 def _add_common_arguments(parser: argparse.ArgumentParser, *, include_state: bool = True) -> None:
     parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"))
     parser.add_argument("--species", default="H2O")
     if include_state:
         parser.add_argument("--temperature-k", type=float, default=300.0)
         parser.add_argument("--pressure-bar", type=float, default=1.0)
-    parser.add_argument("--wn-min", type=float, default=20.0)
-    parser.add_argument("--wn-max", type=float, default=2500.0)
+    parser.add_argument("--wn-range", type=_parse_wn_range, default=(20.0, 2500.0))
     parser.add_argument("--resolution", type=float, default=1.0)
     parser.add_argument("--refresh-hitran", action="store_true")
 
@@ -42,11 +59,12 @@ def _add_external_cia_arguments(parser: argparse.ArgumentParser, *, required: bo
 
 
 def _build_band_and_config(args: argparse.Namespace) -> tuple[SpectralBandConfig, SpectroscopyConfig]:
+    wn_min, wn_max = _wn_bounds(args)
     if args.resolution <= 0.0:
         raise ValueError("resolution must be positive")
-    if args.wn_max < args.wn_min:
-        raise ValueError("wn-max must be >= wn-min")
-    band = SpectralBandConfig("single_state", args.wn_min, args.wn_max, args.resolution)
+    if wn_max < wn_min:
+        raise ValueError("wn-range max must be >= min")
+    band = SpectralBandConfig("single_state", wn_min, wn_max, args.resolution)
     config = SpectroscopyConfig(
         output_path=Path("output") / "unused.nc",
         hitran_cache_dir=args.hitran_dir,
@@ -165,6 +183,10 @@ def build_xsection_parser() -> argparse.ArgumentParser:
 
 def main_xsection() -> None:
     args = build_xsection_parser().parse_args()
+    run_xsection(args)
+
+
+def run_xsection(args: argparse.Namespace) -> None:
     _, _, spectrum = _compute_requested_absorption_spectrum(args)
     plot_absorption_spectrum(spectrum, args.figure)
     print(f"Species: {spectrum.species_name}")
@@ -190,6 +212,10 @@ def build_attenuation_parser(*, require_external_cia: bool = False, description:
 
 def main_attenuation() -> None:
     args = build_attenuation_parser().parse_args()
+    run_attenuation(args)
+
+
+def run_attenuation(args: argparse.Namespace) -> None:
     _, _, spectrum = _compute_requested_absorption_spectrum(args)
     plot_attenuation_spectrum(spectrum, args.figure)
     _print_spectrum_summary(spectrum, include_components=True)
@@ -201,9 +227,7 @@ def main_attenuation_with_cia() -> None:
         description="Compute and plot molecular line, CIA, and total attenuation on one graph.",
         default_figure=Path("output/molecule_plus_cia_attenuation_300K_1bar.png"),
     ).parse_args()
-    _, _, spectrum = _compute_requested_absorption_spectrum(args)
-    plot_attenuation_spectrum(spectrum, args.figure)
-    _print_spectrum_summary(spectrum, include_components=True)
+    run_attenuation(args)
 
 
 def build_transmission_parser(*, require_external_cia: bool = False, description: str | None = None, default_figure: Path | None = None) -> argparse.ArgumentParser:
@@ -234,6 +258,10 @@ def _compute_requested_transmittance(args: argparse.Namespace):
 
 def main_transmission() -> None:
     args = build_transmission_parser().parse_args()
+    run_transmission(args)
+
+
+def run_transmission(args: argparse.Namespace) -> None:
     _, transmittance = _compute_requested_transmittance(args)
     plot_transmittance_spectrum(transmittance, args.figure)
     _print_transmittance_summary(transmittance, include_components=True)
@@ -245,9 +273,7 @@ def main_transmission_with_cia() -> None:
         description="Compute and plot molecular line, CIA, and total transmission on one graph.",
         default_figure=Path("output/molecule_plus_cia_transmission_300K_1bar_1km.png"),
     ).parse_args()
-    _, transmittance = _compute_requested_transmittance(args)
-    plot_transmittance_spectrum(transmittance, args.figure)
-    _print_transmittance_summary(transmittance, include_components=True)
+    run_transmission(args)
 
 
 def build_line_positions_parser() -> argparse.ArgumentParser:
@@ -259,6 +285,10 @@ def build_line_positions_parser() -> argparse.ArgumentParser:
 
 def main_line_positions() -> None:
     args = build_line_positions_parser().parse_args()
+    run_line_positions(args)
+
+
+def run_line_positions(args: argparse.Namespace) -> None:
     band, config = _build_band_and_config(args)
     line_list = load_hitran_line_list(config, band)
     plot_hitran_line_positions(
@@ -534,20 +564,6 @@ class _SplitSpeciesAction(argparse.Action):
         setattr(namespace, self.dest, species)
 
 
-def _parse_wn_range(value: str) -> tuple[float, float]:
-    lower_text, sep, upper_text = str(value).partition(",")
-    if not sep:
-        raise argparse.ArgumentTypeError("wn-range must have the form min,max")
-    try:
-        lower = float(lower_text)
-        upper = float(upper_text)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("wn-range must contain numeric min,max values") from exc
-    if upper < lower:
-        raise argparse.ArgumentTypeError("wn-range max must be >= min")
-    return lower, upper
-
-
 def build_molecule_overview_batch_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Generate a combined multi-page PDF of molecule overview plots over one or more wavenumber ranges."
@@ -568,6 +584,10 @@ def build_molecule_overview_batch_parser() -> argparse.ArgumentParser:
 
 def main_overview_batch() -> None:
     args = build_molecule_overview_batch_parser().parse_args()
+    run_overview_batch(args)
+
+
+def run_overview_batch(args: argparse.Namespace) -> None:
     if args.path_length_km <= 0.0:
         raise ValueError("path-length-km must be positive")
     figure_path = args.figure
@@ -581,8 +601,7 @@ def main_overview_batch() -> None:
                     species=species,
                     temperature_k=args.temperature_k,
                     pressure_bar=args.pressure_bar,
-                    wn_min=wn_min,
-                    wn_max=wn_max,
+                    wn_range=(wn_min, wn_max),
                     resolution=args.resolution,
                     refresh_hitran=args.refresh_hitran,
                     cia_filename=None,
@@ -628,6 +647,10 @@ def build_overview_parser() -> argparse.ArgumentParser:
 
 def main_overview() -> None:
     args = build_overview_parser().parse_args()
+    run_overview(args)
+
+
+def run_overview(args: argparse.Namespace) -> None:
     band, config, line_list, spectrum, transmittance, cia_dataset = _compute_overview_products(args)
     figure_path = args.figure
     figure_path.parent.mkdir(parents=True, exist_ok=True)
