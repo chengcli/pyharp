@@ -41,8 +41,8 @@ def default_output_path() -> Path:
 
 
 def default_hitran_dir() -> Path:
-    """Return the default HITRAN cache directory inside the project root."""
-    return project_root() / "hitran"
+    """Return the default HITRAN cache directory in the current working directory."""
+    return Path("hitran")
 
 
 def parse_wn_range(value: str) -> tuple[float, float]:

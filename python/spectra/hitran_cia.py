@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 
 import numpy as np
 
+from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig
 
 K_BOLTZMANN = 1.380649e-23
@@ -359,6 +360,17 @@ def plot_cia_transmission(
     figure_path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(11, 6))
     ax.plot(wavenumber_grid_cm1, transmission, color="tab:green", linewidth=1.25)
+    ax.plot(
+        wavenumber_grid_cm1,
+        compute_normalized_blackbody_curve(
+            wavenumber_cm1=wavenumber_grid_cm1,
+            temperature_k=temperature_k,
+        ),
+        color="black",
+        linestyle="--",
+        linewidth=1.1,
+        label="Blackbody",
+    )
     ax.set_xlabel("Wavenumber [cm$^{-1}$]")
     ax.set_ylabel("Transmission")
     ax.set_ylim(0.0, 1.01)
@@ -367,6 +379,7 @@ def plot_cia_transmission(
         f"{pressure_pa / 1.0e5:.3f} bar, L={path_length_m / 1000.0:.3f} km"
     )
     ax.grid(True, which="both", alpha=0.3)
+    ax.legend()
     fig.tight_layout()
     fig.savefig(figure_path, dpi=150)
     plt.close(fig)

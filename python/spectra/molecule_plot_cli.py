@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 
+from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig, SpectralBandConfig, parse_broadening_composition, resolve_hitran_cia_pair
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import HapiLineProvider, LineDatabase, build_line_provider, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
@@ -474,6 +475,17 @@ def _plot_transmittance_panel(ax, transmittance, *, xlim: tuple[float, float], s
         transmittance.transmittance_total,
         label="Total" if show_components else "Transmittance",
         linewidth=1.4,
+    )
+    ax.plot(
+        transmittance.wavenumber_cm1,
+        compute_normalized_blackbody_curve(
+            wavenumber_cm1=transmittance.wavenumber_cm1,
+            temperature_k=transmittance.temperature_k,
+        ),
+        color="black",
+        linestyle="--",
+        linewidth=1.0,
+        label="Blackbody",
     )
     ax.set_ylabel("Transmittance", fontsize=9)
     ax.set_ylim(0.0, 1.01)

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
+from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig, SpectralBandConfig
 from .spectrum import AbsorptionSpectrum, compute_absorption_spectrum
 
@@ -99,6 +100,17 @@ def plot_transmittance_spectrum(transmittance: TransmittanceSpectrum, figure_pat
     ax.plot(transmittance.wavenumber_cm1, transmittance.transmittance_line, label="Line")
     ax.plot(transmittance.wavenumber_cm1, transmittance.transmittance_cia, label="CIA / Continuum")
     ax.plot(transmittance.wavenumber_cm1, transmittance.transmittance_total, label="Total", linewidth=2.0)
+    ax.plot(
+        transmittance.wavenumber_cm1,
+        compute_normalized_blackbody_curve(
+            wavenumber_cm1=transmittance.wavenumber_cm1,
+            temperature_k=transmittance.temperature_k,
+        ),
+        color="black",
+        linestyle="--",
+        linewidth=1.1,
+        label="Blackbody",
+    )
     ax.set_xlabel("Wavenumber [cm$^{-1}$]")
     ax.set_ylabel("Transmittance")
     ax.set_ylim(0.0, 1.01)

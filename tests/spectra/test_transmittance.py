@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
+from pyharp.spectra.blackbody import compute_normalized_blackbody_curve
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 from pyharp.spectra.transmittance import (
     compute_transmittance_spectrum,
@@ -53,3 +54,13 @@ def test_transmittance_outputs_can_be_written(tmp_path: Path) -> None:
     finally:
         loaded.close()
     assert figure_path.exists()
+
+
+def test_normalized_blackbody_curve_is_bounded_and_peaks_at_one() -> None:
+    curve = compute_normalized_blackbody_curve(
+        wavenumber_cm1=np.array([100.0, 500.0, 1000.0, 1500.0]),
+        temperature_k=300.0,
+    )
+    assert np.all(curve >= 0.0)
+    assert np.all(curve <= 1.0)
+    assert np.isclose(curve.max(), 1.0)
