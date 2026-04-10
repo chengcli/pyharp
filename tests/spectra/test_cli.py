@@ -1,6 +1,7 @@
 import sys
 
-from pyharp.spectra.cli import build_parser, default_hitran_dir, default_output_path, project_root, main
+from pyharp.spectra.dump_cli import build_parser, main
+from pyharp.spectra.shared_cli import default_hitran_dir, default_output_path, project_root
 
 
 def test_default_paths_are_inside_project_root() -> None:
@@ -26,8 +27,6 @@ def test_spectrum_parser_accepts_pressure_temperature_and_outputs(tmp_path) -> N
             "spectrum",
             "--output",
             str(tmp_path / "spec.nc"),
-            "--figure",
-            str(tmp_path / "spec.png"),
             "--temperature-k",
             "300",
             "--pressure-bar",
@@ -42,7 +41,6 @@ def test_spectrum_parser_accepts_pressure_temperature_and_outputs(tmp_path) -> N
     )
     assert args.command == "spectrum"
     assert args.output == tmp_path / "spec.nc"
-    assert args.figure == tmp_path / "spec.png"
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
     assert args.species == "co2"
@@ -57,8 +55,6 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
             "transmittance",
             "--output",
             str(tmp_path / "trans.nc"),
-            "--figure",
-            str(tmp_path / "trans.png"),
             "--temperature-k",
             "300",
             "--pressure-bar",
@@ -75,7 +71,6 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
     )
     assert args.command == "transmittance"
     assert args.output == tmp_path / "trans.nc"
-    assert args.figure == tmp_path / "trans.png"
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
     assert args.path_length_m == 1.5
@@ -86,10 +81,10 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
 
 def test_cli_spectrum_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setattr(
-        sys,
+            sys,
         "argv",
         [
-            "pyharp-spectra",
+            "pyharp-dump",
             "spectrum",
             "--species",
             "CO2",
@@ -99,13 +94,11 @@ def test_cli_spectrum_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
             "20,22",
             "--output",
             str(tmp_path / "spec.nc"),
-            "--figure",
-            str(tmp_path / "spec.png"),
         ],
     )
-    monkeypatch.setattr("pyharp.spectra.cli.download_hitran_lines", lambda config, band: object())
+    monkeypatch.setattr("pyharp.spectra.dump_cli.download_hitran_lines", lambda config, band: object())
     monkeypatch.setattr(
-        "pyharp.spectra.cli.build_line_provider",
+        "pyharp.spectra.dump_cli.build_line_provider",
         lambda config, line_db: type(
             "Provider",
             (),
@@ -113,13 +106,44 @@ def test_cli_spectrum_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
         )(),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.cli.compute_absorption_spectrum",
+        "pyharp.spectra.dump_cli.compute_absorption_spectrum",
         lambda **kwargs: type("Spectrum", (), {})(),
     )
-    monkeypatch.setattr("pyharp.spectra.cli.write_spectrum_dataset", lambda spectrum, output_path: None)
-    monkeypatch.setattr("pyharp.spectra.cli.plot_absorption_spectrum", lambda spectrum, figure_path: None)
+    monkeypatch.setattr("pyharp.spectra.dump_cli.write_spectrum_dataset", lambda spectrum, output_path: None)
 
     main()
 
     out = capsys.readouterr().out
+    assert "Wrote NetCDF:" in out
     assert "Broadening: requested=h2:0.900,he:0.100 -> effective=air:1.000" in out
+
+
+def test_cli_help_includes_examples_and_subcommands(capsys) -> None:
+    parser = build_parser()
+    try:
+        parser.parse_args(["-h"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:
+        raise AssertionError("expected SystemExit")
+
+    help_text = capsys.readouterr().out
+    assert "spectrum" in help_text
+    assert "transmittance" in help_text
+    assert "pyharp-dump spectrum --species NH3" in help_text
+
+
+def test_cli_transmittance_help_describes_broadening_and_path_length(capsys) -> None:
+    parser = build_parser()
+    try:
+        parser.parse_args(["transmittance", "-h"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:
+        raise AssertionError("expected SystemExit")
+
+    help_text = capsys.readouterr().out
+    assert "Compute molecular transmittance at one pressure-temperature state and write a NetCDF dataset." in help_text
+    assert "--broadening-composition BROADENER:FRACTION,..." in help_text
+    assert "Propagation path length in meters." in help_text
+    assert "pyharp-dump transmittance --species CH4" in help_text

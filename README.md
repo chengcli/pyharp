@@ -83,12 +83,12 @@ If you are using command line argument outside of pyharp, clone MT_CKD directly:
 mkdir -p external && cd external && git clone https://github.com/AER-RC/MT_CKD
 ```
 
-The top-level spectroscopy CLI computes one pressure-temperature state. Use
-`--wn-range=min,max` for the wavenumber bounds:
+The `pyharp-dump` CLI writes one pressure-temperature NetCDF product per run.
+Use `--wn-range=min,max` for the wavenumber bounds:
 
 ```bash
-pyharp-spectra spectrum --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-pyharp-spectra transmittance --species H2O --path-length-m 1 --wn-range=20,2500
+pyharp-dump spectrum --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+pyharp-dump transmittance --species H2O --path-length-m 1 --wn-range=20,2500
 ```
 
 Plotting diagnostics are available from one entry point, `pyharp-plot`. It
