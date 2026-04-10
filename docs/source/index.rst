@@ -10,6 +10,7 @@ Pyharp Documentation
     builtin_opacities
     radiation
     api
+    plot_cli
     trouble
 
 Introduction
