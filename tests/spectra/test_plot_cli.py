@@ -85,6 +85,21 @@ def test_plot_main_dispatches_pair_attenuation(monkeypatch) -> None:
     assert len(calls) == 1
     assert calls[0].pair == "H2-He"
     assert calls[0].wn_range == (25.0, 30.0)
+    assert calls[0].figure.name == "h2_he_attenuation_300K_1bar_25_30.png"
+
+
+def test_plot_main_dispatches_molecule_xsection_with_default_figure(monkeypatch) -> None:
+    calls = []
+
+    def fake_run(args):
+        calls.append(args)
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+
+    plot_cli.main(["xsection", "--species", "CO2", "--temperature-k", "275.5", "--pressure-bar", "0.25", "--wn-range", "25,30.5"])
+
+    assert len(calls) == 1
+    assert calls[0].figure.name == "co2_xsection_275p5K_0p25bar_25_30p5.png"
 
 
 def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:
@@ -99,6 +114,7 @@ def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:
 
     assert len(calls) == 1
     assert calls[0][0].composition == "H2:0.9,He:0.1"
+    assert calls[0][0].figure.name == "h2_0p9_he_0p1_attenuation_300K_1bar_25_30.png"
     assert calls[0][1] == (25.0, 30.0)
 
 

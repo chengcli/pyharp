@@ -129,7 +129,9 @@ The target is selected by argument:
 - `--species` selects a molecule.
 - `--composition` selects an atmosphere mixture.
 
-All plot commands use `--wn-range=min,max` for wavenumber bounds.
+All plot commands use `--wn-range=min,max` for wavenumber bounds. Default
+output names use
+`<species_or_cia_name>_<plot_type>_<temperature>_<pressure>_<wavenumber_min>_<wavenumber_max>`.
 
 Examples:
 

@@ -9,9 +9,17 @@ import xarray as xr
 from scipy.interpolate import interp1d
 
 
+_MT_CKD_H2O_RELATIVE_PATH = Path("external") / "MT_CKD_H2O" / "data" / "absco-ref_wv-mt-ckd.nc"
+
+
 def default_mt_ckd_h2o_data_path() -> Path:
-    """Return the default MT_CKD_H2O coefficient file path in the repository."""
-    return Path(__file__).resolve().parents[2] / "external" / "MT_CKD_H2O" / "data" / "absco-ref_wv-mt-ckd.nc"
+    """Return the local MT_CKD_H2O coefficient file path."""
+    cwd = Path.cwd().resolve()
+    for root in (cwd, *cwd.parents):
+        candidate = root / _MT_CKD_H2O_RELATIVE_PATH
+        if candidate.exists():
+            return candidate
+    return cwd / _MT_CKD_H2O_RELATIVE_PATH
 
 
 def _radiation_term(wavenumber_cm1: np.ndarray, temperature_k: float) -> np.ndarray:

@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from . import atm_overview_cli, cia_plot_cli, molecule_plot_cli
+from .output_names import default_output_path
 
 
 class _SplitSpeciesAction(argparse.Action):
@@ -49,28 +50,63 @@ def _validate_single_selector(args: argparse.Namespace, parser: argparse.Argumen
         parser.error("choose only one of --pair, --species, or --composition")
 
 
-def _as_cia_args(args: argparse.Namespace, *, default_pair: str, default_figure: Path) -> argparse.Namespace:
-    return argparse.Namespace(
-        hitran_dir=args.hitran_dir,
-        filename=getattr(args, "filename", None),
-        pair=args.pair or default_pair,
-        temperature_k=args.temperature_k,
-        wn_range=args.wn_range or (20.0, 10000.0),
-        resolution=args.resolution,
-        refresh=getattr(args, "refresh", False),
-        pressure_bar=getattr(args, "pressure_bar", 1.0),
-        path_length_km=getattr(args, "path_length_km", 1.0),
-        figure=args.figure or default_figure,
+def _combined_range(wn_ranges: list[tuple[float, float]]) -> tuple[float, float]:
+    return min(wn_min for wn_min, _ in wn_ranges), max(wn_max for _, wn_max in wn_ranges)
+
+
+def _default_figure(
+    *,
+    target_name: object,
+    plot_type: str,
+    temperature_k: float,
+    pressure_bar: float,
+    wn_range: tuple[float, float],
+    suffix: str = ".png",
+) -> Path:
+    return default_output_path(
+        target_name=target_name,
+        plot_type=plot_type,
+        temperature_k=temperature_k,
+        pressure_bar=pressure_bar,
+        wn_range=wn_range,
+        suffix=suffix,
     )
 
 
-def _as_molecule_args(args: argparse.Namespace, *, default_figure: Path) -> argparse.Namespace:
+def _as_cia_args(args: argparse.Namespace, *, default_pair: str, plot_type: str) -> argparse.Namespace:
+    wn_range = args.wn_range or (20.0, 10000.0)
+    pressure_bar = getattr(args, "pressure_bar", 1.0)
+    pair = args.pair or default_pair
     return argparse.Namespace(
         hitran_dir=args.hitran_dir,
-        species=args.species or "H2O",
+        filename=getattr(args, "filename", None),
+        pair=pair,
+        temperature_k=args.temperature_k,
+        wn_range=wn_range,
+        resolution=args.resolution,
+        refresh=getattr(args, "refresh", False),
+        pressure_bar=pressure_bar,
+        path_length_km=getattr(args, "path_length_km", 1.0),
+        figure=args.figure
+        or _default_figure(
+            target_name=pair,
+            plot_type=plot_type,
+            temperature_k=args.temperature_k,
+            pressure_bar=pressure_bar,
+            wn_range=wn_range,
+        ),
+    )
+
+
+def _as_molecule_args(args: argparse.Namespace, *, plot_type: str) -> argparse.Namespace:
+    species = args.species or "H2O"
+    wn_range = args.wn_range or (20.0, 2500.0)
+    return argparse.Namespace(
+        hitran_dir=args.hitran_dir,
+        species=species,
         temperature_k=args.temperature_k,
         pressure_bar=args.pressure_bar,
-        wn_range=args.wn_range or (20.0, 2500.0),
+        wn_range=wn_range,
         resolution=args.resolution,
         refresh_hitran=args.refresh_hitran,
         cia_filename=getattr(args, "cia_filename", None),
@@ -78,7 +114,14 @@ def _as_molecule_args(args: argparse.Namespace, *, default_figure: Path) -> argp
         cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
         path_length_km=getattr(args, "path_length_km", 1.0),
-        figure=args.figure or default_figure,
+        figure=args.figure
+        or _default_figure(
+            target_name=species,
+            plot_type=plot_type,
+            temperature_k=args.temperature_k,
+            pressure_bar=args.pressure_bar,
+            wn_range=wn_range,
+        ),
     )
 
 
@@ -96,7 +139,15 @@ def _as_molecule_overview_args(args: argparse.Namespace, *, species: str, wn_ran
         cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
         path_length_km=args.path_length_km,
-        figure=args.figure or Path("output/molecule_overview_300K_1bar.pdf"),
+        figure=args.figure
+        or _default_figure(
+            target_name=species,
+            plot_type="overview",
+            temperature_k=args.temperature_k,
+            pressure_bar=args.pressure_bar,
+            wn_range=wn_range,
+            suffix=".pdf",
+        ),
     )
 
 
@@ -112,7 +163,15 @@ def _as_molecule_overview_batch_args(args: argparse.Namespace, *, species: list[
         refresh_hitran=args.refresh_hitran,
         cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
-        figure=args.figure or Path("output/molecule_overview_collection.pdf"),
+        figure=args.figure
+        or _default_figure(
+            target_name="_".join(species),
+            plot_type="overview",
+            temperature_k=args.temperature_k,
+            pressure_bar=args.pressure_bar,
+            wn_range=_combined_range(wn_ranges),
+            suffix=".pdf",
+        ),
     )
 
 
@@ -128,12 +187,20 @@ def _as_atm_overview_args(args: argparse.Namespace, *, wn_ranges: list[tuple[flo
         cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
-        figure=args.figure or Path("output/atm_overview.pdf"),
+        figure=args.figure
+        or _default_figure(
+            target_name=args.composition,
+            plot_type="overview",
+            temperature_k=args.temperature_k,
+            pressure_bar=args.pressure_bar,
+            wn_range=_combined_range(wn_ranges),
+            suffix=".pdf",
+        ),
         manifest=args.manifest,
     )
 
 
-def _as_atm_args(args: argparse.Namespace, *, default_figure: Path) -> argparse.Namespace:
+def _as_atm_args(args: argparse.Namespace, *, plot_type: str, wn_range: tuple[float, float]) -> argparse.Namespace:
     return argparse.Namespace(
         hitran_dir=args.hitran_dir,
         composition=args.composition,
@@ -144,7 +211,14 @@ def _as_atm_args(args: argparse.Namespace, *, default_figure: Path) -> argparse.
         cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
-        figure=args.figure or default_figure,
+        figure=args.figure
+        or _default_figure(
+            target_name=args.composition,
+            plot_type=plot_type,
+            temperature_k=args.temperature_k,
+            pressure_bar=args.pressure_bar,
+            wn_range=wn_range,
+        ),
     )
 
 
@@ -202,47 +276,32 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.command == "binary":
-        cia_plot_cli.run_binary(_as_cia_args(args, default_pair="H2-H2", default_figure=Path("output/h2_h2_cia_300K.png")))
+        cia_plot_cli.run_binary(_as_cia_args(args, default_pair="H2-H2", plot_type="binary"))
         return
 
     if args.command == "xsection":
-        molecule_plot_cli.run_xsection(_as_molecule_args(args, default_figure=Path("output/molecule_xsection_300K_1bar.png")))
+        molecule_plot_cli.run_xsection(_as_molecule_args(args, plot_type="xsection"))
         return
 
     if args.command in {"attenuation", "transmission"}:
         _validate_single_selector(args, parser)
         if args.composition:
-            default_figure = (
-                Path("output/atm_attenuation_300K_1bar.png")
-                if args.command == "attenuation"
-                else Path("output/atm_transmission_300K_1bar_1km.png")
-            )
-            atm_args = _as_atm_args(args, default_figure=default_figure)
             wn_range = args.wn_range or (20.0, 2500.0)
+            atm_args = _as_atm_args(args, plot_type=args.command, wn_range=wn_range)
             if args.command == "attenuation":
                 atm_overview_cli.run_atm_attenuation(atm_args, wn_range=wn_range)
             else:
                 atm_overview_cli.run_atm_transmission(atm_args, wn_range=wn_range)
             return
         if args.pair:
-            default_figure = (
-                Path("output/h2_h2_cia_attenuation_300K_1bar.png")
-                if args.command == "attenuation"
-                else Path("output/h2_h2_cia_transmission_300K_1bar_1km.png")
-            )
-            cia_args = _as_cia_args(args, default_pair=args.pair, default_figure=default_figure)
+            cia_args = _as_cia_args(args, default_pair=args.pair, plot_type=args.command)
             if args.command == "attenuation":
                 cia_plot_cli.run_attenuation(cia_args)
             else:
                 cia_plot_cli.run_transmission(cia_args)
             return
 
-        default_figure = (
-            Path("output/molecule_attenuation_300K_1bar.png")
-            if args.command == "attenuation"
-            else Path("output/molecule_transmission_300K_1bar_1km.png")
-        )
-        molecule_args = _as_molecule_args(args, default_figure=default_figure)
+        molecule_args = _as_molecule_args(args, plot_type=args.command)
         if args.command == "attenuation":
             molecule_plot_cli.run_attenuation(molecule_args)
         else:
