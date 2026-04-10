@@ -12,7 +12,7 @@ namespace harp {
  * adapted from Numerical Recipes in C, 2nd Ed., p. 117.
  */
 template <typename T>
-DISPATCH_MACRO int locate(T const *xx, T x, int n) {
+DISPATCH_MACRO int locate(T const* xx, T x, int n) {
   xx -= 1;  // zero-offset to unit-offset
 
   int j;

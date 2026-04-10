@@ -8,7 +8,7 @@
 
 namespace harp {
 
-torch::Tensor parse_radiation_direction(std::string const &str) {
+torch::Tensor parse_radiation_direction(std::string const& str) {
   float mu = 0.;
   float phi = 0.;
 
@@ -19,7 +19,7 @@ torch::Tensor parse_radiation_direction(std::string const &str) {
   return torch::tensor({mu, phi}, torch::kFloat32);
 }
 
-torch::Tensor parse_radiation_directions(std::string const &str) {
+torch::Tensor parse_radiation_directions(std::string const& str) {
   std::vector<std::string> dstr = Vectorize<std::string>(str.c_str());
   int nray = dstr.size();
 

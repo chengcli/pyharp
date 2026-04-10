@@ -49,6 +49,106 @@ Here are the available options:
 
 ---
 
+## Spectroscopy workflow
+
+Pyharp also includes `pyharp.spectra`, a pure-Python spectroscopy workflow for
+HITRAN line data, HITRAN CIA data, single-state absorption spectra,
+transmittance products, diagnostic plots, and gas-mixture overview figures.
+The former standalone `spectra` library now lives under the `pyharp.spectra`
+namespace.
+
+The main library entry points are available from `pyharp.spectra`:
+
+```python
+from pathlib import Path
+
+from pyharp.spectra import (
+    AbsorptionSpectrum,
+    SpectroscopyConfig,
+    SpectralBandConfig,
+    compute_absorption_spectrum,
+)
+
+band = SpectralBandConfig(
+    name="single_state",
+    wavenumber_min_cm1=20.0,
+    wavenumber_max_cm1=2500.0,
+    resolution_cm1=1.0,
+)
+config = SpectroscopyConfig(
+    output_path=Path("output/h2o_absorption_300K_1bar.nc"),
+    hitran_cache_dir=Path("hitran"),
+    species_name="H2O",
+)
+spectrum: AbsorptionSpectrum = compute_absorption_spectrum(
+    config=config,
+    band=band,
+    temperature_k=300.0,
+    pressure_pa=1.0e5,
+)
+```
+
+`SpectroscopyConfig.hitran_cache_dir` stores downloaded HITRAN line and CIA
+files. `SpectroscopyConfig.output_path` controls where NetCDF products are
+written by CLI helpers and is also used to create parent output directories.
+
+H2O continuum calculations use the MT_CKD_H2O coefficient file at
+`external/MT_CKD_H2O/data/absco-ref_wv-mt-ckd.nc` relative to the Pyharp
+repository root. It is tracked as a Git submodule. Clone Pyharp with
+submodules to fetch it immediately:
+
+```bash
+git clone --recurse-submodules https://github.com/chengcli/pyharp
+```
+
+If you already cloned Pyharp, initialize the submodule from the repository root:
+
+```bash
+git submodule update --init --recursive external/MT_CKD_H2O
+```
+
+The top-level spectroscopy CLI computes one pressure-temperature state:
+
+```bash
+pyharp-spectra spectrum --species H2O --temperature-k 300 --pressure-bar 1
+pyharp-spectra transmittance --species H2O --path-length-m 1
+```
+
+Additional installed plotting helpers:
+
+- `pyharp-plot-cia-binary`
+- `pyharp-plot-cia-attenuation`
+- `pyharp-plot-cia-transmission`
+- `pyharp-plot-molecule-xsection`
+- `pyharp-plot-molecule-attenuation`
+- `pyharp-plot-molecule-transmission`
+- `pyharp-plot-molecule-plus-cia-attenuation`
+- `pyharp-plot-molecule-plus-cia-transmission`
+- `pyharp-plot-molecule-lines`
+- `pyharp-plot-molecule-overview`
+- `pyharp-gen-molecule-overview`
+- `pyharp-gen-atm-overview`
+
+Examples:
+
+```bash
+pyharp-plot-cia-binary --pair H2-H2 --temperature-k 300 --wn-min 20 --wn-max 10000
+pyharp-plot-molecule-xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-min 20 --wn-max 2500
+pyharp-gen-atm-overview --composition H2O:0.1,H2:0.9 --wn-range=25,2500 --temperature-k 300 --pressure-bar 1
+```
+
+Supported built-in HITRAN line species are `CH4`, `CO2`, `H2`, `H2O`, and
+`N2`. Built-in CIA pair resolution includes the self pairs for these species
+where HITRAN CIA data is configured, plus `CO2-CH4`, `CO2-H2`, `H2-He`, and
+`N2-CH4`.
+
+`pyharp.spectra` does not provide a fixed reference-column radiative-transfer
+experiment. Use the core Pyharp radiative-transfer APIs for column RT
+calculations, and use `pyharp.spectra` for spectroscopy inputs, diagnostics,
+single-state products, and overview plots.
+
+---
+
 ## Development
 
 If you want to further develop Pyharp, you will need to install it locally, which allows you

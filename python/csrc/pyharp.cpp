@@ -10,12 +10,12 @@
 
 namespace py = pybind11;
 
-void bind_radiation(py::module &m);
-void bind_opacity(py::module &m);
-void bind_math(py::module &m);
-void bind_constants(py::module &m);
-void bind_integrator(py::module &);
-void bind_rtsolver(py::module &);
+void bind_radiation(py::module& m);
+void bind_opacity(py::module& m);
+void bind_math(py::module& m);
+void bind_constants(py::module& m);
+void bind_integrator(py::module&);
+void bind_rtsolver(py::module&);
 
 PYBIND11_MODULE(pyharp, m) {
   m.attr("__name__") = "pyharp";
@@ -34,12 +34,10 @@ PYBIND11_MODULE(pyharp, m) {
   bind_integrator(m);
   bind_rtsolver(m);
 
-  m.def(
-       "species_names",
-       []() -> const std::vector<std::string> & { return harp::species_names; })
-      .def(
-          "species_weights",
-          []() -> const std::vector<double> & { return harp::species_weights; })
+  m.def("species_names",
+        []() -> const std::vector<std::string>& { return harp::species_names; })
+      .def("species_weights",
+           []() -> const std::vector<double>& { return harp::species_weights; })
       .def(
           "set_search_paths",
           [](const std::string path) {

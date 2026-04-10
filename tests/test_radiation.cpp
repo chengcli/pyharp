@@ -27,8 +27,8 @@
 
 class TestRadiation : public testing::Test {
  protected:
-  ParameterInput *pinput;
-  Mesh *pmesh;
+  ParameterInput* pinput;
+  Mesh* pmesh;
 
   virtual void SetUp() {
     // code here will execute just before the test ensues
@@ -49,7 +49,7 @@ class TestRadiation : public testing::Test {
 
     // set up components
     for (int b = 0; b < pmesh->nblocal; ++b) {
-      MeshBlock *pmb = pmesh->my_blocks(b);
+      MeshBlock* pmb = pmesh->my_blocks(b);
       pmb->pimpl = std::make_shared<MeshBlock::Impl>(pmb, pinput);
     }
 
@@ -82,7 +82,7 @@ TEST_F(TestRadiation, Radiation) {
   EXPECT_EQ(prad->GetBand(0)->GetAbsorber(1)->GetName(), "H2-He-CIA");
 };
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   Application::Start(argc, argv);
 
   testing::InitGoogleTest(&argc, argv);

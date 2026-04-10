@@ -12,14 +12,14 @@
 
 namespace py = pybind11;
 
-void bind_rtsolver(py::module &m) {
+void bind_rtsolver(py::module& m) {
   auto pyToonMcKay89Options =
       py::class_<harp::ToonMcKay89OptionsImpl, harp::ToonMcKay89Options>(
           m, "ToonMcKay89Options");
 
   pyToonMcKay89Options.def(py::init<>())
       .def("__repr__",
-           [](const harp::ToonMcKay89Options &a) {
+           [](const harp::ToonMcKay89Options& a) {
              std::stringstream ss;
              a->report(ss);
              return fmt::format("ToonMcKay89Options(\n{})", ss.str());
@@ -34,8 +34,8 @@ void bind_rtsolver(py::module &m) {
       .def_readonly("options", &harp::ToonMcKay89Impl::options)
       .def(
           "forward",
-          [](harp::ToonMcKay89Impl &self, torch::Tensor prop, std::string bname,
-             torch::optional<torch::Tensor> temf, const py::kwargs &kwargs) {
+          [](harp::ToonMcKay89Impl& self, torch::Tensor prop, std::string bname,
+             torch::optional<torch::Tensor> temf, const py::kwargs& kwargs) {
             // get bc from kwargs
             std::map<std::string, torch::Tensor> bc;
             for (auto item : kwargs) {
@@ -44,7 +44,7 @@ void bind_rtsolver(py::module &m) {
               bc.emplace(std::move(key), std::move(value));
             }
 
-            for (auto &[key, value] : bc) {
+            for (auto& [key, value] : bc) {
               std::vector<std::string> items = {"fbeam", "albedo"};
               // broadcast dimensions to (nwave, ncol)
               if (std::find(items.begin(), items.end(), key) != items.end()) {

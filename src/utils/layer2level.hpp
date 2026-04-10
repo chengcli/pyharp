@@ -31,7 +31,7 @@ struct Layer2LevelOptions {
  * \param options options
  * \return level variables, shape (..., nlevel = nlayer + 1)
  */
-torch::Tensor layer2level(torch::Tensor var, Layer2LevelOptions const &options);
+torch::Tensor layer2level(torch::Tensor var, Layer2LevelOptions const& options);
 
 //! Convert layer variables to level variables for non-uniform mesh
 /*!
@@ -45,7 +45,7 @@ torch::Tensor layer2level(torch::Tensor var, Layer2LevelOptions const &options);
  * \return level variables, shape (..., nlevel = nlayer + 1)
  */
 torch::Tensor layer2level(torch::Tensor dx, torch::Tensor var,
-                          Layer2LevelOptions const &options);
+                          Layer2LevelOptions const& options);
 
 }  // namespace harp
 

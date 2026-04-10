@@ -12,7 +12,7 @@
 
 namespace py = pybind11;
 
-void bind_radiation(py::module &m) {
+void bind_radiation(py::module& m) {
   m.def("bbflux_wavenumber",
         py::overload_cast<torch::Tensor, double, int>(&harp::bbflux_wavenumber),
         py::arg("wave"), py::arg("temp"), py::arg("ncol") = 1);
@@ -34,7 +34,7 @@ void bind_radiation(py::module &m) {
 
   pyRadiationBandOptions.def(py::init<>())
       .def("__repr__",
-           [](const harp::RadiationBandOptions &a) {
+           [](const harp::RadiationBandOptions& a) {
              std::stringstream ss;
              a->report(ss);
              return fmt::format("RadiationBandOptions(\n{})", ss.str());
@@ -62,7 +62,7 @@ void bind_radiation(py::module &m) {
 
   pyRadiationOptions.def(py::init<>())
       .def("__repr__",
-           [](const harp::RadiationOptions &a) {
+           [](const harp::RadiationOptions& a) {
              std::stringstream ss;
              a->report(ss);
              return fmt::format("RadiationOptions(\n{})", ss.str());

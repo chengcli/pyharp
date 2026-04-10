@@ -10,7 +10,7 @@ namespace harp {
 
 // Solves a tridiagonal system using the Thomas algorithm (TDMA)
 template <typename T>
-DISPATCH_MACRO void dtridgl(int n, const T *a, const T *b, T *c, T *d, T *x) {
+DISPATCH_MACRO void dtridgl(int n, const T* a, const T* b, T* c, T* d, T* x) {
   // First row
   c[0] = c[0] / b[0];
   d[0] = d[0] / b[0];
