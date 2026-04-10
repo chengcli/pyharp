@@ -15,9 +15,9 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 
-from .config import SpectroscopyConfig, SpectralBandConfig, resolve_hitran_cia_pair
+from .config import SpectroscopyConfig, SpectralBandConfig, parse_broadening_composition, resolve_hitran_cia_pair
 from .hitran_cia import load_cia_dataset
-from .hitran_lines import HapiLineProvider, LineDatabase, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
+from .hitran_lines import HapiLineProvider, LineDatabase, build_line_provider, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
 from .spectrum import compute_absorption_spectrum, compute_absorption_spectrum_from_sources, plot_absorption_spectrum, plot_attenuation_spectrum
 from .transmittance import compute_transmittance_spectrum, plot_transmittance_spectrum
 
@@ -49,6 +49,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_state: boo
     parser.add_argument("--wn-range", type=_parse_wn_range, default=(20.0, 2500.0))
     parser.add_argument("--resolution", type=float, default=1.0)
     parser.add_argument("--refresh-hitran", action="store_true")
+    parser.add_argument("--broadening-composition", default=None)
 
 
 def _add_external_cia_arguments(parser: argparse.ArgumentParser, *, required: bool = False) -> None:
@@ -69,6 +70,7 @@ def _build_band_and_config(args: argparse.Namespace) -> tuple[SpectralBandConfig
         output_path=Path("output") / "unused.nc",
         hitran_cache_dir=args.hitran_dir,
         species_name=args.species,
+        broadening_composition=parse_broadening_composition(getattr(args, "broadening_composition", None)),
         refresh_hitran=args.refresh_hitran,
     )
     return band, config
@@ -131,11 +133,7 @@ def _compute_requested_absorption_spectrum(
         cia_dataset = _load_requested_cia_dataset(args, config)
     line_db = line_db or download_hitran_lines(config, band)
     if cia_dataset is not None:
-        line_provider = HapiLineProvider(
-            line_db.table_name,
-            cache_dir=line_db.cache_dir,
-            min_line_strength=config.min_line_strength,
-        )
+        line_provider = build_line_provider(config, line_db)
         spectrum = compute_absorption_spectrum_from_sources(
             species_name=config.hitran_species.name,
             wavenumber_grid_cm1=band.grid(),
@@ -576,6 +574,7 @@ def build_molecule_overview_batch_parser() -> argparse.ArgumentParser:
     parser.add_argument("--path-length-km", type=float, default=1.0)
     parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=_parse_wn_range, required=True)
     parser.add_argument("--refresh-hitran", action="store_true")
+    parser.add_argument("--broadening-composition", default=None)
     parser.add_argument("--cia-index-url", default="https://hitran.org/cia/")
     parser.add_argument("--refresh-cia", action="store_true")
     parser.add_argument("--figure", type=Path, default=Path("output/molecule_overview_collection.pdf"))
@@ -604,6 +603,7 @@ def run_overview_batch(args: argparse.Namespace) -> None:
                     wn_range=(wn_min, wn_max),
                     resolution=args.resolution,
                     refresh_hitran=args.refresh_hitran,
+                    broadening_composition=args.broadening_composition,
                     cia_filename=None,
                     cia_pair=None,
                     cia_index_url=args.cia_index_url,

@@ -55,7 +55,13 @@ class HapiLineProvider:
         self._hapi = _import_hapi()
         self.table_name = table_name
         self.cache_dir = cache_dir
-        self.diluent = diluent or {"self": 1.0}
+        requested_diluent = dict(diluent or {"self": 1.0})
+        self.diluent, self.diluent_fallbacks = _resolve_effective_diluent(
+            self._hapi,
+            table_name=table_name,
+            cache_dir=cache_dir,
+            requested_diluent=requested_diluent,
+        )
         self.min_line_strength = float(min_line_strength)
         if cache_dir is not None:
             self._hapi.db_begin(str(cache_dir))
@@ -125,6 +131,52 @@ def _cache_matches_requested_molecule(hapi, table_name: str, molecule_id: int) -
     return {int(value) for value in molec_ids} == {int(molecule_id)}
 
 
+def _available_broadener_keys(hapi, table_name: str, cache_dir: Path | None) -> set[str]:
+    if cache_dir is not None:
+        hapi.db_begin(str(cache_dir))
+    hapi.storage2cache(table_name)
+    data = hapi.LOCAL_TABLE_CACHE[table_name]["data"]
+    return {
+        str(key)[len("gamma_") :].lower()
+        for key in data
+        if str(key).startswith("gamma_")
+    }
+
+
+def _resolve_effective_diluent(
+    hapi,
+    *,
+    table_name: str,
+    cache_dir: Path | None,
+    requested_diluent: dict[str, float],
+) -> tuple[dict[str, float], dict[str, str]]:
+    available = _available_broadener_keys(hapi, table_name, cache_dir)
+    effective: dict[str, float] = {}
+    fallbacks: dict[str, str] = {}
+    needs_air_fallback = False
+    for broadener_name, fraction in requested_diluent.items():
+        key = str(broadener_name).strip().lower()
+        amount = float(fraction)
+        if amount <= 0.0:
+            continue
+        if key == "self" or key in available:
+            effective[key] = effective.get(key, 0.0) + amount
+            continue
+        needs_air_fallback = True
+        fallbacks[key] = "air"
+        effective["air"] = effective.get("air", 0.0) + amount
+    if needs_air_fallback and "air" not in available:
+        missing = ", ".join(sorted(name for name, target in fallbacks.items() if target == "air"))
+        raise ValueError(
+            f"Requested broadeners {missing} are unavailable for table {table_name}, "
+            "and air broadening parameters are not available for fallback."
+        )
+    if not effective:
+        return {"self": 1.0}, {}
+    total = sum(effective.values())
+    return ({name: value / total for name, value in effective.items()}, fallbacks)
+
+
 def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> LineDatabase:
     """Fetch the configured species line table for one spectral band."""
     config.ensure_directories()
@@ -181,6 +233,19 @@ def load_hitran_line_list(
         table_name=line_db.table_name,
         wavenumber_cm1=wavenumber_cm1[valid][order],
         line_intensity=line_intensity[valid][order],
+    )
+
+
+def build_line_provider(
+    config: SpectroscopyConfig,
+    line_db: LineDatabase,
+) -> HapiLineProvider:
+    """Construct a HAPI line provider using the config's broadening rules."""
+    return HapiLineProvider(
+        line_db.table_name,
+        cache_dir=line_db.cache_dir,
+        diluent=config.resolved_line_diluent(),
+        min_line_strength=config.min_line_strength,
     )
 
 

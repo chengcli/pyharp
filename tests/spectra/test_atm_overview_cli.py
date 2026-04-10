@@ -32,6 +32,8 @@ def test_atm_overview_parser_accepts_manifest_path_and_ranges(tmp_path) -> None:
         [
             "--composition",
             "H2O:0.1,H2:0.9",
+            "--broadening-composition",
+            "H2:0.85,He:0.15",
             "--wn-range=25,2500",
             "--wn-range=2501,20000",
             "--manifest",
@@ -42,6 +44,7 @@ def test_atm_overview_parser_accepts_manifest_path_and_ranges(tmp_path) -> None:
     )
 
     assert args.composition == "H2O:0.1,H2:0.9"
+    assert args.broadening_composition == "H2:0.85,He:0.15"
     assert args.wn_ranges == [(25.0, 2500.0), (2501.0, 20000.0)]
     assert args.manifest == tmp_path / "sources.json"
     assert args.figure == tmp_path / "overview.pdf"

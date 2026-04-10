@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Mapping
 
 import numpy as np
 
@@ -115,6 +116,22 @@ _HITRAN_SPECIES_BY_NAME: dict[str, HitranSpecies] = {
     ),
 }
 
+_USER_BROADENER_CANONICAL_NAMES: dict[str, str] = {
+    "AIR": "air",
+    "SELF": "self",
+    "H2": "H2",
+    "HE": "He",
+    "CO2": "CO2",
+}
+
+_HAPI_BROADENER_KEYS: dict[str, str] = {
+    "air": "air",
+    "self": "self",
+    "H2": "h2",
+    "He": "he",
+    "CO2": "co2",
+}
+
 
 def resolve_hitran_cia_pair(pair: str) -> HitranCiaPair:
     """Resolve a supported HITRAN CIA pair by name, allowing reversed order."""
@@ -142,6 +159,74 @@ def supported_hitran_species_names() -> tuple[str, ...]:
     return tuple(sorted(_HITRAN_SPECIES_BY_NAME))
 
 
+def parse_broadening_composition(value: str | Mapping[str, float] | None) -> dict[str, float] | None:
+    """Parse and normalize a line-broadening composition specification."""
+    if value is None:
+        return None
+    entries = value.items() if isinstance(value, Mapping) else _split_broadening_string(value)
+    totals: dict[str, float] = {}
+    for name, fraction_value in entries:
+        broadener_name = _canonical_broadener_name(name)
+        try:
+            fraction = float(fraction_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid broadening fraction {fraction_value!r} for {name!r}.") from exc
+        if fraction < 0.0:
+            raise ValueError("broadening fractions must be non-negative")
+        totals[broadener_name] = totals.get(broadener_name, 0.0) + fraction
+    if not totals:
+        raise ValueError("broadening composition must contain at least one BROADENER:FRACTION entry")
+    total_fraction = sum(totals.values())
+    if total_fraction <= 0.0:
+        raise ValueError("broadening fractions must sum to a positive value")
+    return {name: fraction / total_fraction for name, fraction in totals.items()}
+
+
+def resolve_broadening_diluent(
+    absorber_species: str,
+    composition: str | Mapping[str, float] | None,
+) -> dict[str, float]:
+    """Resolve a user-facing broadening composition into HAPI Diluent keys."""
+    parsed = parse_broadening_composition(composition)
+    if parsed is None:
+        return {"self": 1.0}
+    absorber = resolve_hitran_species(absorber_species).name
+    diluent: dict[str, float] = {}
+    for broadener_name, fraction in parsed.items():
+        if broadener_name == absorber:
+            key = "self"
+        else:
+            key = _HAPI_BROADENER_KEYS.get(broadener_name, str(broadener_name).strip().lower())
+        diluent[key] = diluent.get(key, 0.0) + float(fraction)
+    return diluent
+
+
+def _split_broadening_string(value: str) -> tuple[tuple[str, str], ...]:
+    entries: list[tuple[str, str]] = []
+    for chunk in str(value).split(","):
+        piece = chunk.strip()
+        if not piece:
+            continue
+        name, sep, fraction_text = piece.partition(":")
+        if not sep:
+            raise ValueError("broadening entries must have the form BROADENER:FRACTION")
+        entries.append((name.strip(), fraction_text.strip()))
+    return tuple(entries)
+
+
+def _canonical_broadener_name(name: object) -> str:
+    text = str(name).strip()
+    if not text:
+        raise ValueError("broadening species names must be non-empty")
+    upper = text.upper()
+    if upper in _USER_BROADENER_CANONICAL_NAMES:
+        return _USER_BROADENER_CANONICAL_NAMES[upper]
+    try:
+        return resolve_hitran_species(text).name
+    except ValueError:
+        return text
+
+
 def resolve_hitran_species(name: str) -> HitranSpecies:
     """Resolve a supported HITRAN species by name."""
     key = str(name).upper()
@@ -160,6 +245,7 @@ class SpectroscopyConfig:
     hitran_cache_dir: Path
     species_name: str = "CO2"
     isotopologue_ids: tuple[int, ...] | None = None
+    broadening_composition: dict[str, float] | str | None = None
     cia_index_url: str = "https://hitran.org/cia/"
     refresh_hitran: bool = False
     min_line_strength: float = 1.0e-27
@@ -192,6 +278,14 @@ class SpectroscopyConfig:
         if self.isotopologue_ids is None:
             return self.hitran_species.isotopologue_ids
         return tuple(int(value) for value in self.isotopologue_ids)
+
+    def resolved_broadening_composition(self) -> dict[str, float] | None:
+        """Return the normalized user-facing broadening composition."""
+        return parse_broadening_composition(self.broadening_composition)
+
+    def resolved_line_diluent(self) -> dict[str, float]:
+        """Return the HAPI Diluent mapping for the selected absorber."""
+        return resolve_broadening_diluent(self.hitran_species.name, self.broadening_composition)
 
     def resolved_line_table_name(self, band: SpectralBandConfig) -> str:
         """Return a cache-stable HITRAN table name keyed by spectral bounds."""

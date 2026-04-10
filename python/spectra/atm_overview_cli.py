@@ -20,12 +20,13 @@ import numpy as np
 from .config import (
     SpectroscopyConfig,
     SpectralBandConfig,
+    parse_broadening_composition,
     resolve_hitran_species,
     supported_hitran_cia_pairs,
     supported_hitran_species_names,
 )
 from .hitran_cia import load_cia_dataset
-from .hitran_lines import HapiLineProvider, download_hitran_lines, load_hitran_line_list
+from .hitran_lines import build_line_provider, download_hitran_lines, load_hitran_line_list
 from .molecule_plot_cli import _add_legend_if_needed, _apply_positive_log_scale, _mask_nonpositive, _plot_transmittance_panel, _style_shared_axis
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
 from .spectrum import AbsorptionSpectrum, number_density_cm3_from_pressure_temperature
@@ -127,11 +128,19 @@ def _build_band(*, wn_min: float, wn_max: float, resolution: float) -> SpectralB
     return SpectralBandConfig("single_state", float(wn_min), float(wn_max), float(resolution))
 
 
-def _build_species_config(*, species_name: str, band: SpectralBandConfig, hitran_dir: Path, refresh_hitran: bool) -> SpectroscopyConfig:
+def _build_species_config(
+    *,
+    species_name: str,
+    band: SpectralBandConfig,
+    hitran_dir: Path,
+    refresh_hitran: bool,
+    broadening_composition: dict[str, float] | None = None,
+) -> SpectroscopyConfig:
     return SpectroscopyConfig(
         output_path=Path("output") / "unused.nc",
         hitran_cache_dir=hitran_dir,
         species_name=species_name,
+        broadening_composition=broadening_composition,
         refresh_hitran=refresh_hitran,
     )
 
@@ -157,6 +166,9 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
     if args.path_length_km <= 0.0:
         raise ValueError("path-length-km must be positive")
     composition = _parse_composition(args.composition)
+    broadening_composition = parse_broadening_composition(
+        getattr(args, "broadening_composition", None) or composition
+    )
     band = _build_band(wn_min=wn_range[0], wn_max=wn_range[1], resolution=float(args.resolution))
     grid = band.grid()
     temperature_k = float(args.temperature_k)
@@ -173,14 +185,11 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
             species_name=species_name,
             band=band,
             hitran_dir=args.hitran_dir,
+            broadening_composition=broadening_composition,
             refresh_hitran=bool(args.refresh_hitran),
         )
         line_db = download_hitran_lines(config, band)
-        line_provider = HapiLineProvider(
-            line_db.table_name,
-            cache_dir=line_db.cache_dir,
-            min_line_strength=config.min_line_strength,
-        )
+        line_provider = build_line_provider(config, line_db)
         sigma_line = np.asarray(
             line_provider.cross_section_cm2_molecule(
                 wavenumber_grid_cm1=grid,
@@ -503,6 +512,7 @@ def build_atm_overview_parser() -> argparse.ArgumentParser:
     parser.add_argument("--path-length-km", type=float, default=1.0)
     parser.add_argument("--resolution", type=float, default=1.0)
     parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=_parse_wn_range, required=True)
+    parser.add_argument("--broadening-composition", default=None)
     parser.add_argument("--cia-index-url", default="https://hitran.org/cia/")
     parser.add_argument("--refresh-hitran", action="store_true")
     parser.add_argument("--refresh-cia", action="store_true")

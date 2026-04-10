@@ -1,4 +1,11 @@
-from pyharp.spectra.config import SpectralBandConfig, SpectroscopyConfig, resolve_hitran_cia_pair, resolve_hitran_species
+from pyharp.spectra.config import (
+    SpectralBandConfig,
+    SpectroscopyConfig,
+    parse_broadening_composition,
+    resolve_broadening_diluent,
+    resolve_hitran_cia_pair,
+    resolve_hitran_species,
+)
 
 
 def test_resolve_hitran_species_is_case_insensitive() -> None:
@@ -86,3 +93,28 @@ def test_resolve_hitran_cia_pair_supports_new_binary_pairs() -> None:
 def test_resolve_hitran_cia_pair_accepts_reversed_order() -> None:
     assert resolve_hitran_cia_pair("He-H2").pair == "H2-He"
     assert resolve_hitran_cia_pair("CH4-CO2").pair == "CO2-CH4"
+
+
+def test_parse_broadening_composition_normalizes_and_merges_duplicates() -> None:
+    composition = parse_broadening_composition("air:8,CO2:1,co2:1")
+    assert composition == {"air": 0.8, "CO2": 0.2}
+
+
+def test_parse_broadening_composition_accepts_mapping() -> None:
+    composition = parse_broadening_composition({"self": 1.0, "H2": 3.0})
+    assert composition == {"self": 0.25, "H2": 0.75}
+
+
+def test_resolve_broadening_diluent_maps_absorber_to_self() -> None:
+    diluent = resolve_broadening_diluent("CO2", "CO2:0.25,H2:0.75")
+    assert diluent == {"self": 0.25, "h2": 0.75}
+
+
+def test_config_resolves_line_diluent(tmp_path) -> None:
+    config = SpectroscopyConfig(
+        output_path=tmp_path / "out.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="CO2",
+        broadening_composition="air:0.8,CO2:0.2",
+    )
+    assert config.resolved_line_diluent() == {"air": 0.8, "self": 0.2}

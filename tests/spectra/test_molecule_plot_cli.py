@@ -17,6 +17,8 @@ def test_overview_parser_accepts_optional_cia_and_pdf_output(tmp_path) -> None:
             "325",
             "--pressure-bar",
             "2.5",
+            "--broadening-composition",
+            "air:0.8,self:0.2",
             "--wn-range",
             "1000,1500",
             "--path-length-km",
@@ -33,6 +35,7 @@ def test_overview_parser_accepts_optional_cia_and_pdf_output(tmp_path) -> None:
     assert args.species == "H2O"
     assert args.temperature_k == 325.0
     assert args.pressure_bar == 2.5
+    assert args.broadening_composition == "air:0.8,self:0.2"
     assert args.wn_range == (1000.0, 1500.0)
     assert args.path_length_km == 3.0
     assert args.cia_filename == "H2-H2_2011.cia"
@@ -50,6 +53,8 @@ def test_batch_overview_parser_accepts_repeated_ranges_and_default_species(tmp_p
             "300",
             "--pressure-bar",
             "1",
+            "--broadening-composition",
+            "H2:0.85,He:0.15",
             "--path-length-km",
             "1",
             "--figure",
@@ -61,6 +66,7 @@ def test_batch_overview_parser_accepts_repeated_ranges_and_default_species(tmp_p
     assert args.wn_ranges == [(25.0, 2500.0), (2501.0, 20000.0)]
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
+    assert args.broadening_composition == "H2:0.85,He:0.15"
     assert args.path_length_km == 1.0
     assert args.figure == tmp_path / "combined.pdf"
 

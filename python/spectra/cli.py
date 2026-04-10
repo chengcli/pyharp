@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .config import SpectroscopyConfig, SpectralBandConfig
+from .config import SpectroscopyConfig, SpectralBandConfig, parse_broadening_composition
 from .output_names import default_output_path as default_named_output_path
 from .spectrum import compute_absorption_spectrum, plot_absorption_spectrum, write_spectrum_dataset
 from .transmittance import (
@@ -80,6 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     spectrum.add_argument("--hitran-dir", type=Path, default=default_hitran_dir())
     spectrum.add_argument("--species", default="CO2")
     spectrum.add_argument("--refresh-hitran", action="store_true")
+    spectrum.add_argument("--broadening-composition", default=None)
     spectrum.add_argument("--temperature-k", type=float, default=300.0)
     spectrum.add_argument("--pressure-bar", type=float, default=1.0)
     spectrum.add_argument("--wn-range", type=_parse_wn_range, default=(20.0, 2500.0))
@@ -91,6 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     transmittance.add_argument("--hitran-dir", type=Path, default=default_hitran_dir())
     transmittance.add_argument("--species", default="CO2")
     transmittance.add_argument("--refresh-hitran", action="store_true")
+    transmittance.add_argument("--broadening-composition", default=None)
     transmittance.add_argument("--temperature-k", type=float, default=300.0)
     transmittance.add_argument("--pressure-bar", type=float, default=1.0)
     transmittance.add_argument("--path-length-m", type=float, default=1.0)
@@ -110,6 +112,7 @@ def main() -> None:
             output_path=output_path,
             hitran_cache_dir=args.hitran_dir,
             species_name=args.species,
+            broadening_composition=parse_broadening_composition(args.broadening_composition),
             refresh_hitran=args.refresh_hitran,
         )
         spectrum = compute_absorption_spectrum(
@@ -129,6 +132,7 @@ def main() -> None:
             output_path=output_path,
             hitran_cache_dir=args.hitran_dir,
             species_name=args.species,
+            broadening_composition=parse_broadening_composition(args.broadening_composition),
             refresh_hitran=args.refresh_hitran,
         )
         transmittance = compute_transmittance_from_config(
