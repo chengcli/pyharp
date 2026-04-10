@@ -121,3 +121,29 @@ def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:
 def test_plot_main_rejects_multiple_selectors() -> None:
     with pytest.raises(SystemExit):
         plot_cli.main(["attenuation", "--pair", "H2-H2", "--species", "H2O"])
+
+
+def test_plot_help_includes_subcommands_and_examples(capsys) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        plot_cli.main(["-h"])
+
+    assert excinfo.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "binary" in help_text
+    assert "Plot a HITRAN CIA binary coefficient." in help_text
+    assert "Target selection:" in help_text
+    assert "pyharp-plot transmission --composition H2O:0.1,H2:0.9" in help_text
+
+
+def test_plot_subcommand_help_describes_selectors_and_outputs(capsys) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        plot_cli.main(["transmission", "-h"])
+
+    assert excinfo.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "Plot transmission for exactly one target: --pair, --species, or --composition." in help_text
+    assert "--composition SPECIES:FRACTION,..." in help_text
+    assert "Transmission path length in kilometers." in help_text
+    assert "Output PNG path. Defaults to an auto-generated path" in help_text
+    assert "under output/." in help_text
+    assert "(default: None)" not in help_text

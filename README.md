@@ -19,36 +19,6 @@ We support Linux and Mac operation systems with Python version 3.10+.
 
 ---
 
-## Supported opacities
-
-Pyharp has built-in functionalities that work with various opacity sources.
-The following table summaries off-the-shelf opacities.
-
-| Opacity Name          | Tested    | Peer Reviewed | References    |
-|-----------------------|-----------|---------------|---------------|
-| Premix H2 molecule    | YES       | NO            | [1]           |
-| H2-He continuum       | YES       | YES           | [2]           |
-| CO2 molecule          | YES       | NO            |               |
-| CO2 continuum         | YES       | NO            |               |
-| H2O molecule          | YES       | NO            |               |
-| H2O continuum         | YES       | NO            |               |
-| N2 molecule           | YES       | NO            |               |
-| N2 continuum          | YES       | NO            |               |
-| Grey (user implement) | YES       | NO            |               |
-| *(More coming)*       | ...       | ...           |               |
-
-## Supported radiative transfer solvers
-
-You can choose the backend radiative transfer solver to use by Pyharp.
-Here are the available options:
-
-| Radiative Transfer Solver | Tested    | Peer Reviewed | References |
-|---------------------------|-----------|---------------|------------|
-| DISORT                    | YES       | YES           | [1]        |
-| Two-steam (Toon-McKay)    | NO        | NO            |            |
-
----
-
 ## Spectroscopy workflow
 
 Pyharp also includes `pyharp.spectra`, a pure-Python spectroscopy workflow for
@@ -115,42 +85,27 @@ pyharp-spectra spectrum --species H2O --temperature-k 300 --pressure-bar 1 --wn-
 pyharp-spectra transmittance --species H2O --path-length-m 1 --wn-range=20,2500
 ```
 
-Plotting diagnostics are available from one entry point, `pyharp-plot`:
-
-- `pyharp-plot binary`
-- `pyharp-plot attenuation`
-- `pyharp-plot transmission`
-- `pyharp-plot xsection`
-- `pyharp-plot overview`
-
-The target is selected by argument:
-
-- `--pair` selects a CIA pair.
-- `--species` selects a molecule.
-- `--composition` selects an atmosphere mixture.
-
-All plot commands use `--wn-range=min,max` for wavenumber bounds. Default
-output names use
-`<species_or_cia_name>_<plot_type>_<temperature>_<pressure>_<wavenumber_min>_<wavenumber_max>`.
-
-Examples:
+Plotting diagnostics are available from one entry point, `pyharp-plot`. It
+provides CIA binary coefficient, molecular cross-section, attenuation,
+transmission, and overview plot subcommands:
 
 ```bash
 pyharp-plot binary --pair H2-H2 --temperature-k 300 --wn-range=20,10000
-
 pyharp-plot xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-
-pyharp-plot attenuation --pair H2-H2 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
 pyharp-plot attenuation --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-pyharp-plot attenuation --composition H2O:0.1,H2:0.9 --temperature-k 300 --pressure-bar 1 --wn-range=25,2500
-
-pyharp-plot transmission --pair H2-H2 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=20,10000
-pyharp-plot transmission --species CO2 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=20,2500
 pyharp-plot transmission --composition H2O:0.1,H2:0.9 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=25,2500
-
-pyharp-plot overview --species H2O --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=20,2500
-pyharp-plot overview --composition H2O:0.1,H2:0.9 --wn-range=25,2500 --temperature-k 300 --pressure-bar 1
+pyharp-plot overview --species H2O CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500 --wn-range=2500,10000
 ```
+
+Use `--pair` for CIA pairs, `--species` for molecules, and `--composition`
+for gas mixtures such as `H2O:0.1,H2:0.9`. All plot commands accept
+`--wn-range=min,max`; `overview` accepts multiple `--wn-range` values for
+multi-page PDFs. Use `--figure` to choose the output path. Without `--figure`,
+plots are written under `output/` with names derived from the target, plot
+type, temperature, pressure, and wavenumber range.
+
+See the [pyharp-plot CLI documentation](https://pyharp.readthedocs.io/en/latest/plot_cli.html)
+for command-specific options and more examples.
 
 Supported built-in HITRAN line species are `CH4`, `CO2`, `H2`, `H2O`, and
 `N2`. Built-in CIA pair resolution includes the self pairs for these species
