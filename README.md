@@ -87,8 +87,9 @@ The `pyharp-dump` CLI writes one pressure-temperature NetCDF product per run.
 Use `--wn-range=min,max` for the wavenumber bounds:
 
 ```bash
-pyharp-dump spectrum --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-pyharp-dump transmittance --species H2O --path-length-m 1 --wn-range=20,2500
+pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+pyharp-dump xsection --pair H2-H2 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
+pyharp-dump transmission --species H2O --path-length-m 1 --wn-range=20,2500
 ```
 
 Plotting diagnostics are available from one entry point, `pyharp-plot`. It

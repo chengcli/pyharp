@@ -8,7 +8,7 @@ def test_default_paths_are_inside_project_root() -> None:
     root = project_root()
     assert default_output_path().is_relative_to(root)
     assert default_hitran_dir().is_relative_to(root)
-    assert default_output_path().name == "co2_spectrum_300K_1bar_20_2500.nc"
+    assert default_output_path().name == "co2_xsection_300K_1bar_20_2500.nc"
     assert default_output_path().parent.name == "output"
     assert default_hitran_dir().name == "hitran"
 
@@ -20,13 +20,13 @@ def test_parser_does_not_expose_reference_column_commands() -> None:
     assert "status" not in commands
 
 
-def test_spectrum_parser_accepts_pressure_temperature_and_outputs(tmp_path) -> None:
+def test_xsection_parser_accepts_species_pressure_temperature_and_outputs(tmp_path) -> None:
     parser = build_parser()
     args = parser.parse_args(
         [
-            "spectrum",
+            "xsection",
             "--output",
-            str(tmp_path / "spec.nc"),
+            str(tmp_path / "xsection.nc"),
             "--temperature-k",
             "300",
             "--pressure-bar",
@@ -39,8 +39,8 @@ def test_spectrum_parser_accepts_pressure_temperature_and_outputs(tmp_path) -> N
             "100,200",
         ]
     )
-    assert args.command == "spectrum"
-    assert args.output == tmp_path / "spec.nc"
+    assert args.command == "xsection"
+    assert args.output == tmp_path / "xsection.nc"
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
     assert args.species == "co2"
@@ -48,11 +48,39 @@ def test_spectrum_parser_accepts_pressure_temperature_and_outputs(tmp_path) -> N
     assert args.wn_range == (100.0, 200.0)
 
 
-def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
+def test_xsection_parser_accepts_cia_pair_selector(tmp_path) -> None:
     parser = build_parser()
     args = parser.parse_args(
         [
-            "transmittance",
+            "xsection",
+            "--output",
+            str(tmp_path / "pair.nc"),
+            "--temperature-k",
+            "300",
+            "--pressure-bar",
+            "1",
+            "--pair",
+            "H2-He",
+            "--filename",
+            "H2-He_2011.cia",
+            "--wn-range",
+            "50,150",
+        ]
+    )
+    assert args.command == "xsection"
+    assert args.output == tmp_path / "pair.nc"
+    assert args.temperature_k == 300.0
+    assert args.pressure_bar == 1.0
+    assert args.pair == "H2-He"
+    assert args.filename == "H2-He_2011.cia"
+    assert args.wn_range == (50.0, 150.0)
+
+
+def test_transmission_parser_accepts_path_length_and_outputs(tmp_path) -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "transmission",
             "--output",
             str(tmp_path / "trans.nc"),
             "--temperature-k",
@@ -69,7 +97,7 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
             "50,150",
         ]
     )
-    assert args.command == "transmittance"
+    assert args.command == "transmission"
     assert args.output == tmp_path / "trans.nc"
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
@@ -79,13 +107,13 @@ def test_transmittance_parser_accepts_path_length_and_outputs(tmp_path) -> None:
     assert args.wn_range == (50.0, 150.0)
 
 
-def test_cli_spectrum_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:
+def test_cli_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setattr(
-            sys,
+        sys,
         "argv",
         [
             "pyharp-dump",
-            "spectrum",
+            "xsection",
             "--species",
             "CO2",
             "--broadening-composition",
@@ -93,9 +121,10 @@ def test_cli_spectrum_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
             "--wn-range",
             "20,22",
             "--output",
-            str(tmp_path / "spec.nc"),
+            str(tmp_path / "xsection.nc"),
         ],
     )
+    monkeypatch.setattr("pyharp.spectra.dump_cli._resolve_species_cia", lambda args, config: None)
     monkeypatch.setattr("pyharp.spectra.dump_cli.download_hitran_lines", lambda config, band: object())
     monkeypatch.setattr(
         "pyharp.spectra.dump_cli.build_line_provider",
@@ -128,22 +157,22 @@ def test_cli_help_includes_examples_and_subcommands(capsys) -> None:
         raise AssertionError("expected SystemExit")
 
     help_text = capsys.readouterr().out
-    assert "spectrum" in help_text
-    assert "transmittance" in help_text
-    assert "pyharp-dump spectrum --species NH3" in help_text
+    assert "xsection" in help_text
+    assert "transmission" in help_text
+    assert "pyharp-dump xsection --pair H2-He" in help_text
 
 
-def test_cli_transmittance_help_describes_broadening_and_path_length(capsys) -> None:
+def test_cli_transmission_help_describes_broadening_and_path_length(capsys) -> None:
     parser = build_parser()
     try:
-        parser.parse_args(["transmittance", "-h"])
+        parser.parse_args(["transmission", "-h"])
     except SystemExit as exc:
         assert exc.code == 0
     else:
         raise AssertionError("expected SystemExit")
 
     help_text = capsys.readouterr().out
-    assert "Compute molecular transmittance at one pressure-temperature state and write a NetCDF dataset." in help_text
+    assert "Compute line, CIA, and total transmission over a fixed path length and write a NetCDF dataset." in help_text
     assert "--broadening-composition BROADENER:FRACTION,..." in help_text
     assert "Propagation path length in meters." in help_text
-    assert "pyharp-dump transmittance --species CH4" in help_text
+    assert "pyharp-dump transmission --composition H2:0.9,He:0.1,CH4:0.004" in help_text

@@ -31,7 +31,7 @@ def default_output_path() -> Path:
     """Return the default NetCDF output path inside the project root."""
     return default_named_output_path(
         target_name="CO2",
-        plot_type="spectrum",
+        plot_type="xsection",
         temperature_k=300.0,
         pressure_bar=1.0,
         wn_range=(20.0, 2500.0),
