@@ -77,6 +77,7 @@ def _as_cia_args(args: argparse.Namespace, *, default_pair: str, plot_type: str)
     wn_range = args.wn_range or (20.0, 10000.0)
     pressure_bar = getattr(args, "pressure_bar", 1.0)
     pair = args.pair or default_pair
+    refresh_cia = getattr(args, "refresh_cia", getattr(args, "refresh", False))
     return argparse.Namespace(
         hitran_dir=args.hitran_dir,
         filename=getattr(args, "filename", None),
@@ -84,7 +85,9 @@ def _as_cia_args(args: argparse.Namespace, *, default_pair: str, plot_type: str)
         temperature_k=args.temperature_k,
         wn_range=wn_range,
         resolution=args.resolution,
-        refresh=getattr(args, "refresh", False),
+        refresh=refresh_cia,
+        refresh_cia=refresh_cia,
+        cia_index_url=getattr(args, "cia_index_url", None),
         pressure_bar=pressure_bar,
         path_length_km=getattr(args, "path_length_km", 1.0),
         figure=args.figure

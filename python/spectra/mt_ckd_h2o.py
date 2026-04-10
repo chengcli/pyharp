@@ -12,14 +12,20 @@ from scipy.interpolate import interp1d
 _MT_CKD_H2O_RELATIVE_PATH = Path("external") / "MT_CKD_H2O" / "data" / "absco-ref_wv-mt-ckd.nc"
 
 
+def _find_repo_root(start: Path) -> Path | None:
+    """Return the nearest parent directory that looks like the repository root."""
+    for root in (start, *start.parents):
+        if (root / "pyproject.toml").exists() or (root / ".git").exists():
+            return root
+    return None
+
+
 def default_mt_ckd_h2o_data_path() -> Path:
     """Return the local MT_CKD_H2O coefficient file path."""
     cwd = Path.cwd().resolve()
-    for root in (cwd, *cwd.parents):
-        candidate = root / _MT_CKD_H2O_RELATIVE_PATH
-        if candidate.exists():
-            return candidate
-    return cwd / _MT_CKD_H2O_RELATIVE_PATH
+    repo_root = _find_repo_root(cwd)
+    root = repo_root if repo_root is not None else cwd
+    return root / _MT_CKD_H2O_RELATIVE_PATH
 
 
 def _radiation_term(wavenumber_cm1: np.ndarray, temperature_k: float) -> np.ndarray:
