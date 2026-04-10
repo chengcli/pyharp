@@ -1,0 +1,3 @@
+[submodule "external/MT_CKD_H2O"]
+	path = external/MT_CKD_H2O
+	url = https://github.com/AER-RC/MT_CKD_H2O.git

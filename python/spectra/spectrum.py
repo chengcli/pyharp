@@ -17,7 +17,7 @@ import xarray as xr
 
 from .config import SpectroscopyConfig, SpectralBandConfig
 from .hitran_cia import CiaDataset, download_cia_file, parse_cia_file
-from .hitran_lines import HapiLineProvider, download_hitran_lines
+from .hitran_lines import HapiLineProvider, LineDatabase, download_hitran_lines
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
 
 K_BOLTZMANN = 1.380649e-23
@@ -108,11 +108,13 @@ def compute_absorption_spectrum(
     band: SpectralBandConfig,
     temperature_k: float,
     pressure_pa: float,
+    *,
+    line_db: LineDatabase | None = None,
 ) -> AbsorptionSpectrum:
     """Download/load spectroscopy inputs and compute one-state absorption."""
     config.ensure_directories()
     grid = band.grid()
-    line_db = download_hitran_lines(config, band)
+    line_db = line_db or download_hitran_lines(config, band)
     line_provider = HapiLineProvider(
         line_db.table_name,
         cache_dir=line_db.cache_dir,

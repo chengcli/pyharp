@@ -17,7 +17,7 @@ import numpy as np
 
 from .config import SpectroscopyConfig, SpectralBandConfig, resolve_hitran_cia_pair
 from .hitran_cia import load_cia_dataset
-from .hitran_lines import HapiLineProvider, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
+from .hitran_lines import HapiLineProvider, LineDatabase, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
 from .spectrum import compute_absorption_spectrum, compute_absorption_spectrum_from_sources, plot_absorption_spectrum, plot_attenuation_spectrum
 from .transmittance import compute_transmittance_spectrum, plot_transmittance_spectrum
 
@@ -97,13 +97,22 @@ def _load_requested_cia_dataset(args: argparse.Namespace, config: SpectroscopyCo
     )
 
 
-def _compute_requested_absorption_spectrum(args: argparse.Namespace):
+_MISSING = object()
+
+
+def _compute_requested_absorption_spectrum(
+    args: argparse.Namespace,
+    *,
+    line_db: LineDatabase | None = None,
+    cia_dataset=_MISSING,
+):
     band, config = _build_band_and_config(args)
     temperature_k = float(args.temperature_k)
     pressure_pa = float(args.pressure_bar) * 1.0e5
-    cia_dataset = _load_requested_cia_dataset(args, config)
+    if cia_dataset is _MISSING:
+        cia_dataset = _load_requested_cia_dataset(args, config)
+    line_db = line_db or download_hitran_lines(config, band)
     if cia_dataset is not None:
-        line_db = download_hitran_lines(config, band)
         line_provider = HapiLineProvider(
             line_db.table_name,
             cache_dir=line_db.cache_dir,
@@ -123,6 +132,7 @@ def _compute_requested_absorption_spectrum(args: argparse.Namespace):
             band=band,
             temperature_k=temperature_k,
             pressure_pa=pressure_pa,
+            line_db=line_db,
         )
     return band, config, spectrum
 
@@ -495,13 +505,14 @@ def _compute_overview_products(args: argparse.Namespace):
     if args.path_length_km <= 0.0:
         raise ValueError("path-length-km must be positive")
     band, config = _build_band_and_config(args)
-    line_list = load_hitran_line_list(config, band)
-    _, _, spectrum = _compute_requested_absorption_spectrum(args)
+    line_db = download_hitran_lines(config, band)
+    line_list = load_hitran_line_list(config, band, line_db=line_db)
+    cia_dataset = _load_requested_cia_dataset(args, config)
+    _, _, spectrum = _compute_requested_absorption_spectrum(args, line_db=line_db, cia_dataset=cia_dataset)
     transmittance = compute_transmittance_spectrum(
         spectrum=spectrum,
         path_length_m=float(args.path_length_km) * 1000.0,
     )
-    cia_dataset = _load_requested_cia_dataset(args, config)
     return band, config, line_list, spectrum, transmittance, cia_dataset
 
 

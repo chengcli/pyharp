@@ -156,9 +156,13 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
     )
 
 
-def load_hitran_line_list(config: SpectroscopyConfig, band: SpectralBandConfig) -> HitranLineList:
+def load_hitran_line_list(
+    config: SpectroscopyConfig,
+    band: SpectralBandConfig,
+    line_db: LineDatabase | None = None,
+) -> HitranLineList:
     """Load discrete HITRAN line positions and tabulated intensities for the configured species."""
-    line_db = download_hitran_lines(config, band)
+    line_db = line_db or download_hitran_lines(config, band)
     hapi = _import_hapi()
     hapi.db_begin(str(line_db.cache_dir))
     hapi.storage2cache(line_db.table_name)

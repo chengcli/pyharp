@@ -10,8 +10,8 @@ from scipy.interpolate import interp1d
 
 
 def default_mt_ckd_h2o_data_path() -> Path:
-    """Return the default MT_CKD_H2O coefficient file path in the workspace."""
-    return Path(__file__).resolve().parents[1] / "external" / "MT_CKD_H2O" / "data" / "absco-ref_wv-mt-ckd.nc"
+    """Return the default MT_CKD_H2O coefficient file path in the repository."""
+    return Path(__file__).resolve().parents[2] / "external" / "MT_CKD_H2O" / "data" / "absco-ref_wv-mt-ckd.nc"
 
 
 def _radiation_term(wavenumber_cm1: np.ndarray, temperature_k: float) -> np.ndarray:

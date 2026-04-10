@@ -92,6 +92,21 @@ spectrum: AbsorptionSpectrum = compute_absorption_spectrum(
 files. `SpectroscopyConfig.output_path` controls where NetCDF products are
 written by CLI helpers and is also used to create parent output directories.
 
+H2O continuum calculations use the MT_CKD_H2O coefficient file at
+`external/MT_CKD_H2O/data/absco-ref_wv-mt-ckd.nc` relative to the Pyharp
+repository root. It is tracked as a Git submodule. Clone Pyharp with
+submodules to fetch it immediately:
+
+```bash
+git clone --recurse-submodules https://github.com/chengcli/pyharp
+```
+
+If you already cloned Pyharp, initialize the submodule from the repository root:
+
+```bash
+git submodule update --init --recursive external/MT_CKD_H2O
+```
+
 The top-level spectroscopy CLI computes one pressure-temperature state:
 
 ```bash
