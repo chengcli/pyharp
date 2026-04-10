@@ -108,11 +108,23 @@ _HITRAN_SPECIES_BY_NAME: dict[str, HitranSpecies] = {
         isotopologue_ids=(1, 2, 3, 4),
         cia_filename="CH4-CH4_2011.cia",
     ),
+    "NH3": HitranSpecies(
+        name="NH3",
+        molecule_id=11,
+        isotopologue_ids=(1, 2),
+        cia_filename=None,
+    ),
     "N2": HitranSpecies(
         name="N2",
         molecule_id=22,
         isotopologue_ids=(1, 2),
         cia_filename="N2-N2_2021.cia",
+    ),
+    "H2S": HitranSpecies(
+        name="H2S",
+        molecule_id=31,
+        isotopologue_ids=(1, 2, 3),
+        cia_filename=None,
     ),
 }
 
@@ -120,7 +132,9 @@ _USER_BROADENER_CANONICAL_NAMES: dict[str, str] = {
     "AIR": "air",
     "SELF": "self",
     "H2": "H2",
+    "H2S": "H2S",
     "HE": "He",
+    "NH3": "NH3",
     "CO2": "CO2",
 }
 

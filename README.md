@@ -118,8 +118,8 @@ active absorber, Pyharp falls back to `air` for that fraction.
 See the [pyharp-plot CLI documentation](https://pyharp.readthedocs.io/en/latest/plot_cli.html)
 for command-specific options and more examples.
 
-Supported built-in HITRAN line species are `CH4`, `CO2`, `H2`, `H2O`, and
-`N2`. Built-in CIA pair resolution includes the self pairs for these species
+Supported built-in HITRAN line species are `CH4`, `CO2`, `H2`, `H2O`, `H2S`,
+`N2`, and `NH3`. Built-in CIA pair resolution includes the self pairs for these species
 where HITRAN CIA data is configured, plus `CO2-CH4`, `CO2-H2`, `H2-He`, and
 `N2-CH4`.
 

@@ -137,7 +137,7 @@ CIA pair resolution includes ``CH4-CH4``, ``CO2-CH4``, ``CO2-CO2``,
 ``CO2-H2``, ``H2-H2``, ``H2-He``, ``N2-CH4``, and ``N2-N2``.
 
 Use ``--species`` for molecular line calculations. Built-in HITRAN line
-species are ``CH4``, ``CO2``, ``H2``, ``H2O``, and ``N2``.
+species are ``CH4``, ``CO2``, ``H2``, ``H2O``, ``H2S``, ``N2``, and ``NH3``.
 
 Use ``--composition`` for a gas mixture. The format is a comma-separated list
 of ``species:fraction`` terms:

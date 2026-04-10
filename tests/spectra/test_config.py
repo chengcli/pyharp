@@ -68,6 +68,22 @@ def test_resolve_hitran_species_supports_n2() -> None:
     assert species.cia_filename == "N2-N2_2021.cia"
 
 
+def test_resolve_hitran_species_supports_nh3() -> None:
+    species = resolve_hitran_species("NH3")
+    assert species.name == "NH3"
+    assert species.molecule_id == 11
+    assert species.isotopologue_ids == (1, 2)
+    assert species.cia_filename is None
+
+
+def test_resolve_hitran_species_supports_h2s() -> None:
+    species = resolve_hitran_species("H2S")
+    assert species.name == "H2S"
+    assert species.molecule_id == 31
+    assert species.isotopologue_ids == (1, 2, 3)
+    assert species.cia_filename is None
+
+
 def test_n2_config_derives_default_cia_metadata(tmp_path) -> None:
     band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
     config = SpectroscopyConfig(
@@ -81,6 +97,34 @@ def test_n2_config_derives_default_cia_metadata(tmp_path) -> None:
     assert config.cia_pair == "N2-N2"
     assert config.cia_filename == "N2-N2_2021.cia"
     assert config.resolved_line_table_name(band) == "n2_lines_25_2500"
+
+
+def test_nh3_config_derives_default_metadata(tmp_path) -> None:
+    band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
+    config = SpectroscopyConfig(
+        output_path=tmp_path / "out.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="nh3",
+    )
+    assert config.hitran_species.name == "NH3"
+    assert config.molecule_id == 11
+    assert config.resolved_isotopologue_ids() == (1, 2)
+    assert config.cia_pair == "NH3-NH3"
+    assert config.resolved_line_table_name(band) == "nh3_lines_25_2500"
+
+
+def test_h2s_config_derives_default_metadata(tmp_path) -> None:
+    band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
+    config = SpectroscopyConfig(
+        output_path=tmp_path / "out.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="h2s",
+    )
+    assert config.hitran_species.name == "H2S"
+    assert config.molecule_id == 31
+    assert config.resolved_isotopologue_ids() == (1, 2, 3)
+    assert config.cia_pair == "H2S-H2S"
+    assert config.resolved_line_table_name(band) == "h2s_lines_25_2500"
 
 
 def test_resolve_hitran_cia_pair_supports_new_binary_pairs() -> None:
