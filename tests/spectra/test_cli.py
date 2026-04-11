@@ -5,7 +5,7 @@ from pathlib import Path
 
 import xarray as xr
 
-from pyharp.spectra.dump_cli import _args_for_wn_range, _combine_band_datasets, _composition_xsection_dataset, _pair_xsection_dataset, _xsection_dataset, build_parser, main
+from pyharp.spectra.dump_cli import _args_for_wn_range, _combine_band_datasets, _composition_transmission_dataset, _composition_xsection_dataset, _pair_xsection_dataset, _species_transmission_dataset, _write_dataset_via_tmp, _xsection_dataset, build_parser, main
 from pyharp.spectra.shared_cli import default_hitran_dir, default_output_path, project_root
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 
@@ -291,6 +291,17 @@ def test_combine_band_datasets_preserves_band_metadata() -> None:
         combined.close()
 
 
+def test_write_dataset_via_tmp_creates_missing_output_parent(tmp_path) -> None:
+    dataset = xr.Dataset(coords={"wavenumber": ("wavenumber", np.array([1.0, 2.0]))}, data_vars={"sigma_total": ("wavenumber", np.array([3.0, 4.0]))})
+    output_path = tmp_path / "nested" / "pair.nc"
+
+    try:
+        _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+        assert output_path.exists()
+    finally:
+        dataset.close()
+
+
 def test_xsection_dataset_keeps_only_sigma_fields() -> None:
     spectrum = AbsorptionSpectrum(
         species_name="H2O",
@@ -505,6 +516,142 @@ def test_cli_xsection_composition_multi_range_uses_composition_worker(monkeypatc
     assert written == [(2, [(20.0, 2500.0), (2500.0, 10000.0)], tmp_path / "mixture.nc")]
     out = capsys.readouterr().out
     assert "Wrote NetCDF:" in out
+
+
+def test_species_transmission_dataset_matches_xsection_naming() -> None:
+    spectrum = AbsorptionSpectrum(
+        species_name="H2O",
+        wavenumber_cm1=np.array([20.0, 21.0]),
+        sigma_line_cm2_molecule=np.array([1.0, 2.0]),
+        sigma_cia_cm2_molecule=np.array([0.1, 0.2]),
+        sigma_total_cm2_molecule=np.array([1.1, 2.2]),
+        kappa_line_cm1=np.array([3.0, 4.0]),
+        kappa_cia_cm1=np.array([0.3, 0.4]),
+        kappa_total_cm1=np.array([3.3, 4.4]),
+        attenuation_line_m1=np.array([5.0, 6.0]),
+        attenuation_cia_m1=np.array([0.5, 0.6]),
+        attenuation_total_m1=np.array([5.5, 6.6]),
+        temperature_k=300.0,
+        pressure_pa=1.0e5,
+        number_density_cm3=2.4e19,
+    )
+    transmittance = type(
+        "Trans",
+        (),
+        {
+            "wavenumber_cm1": np.array([20.0, 21.0]),
+            "transmittance_line": np.array([0.9, 0.8]),
+            "transmittance_cia": np.array([0.99, 0.98]),
+            "transmittance_total": np.array([0.89, 0.78]),
+            "path_length_m": 10.0,
+            "temperature_k": 300.0,
+            "pressure_pa": 1.0e5,
+        },
+    )()
+
+    dataset = _species_transmission_dataset(
+        spectrum=spectrum,
+        transmittance=transmittance,
+        species_name="H2O",
+        secondary_component={"kind": "continuum", "label": "H2O continuum (MT_CKD)"},
+    )
+    try:
+        assert set(dataset.data_vars) == {
+            "transmittance_line_h2o",
+            "attenuation_line_h2o",
+            "transmittance_continuum_h2o_continuum_mt_ckd",
+            "attenuation_continuum_h2o_continuum_mt_ckd",
+            "transmittance_total",
+            "attenuation_total",
+        }
+        assert dataset.attrs["species_name"] == "H2O"
+        assert dataset["attenuation_continuum_h2o_continuum_mt_ckd"].attrs["units"] == "m^-1"
+    finally:
+        dataset.close()
+
+
+def test_composition_transmission_dataset_uses_component_names_and_attrs(monkeypatch, tmp_path) -> None:
+    products = type(
+        "Products",
+        (),
+        {
+            "spectrum": type(
+                "Spectrum",
+                (),
+                {
+                    "wavenumber_cm1": np.array([20.0, 21.0]),
+                    "attenuation_total_m1": np.array([7.0, 8.0]),
+                    "temperature_k": 300.0,
+                    "pressure_pa": 1.0e5,
+                    "number_density_cm3": 10.0,
+                },
+            )(),
+            "transmittance": type(
+                "Trans",
+                (),
+                {
+                    "wavenumber_cm1": np.array([20.0, 21.0]),
+                    "transmittance_total": np.array([0.7, 0.6]),
+                    "path_length_m": 2.0,
+                    "temperature_k": 300.0,
+                    "pressure_pa": 1.0e5,
+                },
+            )(),
+            "species_terms": (
+                type(
+                    "SpeciesTerm",
+                    (),
+                    {"species_name": "H2O", "mole_fraction": 0.2, "sigma_line_cm2_molecule": np.array([3.0, 4.0])},
+                )(),
+            ),
+            "secondary_sources": (
+                type(
+                    "Secondary",
+                    (),
+                    {"kind": "continuum", "label": "H2O continuum (MT_CKD)", "weight": 0.2, "sigma_cm2_molecule": np.array([5.0, 6.0])},
+                )(),
+                type(
+                    "Secondary",
+                    (),
+                    {"kind": "binary_cia", "label": "H2-He", "weight": 0.09, "sigma_cm2_molecule": np.array([7.0, 8.0])},
+                )(),
+            ),
+        },
+    )()
+    monkeypatch.setattr("pyharp.spectra.dump_cli._compute_composition_products", lambda args: products)
+    args = build_parser().parse_args(
+        [
+            "transmission",
+            "--composition",
+            "H2:0.9,He:0.1,H2O:0.002",
+            "--path-length-m",
+            "2",
+            "--wn-range",
+            "20,21",
+            "--hitran-dir",
+            str(tmp_path / "hitran"),
+        ]
+    )
+
+    dataset = _composition_transmission_dataset(_args_for_wn_range(args, args.wn_ranges[0]))
+    try:
+        assert dataset.attrs["composition_input"] == "H2:0.9,He:0.1,H2O:0.002"
+        assert dataset.attrs["species_name"] == "H2,He,H2O"
+        assert set(dataset.data_vars) == {
+            "transmittance_total",
+            "attenuation_total",
+            "attenuation_line_h2o",
+            "transmittance_line_h2o",
+            "attenuation_continuum_h2o_continuum_mt_ckd",
+            "transmittance_continuum_h2o_continuum_mt_ckd",
+            "attenuation_cia_h2_he",
+            "transmittance_cia_h2_he",
+        }
+        assert np.allclose(dataset["attenuation_line_h2o"].values, np.array([600.0, 800.0]))
+        assert np.allclose(dataset["attenuation_continuum_h2o_continuum_mt_ckd"].values, np.array([5000.0, 6000.0]))
+        assert np.allclose(dataset["attenuation_cia_h2_he"].values, np.array([7000.0, 8000.0]))
+    finally:
+        dataset.close()
 
 
 def test_cli_xsection_reuses_built_provider_for_species_spectrum(monkeypatch, tmp_path) -> None:

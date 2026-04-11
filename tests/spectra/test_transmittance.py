@@ -43,7 +43,7 @@ def test_transmittance_outputs_can_be_written(tmp_path: Path) -> None:
     dataset = transmittance_to_dataset(trans)
     assert "transmittance_total" in dataset.data_vars
 
-    output_path = tmp_path / "trans.nc"
+    output_path = tmp_path / "nested" / "trans.nc"
     figure_path = tmp_path / "trans.png"
     write_transmittance_dataset(trans, output_path)
     plot_transmittance_spectrum(trans, figure_path)

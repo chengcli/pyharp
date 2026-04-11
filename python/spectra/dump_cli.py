@@ -15,7 +15,7 @@ import numpy as np
 import xarray as xr
 
 from .atm_overview_cli import _parse_composition, compute_mixture_overview_products
-from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair, resolve_hitran_species
+from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import build_line_provider, download_hitran_lines
 from .output_names import default_output_path as default_named_output_path
@@ -30,9 +30,8 @@ from .spectrum import (
     compute_absorption_spectrum_from_sources,
     number_density_cm3_from_pressure_temperature,
     spectrum_to_dataset,
-    write_spectrum_dataset,
 )
-from .transmittance import compute_transmittance_spectrum, transmittance_to_dataset, write_transmittance_dataset
+from .transmittance import compute_transmittance_spectrum
 
 
 class _ZeroLineProvider:
@@ -285,6 +284,203 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
     return dataset
 
 
+def _species_transmission_dataset(
+    *,
+    spectrum,
+    transmittance,
+    species_name: str,
+    secondary_component: dict[str, object] | None = None,
+) -> xr.Dataset:
+    species_token = _clean_var_token(species_name)
+    data_vars: dict[str, tuple[tuple[str], np.ndarray, dict[str, str]]] = {
+        f"transmittance_line_{species_token}": (
+            "wavenumber",
+            np.asarray(transmittance.transmittance_line, dtype=np.float64),
+            {"long_name": f"{species_name} line transmittance", "units": "1"},
+        ),
+        f"attenuation_line_{species_token}": (
+            "wavenumber",
+            np.asarray(spectrum.attenuation_line_m1, dtype=np.float64),
+            {"long_name": f"{species_name} line attenuation coefficient", "units": "m^-1"},
+        ),
+        "transmittance_total": (
+            "wavenumber",
+            np.asarray(transmittance.transmittance_total, dtype=np.float64),
+            {"long_name": "total transmittance", "units": "1"},
+        ),
+        "attenuation_total": (
+            "wavenumber",
+            np.asarray(spectrum.attenuation_total_m1, dtype=np.float64),
+            {"long_name": "total attenuation coefficient", "units": "m^-1"},
+        ),
+    }
+    if secondary_component is None:
+        data_vars["transmittance_cia"] = (
+            "wavenumber",
+            np.asarray(transmittance.transmittance_cia, dtype=np.float64),
+            {"long_name": "CIA or continuum transmittance", "units": "1"},
+        )
+        data_vars["attenuation_cia"] = (
+            "wavenumber",
+            np.asarray(spectrum.attenuation_cia_m1, dtype=np.float64),
+            {"long_name": "CIA or continuum attenuation coefficient", "units": "m^-1"},
+        )
+    else:
+        label = str(secondary_component.get("label", ""))
+        label_token = _clean_var_token(label)
+        if str(secondary_component.get("kind", "")) == "continuum":
+            trans_name = f"transmittance_continuum_{label_token}"
+            att_name = f"attenuation_continuum_{label_token}"
+            trans_long = f"{label} transmittance"
+            att_long = f"{label} attenuation coefficient"
+        else:
+            trans_name = f"transmittance_cia_{label_token}"
+            att_name = f"attenuation_cia_{label_token}"
+            trans_long = f"{label} CIA transmittance"
+            att_long = f"{label} CIA attenuation coefficient"
+        data_vars[trans_name] = (
+            "wavenumber",
+            np.asarray(transmittance.transmittance_cia, dtype=np.float64),
+            {"long_name": trans_long, "units": "1"},
+        )
+        data_vars[att_name] = (
+            "wavenumber",
+            np.asarray(spectrum.attenuation_cia_m1, dtype=np.float64),
+            {"long_name": att_long, "units": "m^-1"},
+        )
+    dataset = xr.Dataset(
+        coords={"wavenumber": ("wavenumber", np.asarray(transmittance.wavenumber_cm1, dtype=np.float64))},
+        data_vars=data_vars,
+        attrs={
+            "species_name": str(species_name),
+            "path_length_m": float(transmittance.path_length_m),
+            "temperature_k": float(transmittance.temperature_k),
+            "pressure_pa": float(transmittance.pressure_pa),
+            "pressure_bar": float(transmittance.pressure_pa) / 1.0e5,
+        },
+    )
+    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    return dataset
+
+
+def _pair_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
+    spectrum = _compute_pair_xsection(args)
+    transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
+    pair, _ = _resolve_pair_filename(args)
+    pair_token = _clean_var_token(pair)
+    dataset = xr.Dataset(
+        coords={"wavenumber": ("wavenumber", np.asarray(transmittance.wavenumber_cm1, dtype=np.float64))},
+        data_vars={
+            f"transmittance_cia_{pair_token}": (
+                "wavenumber",
+                np.asarray(transmittance.transmittance_cia, dtype=np.float64),
+                {"long_name": f"{pair} CIA transmittance", "units": "1"},
+            ),
+            f"attenuation_cia_{pair_token}": (
+                "wavenumber",
+                np.asarray(spectrum.attenuation_cia_m1, dtype=np.float64),
+                {"long_name": f"{pair} CIA attenuation coefficient", "units": "m^-1"},
+            ),
+            "transmittance_total": (
+                "wavenumber",
+                np.asarray(transmittance.transmittance_total, dtype=np.float64),
+                {"long_name": "total transmittance", "units": "1"},
+            ),
+            "attenuation_total": (
+                "wavenumber",
+                np.asarray(spectrum.attenuation_total_m1, dtype=np.float64),
+                {"long_name": "total attenuation coefficient", "units": "m^-1"},
+            ),
+        },
+        attrs={
+            "species_name": pair,
+            "path_length_m": float(transmittance.path_length_m),
+            "temperature_k": float(transmittance.temperature_k),
+            "pressure_pa": float(transmittance.pressure_pa),
+            "pressure_bar": float(transmittance.pressure_pa) / 1.0e5,
+        },
+    )
+    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    return dataset
+
+
+def _composition_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
+    products = _compute_composition_products(args)
+    spectrum = products.spectrum
+    transmittance = products.transmittance
+    number_density_cm3 = float(
+        getattr(
+            spectrum,
+            "number_density_cm3",
+            number_density_cm3_from_pressure_temperature(
+                pressure_pa=float(spectrum.pressure_pa),
+                temperature_k=float(spectrum.temperature_k),
+            ),
+        )
+    )
+    path_length_m = float(transmittance.path_length_m)
+    data_vars: dict[str, tuple[tuple[str], np.ndarray, dict[str, str]]] = {
+        "transmittance_total": (
+            "wavenumber",
+            np.asarray(transmittance.transmittance_total, dtype=np.float64),
+            {"long_name": "total transmittance", "units": "1"},
+        ),
+        "attenuation_total": (
+            "wavenumber",
+            np.asarray(spectrum.attenuation_total_m1, dtype=np.float64),
+            {"long_name": "total attenuation coefficient", "units": "m^-1"},
+        ),
+    }
+    for term in products.species_terms:
+        species_token = _clean_var_token(term.species_name)
+        attenuation = np.asarray(term.mole_fraction * term.sigma_line_cm2_molecule * number_density_cm3 * 100.0, dtype=np.float64)
+        data_vars[f"attenuation_line_{species_token}"] = (
+            "wavenumber",
+            attenuation,
+            {"long_name": f"{term.species_name} weighted line attenuation coefficient", "units": "m^-1"},
+        )
+        data_vars[f"transmittance_line_{species_token}"] = (
+            "wavenumber",
+            np.exp(-attenuation * path_length_m),
+            {"long_name": f"{term.species_name} weighted line transmittance", "units": "1"},
+        )
+    for source in products.secondary_sources:
+        label_token = _clean_var_token(source.label)
+        attenuation = np.asarray(source.sigma_cm2_molecule * number_density_cm3 * 100.0, dtype=np.float64)
+        if source.kind == "continuum":
+            att_name = f"attenuation_continuum_{label_token}"
+            trans_name = f"transmittance_continuum_{label_token}"
+            prefix = f"{source.label} weighted"
+        else:
+            att_name = f"attenuation_cia_{label_token}"
+            trans_name = f"transmittance_cia_{label_token}"
+            prefix = f"{source.label} weighted CIA"
+        data_vars[att_name] = (
+            "wavenumber",
+            attenuation,
+            {"long_name": f"{prefix} attenuation coefficient", "units": "m^-1"},
+        )
+        data_vars[trans_name] = (
+            "wavenumber",
+            np.exp(-attenuation * path_length_m),
+            {"long_name": f"{prefix} transmittance", "units": "1"},
+        )
+    dataset = xr.Dataset(
+        coords={"wavenumber": ("wavenumber", np.asarray(transmittance.wavenumber_cm1, dtype=np.float64))},
+        data_vars=data_vars,
+        attrs={
+            "composition_input": str(args.composition),
+            "species_name": ",".join(_composition_species_names(str(args.composition))),
+            "path_length_m": path_length_m,
+            "temperature_k": float(transmittance.temperature_k),
+            "pressure_pa": float(transmittance.pressure_pa),
+            "pressure_bar": float(transmittance.pressure_pa) / 1.0e5,
+        },
+    )
+    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    return dataset
+
+
 def _write_xsection_dataset(
     spectrum,
     output_path: Path,
@@ -302,6 +498,7 @@ def _write_xsection_dataset(
 
 def _write_dataset_via_tmp(dataset: xr.Dataset, output_path: Path, *, engine: str) -> None:
     """Write to a local temporary file first, then move to the target path."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix="pyharp_", suffix=".nc", dir="/tmp")
     import os
 
@@ -500,15 +697,19 @@ def _compute_transmission_band(task: tuple[str, argparse.Namespace]) -> tuple[xr
     target_kind, args = task
     broadening_summary: str | None = None
     if target_kind == "pair":
-        spectrum = _compute_pair_xsection(args)
-        transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
+        dataset = _pair_transmission_dataset(args)
     elif target_kind == "composition":
-        products = _compute_composition_products(args)
-        transmittance = products.transmittance
+        dataset = _composition_transmission_dataset(args)
     else:
-        spectrum, broadening_summary = _compute_species_xsection(args)
+        spectrum, broadening_summary, secondary_component = _compute_species_xsection(args)
         transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
-    return transmittance_to_dataset(transmittance), broadening_summary
+        dataset = _species_transmission_dataset(
+            spectrum=spectrum,
+            transmittance=transmittance,
+            species_name=str(args.species or "CO2"),
+            secondary_component=secondary_component,
+        )
+    return dataset, broadening_summary
 
 
 def _composition_species_names(composition: str) -> tuple[str, ...]:
@@ -636,18 +837,12 @@ def main() -> None:
         target_kind, _ = _selected_target(args)
         if len(wn_ranges) == 1:
             range_args = _args_for_wn_range(args, wn_ranges[0])
-            broadening_summary: str | None = None
-            if target_kind == "pair":
-                spectrum = _compute_pair_xsection(range_args)
-                transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=range_args.path_length_m)
-            elif target_kind == "composition":
-                products = _compute_composition_products(range_args)
-                transmittance = products.transmittance
-            else:
-                spectrum, broadening_summary, _ = _compute_species_xsection(range_args)
-                transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=range_args.path_length_m)
+            dataset, broadening_summary = _compute_transmission_band((target_kind, range_args))
             output_path = _multi_range_output_path(args, suffix=".nc")
-            write_transmittance_dataset(transmittance, output_path)
+            try:
+                _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+            finally:
+                dataset.close()
             print(f"Wrote NetCDF: {output_path}")
             if broadening_summary:
                 print(f"Broadening: {broadening_summary}")

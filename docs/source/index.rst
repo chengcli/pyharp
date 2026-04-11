@@ -11,6 +11,7 @@ Pyharp Documentation
     radiation
     api
     plot_cli
+    dump_cli
     trouble
 
 Introduction

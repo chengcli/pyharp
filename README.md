@@ -83,14 +83,18 @@ If you are using command line argument outside of pyharp, clone MT_CKD directly:
 mkdir -p external && cd external && git clone https://github.com/AER-RC/MT_CKD_H2O
 ```
 
-The `pyharp-dump` CLI writes one pressure-temperature NetCDF product per run.
-Use `--wn-range=min,max` for the wavenumber bounds:
+The `pyharp-dump` CLI writes NetCDF spectroscopy products for single species,
+CIA pairs, and gas mixtures:
 
 ```bash
 pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 pyharp-dump xsection --pair H2-H2 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
 pyharp-dump transmission --species H2O --path-length-m 1 --wn-range=20,2500
 ```
+
+Use repeated `--wn-range=min,max` values to store multiple bands in one file.
+See the [pyharp-dump CLI documentation](https://pyharp.readthedocs.io/en/latest/dump_cli.html)
+for the full command reference, output naming conventions, and NetCDF schema.
 
 Plotting diagnostics are available from one entry point, `pyharp-plot`. It
 provides CIA binary coefficient, molecular cross-section, attenuation,
