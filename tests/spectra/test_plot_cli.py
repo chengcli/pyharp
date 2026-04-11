@@ -240,6 +240,32 @@ def test_plot_main_passes_broadening_composition_to_molecule_workflow(monkeypatc
     assert calls[0].broadening_composition == "air:0.8,self:0.2"
 
 
+def test_parallel_plot_results_uses_selected_process_context(monkeypatch) -> None:
+    created = {}
+
+    class DummyExecutor:
+        def __init__(self, *, max_workers, mp_context):
+            created["max_workers"] = max_workers
+            created["mp_context"] = mp_context
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def map(self, worker, tasks):
+            return [worker(task) for task in tasks]
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.process_pool_context", lambda: "ctx-token")
+    monkeypatch.setattr("pyharp.spectra.plot_cli.ProcessPoolExecutor", DummyExecutor)
+
+    result = plot_cli._parallel_plot_results([("x", 1), ("y", 2)], worker=lambda task: task[1] * 10)
+
+    assert result == [10, 20]
+    assert created == {"max_workers": 2, "mp_context": "ctx-token"}
+
+
 def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:
     calls = []
 

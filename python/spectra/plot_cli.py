@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ProcessPoolExecutor
-import multiprocessing as mp
 import os
 from pathlib import Path
 from textwrap import dedent
 
 from . import atm_overview_cli, cia_plot_cli, molecule_plot_cli
 from .output_names import _format_value, default_output_path
+from .shared_cli import process_pool_context
 
 
 class _SplitSpeciesAction(argparse.Action):
@@ -352,7 +352,7 @@ def _parallel_plot_results(
     if len(tasks) <= 1:
         return [worker(task) for task in tasks]
     max_workers = min(len(tasks), os.cpu_count() or 1)
-    ctx = mp.get_context("fork")
+    ctx = process_pool_context()
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
         return list(executor.map(worker, tasks))
 

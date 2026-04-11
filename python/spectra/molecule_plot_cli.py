@@ -8,7 +8,6 @@ from concurrent.futures import ProcessPoolExecutor
 import os
 from pathlib import Path
 import tempfile
-import multiprocessing as mp
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "spectra_matplotlib"))
 import matplotlib
@@ -22,6 +21,7 @@ from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig, SpectralBandConfig, parse_broadening_composition, resolve_hitran_cia_pair
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import LineDatabase, build_line_provider, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
+from .shared_cli import process_pool_context
 from .spectrum import _resolve_continuum_sources, compute_absorption_spectrum_from_sources, plot_absorption_spectrum, plot_attenuation_spectrum
 from .transmittance import compute_transmittance_spectrum, plot_transmittance_spectrum
 
@@ -738,7 +738,7 @@ def _parallel_overview_page_products(tasks: list[argparse.Namespace]) -> Iterato
             yield _compute_overview_page_task(task)
         return
     max_workers = min(len(tasks), os.cpu_count() or 1)
-    ctx = mp.get_context("fork")
+    ctx = process_pool_context()
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
         yield from executor.map(_compute_overview_page_task, tasks)
 

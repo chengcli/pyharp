@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import multiprocessing as mp
 from pathlib import Path
+import sys
 
 from .output_names import default_output_path as default_named_output_path
 
@@ -43,6 +45,19 @@ def default_output_path() -> Path:
 def default_hitran_dir() -> Path:
     """Return the default HITRAN cache directory in the current working directory."""
     return Path("hitran")
+
+
+def process_pool_context() -> mp.context.BaseContext:
+    """Return a process start context that is safe for the current platform."""
+    if sys.platform == "darwin":
+        return mp.get_context("spawn")
+    start_methods = mp.get_all_start_methods()
+    if "fork" in start_methods:
+        return mp.get_context("fork")
+    current = mp.get_start_method(allow_none=True)
+    if current is not None:
+        return mp.get_context(current)
+    return mp.get_context(start_methods[0])
 
 
 def parse_wn_range(value: str) -> tuple[float, float]:

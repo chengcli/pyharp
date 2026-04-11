@@ -7,7 +7,6 @@ from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 import json
-import multiprocessing as mp
 import os
 from pathlib import Path
 import tempfile
@@ -32,6 +31,7 @@ from .hitran_cia import load_cia_dataset
 from .hitran_lines import build_line_provider, download_hitran_lines, load_hitran_line_list
 from .molecule_plot_cli import _add_legend_if_needed, _apply_positive_log_scale, _mask_nonpositive, _plot_transmittance_panel, _style_shared_axis
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
+from .shared_cli import process_pool_context
 from .spectrum import AbsorptionSpectrum, number_density_cm3_from_pressure_temperature
 from .transmittance import compute_transmittance_spectrum
 
@@ -615,6 +615,6 @@ def _parallel_mixture_overview_products(
             yield _compute_mixture_overview_product_task(task)
         return
     max_workers = min(len(tasks), os.cpu_count() or 1)
-    ctx = mp.get_context("fork")
+    ctx = process_pool_context()
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
         yield from executor.map(_compute_mixture_overview_product_task, tasks)
