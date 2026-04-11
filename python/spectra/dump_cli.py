@@ -7,6 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 import multiprocessing as mp
 import os
 from pathlib import Path
+import sys
 from textwrap import dedent
 
 import numpy as np
@@ -24,7 +25,7 @@ from .dataset_io import (
 )
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import build_line_provider, download_hitran_lines
-from .output_names import _format_value, default_output_path as default_named_output_path
+from .output_names import _clean_token, _format_value
 from .shared_cli import (
     HelpFormatter,
     build_band,
@@ -46,17 +47,42 @@ class _ZeroLineProvider:
 
 
 TRANSMISSION_PATH_LENGTH_HELP = "Transmission path length in kilometers."
-TEMPERATURE_COORD_ATTRS = {"long_name": "temperature", "units": "K"}
+DEL_TEMPERATURE_COORD_ATTRS = {"long_name": "temperature anomaly", "units": "K"}
+PRESSURE_COORD_ATTRS = {"long_name": "pressure", "units": "Pa"}
+TEMPERATURE_VAR_ATTRS = {"long_name": "base temperature", "units": "K"}
+LIST_ARG_OPTIONS = {"--temperature-k", "--pressure-bar", "--del-temperature-k"}
 
 
-def _parse_temperature_list(value: str) -> list[float]:
+class DumpArgumentParser(argparse.ArgumentParser):
+    def _normalize_list_option_tokens(self, args: list[str] | None) -> list[str] | None:
+        if args is None:
+            args = sys.argv[1:]
+        normalized: list[str] = []
+        index = 0
+        while index < len(args):
+            token = args[index]
+            if token in LIST_ARG_OPTIONS and index + 1 < len(args):
+                next_token = args[index + 1]
+                if next_token.startswith("-") and "," in next_token:
+                    normalized.append(f"{token}={next_token}")
+                    index += 2
+                    continue
+            normalized.append(token)
+            index += 1
+        return normalized
+
+    def parse_known_args(self, args=None, namespace=None):
+        return super().parse_known_args(self._normalize_list_option_tokens(args), namespace)
+
+
+def _parse_float_list(value: str) -> list[float]:
     parts = [part.strip() for part in str(value).split(",")]
     if not parts or any(part == "" for part in parts):
-        raise argparse.ArgumentTypeError("temperature-k must be a number or comma-separated list of numbers")
+        raise argparse.ArgumentTypeError("value must be a number or comma-separated list of numbers")
     try:
         return [float(part) for part in parts]
     except ValueError as exc:
-        raise argparse.ArgumentTypeError("temperature-k must contain numeric values") from exc
+        raise argparse.ArgumentTypeError("value must contain numeric values") from exc
 
 
 def _add_selector_arguments(parser: argparse.ArgumentParser) -> None:
@@ -70,8 +96,9 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--output", type=Path, default=None, metavar="PATH", help="Output NetCDF path. Defaults to an auto-generated path under --output-dir.")
     parser.add_argument("--output-dir", type=Path, default=Path("output"), metavar="DIR", help="Directory for auto-generated NetCDF output paths.")
     parser.add_argument("--hitran-dir", type=Path, default=default_hitran_dir(), metavar="DIR", help="Directory for downloaded HITRAN line and CIA data.")
-    parser.add_argument("--temperature-k", type=_parse_temperature_list, default=[300.0], metavar="K[,K...]", help="Gas temperature in kelvin. Use a comma-separated list to stack multiple temperatures into one NetCDF.")
-    parser.add_argument("--pressure-bar", type=float, default=1.0, metavar="BAR", help="Gas pressure in bar.")
+    parser.add_argument("--temperature-k", type=_parse_float_list, default=[300.0], metavar="K[,K...]", help="Base gas temperature in kelvin. Use a comma-separated list paired one-to-one with --pressure-bar.")
+    parser.add_argument("--pressure-bar", type=_parse_float_list, default=[1.0], metavar="BAR[,BAR...]", help="Gas pressure in bar. Use a comma-separated list paired one-to-one with --temperature-k.")
+    parser.add_argument("--del-temperature-k", type=_parse_float_list, default=[0.0], metavar="K[,K...]", help="Temperature anomalies in kelvin applied to each temperature-pressure pair.")
     parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=parse_wn_range, metavar="MIN,MAX", help="Wavenumber range in cm^-1. Repeat to write one NetCDF per band.")
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
     parser.add_argument("--refresh-hitran", action="store_true", help="Re-download HITRAN line tables even if cached.")
@@ -91,6 +118,13 @@ def _validate_single_selector(args: argparse.Namespace, parser: argparse.Argumen
         parser.error("choose only one of --pair, --species, or --composition")
 
 
+def _validate_state_grid(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    temperatures = _selected_base_temperatures(args)
+    pressures = _selected_pressure_bars(args)
+    if len(temperatures) != len(pressures):
+        parser.error("--temperature-k and --pressure-bar must have the same number of values")
+
+
 def _selected_target(args: argparse.Namespace) -> tuple[str, object]:
     if args.pair:
         return "pair", args.pair
@@ -99,31 +133,61 @@ def _selected_target(args: argparse.Namespace) -> tuple[str, object]:
     return "species", args.species or "CO2"
 
 
-def _selected_temperatures(args: argparse.Namespace) -> list[float]:
+def _selected_base_temperatures(args: argparse.Namespace) -> list[float]:
     values = getattr(args, "temperature_k", [300.0])
     if isinstance(values, (list, tuple)):
         return [float(value) for value in values]
     return [float(values)]
 
 
-def _temperature_output_value(args: argparse.Namespace) -> float | str:
-    temperatures = _selected_temperatures(args)
-    if len(temperatures) == 1:
-        return temperatures[0]
-    return "_".join(f"{value:g}".replace("-", "m").replace(".", "p") for value in temperatures)
+def _selected_pressure_bars(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "pressure_bar", [1.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _selected_del_temperatures(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "del_temperature_k", [0.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _state_span_token(min_value: float, max_value: float, *, unit: str) -> str:
+    return f"{_format_value(min_value)}_{_format_value(max_value, unit)}"
+
+
+def _temperature_output_value(args: argparse.Namespace) -> str:
+    base_temperatures = _selected_base_temperatures(args)
+    del_temperatures = _selected_del_temperatures(args)
+    actual_temperatures = [
+        base_temperature + del_temperature
+        for base_temperature in base_temperatures
+        for del_temperature in del_temperatures
+    ]
+    return _state_span_token(min(actual_temperatures), max(actual_temperatures), unit="K")
+
+
+def _pressure_output_value(args: argparse.Namespace) -> str:
+    pressures = _selected_pressure_bars(args)
+    return _state_span_token(min(pressures), max(pressures), unit="bar")
 
 
 def _default_cli_output_path(args: argparse.Namespace, *, suffix: str) -> Path:
     _, target = _selected_target(args)
-    return default_named_output_path(
-        target_name=target,
-        plot_type=args.command,
-        temperature_k=_temperature_output_value(args),
-        pressure_bar=args.pressure_bar,
-        wn_range=args.wn_range,
-        suffix=suffix,
-        output_dir=Path(args.output_dir),
+    wn_min, wn_max = args.wn_range
+    stem = "_".join(
+        [
+            _clean_token(target),
+            _clean_token(args.command),
+            _temperature_output_value(args),
+            _pressure_output_value(args),
+            _format_value(wn_min),
+            _format_value(wn_max, "cm1"),
+        ]
     )
+    return Path(args.output_dir) / f"{stem}{suffix}"
 
 
 def _selected_wn_ranges(args: argparse.Namespace) -> list[tuple[float, float]]:
@@ -147,6 +211,15 @@ def _args_for_wn_range(args: argparse.Namespace, wn_range: tuple[float, float]) 
 def _args_for_temperature(args: argparse.Namespace, temperature_k: float) -> argparse.Namespace:
     scoped = argparse.Namespace(**vars(args))
     scoped.temperature_k = float(temperature_k)
+    return scoped
+
+
+def _args_for_state(args: argparse.Namespace, *, base_temperature_k: float, pressure_bar: float, del_temperature_k: float) -> argparse.Namespace:
+    scoped = argparse.Namespace(**vars(args))
+    scoped.base_temperature_k = float(base_temperature_k)
+    scoped.del_temperature_k = float(del_temperature_k)
+    scoped.temperature_k = float(base_temperature_k + del_temperature_k)
+    scoped.pressure_bar = float(pressure_bar)
     return scoped
 
 
@@ -536,8 +609,8 @@ def _compute_species_xsection(args: argparse.Namespace):
     line_provider = build_line_provider(config, line_db)
     cia_dataset = _resolve_species_cia(args, config)
     cia_selection = _resolve_species_cia_selection(args, config)
-    temperature_k = _selected_temperatures(args)[0]
-    pressure_pa = float(args.pressure_bar) * 1.0e5
+    temperature_k = _selected_base_temperatures(args)[0]
+    pressure_pa = _selected_pressure_bars(args)[0] * 1.0e5
     grid = band.grid()
     cia_cross_section_cm2_molecule = None
     secondary_component: dict[str, object] | None = None
@@ -588,8 +661,8 @@ def _compute_pair_xsection(args: argparse.Namespace):
     spectrum = compute_absorption_spectrum_from_sources(
         species_name=pair,
         wavenumber_grid_cm1=band.grid(),
-        temperature_k=_selected_temperatures(args)[0],
-        pressure_pa=float(args.pressure_bar) * 1.0e5,
+        temperature_k=_selected_base_temperatures(args)[0],
+        pressure_pa=_selected_pressure_bars(args)[0] * 1.0e5,
         line_provider=_ZeroLineProvider(),
         cia_dataset=cia_dataset,
     )
@@ -609,7 +682,7 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
     grid = band.grid()
     binary = np.asarray(
         cia_dataset.interpolate_to_grid(
-            temperature_k=_selected_temperatures(args)[0],
+            temperature_k=_selected_base_temperatures(args)[0],
             wavenumber_grid_cm1=grid,
         ),
         dtype=np.float64,
@@ -627,7 +700,7 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
         },
         attrs={
             "pair_name": pair,
-            "temperature_k": _selected_temperatures(args)[0],
+            "temperature_k": _selected_base_temperatures(args)[0],
             "source_filename": filename,
             **_band_attr_values(args.wn_range),
         },
@@ -638,8 +711,8 @@ def _compute_composition_products(args: argparse.Namespace):
     mixture_args = argparse.Namespace(
         composition=args.composition,
         hitran_dir=args.hitran_dir,
-        temperature_k=args.temperature_k,
-        pressure_bar=args.pressure_bar,
+        temperature_k=_selected_base_temperatures(args)[0],
+        pressure_bar=_selected_pressure_bars(args)[0],
         resolution=args.resolution,
         cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
@@ -708,41 +781,44 @@ def _parallel_band_results(
         return list(executor.map(worker, tasks))
 
 
-def _stack_temperature_datasets(datasets: list[xr.Dataset], *, temperatures: list[float]) -> xr.Dataset:
+def _stack_state_grid_datasets(
+    datasets: list[xr.Dataset],
+    *,
+    base_temperatures: list[float],
+    pressure_bars: list[float],
+    del_temperatures: list[float],
+) -> xr.Dataset:
     if not datasets:
         raise ValueError("at least one dataset is required")
+    per_pressure: list[xr.Dataset] = []
+    index = 0
+    for _ in pressure_bars:
+        del_slice = datasets[index:index + len(del_temperatures)]
+        index += len(del_temperatures)
+        per_pressure.append(
+            xr.concat(
+                del_slice,
+                dim=xr.IndexVariable("del_temperature", np.asarray(del_temperatures, dtype=np.float64)),
+            )
+        )
     stacked = xr.concat(
-        datasets,
-        dim=xr.IndexVariable("temperature", np.asarray(temperatures, dtype=np.float64)),
+        per_pressure,
+        dim=xr.IndexVariable("pressure", np.asarray(pressure_bars, dtype=np.float64) * 1.0e5),
+    ).transpose("del_temperature", "pressure", "wavenumber")
+    stacked["del_temperature"].attrs = dict(DEL_TEMPERATURE_COORD_ATTRS)
+    stacked["pressure"].attrs = dict(PRESSURE_COORD_ATTRS)
+    stacked["temperature"] = (
+        "pressure",
+        np.asarray(base_temperatures, dtype=np.float64),
+        dict(TEMPERATURE_VAR_ATTRS),
     )
-    stacked["temperature"].attrs = dict(TEMPERATURE_COORD_ATTRS)
     attrs = dict(datasets[0].attrs)
     attrs.pop("temperature_k", None)
+    attrs.pop("pressure_pa", None)
+    attrs.pop("pressure_bar", None)
     attrs.pop("number_density_cm3", None)
     stacked.attrs = attrs
     return stacked
-
-
-def _compute_temperature_stacked_dataset(
-    *,
-    base_args: argparse.Namespace,
-    target_kind: str,
-    worker,
-) -> tuple[xr.Dataset, list[str]]:
-    temperatures = _selected_temperatures(base_args)
-    tasks = [
-        (target_kind, _args_for_temperature(base_args, temperature_k))
-        for temperature_k in temperatures
-    ]
-    results = _parallel_band_results(tasks, worker=worker)
-    datasets = [dataset for dataset, _ in results]
-    broadening_summaries = [summary for _, summary in results if summary]
-    try:
-        stacked = _stack_temperature_datasets(datasets, temperatures=temperatures)
-    finally:
-        for dataset in datasets:
-            dataset.close()
-    return stacked, broadening_summaries
 
 
 def _compute_range_temperature_datasets(
@@ -752,23 +828,42 @@ def _compute_range_temperature_datasets(
     target_kind: str,
     worker,
 ) -> list[tuple[tuple[float, float], xr.Dataset, list[str]]]:
-    temperatures = _selected_temperatures(args)
+    base_temperatures = _selected_base_temperatures(args)
+    pressure_bars = _selected_pressure_bars(args)
+    del_temperatures = _selected_del_temperatures(args)
     tasks: list[tuple[str, argparse.Namespace]] = []
     for wn_range in wn_ranges:
         range_args = _args_for_wn_range(args, wn_range)
-        for temperature_k in temperatures:
-            tasks.append((target_kind, _args_for_temperature(range_args, temperature_k)))
+        for base_temperature_k, pressure_bar in zip(base_temperatures, pressure_bars, strict=True):
+            for del_temperature_k in del_temperatures:
+                tasks.append(
+                    (
+                        target_kind,
+                        _args_for_state(
+                            range_args,
+                            base_temperature_k=base_temperature_k,
+                            pressure_bar=pressure_bar,
+                            del_temperature_k=del_temperature_k,
+                        ),
+                    )
+                )
 
     results = _parallel_band_results(tasks, worker=worker)
     grouped: list[tuple[tuple[float, float], xr.Dataset, list[str]]] = []
     index = 0
     for wn_range in wn_ranges:
-        range_results = results[index:index + len(temperatures)]
-        index += len(temperatures)
+        span = len(base_temperatures) * len(del_temperatures)
+        range_results = results[index:index + span]
+        index += span
         datasets = [dataset for dataset, _ in range_results]
         broadening_summaries = [summary for _, summary in range_results if summary]
         try:
-            stacked = _stack_temperature_datasets(datasets, temperatures=temperatures)
+            stacked = _stack_state_grid_datasets(
+                datasets,
+                base_temperatures=base_temperatures,
+                pressure_bars=pressure_bars,
+                del_temperatures=del_temperatures,
+            )
         finally:
             for dataset in datasets:
                 dataset.close()
@@ -778,7 +873,7 @@ def _compute_range_temperature_datasets(
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the dump CLI parser."""
-    parser = argparse.ArgumentParser(
+    parser = DumpArgumentParser(
         description="Write spectroscopy NetCDF products from HITRAN line and CIA data.",
         formatter_class=HelpFormatter,
         epilog=dedent(
@@ -834,6 +929,7 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     _validate_single_selector(args, parser)
+    _validate_state_grid(args, parser)
     if args.command == "xsection":
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)

@@ -6,7 +6,7 @@ from pathlib import Path
 import xarray as xr
 
 from pyharp.spectra.dataset_io import combine_band_datasets, write_dataset_via_tmp
-from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _output_path_for_wn_range, _pair_xsection_dataset, _species_transmission_dataset, _stack_temperature_datasets, _xsection_dataset, build_parser, main
+from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _output_path_for_wn_range, _pair_xsection_dataset, _species_transmission_dataset, _stack_state_grid_datasets, _xsection_dataset, build_parser, main
 from pyharp.spectra.shared_cli import default_hitran_dir, default_output_path, project_root
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 
@@ -52,7 +52,7 @@ def test_xsection_parser_accepts_species_pressure_temperature_and_outputs(tmp_pa
     assert args.output == tmp_path / "xsection.nc"
     assert args.output_dir == tmp_path / "named"
     assert args.temperature_k == [300.0]
-    assert args.pressure_bar == 1.0
+    assert args.pressure_bar == [1.0]
     assert args.species == "co2"
     assert args.broadening_composition == "air:0.8,self:0.2"
     assert args.wn_ranges == [(100.0, 200.0)]
@@ -80,7 +80,7 @@ def test_xsection_parser_accepts_cia_pair_selector(tmp_path) -> None:
     assert args.command == "xsection"
     assert args.output == tmp_path / "pair.nc"
     assert args.temperature_k == [300.0]
-    assert args.pressure_bar == 1.0
+    assert args.pressure_bar == [1.0]
     assert args.pair == "H2-He"
     assert args.filename == "H2-He_2011.cia"
     assert args.wn_ranges == [(50.0, 150.0)]
@@ -110,7 +110,7 @@ def test_transmission_parser_accepts_path_length_and_outputs(tmp_path) -> None:
     assert args.command == "transmission"
     assert args.output == tmp_path / "trans.nc"
     assert args.temperature_k == [300.0]
-    assert args.pressure_bar == 1.0
+    assert args.pressure_bar == [1.0]
     assert args.path_length_km == 1.5
     assert args.species == "CO2"
     assert args.broadening_composition == "H2:0.85,He:0.15"
@@ -166,6 +166,29 @@ def test_xsection_parser_accepts_temperature_list(tmp_path) -> None:
     assert args.temperature_k == [300.0, 400.0, 500.0]
 
 
+def test_xsection_parser_accepts_temperature_pressure_pairs_and_deltas(tmp_path) -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "xsection",
+            "--species",
+            "H2O",
+            "--temperature-k",
+            "300,400",
+            "--pressure-bar",
+            "1,10",
+            "--del-temperature-k",
+            "-10,0,10",
+            "--output",
+            str(tmp_path / "xsection.nc"),
+        ]
+    )
+
+    assert args.temperature_k == [300.0, 400.0]
+    assert args.pressure_bar == [1.0, 10.0]
+    assert args.del_temperature_k == [-10.0, 0.0, 10.0]
+
+
 def test_output_path_for_multiple_ranges_appends_band_suffix(tmp_path) -> None:
     parser = build_parser()
     args = parser.parse_args(
@@ -215,7 +238,7 @@ def test_output_path_for_wn_range_uses_output_dir_for_generated_names(tmp_path) 
         ]
     )
 
-    assert _output_path_for_wn_range(args, wn_range=(20.0, 2500.0), suffix=".nc") == tmp_path / "products" / "h2o_xsection_1bar_300K_20_2500cm1.nc"
+    assert _output_path_for_wn_range(args, wn_range=(20.0, 2500.0), suffix=".nc") == tmp_path / "products" / "h2o_xsection_300_300K_1_1bar_20_2500cm1.nc"
 
 
 def test_output_path_for_wn_range_includes_temperature_list_token(tmp_path) -> None:
@@ -233,7 +256,29 @@ def test_output_path_for_wn_range_includes_temperature_list_token(tmp_path) -> N
         ]
     )
 
-    assert _output_path_for_wn_range(args, wn_range=(20.0, 2500.0), suffix=".nc") == tmp_path / "products" / "h2o_xsection_1bar_300_400_500K_20_2500cm1.nc"
+    assert _output_path_for_wn_range(args, wn_range=(20.0, 2500.0), suffix=".nc") == tmp_path / "products" / "h2o_xsection_300_500K_1_1bar_20_2500cm1.nc"
+
+
+def test_output_path_for_wn_range_uses_supported_temperature_and_pressure_spans(tmp_path) -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "xsection",
+            "--species",
+            "H2O",
+            "--temperature-k",
+            "300,400",
+            "--pressure-bar",
+            "1,10",
+            "--del-temperature-k",
+            "-10,0,20",
+            "--wn-range=20,2500",
+            "--output-dir",
+            str(tmp_path / "products"),
+        ]
+    )
+
+    assert _output_path_for_wn_range(args, wn_range=(20.0, 2500.0), suffix=".nc") == tmp_path / "products" / "h2o_xsection_290_420K_1_10bar_20_2500cm1.nc"
 
 
 def test_cli_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:
@@ -268,7 +313,17 @@ def test_cli_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
         "pyharp.spectra.dump_cli.compute_absorption_spectrum_from_sources",
         lambda **kwargs: type("Spectrum", (), {})(),
     )
-    monkeypatch.setattr("pyharp.spectra.dump_cli._compute_xsection_band", lambda task: (xr.Dataset(), "requested=h2:0.900,he:0.100 -> effective=air:1.000 (fallback: h2->air, he->air)"))
+    monkeypatch.setattr(
+        "pyharp.spectra.dump_cli._compute_xsection_band",
+        lambda task: (
+            xr.Dataset(
+                coords={"wavenumber": ("wavenumber", np.array([20.0, 21.0]))},
+                data_vars={"sigma_total": ("wavenumber", np.array([1.0, 2.0]))},
+                attrs={"species_name": "CO2", "pressure_pa": 1.0e5, "pressure_bar": 1.0},
+            ),
+            "requested=h2:0.900,he:0.100 -> effective=air:1.000 (fallback: h2->air, he->air)",
+        ),
+    )
     monkeypatch.setattr("pyharp.spectra.dump_cli.write_dataset_via_tmp", lambda dataset, output_path, *, engine: None)
 
     main()
@@ -361,15 +416,17 @@ def test_cli_xsection_composition_writes_one_file_with_component_fields(monkeypa
     )
     monkeypatch.setattr(
         "pyharp.spectra.dump_cli.write_dataset_via_tmp",
-        lambda dataset, output_path, *, engine: written.append((sorted(dataset.data_vars), dataset["sigma_total"].dims, tuple(dataset["temperature"].values), output_path, engine)),
+        lambda dataset, output_path, *, engine: written.append((sorted(dataset.data_vars), dataset["sigma_total"].dims, tuple(dataset["del_temperature"].values), tuple(dataset["pressure"].values), tuple(dataset["temperature"].values), output_path, engine)),
     )
 
     main()
 
     assert written == [
         (
-            ["binary_absorption_coefficient_h2_he", "sigma_line_h2", "sigma_total"],
-            ("temperature", "wavenumber"),
+            ["binary_absorption_coefficient_h2_he", "sigma_line_h2", "sigma_total", "temperature"],
+            ("del_temperature", "pressure", "wavenumber"),
+            (0.0,),
+            (1.0e5,),
             (300.0,),
             tmp_path / "mixture.nc",
             "scipy",
@@ -396,7 +453,14 @@ def test_cli_xsection_uses_output_dir_for_generated_path(monkeypatch, tmp_path, 
     written = []
     monkeypatch.setattr(
         "pyharp.spectra.dump_cli._compute_xsection_band",
-        lambda task: (xr.Dataset(), None),
+        lambda task: (
+            xr.Dataset(
+                coords={"wavenumber": ("wavenumber", np.array([20.0, 21.0]))},
+                data_vars={"sigma_total": ("wavenumber", np.array([1.0, 2.0]))},
+                attrs={"species_name": "H2O", "pressure_pa": 1.0e5, "pressure_bar": 1.0},
+            ),
+            None,
+        ),
     )
     monkeypatch.setattr(
         "pyharp.spectra.dump_cli.write_dataset_via_tmp",
@@ -405,34 +469,55 @@ def test_cli_xsection_uses_output_dir_for_generated_path(monkeypatch, tmp_path, 
 
     main()
 
-    assert written == [tmp_path / "products" / "h2o_xsection_1bar_300K_20_2500cm1.nc"]
+    assert written == [tmp_path / "products" / "h2o_xsection_300_300K_1_1bar_20_2500cm1.nc"]
     out = capsys.readouterr().out
-    assert "Wrote NetCDF: " + str(tmp_path / "products" / "h2o_xsection_1bar_300K_20_2500cm1.nc") in out
+    assert "Wrote NetCDF: " + str(tmp_path / "products" / "h2o_xsection_300_300K_1_1bar_20_2500cm1.nc") in out
 
 
-def test_stack_temperature_datasets_adds_temperature_dimension() -> None:
+def test_stack_state_grid_datasets_adds_del_temperature_and_pressure_dimensions() -> None:
     first = xr.Dataset(
         coords={"wavenumber": ("wavenumber", np.array([20.0, 21.0]))},
         data_vars={"sigma_total": ("wavenumber", np.array([1.0, 2.0]))},
-        attrs={"species_name": "H2O", "temperature_k": 300.0, "pressure_pa": 1.0e5, "number_density_cm3": 1.0},
+        attrs={"species_name": "H2O", "temperature_k": 290.0, "pressure_pa": 1.0e5, "pressure_bar": 1.0, "number_density_cm3": 1.0},
     )
     second = xr.Dataset(
         coords={"wavenumber": ("wavenumber", np.array([20.0, 21.0]))},
         data_vars={"sigma_total": ("wavenumber", np.array([3.0, 4.0]))},
-        attrs={"species_name": "H2O", "temperature_k": 400.0, "pressure_pa": 1.0e5, "number_density_cm3": 2.0},
+        attrs={"species_name": "H2O", "temperature_k": 300.0, "pressure_pa": 1.0e5, "pressure_bar": 1.0, "number_density_cm3": 2.0},
+    )
+    third = xr.Dataset(
+        coords={"wavenumber": ("wavenumber", np.array([20.0, 21.0]))},
+        data_vars={"sigma_total": ("wavenumber", np.array([5.0, 6.0]))},
+        attrs={"species_name": "H2O", "temperature_k": 390.0, "pressure_pa": 1.0e6, "pressure_bar": 10.0, "number_density_cm3": 3.0},
+    )
+    fourth = xr.Dataset(
+        coords={"wavenumber": ("wavenumber", np.array([20.0, 21.0]))},
+        data_vars={"sigma_total": ("wavenumber", np.array([7.0, 8.0]))},
+        attrs={"species_name": "H2O", "temperature_k": 400.0, "pressure_pa": 1.0e6, "pressure_bar": 10.0, "number_density_cm3": 4.0},
     )
 
-    stacked = _stack_temperature_datasets([first, second], temperatures=[300.0, 400.0])
+    stacked = _stack_state_grid_datasets(
+        [first, second, third, fourth],
+        base_temperatures=[300.0, 400.0],
+        pressure_bars=[1.0, 10.0],
+        del_temperatures=[-10.0, 0.0],
+    )
     try:
-        assert stacked["sigma_total"].dims == ("temperature", "wavenumber")
+        assert stacked["sigma_total"].dims == ("del_temperature", "pressure", "wavenumber")
+        assert np.allclose(stacked["del_temperature"].values, np.array([-10.0, 0.0]))
+        assert np.allclose(stacked["pressure"].values, np.array([1.0e5, 1.0e6]))
+        assert stacked["pressure"].attrs["units"] == "Pa"
         assert np.allclose(stacked["temperature"].values, np.array([300.0, 400.0]))
-        assert stacked["temperature"].attrs["units"] == "K"
+        assert stacked["temperature"].dims == ("pressure",)
         assert "temperature_k" not in stacked.attrs
+        assert "pressure_bar" not in stacked.attrs
         assert "number_density_cm3" not in stacked.attrs
     finally:
         stacked.close()
         first.close()
         second.close()
+        third.close()
+        fourth.close()
 
 
 def test_cli_xsection_temperature_list_writes_temperature_stacked_dataset(monkeypatch, tmp_path, capsys) -> None:
@@ -446,6 +531,10 @@ def test_cli_xsection_temperature_list_writes_temperature_stacked_dataset(monkey
             "H2O",
             "--temperature-k",
             "300,400",
+            "--pressure-bar",
+            "1,10",
+            "--del-temperature-k",
+            "-5,0",
             "--wn-range",
             "20,22",
             "--output",
@@ -459,7 +548,7 @@ def test_cli_xsection_temperature_list_writes_temperature_stacked_dataset(monkey
                 xr.Dataset(
                     coords={"wavenumber": ("wavenumber", np.array([20.0, 21.0]))},
                     data_vars={"sigma_total": ("wavenumber", np.array([float(task_args.temperature_k), float(task_args.temperature_k) + 1.0]))},
-                    attrs={"species_name": "H2O", "temperature_k": float(task_args.temperature_k), "pressure_pa": 1.0e5},
+                    attrs={"species_name": "H2O", "temperature_k": float(task_args.temperature_k), "pressure_pa": float(task_args.pressure_bar) * 1.0e5, "pressure_bar": float(task_args.pressure_bar)},
                 ),
                 "requested=self:1.000 -> effective=self:1.000",
             )
@@ -469,13 +558,13 @@ def test_cli_xsection_temperature_list_writes_temperature_stacked_dataset(monkey
     written = []
     monkeypatch.setattr(
         "pyharp.spectra.dump_cli.write_dataset_via_tmp",
-        lambda dataset, output_path, *, engine: written.append((dataset["sigma_total"].dims, tuple(dataset["temperature"].values), output_path, engine)),
+        lambda dataset, output_path, *, engine: written.append((dataset["sigma_total"].dims, tuple(dataset["del_temperature"].values), tuple(dataset["pressure"].values), tuple(dataset["temperature"].values), output_path, engine)),
     )
 
     main()
 
     assert written == [
-        (("temperature", "wavenumber"), (300.0, 400.0), tmp_path / "xsection.nc", "scipy")
+        (("del_temperature", "pressure", "wavenumber"), (-5.0, 0.0), (1.0e5, 1.0e6), (300.0, 400.0), tmp_path / "xsection.nc", "scipy")
     ]
     out = capsys.readouterr().out
     assert "Wrote NetCDF: " + str(tmp_path / "xsection.nc") in out
@@ -492,6 +581,10 @@ def test_cli_xsection_temperature_list_and_ranges_flattens_all_tasks(monkeypatch
             "H2O",
             "--temperature-k",
             "300,400,500",
+            "--pressure-bar",
+            "1,2,3",
+            "--del-temperature-k",
+            "-10,0",
             "--wn-range=20,2500",
             "--wn-range=2500,10000",
             "--output",
@@ -502,17 +595,17 @@ def test_cli_xsection_temperature_list_and_ranges_flattens_all_tasks(monkeypatch
 
     def fake_parallel(tasks, *, worker):
         for _, task_args in tasks:
-            seen.append((task_args.wn_range, float(task_args.temperature_k)))
+            seen.append((task_args.wn_range, float(task_args.base_temperature_k), float(task_args.pressure_bar), float(task_args.del_temperature_k), float(task_args.temperature_k)))
         return [
             (
                 xr.Dataset(
                     coords={"wavenumber": ("wavenumber", np.array([1.0, 2.0]))},
                     data_vars={"sigma_total": ("wavenumber", np.array([3.0, 4.0]))},
-                    attrs={"species_name": "H2O", "pressure_pa": 1.0e5},
+                    attrs={"species_name": "H2O", "pressure_pa": float(task_args.pressure_bar) * 1.0e5, "pressure_bar": float(task_args.pressure_bar)},
                 ),
                 None,
             )
-            for _ in tasks
+            for _, task_args in tasks
         ]
 
     monkeypatch.setattr("pyharp.spectra.dump_cli._parallel_band_results", fake_parallel)
@@ -521,12 +614,18 @@ def test_cli_xsection_temperature_list_and_ranges_flattens_all_tasks(monkeypatch
     main()
 
     assert seen == [
-        ((20.0, 2500.0), 300.0),
-        ((20.0, 2500.0), 400.0),
-        ((20.0, 2500.0), 500.0),
-        ((2500.0, 10000.0), 300.0),
-        ((2500.0, 10000.0), 400.0),
-        ((2500.0, 10000.0), 500.0),
+        ((20.0, 2500.0), 300.0, 1.0, -10.0, 290.0),
+        ((20.0, 2500.0), 300.0, 1.0, 0.0, 300.0),
+        ((20.0, 2500.0), 400.0, 2.0, -10.0, 390.0),
+        ((20.0, 2500.0), 400.0, 2.0, 0.0, 400.0),
+        ((20.0, 2500.0), 500.0, 3.0, -10.0, 490.0),
+        ((20.0, 2500.0), 500.0, 3.0, 0.0, 500.0),
+        ((2500.0, 10000.0), 300.0, 1.0, -10.0, 290.0),
+        ((2500.0, 10000.0), 300.0, 1.0, 0.0, 300.0),
+        ((2500.0, 10000.0), 400.0, 2.0, -10.0, 390.0),
+        ((2500.0, 10000.0), 400.0, 2.0, 0.0, 400.0),
+        ((2500.0, 10000.0), 500.0, 3.0, -10.0, 490.0),
+        ((2500.0, 10000.0), 500.0, 3.0, 0.0, 500.0),
     ]
     out = capsys.readouterr().out
     assert "Wrote NetCDF: " + str(tmp_path / "xsection_20_2500.nc") in out
