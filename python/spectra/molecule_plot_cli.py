@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
 import os
 from pathlib import Path
@@ -562,9 +563,9 @@ def _compute_overview_products(args: argparse.Namespace):
     return band, config, line_list, spectrum, transmittance, cia_dataset, line_provider
 
 
-def _print_overview_summary(*, figure_path: Path, spectrum, transmittance, cia_dataset, line_provider) -> None:
+def _print_overview_summary(*, figure_path: Path, spectrum, transmittance, cia_dataset, broadening_summary: str) -> None:
     print(f"Overview figure: {figure_path}")
-    print(f"Broadening: {line_provider.broadening_summary()}")
+    print(f"Broadening: {broadening_summary}")
     print(f"Species: {spectrum.species_name}")
     print(f"Grid points: {spectrum.wavenumber_cm1.size}")
     print(f"Path length: {transmittance.path_length_m / 1000.0:.3f} km")
@@ -633,10 +634,13 @@ def run_overview_batch(args: argparse.Namespace) -> None:
                 )
                 page_tasks.append(page_args)
                 page_metadata.append((float(temperature_k), float(pressure_bar), species, wn_min, wn_max))
-    page_results = _parallel_overview_page_products(page_tasks)
     page_count = 0
     with PdfPages(figure_path) as pdf:
-        for (temperature_k, pressure_bar, species, wn_min, wn_max), result in zip(page_metadata, page_results, strict=True):
+        for (temperature_k, pressure_bar, species, wn_min, wn_max), result in zip(
+            page_metadata,
+            _parallel_overview_page_products(page_tasks),
+            strict=True,
+        ):
             band, config, line_list, spectrum, transmittance, cia_dataset, _ = result
             fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8.5, 11.0), squeeze=False)
             _render_overview_page(
@@ -685,10 +689,15 @@ def run_overview(args: argparse.Namespace) -> None:
         page_args.temperature_k = float(temperature_k)
         page_args.pressure_bar = float(pressure_bar)
         page_tasks.append(page_args)
-    page_results = _parallel_overview_page_products(page_tasks)
 
+    final_summary: tuple[object, object, object, object, str] | None = None
     with PdfPages(figure_path) as pdf:
-        for temperature_k, pressure_bar, result in zip(_selected_temperatures(args), _selected_pressure_bars(args), page_results, strict=True):
+        for temperature_k, pressure_bar, result in zip(
+            _selected_temperatures(args),
+            _selected_pressure_bars(args),
+            _parallel_overview_page_products(page_tasks),
+            strict=True,
+        ):
             band, config, line_list, spectrum, transmittance, cia_dataset, broadening_summary = result
             fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8.5, 11.0), squeeze=False)
             _render_overview_page(
@@ -704,14 +713,17 @@ def run_overview(args: argparse.Namespace) -> None:
             pdf.savefig(fig)
             plt.close(fig)
             print(f"Added page: T={temperature_k:.1f} K | p={pressure_bar:.3f} bar")
+            final_summary = (spectrum, transmittance, cia_dataset, band, broadening_summary)
 
-    band, config, line_list, spectrum, transmittance, cia_dataset, broadening_summary = page_results[-1]
+    if final_summary is None:
+        raise ValueError("at least one overview page is required")
+    spectrum, transmittance, cia_dataset, _, broadening_summary = final_summary
     _print_overview_summary(
         figure_path=figure_path,
         spectrum=spectrum,
         transmittance=transmittance,
         cia_dataset=cia_dataset,
-        line_provider=type("_Summary", (), {"broadening_summary": lambda self: broadening_summary})(),
+        broadening_summary=broadening_summary,
     )
 
 
@@ -720,13 +732,15 @@ def _compute_overview_page_task(args: argparse.Namespace):
     return band, config, line_list, spectrum, transmittance, cia_dataset, line_provider.broadening_summary()
 
 
-def _parallel_overview_page_products(tasks: list[argparse.Namespace]):
+def _parallel_overview_page_products(tasks: list[argparse.Namespace]) -> Iterator[tuple[object, object, object, object, object, object, str]]:
     if len(tasks) <= 1:
-        return [_compute_overview_page_task(task) for task in tasks]
+        for task in tasks:
+            yield _compute_overview_page_task(task)
+        return
     max_workers = min(len(tasks), os.cpu_count() or 1)
     ctx = mp.get_context("fork")
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
-        return list(executor.map(_compute_overview_page_task, tasks))
+        yield from executor.map(_compute_overview_page_task, tasks)
 
 
 def _selected_temperatures(args: argparse.Namespace) -> list[float]:

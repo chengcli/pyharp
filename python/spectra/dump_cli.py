@@ -119,10 +119,10 @@ def _validate_single_selector(args: argparse.Namespace, parser: argparse.Argumen
 
 
 def _validate_state_grid(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
-    temperatures = _selected_base_temperatures(args)
-    pressures = _selected_pressure_bars(args)
-    if len(temperatures) != len(pressures):
-        parser.error("--temperature-k and --pressure-bar must have the same number of values")
+    try:
+        _state_pairs(args)
+    except ValueError as exc:
+        parser.error(str(exc))
 
 
 def _selected_target(args: argparse.Namespace) -> tuple[str, object]:
@@ -152,6 +152,19 @@ def _selected_del_temperatures(args: argparse.Namespace) -> list[float]:
     if isinstance(values, (list, tuple)):
         return [float(value) for value in values]
     return [float(values)]
+
+
+def _state_pairs(args: argparse.Namespace) -> list[tuple[float, float]]:
+    temperatures = _selected_base_temperatures(args)
+    pressures = _selected_pressure_bars(args)
+    if len(temperatures) != len(pressures):
+        raise ValueError("--temperature-k and --pressure-bar must have the same number of values")
+    return list(zip(temperatures, pressures, strict=True))
+
+
+def _single_base_state(args: argparse.Namespace) -> tuple[float, float]:
+    temperature_k, pressure_bar = _state_pairs(args)[0]
+    return float(temperature_k), float(pressure_bar)
 
 
 def _state_span_token(min_value: float, max_value: float, *, unit: str) -> str:
@@ -205,12 +218,6 @@ def _band_attr_values(wn_range: tuple[float, float]) -> dict[str, float]:
 def _args_for_wn_range(args: argparse.Namespace, wn_range: tuple[float, float]) -> argparse.Namespace:
     scoped = argparse.Namespace(**vars(args))
     scoped.wn_range = wn_range
-    return scoped
-
-
-def _args_for_temperature(args: argparse.Namespace, temperature_k: float) -> argparse.Namespace:
-    scoped = argparse.Namespace(**vars(args))
-    scoped.temperature_k = float(temperature_k)
     return scoped
 
 
@@ -623,8 +630,8 @@ def _compute_species_xsection(args: argparse.Namespace):
     line_provider = build_line_provider(config, line_db)
     cia_dataset = _resolve_species_cia(args, config)
     cia_selection = _resolve_species_cia_selection(args, config)
-    temperature_k = _selected_base_temperatures(args)[0]
-    pressure_pa = _selected_pressure_bars(args)[0] * 1.0e5
+    temperature_k, pressure_bar = _single_base_state(args)
+    pressure_pa = pressure_bar * 1.0e5
     grid = band.grid()
     cia_cross_section_cm2_molecule = None
     secondary_component: dict[str, object] | None = None
@@ -675,8 +682,8 @@ def _compute_pair_xsection(args: argparse.Namespace):
     spectrum = compute_absorption_spectrum_from_sources(
         species_name=pair,
         wavenumber_grid_cm1=band.grid(),
-        temperature_k=_selected_base_temperatures(args)[0],
-        pressure_pa=_selected_pressure_bars(args)[0] * 1.0e5,
+        temperature_k=_single_base_state(args)[0],
+        pressure_pa=_single_base_state(args)[1] * 1.0e5,
         line_provider=_ZeroLineProvider(),
         cia_dataset=cia_dataset,
     )
@@ -694,9 +701,10 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
         refresh=bool(args.refresh_cia),
     )
     grid = band.grid()
+    temperature_k, _ = _single_base_state(args)
     binary = np.asarray(
         cia_dataset.interpolate_to_grid(
-            temperature_k=_selected_base_temperatures(args)[0],
+            temperature_k=temperature_k,
             wavenumber_grid_cm1=grid,
         ),
         dtype=np.float64,
@@ -714,7 +722,7 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
         },
         attrs={
             "pair_name": pair,
-            "temperature_k": _selected_base_temperatures(args)[0],
+            "temperature_k": temperature_k,
             "source_filename": filename,
             **_band_attr_values(args.wn_range),
         },
@@ -722,18 +730,18 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
 
 
 def _compute_composition_products(args: argparse.Namespace):
+    temperature_k, pressure_bar = _single_base_state(args)
     mixture_args = argparse.Namespace(
         composition=args.composition,
         hitran_dir=args.hitran_dir,
-        temperature_k=_selected_base_temperatures(args)[0],
-        pressure_bar=_selected_pressure_bars(args)[0],
+        temperature_k=temperature_k,
+        pressure_bar=pressure_bar,
         resolution=args.resolution,
         cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
         broadening_composition=args.broadening_composition,
         path_length_km=getattr(args, "path_length_km", 1.0),
-        manifest=None,
     )
     return compute_mixture_overview_products(mixture_args, wn_range=args.wn_range)
 
@@ -842,13 +850,14 @@ def _compute_range_temperature_datasets(
     target_kind: str,
     worker,
 ) -> list[tuple[tuple[float, float], xr.Dataset, list[str]]]:
-    base_temperatures = _selected_base_temperatures(args)
-    pressure_bars = _selected_pressure_bars(args)
+    state_pairs = _state_pairs(args)
+    base_temperatures = [temperature_k for temperature_k, _ in state_pairs]
+    pressure_bars = [pressure_bar for _, pressure_bar in state_pairs]
     del_temperatures = _selected_del_temperatures(args)
     tasks: list[tuple[str, argparse.Namespace]] = []
     for wn_range in wn_ranges:
         range_args = _args_for_wn_range(args, wn_range)
-        for base_temperature_k, pressure_bar in zip(base_temperatures, pressure_bars, strict=True):
+        for base_temperature_k, pressure_bar in state_pairs:
             for del_temperature_k in del_temperatures:
                 tasks.append(
                     (

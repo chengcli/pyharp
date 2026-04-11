@@ -164,19 +164,6 @@ def _stateful_output_path(
     return output_path.with_name(f"{output_path.stem}{_state_output_suffix(temperature_k, pressure_bar)}{suffix}")
 
 
-def _stateful_manifest_path(
-    manifest_path: Path | None,
-    *,
-    num_states: int,
-    temperature_k: float,
-    pressure_bar: float,
-) -> Path | None:
-    if manifest_path is None or num_states <= 1:
-        return manifest_path
-    suffix = manifest_path.suffix or ".json"
-    return manifest_path.with_name(f"{manifest_path.stem}{_state_output_suffix(temperature_k, pressure_bar)}{suffix}")
-
-
 def _args_for_state(args: argparse.Namespace, *, temperature_k: float, pressure_bar: float) -> argparse.Namespace:
     scoped = argparse.Namespace(**vars(args))
     scoped.temperature_k = float(temperature_k)
