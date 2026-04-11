@@ -80,7 +80,7 @@ git submodule update --init --recursive external/MT_CKD_H2O
 If you are using command line argument outside of pyharp, clone MT_CKD directly:
 
 ```bash
-mkdir -p external && cd external && git clone https://github.com/AER-RC/MT_CKD
+mkdir -p external && cd external && git clone https://github.com/AER-RC/MT_CKD_H2O
 ```
 
 The `pyharp-dump` CLI writes one pressure-temperature NetCDF product per run.
@@ -111,8 +111,8 @@ multi-page PDFs. Use `--figure` to choose the output path. Without `--figure`,
 plots are written under `output/` with names derived from the target, plot
 type, temperature, pressure, and wavenumber range.
 
-Molecular line calculations also accept `--broadening-composition
-BROADENER:FRACTION,...`, for example `air:0.8,self:0.2` or `H2:0.85,He:0.15`.
+Molecular line calculations also accept `--broadening-composition BROADENER:FRACTION,...`,
+for example `air:0.8,self:0.2` or `H2:0.85,He:0.15`.
 If a requested foreign broadener is unavailable in the HITRAN table for the
 active absorber, Pyharp falls back to `air` for that fraction.
 
