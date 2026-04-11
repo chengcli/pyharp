@@ -20,7 +20,8 @@ or ``--composition`` where supported.
 Without ``--output``, files are written under ``--output-dir`` using names
 derived from the target, product type, pressure, temperature, and wavenumber
 range. Generated names end with ``cm1`` to indicate wavenumber bounds in
-``cm^-1``.
+``cm^-1``. For state-grid dumps, the state portion of the filename is
+``<min_temp>_<max_temp>K_<min_pres>_<max_pres>bar``.
 
 Subcommands
 -----------
@@ -77,14 +78,18 @@ Shared Options
     Wavenumber spacing in ``cm^-1``. The default is ``1``.
 
 ``--temperature-k value``
-    Temperature in kelvin. The default is ``300``. Use a comma-separated list
-    such as ``300,400,500`` to stack multiple temperatures into one NetCDF.
-    Data variables are always written on ``(temperature, wavenumber)``; a
-    single temperature produces a degenerate temperature dimension of length
-    one.
+    Base temperature in kelvin. The default is ``300``. Use a comma-separated
+    list such as ``300,400,500`` paired one-to-one with ``--pressure-bar``.
 
 ``--pressure-bar value``
-    Pressure in bar. The default is ``1``.
+    Pressure in bar. The default is ``1``. Use a comma-separated list paired
+    one-to-one with ``--temperature-k``.
+
+``--del-temperature-k value``
+    Temperature anomalies in kelvin applied to each base ``(temperature,
+    pressure)`` pair. The default is ``0``. For example, ``--temperature-k
+    300 --pressure-bar 1 --del-temperature-k -10,-5,0,5,10`` evaluates the
+    states ``290, 295, 300, 305, 310 K`` at ``1 bar``.
 
 ``--path-length-km value``
     Transmission path length in kilometers. This option is required only for
@@ -150,7 +155,23 @@ Adjacent repeated ranges do not duplicate the boundary sample. If
 ``output/h2o_20_2500.nc`` and ``output/h2o_2500_10000.nc``.
 
 Auto-generated filenames follow the pattern
-``<target>_<product>_<pressure>bar_<temperature>K_<wnmin>_<wnmax>cm1``.
+``<target>_<product>_<min_temp>_<max_temp>K_<min_pres>_<max_pres>bar_<wnmin>_<wnmax>cm1``.
+
+State Grid Output
+-----------------
+
+Dump products are always written on the dimensions
+``(del_temperature, pressure, wavenumber)``. The ``pressure`` coordinate
+stores the paired ``--pressure-bar`` values converted to ``Pa``,
+``del_temperature`` stores the requested anomalies, and the ``temperature``
+data variable has dimensions ``(pressure,)`` with the base temperatures from
+``--temperature-k``.
+
+Even a single ``(temperature, pressure)`` pair is written with degenerate
+``del_temperature`` and ``pressure`` dimensions of length one.
+
+Parallel execution is flattened across all requested
+``wn_range × pressure × del_temperature`` jobs.
 
 NetCDF Naming Conventions
 -------------------------
@@ -164,7 +185,7 @@ Xsection outputs
 Single-species xsection dumps use names such as:
 
 * ``sigma_line_h2o``
-* ``sigma_continuum_h2o_continuum_mt_ckd``
+* ``sigma_continuum_h2o_mt_ckd``
 * ``sigma_cia_h2o_h2o``
 * ``binary_absorption_coefficient_h2o_h2o``
 * ``sigma_total``
@@ -193,8 +214,8 @@ Examples:
 
 * ``transmittance_line_h2o``
 * ``attenuation_line_h2o``
-* ``transmittance_continuum_h2o_continuum_mt_ckd``
-* ``attenuation_continuum_h2o_continuum_mt_ckd``
+* ``transmittance_continuum_h2o_mt_ckd``
+* ``attenuation_continuum_h2o_mt_ckd``
 * ``transmittance_cia_h2_he``
 * ``attenuation_cia_h2_he``
 * ``transmittance_total``
@@ -235,6 +256,17 @@ Multi-band xsection in one run:
        --pressure-bar 1 \
        --wn-range=20,2500 \
        --wn-range=2500,10000
+
+Paired state grid with temperature anomalies:
+
+.. code-block:: bash
+
+   pyharp-dump xsection \
+       --species H2O \
+       --temperature-k 300,400 \
+       --pressure-bar 1,10 \
+       --del-temperature-k -10,-5,0,5,10 \
+       --wn-range=20,2500
 
 Composition transmission dump:
 

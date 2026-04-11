@@ -96,11 +96,19 @@ Use repeated `--wn-range=min,max` values to write one NetCDF file per band.
 When you also pass `--output`, pyharp appends `_<wnmin>_<wnmax>` to the
 requested stem for each generated file.
 Use `--output-dir` to place auto-generated filenames under a different
-directory without overriding the filename pattern.
-Use `--temperature-k 300,400,500` to stack multiple temperatures into one
-NetCDF with a `temperature` dimension, so data variables are written on
-`(temperature, wavenumber)`. Even a single temperature is written with a
-degenerate `temperature` dimension of length one.
+directory without overriding the filename pattern. For state-grid dumps, the
+auto-generated state section is written as
+`<min_temp>_<max_temp>K_<min_pres>_<max_pres>bar`, where temperature bounds
+come from the full `(temperature + del_temperature)` grid.
+Use `--temperature-k` and `--pressure-bar` as paired comma-separated vectors,
+for example `--temperature-k 300,400 --pressure-bar 1,10`. Add
+`--del-temperature-k` to evaluate temperature anomalies around each base
+state, for example `--del-temperature-k -10,-5,0,5,10`. Dump outputs are
+written on `(del_temperature, pressure, wavenumber)`, include a
+`temperature(pressure)` variable for the base temperatures, store the
+`pressure` coordinate in Pa, and still retain
+degenerate `del_temperature` and `pressure` dimensions when only one state is
+requested.
 Across `pyharp.spectra`, wavenumber ranges are interpreted as
 lower-inclusive and upper-exclusive: `--wn-range=20,22` with `1 cm^-1`
 resolution samples `20` and `21`, not `22`.

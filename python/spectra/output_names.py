@@ -35,7 +35,7 @@ def default_output_path(
     target_name: object,
     plot_type: str,
     temperature_k: float | str,
-    pressure_bar: float,
+    pressure_bar: float | str,
     wn_range: tuple[float, float],
     suffix: str,
     output_dir: Path = Path("output"),
