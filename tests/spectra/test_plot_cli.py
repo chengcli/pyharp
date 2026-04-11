@@ -36,6 +36,8 @@ def test_plot_parser_accepts_molecule_xsection_with_wn_range(tmp_path) -> None:
             "300",
             "--pressure-bar",
             "1",
+            "--broadening-composition",
+            "air:0.8,self:0.2",
             "--wn-range",
             "20,2500",
             "--figure",
@@ -45,6 +47,7 @@ def test_plot_parser_accepts_molecule_xsection_with_wn_range(tmp_path) -> None:
 
     assert args.command == "xsection"
     assert args.species == "CO2"
+    assert args.broadening_composition == "air:0.8,self:0.2"
     assert args.wn_range == (20.0, 2500.0)
     assert args.figure == tmp_path / "co2.png"
 
@@ -56,6 +59,8 @@ def test_plot_parser_accepts_atm_overview_ranges(tmp_path) -> None:
             "overview",
             "--composition",
             "H2O:0.1,H2:0.9",
+            "--broadening-composition",
+            "H2:0.85,He:0.15",
             "--wn-range=25,2500",
             "--wn-range=2501,20000",
             "--manifest",
@@ -67,6 +72,7 @@ def test_plot_parser_accepts_atm_overview_ranges(tmp_path) -> None:
 
     assert args.command == "overview"
     assert args.composition == "H2O:0.1,H2:0.9"
+    assert args.broadening_composition == "H2:0.85,He:0.15"
     assert args.wn_ranges == [(25.0, 2500.0), (2501.0, 20000.0)]
     assert args.manifest == tmp_path / "sources.json"
     assert args.figure == tmp_path / "atm.pdf"
@@ -100,6 +106,19 @@ def test_plot_main_dispatches_molecule_xsection_with_default_figure(monkeypatch)
 
     assert len(calls) == 1
     assert calls[0].figure.name == "co2_xsection_275p5K_0p25bar_25_30p5.png"
+
+
+def test_plot_main_passes_broadening_composition_to_molecule_workflow(monkeypatch) -> None:
+    calls = []
+
+    def fake_run(args):
+        calls.append(args)
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+
+    plot_cli.main(["xsection", "--species", "CO2", "--broadening-composition", "air:0.8,self:0.2"])
+
+    assert calls[0].broadening_composition == "air:0.8,self:0.2"
 
 
 def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:

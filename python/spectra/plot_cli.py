@@ -40,6 +40,12 @@ def _add_state_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_common_arguments(parser: argparse.ArgumentParser, *, allow_multiple_ranges: bool = False) -> None:
     parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"), metavar="DIR", help="Directory for downloaded HITRAN line and CIA data.")
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
+    parser.add_argument(
+        "--broadening-composition",
+        default=None,
+        metavar="BROADENER:FRACTION,...",
+        help="Line-broadening gas composition for molecular line calculations, for example air:0.8,self:0.2 or H2:0.85,He:0.15.",
+    )
     if allow_multiple_ranges:
         parser.add_argument(
             "--wn-range",
@@ -144,6 +150,7 @@ def _as_molecule_args(args: argparse.Namespace, *, plot_type: str) -> argparse.N
         cia_pair=getattr(args, "cia_pair", None),
         cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
+        broadening_composition=getattr(args, "broadening_composition", None),
         path_length_km=getattr(args, "path_length_km", 1.0),
         figure=args.figure
         or _default_figure(
@@ -169,6 +176,7 @@ def _as_molecule_overview_args(args: argparse.Namespace, *, species: str, wn_ran
         cia_pair=getattr(args, "cia_pair", None),
         cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
+        broadening_composition=getattr(args, "broadening_composition", None),
         path_length_km=args.path_length_km,
         figure=args.figure
         or _default_figure(
@@ -194,6 +202,7 @@ def _as_molecule_overview_batch_args(args: argparse.Namespace, *, species: list[
         refresh_hitran=args.refresh_hitran,
         cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
+        broadening_composition=getattr(args, "broadening_composition", None),
         figure=args.figure
         or _default_figure(
             target_name="_".join(species),
@@ -218,6 +227,7 @@ def _as_atm_overview_args(args: argparse.Namespace, *, wn_ranges: list[tuple[flo
         cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
+        broadening_composition=getattr(args, "broadening_composition", None),
         figure=args.figure
         or _default_figure(
             target_name=args.composition,
@@ -242,6 +252,7 @@ def _as_atm_args(args: argparse.Namespace, *, plot_type: str, wn_range: tuple[fl
         cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
+        broadening_composition=getattr(args, "broadening_composition", None),
         figure=args.figure
         or _default_figure(
             target_name=args.composition,

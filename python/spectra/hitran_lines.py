@@ -6,6 +6,7 @@ import importlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
+import socket
 import tempfile
 
 import numpy as np
@@ -30,6 +31,7 @@ class LineDatabase:
     cache_dir: Path
     wavenumber_min_cm1: float
     wavenumber_max_cm1: float
+    available_broadener_keys: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -51,14 +53,32 @@ class HapiLineProvider:
         cache_dir: Path | None = None,
         diluent: dict[str, float] | None = None,
         min_line_strength: float = 1.0e-27,
+        available_broadener_keys: tuple[str, ...] | None = None,
     ) -> None:
         self._hapi = _import_hapi()
         self.table_name = table_name
         self.cache_dir = cache_dir
-        self.diluent = diluent or {"self": 1.0}
+        requested_diluent = dict(diluent or {"self": 1.0})
+        self.requested_diluent = requested_diluent
+        self.diluent, self.diluent_fallbacks = _resolve_effective_diluent(
+            self._hapi,
+            table_name=table_name,
+            cache_dir=cache_dir,
+            requested_diluent=requested_diluent,
+            available=available_broadener_keys,
+        )
         self.min_line_strength = float(min_line_strength)
         if cache_dir is not None:
-            self._hapi.db_begin(str(cache_dir))
+            _call_hapi_quietly(self._hapi.db_begin, str(cache_dir))
+
+    def broadening_summary(self) -> str:
+        """Return a compact description of requested and effective broadening."""
+        requested = _format_diluent(self.requested_diluent)
+        effective = _format_diluent(self.diluent)
+        if not self.diluent_fallbacks:
+            return f"requested={requested} -> effective={effective}"
+        fallback_text = ", ".join(f"{name}->{target}" for name, target in sorted(self.diluent_fallbacks.items()))
+        return f"requested={requested} -> effective={effective} (fallback: {fallback_text})"
 
     def absorption_coefficient_cm1(
         self,
@@ -68,7 +88,8 @@ class HapiLineProvider:
     ) -> np.ndarray:
         """Return line absorption coefficient on the requested grid."""
         pressure_atm = float(pressure_pa) / 101_325.0
-        _, coef = self._hapi.absorptionCoefficient_Voigt(
+        _, coef = _call_hapi_quietly(
+            self._hapi.absorptionCoefficient_Voigt,
             SourceTables=self.table_name,
             OmegaGrid=np.asarray(wavenumber_grid_cm1, dtype=np.float64),
             Environment={"T": float(temperature_k), "p": pressure_atm},
@@ -86,7 +107,8 @@ class HapiLineProvider:
     ) -> np.ndarray:
         """Return line absorption cross section in cm^2/molecule."""
         pressure_atm = float(pressure_pa) / 101_325.0
-        _, coef = self._hapi.absorptionCoefficient_Voigt(
+        _, coef = _call_hapi_quietly(
+            self._hapi.absorptionCoefficient_Voigt,
             SourceTables=self.table_name,
             OmegaGrid=np.asarray(wavenumber_grid_cm1, dtype=np.float64),
             Environment={"T": float(temperature_k), "p": pressure_atm},
@@ -112,17 +134,73 @@ def _resolve_global_isotopologue_ids(hapi, config: SpectroscopyConfig) -> tuple[
     return tuple(global_ids)
 
 
-def _cache_matches_requested_molecule(hapi, table_name: str, molecule_id: int) -> bool:
-    """Return True when the cached HAPI table contains only the requested molecule."""
+def _call_hapi_quietly(func, *args, **kwargs):
+    return func(*args, **kwargs)
+
+
+def _cache_matches_requested_molecule_from_data(data: dict[str, object], molecule_id: int) -> bool:
     try:
-        hapi.storage2cache(table_name)
-    except Exception:
-        return False
-    try:
-        molec_ids = hapi.LOCAL_TABLE_CACHE[table_name]["data"]["molec_id"]
+        molec_ids = data["molec_id"]
     except Exception:
         return False
     return {int(value) for value in molec_ids} == {int(molecule_id)}
+
+
+def _available_broadener_keys_from_data(data: dict[str, object]) -> set[str]:
+    return {
+        str(key)[len("gamma_") :].lower()
+        for key in data
+        if str(key).startswith("gamma_")
+    }
+
+
+def _load_cached_table_data(hapi, table_name: str, cache_dir: Path | None) -> dict[str, object] | None:
+    if cache_dir is not None:
+        _call_hapi_quietly(hapi.db_begin, str(cache_dir))
+    try:
+        _call_hapi_quietly(hapi.storage2cache, table_name)
+        return hapi.LOCAL_TABLE_CACHE[table_name]["data"]
+    except Exception:
+        return None
+
+
+def _resolve_effective_diluent(
+    hapi,
+    *,
+    table_name: str,
+    cache_dir: Path | None,
+    requested_diluent: dict[str, float],
+    available: tuple[str, ...] | None = None,
+) -> tuple[dict[str, float], dict[str, str]]:
+    available_keys = set(available) if available is not None else _available_broadener_keys_from_data(_load_cached_table_data(hapi, table_name, cache_dir) or {})
+    effective: dict[str, float] = {}
+    fallbacks: dict[str, str] = {}
+    needs_air_fallback = False
+    for broadener_name, fraction in requested_diluent.items():
+        key = str(broadener_name).strip().lower()
+        amount = float(fraction)
+        if amount <= 0.0:
+            continue
+        if key == "self" or key in available_keys:
+            effective[key] = effective.get(key, 0.0) + amount
+            continue
+        needs_air_fallback = True
+        fallbacks[key] = "air"
+        effective["air"] = effective.get("air", 0.0) + amount
+    if needs_air_fallback and "air" not in available_keys:
+        missing = ", ".join(sorted(name for name, target in fallbacks.items() if target == "air"))
+        raise ValueError(
+            f"Requested broadeners {missing} are unavailable for table {table_name}, "
+            "and air broadening parameters are not available for fallback."
+        )
+    if not effective:
+        return {"self": 1.0}, {}
+    total = sum(effective.values())
+    return ({name: value / total for name, value in effective.items()}, fallbacks)
+
+
+def _format_diluent(diluent: dict[str, float]) -> str:
+    return ",".join(f"{name}:{value:.3f}" for name, value in sorted(diluent.items()))
 
 
 def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> LineDatabase:
@@ -133,26 +211,46 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
     bounds_max = band.wavenumber_max_cm1
     table_name = config.resolved_line_table_name(band)
     global_iso_ids = _resolve_global_isotopologue_ids(hapi, config)
-    hapi.db_begin(str(config.hitran_cache_dir))
+    _call_hapi_quietly(hapi.db_begin, str(config.hitran_cache_dir))
     data_path = config.hitran_cache_dir / f"{table_name}.data"
     header_path = config.hitran_cache_dir / f"{table_name}.header"
+    cached_data = None
+    available_broadener_keys: tuple[str, ...] | None = None
+    if data_path.exists() and header_path.exists():
+        cached_data = _load_cached_table_data(hapi, table_name, config.hitran_cache_dir)
+        if cached_data is not None:
+            available_broadener_keys = tuple(sorted(_available_broadener_keys_from_data(cached_data)))
     cache_is_valid = (
         data_path.exists()
         and header_path.exists()
-        and _cache_matches_requested_molecule(hapi, table_name, config.molecule_id)
+        and cached_data is not None
+        and _cache_matches_requested_molecule_from_data(cached_data, config.molecule_id)
     )
     if config.refresh_hitran or not cache_is_valid:
-        hapi.fetch_by_ids(
-            table_name,
-            list(global_iso_ids),
-            bounds_min,
-            bounds_max,
-        )
+        previous_timeout = socket.getdefaulttimeout()
+        try:
+            socket.setdefaulttimeout(30.0)
+            _call_hapi_quietly(
+                hapi.fetch_by_ids,
+                table_name,
+                list(global_iso_ids),
+                bounds_min,
+                bounds_max,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to download HITRAN lines for {config.hitran_species.name} over "
+                f"{bounds_min:g}-{bounds_max:g} cm^-1 into {config.hitran_cache_dir}. "
+                "The requested table is not available in the local cache and HAPI could not fetch it."
+            ) from exc
+        finally:
+            socket.setdefaulttimeout(previous_timeout)
     return LineDatabase(
         table_name=table_name,
         cache_dir=config.hitran_cache_dir,
         wavenumber_min_cm1=bounds_min,
         wavenumber_max_cm1=bounds_max,
+        available_broadener_keys=available_broadener_keys,
     )
 
 
@@ -164,8 +262,8 @@ def load_hitran_line_list(
     """Load discrete HITRAN line positions and tabulated intensities for the configured species."""
     line_db = line_db or download_hitran_lines(config, band)
     hapi = _import_hapi()
-    hapi.db_begin(str(line_db.cache_dir))
-    hapi.storage2cache(line_db.table_name)
+    _call_hapi_quietly(hapi.db_begin, str(line_db.cache_dir))
+    _call_hapi_quietly(hapi.storage2cache, line_db.table_name)
     data = hapi.LOCAL_TABLE_CACHE[line_db.table_name]["data"]
     wavenumber_cm1 = np.asarray(data["nu"], dtype=np.float64)
     line_intensity = np.asarray(data["sw"], dtype=np.float64)
@@ -181,6 +279,20 @@ def load_hitran_line_list(
         table_name=line_db.table_name,
         wavenumber_cm1=wavenumber_cm1[valid][order],
         line_intensity=line_intensity[valid][order],
+    )
+
+
+def build_line_provider(
+    config: SpectroscopyConfig,
+    line_db: LineDatabase,
+) -> HapiLineProvider:
+    """Construct a HAPI line provider using the config's broadening rules."""
+    return HapiLineProvider(
+        line_db.table_name,
+        cache_dir=line_db.cache_dir,
+        diluent=config.resolved_line_diluent(),
+        min_line_strength=config.min_line_strength,
+        available_broadener_keys=line_db.available_broadener_keys,
     )
 
 

@@ -16,8 +16,9 @@ import numpy as np
 import xarray as xr
 
 from .config import SpectroscopyConfig, SpectralBandConfig
+from .dataset_io import write_dataset_via_tmp
 from .hitran_cia import CiaDataset, download_cia_file, parse_cia_file
-from .hitran_lines import HapiLineProvider, LineDatabase, download_hitran_lines
+from .hitran_lines import HapiLineProvider, LineDatabase, build_line_provider, download_hitran_lines
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
 
 K_BOLTZMANN = 1.380649e-23
@@ -103,6 +104,29 @@ def compute_absorption_spectrum_from_sources(
     )
 
 
+def _resolve_continuum_sources(
+    *,
+    config: SpectroscopyConfig,
+    wavenumber_grid_cm1: np.ndarray,
+    temperature_k: float,
+    pressure_pa: float,
+) -> tuple[CiaDataset | None, np.ndarray | None]:
+    """Resolve optional continuum inputs for a spectrum calculation."""
+    cia_dataset: CiaDataset | None = None
+    cia_cross_section_cm2_molecule: np.ndarray | None = None
+    if config.hitran_species.name == "H2O":
+        cia_cross_section_cm2_molecule = compute_mt_ckd_h2o_continuum_cross_section(
+            wavenumber_grid_cm1=wavenumber_grid_cm1,
+            temperature_k=temperature_k,
+            pressure_pa=pressure_pa,
+            h2o_vmr=1.0,
+        )
+    elif config.hitran_species.cia_filename is not None:
+        cia_path = download_cia_file(config)
+        cia_dataset = parse_cia_file(cia_path, config.cia_pair)
+    return cia_dataset, cia_cross_section_cm2_molecule
+
+
 def compute_absorption_spectrum(
     config: SpectroscopyConfig,
     band: SpectralBandConfig,
@@ -115,23 +139,13 @@ def compute_absorption_spectrum(
     config.ensure_directories()
     grid = band.grid()
     line_db = line_db or download_hitran_lines(config, band)
-    line_provider = HapiLineProvider(
-        line_db.table_name,
-        cache_dir=line_db.cache_dir,
-        min_line_strength=config.min_line_strength,
+    line_provider = build_line_provider(config, line_db)
+    cia_dataset, cia_cross_section_cm2_molecule = _resolve_continuum_sources(
+        config=config,
+        wavenumber_grid_cm1=grid,
+        temperature_k=temperature_k,
+        pressure_pa=pressure_pa,
     )
-    cia_dataset: CiaDataset | None = None
-    cia_cross_section_cm2_molecule: np.ndarray | None = None
-    if config.hitran_species.name == "H2O":
-        cia_cross_section_cm2_molecule = compute_mt_ckd_h2o_continuum_cross_section(
-            wavenumber_grid_cm1=grid,
-            temperature_k=temperature_k,
-            pressure_pa=pressure_pa,
-            h2o_vmr=1.0,
-        )
-    elif config.hitran_species.cia_filename is not None:
-        cia_path = download_cia_file(config)
-        cia_dataset = parse_cia_file(cia_path, config.cia_pair)
     return compute_absorption_spectrum_from_sources(
         species_name=config.hitran_species.name,
         wavenumber_grid_cm1=grid,
@@ -172,8 +186,10 @@ def write_spectrum_dataset(spectrum: AbsorptionSpectrum, output_path: Path) -> N
     """Write a single-state absorption spectrum dataset to NetCDF."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset = spectrum_to_dataset(spectrum)
-    dataset.to_netcdf(output_path)
-    dataset.close()
+    try:
+        write_dataset_via_tmp(dataset, output_path)
+    finally:
+        dataset.close()
 
 
 def plot_absorption_spectrum(spectrum: AbsorptionSpectrum, figure_path: Path) -> None:

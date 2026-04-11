@@ -71,3 +71,6 @@ hitran
 
 # output
 output
+
+# cache
+*__pycache__*

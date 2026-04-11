@@ -99,7 +99,9 @@ Shared Options
 ``--wn-range=min,max``
     Wavenumber bounds in ``cm^-1``. CIA plots default to ``20,10000`` when it
     is omitted. Molecular and mixture plots default to ``20,2500``. The
-    ``overview`` subcommand accepts this option more than once.
+    ``overview`` subcommand accepts this option more than once. Ranges are
+    lower-inclusive and upper-exclusive, so ``--wn-range=20,22`` with
+    ``--resolution 1`` samples ``20`` and ``21``.
 
 ``--resolution value``
     Wavenumber grid spacing in ``cm^-1``. The default is ``1``.
@@ -124,6 +126,11 @@ Shared Options
     Explicit figure path. Use ``.png`` for single plots and ``.pdf`` for
     overview plots.
 
+``--broadening-composition BROADENER:FRACTION,...``
+    Line-broadening gas composition for molecular line calculations. This
+    option affects HITRAN line absorption only, not CIA-only ``--pair``
+    workflows.
+
 Target Selection
 ----------------
 
@@ -132,7 +139,7 @@ CIA pair resolution includes ``CH4-CH4``, ``CO2-CH4``, ``CO2-CO2``,
 ``CO2-H2``, ``H2-H2``, ``H2-He``, ``N2-CH4``, and ``N2-N2``.
 
 Use ``--species`` for molecular line calculations. Built-in HITRAN line
-species are ``CH4``, ``CO2``, ``H2``, ``H2O``, and ``N2``.
+species are ``CH4``, ``CO2``, ``H2``, ``H2O``, ``H2S``, ``N2``, and ``NH3``.
 
 Use ``--composition`` for a gas mixture. The format is a comma-separated list
 of ``species:fraction`` terms:
@@ -144,6 +151,42 @@ of ``species:fraction`` terms:
 For ``attenuation`` and ``transmission``, choose only one of ``--pair``,
 ``--species``, and ``--composition``. For ``overview``, choose only one of
 ``--species`` and ``--composition``.
+
+Broadening Gases
+----------------
+
+The practical broadening gas keys supported by pyharp are:
+
+* ``air`` for standard HITRAN air broadening
+* ``self`` for absorber self broadening
+* ``H2``
+* ``He``
+* ``CO2``
+
+Examples:
+
+.. code-block:: bash
+
+   pyharp-plot xsection --species CO2 --broadening-composition air:0.8,self:0.2
+   pyharp-plot transmission --species CH4 --broadening-composition H2:0.85,He:0.15 --path-length-km 1
+   pyharp-plot overview --composition H2O:0.1,H2:0.9 --broadening-composition CO2:1 --wn-range=25,2500
+
+Fallback Behavior
+-----------------
+
+If ``--broadening-composition`` is omitted, single-species molecular
+workflows default to ``self`` broadening. Atmosphere-mixture workflows default
+to the plotted gas mixture as the requested line-broadening composition.
+
+If a requested foreign broadener cannot be found in the HITRAN line table for
+the active absorber, pyharp falls back to ``air`` for that fraction. For
+example, a requested broadening mixture of ``H2:0.85,He:0.15`` will be
+remapped to ``air`` for any unavailable broadener component.
+
+If fallback to ``air`` is needed but the line table also lacks ``air``
+broadening parameters, pyharp raises an error instead of inventing
+coefficients. Invalid broadening-composition syntax also raises a validation
+error.
 
 Output Examples
 ---------------

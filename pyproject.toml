@@ -53,7 +53,7 @@ Documentation = "https://pyharp.readthedocs.io"
 [project.scripts]
 fetch-sonora = "pyharp.api.fetch_sonora:main"
 fetch-cia-legacy = "pyharp.api.fetch_cia_legacy:main"
-pyharp-spectra = "pyharp.spectra.cli:main"
+pyharp-dump = "pyharp.spectra.dump_cli:main"
 pyharp-plot = "pyharp.spectra.plot_cli:main"
 
 [tool.setuptools]
