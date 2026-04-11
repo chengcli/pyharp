@@ -18,8 +18,9 @@ or ``--composition`` where supported.
    pyharp-dump transmission --composition H2:0.9,He:0.1,H2O:0.002 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 
 Without ``--output``, files are written under ``--output-dir`` using names
-derived from the target, product type, thermodynamic state, and wavenumber
-range.
+derived from the target, product type, pressure, temperature, and wavenumber
+range. Generated names end with ``cm1`` to indicate wavenumber bounds in
+``cm^-1``.
 
 Subcommands
 -----------
@@ -76,7 +77,11 @@ Shared Options
     Wavenumber spacing in ``cm^-1``. The default is ``1``.
 
 ``--temperature-k value``
-    Temperature in kelvin. The default is ``300``.
+    Temperature in kelvin. The default is ``300``. Use a comma-separated list
+    such as ``300,400,500`` to stack multiple temperatures into one NetCDF.
+    Data variables are always written on ``(temperature, wavenumber)``; a
+    single temperature produces a degenerate temperature dimension of length
+    one.
 
 ``--pressure-bar value``
     Pressure in bar. The default is ``1``.
@@ -143,6 +148,9 @@ This writes one file for ``[20, 2500)`` and one file for ``[2500, 10000)``.
 Adjacent repeated ranges do not duplicate the boundary sample. If
 ``--output output/h2o.nc`` is provided, the generated files are
 ``output/h2o_20_2500.nc`` and ``output/h2o_2500_10000.nc``.
+
+Auto-generated filenames follow the pattern
+``<target>_<product>_<pressure>bar_<temperature>K_<wnmin>_<wnmax>cm1``.
 
 NetCDF Naming Conventions
 -------------------------
@@ -217,7 +225,7 @@ Single-species xsection with custom broadening:
        --broadening-composition H2:0.9,He:0.1 \
        --wn-range=20,2500
 
-Multi-band xsection in one file:
+Multi-band xsection in one run:
 
 .. code-block:: bash
 

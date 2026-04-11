@@ -97,6 +97,10 @@ When you also pass `--output`, pyharp appends `_<wnmin>_<wnmax>` to the
 requested stem for each generated file.
 Use `--output-dir` to place auto-generated filenames under a different
 directory without overriding the filename pattern.
+Use `--temperature-k 300,400,500` to stack multiple temperatures into one
+NetCDF with a `temperature` dimension, so data variables are written on
+`(temperature, wavenumber)`. Even a single temperature is written with a
+degenerate `temperature` dimension of length one.
 Across `pyharp.spectra`, wavenumber ranges are interpreted as
 lower-inclusive and upper-exclusive: `--wn-range=20,22` with `1 cm^-1`
 resolution samples `20` and `21`, not `22`.
@@ -121,7 +125,7 @@ for gas mixtures such as `H2O:0.1,H2:0.9`. All plot commands accept
 multi-page PDFs. These ranges are lower-inclusive and upper-exclusive. Use
 `--output` to choose the output path. Without `--output`, plots are written
 under `--output-dir` (default `output/`) with names derived from the target,
-plot type, temperature, pressure, and wavenumber range.
+plot type, pressure, temperature, and wavenumber range.
 
 Molecular line calculations also accept `--broadening-composition BROADENER:FRACTION,...`,
 for example `air:0.8,self:0.2` or `H2:0.85,He:0.15`.

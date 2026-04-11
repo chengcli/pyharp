@@ -46,6 +46,17 @@ class _ZeroLineProvider:
 
 
 TRANSMISSION_PATH_LENGTH_HELP = "Transmission path length in kilometers."
+TEMPERATURE_COORD_ATTRS = {"long_name": "temperature", "units": "K"}
+
+
+def _parse_temperature_list(value: str) -> list[float]:
+    parts = [part.strip() for part in str(value).split(",")]
+    if not parts or any(part == "" for part in parts):
+        raise argparse.ArgumentTypeError("temperature-k must be a number or comma-separated list of numbers")
+    try:
+        return [float(part) for part in parts]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("temperature-k must contain numeric values") from exc
 
 
 def _add_selector_arguments(parser: argparse.ArgumentParser) -> None:
@@ -59,7 +70,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--output", type=Path, default=None, metavar="PATH", help="Output NetCDF path. Defaults to an auto-generated path under --output-dir.")
     parser.add_argument("--output-dir", type=Path, default=Path("output"), metavar="DIR", help="Directory for auto-generated NetCDF output paths.")
     parser.add_argument("--hitran-dir", type=Path, default=default_hitran_dir(), metavar="DIR", help="Directory for downloaded HITRAN line and CIA data.")
-    parser.add_argument("--temperature-k", type=float, default=300.0, metavar="K", help="Gas temperature in kelvin.")
+    parser.add_argument("--temperature-k", type=_parse_temperature_list, default=[300.0], metavar="K[,K...]", help="Gas temperature in kelvin. Use a comma-separated list to stack multiple temperatures into one NetCDF.")
     parser.add_argument("--pressure-bar", type=float, default=1.0, metavar="BAR", help="Gas pressure in bar.")
     parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=parse_wn_range, metavar="MIN,MAX", help="Wavenumber range in cm^-1. Repeat to write one NetCDF per band.")
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
@@ -88,12 +99,26 @@ def _selected_target(args: argparse.Namespace) -> tuple[str, object]:
     return "species", args.species or "CO2"
 
 
+def _selected_temperatures(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "temperature_k", [300.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _temperature_output_value(args: argparse.Namespace) -> float | str:
+    temperatures = _selected_temperatures(args)
+    if len(temperatures) == 1:
+        return temperatures[0]
+    return "_".join(f"{value:g}".replace("-", "m").replace(".", "p") for value in temperatures)
+
+
 def _default_cli_output_path(args: argparse.Namespace, *, suffix: str) -> Path:
     _, target = _selected_target(args)
     return default_named_output_path(
         target_name=target,
         plot_type=args.command,
-        temperature_k=args.temperature_k,
+        temperature_k=_temperature_output_value(args),
         pressure_bar=args.pressure_bar,
         wn_range=args.wn_range,
         suffix=suffix,
@@ -116,6 +141,12 @@ def _band_attr_values(wn_range: tuple[float, float]) -> dict[str, float]:
 def _args_for_wn_range(args: argparse.Namespace, wn_range: tuple[float, float]) -> argparse.Namespace:
     scoped = argparse.Namespace(**vars(args))
     scoped.wn_range = wn_range
+    return scoped
+
+
+def _args_for_temperature(args: argparse.Namespace, temperature_k: float) -> argparse.Namespace:
+    scoped = argparse.Namespace(**vars(args))
+    scoped.temperature_k = float(temperature_k)
     return scoped
 
 
@@ -503,7 +534,7 @@ def _compute_species_xsection(args: argparse.Namespace):
     line_provider = build_line_provider(config, line_db)
     cia_dataset = _resolve_species_cia(args, config)
     cia_selection = _resolve_species_cia_selection(args, config)
-    temperature_k = float(args.temperature_k)
+    temperature_k = _selected_temperatures(args)[0]
     pressure_pa = float(args.pressure_bar) * 1.0e5
     grid = band.grid()
     cia_cross_section_cm2_molecule = None
@@ -555,7 +586,7 @@ def _compute_pair_xsection(args: argparse.Namespace):
     spectrum = compute_absorption_spectrum_from_sources(
         species_name=pair,
         wavenumber_grid_cm1=band.grid(),
-        temperature_k=float(args.temperature_k),
+        temperature_k=_selected_temperatures(args)[0],
         pressure_pa=float(args.pressure_bar) * 1.0e5,
         line_provider=_ZeroLineProvider(),
         cia_dataset=cia_dataset,
@@ -576,7 +607,7 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
     grid = band.grid()
     binary = np.asarray(
         cia_dataset.interpolate_to_grid(
-            temperature_k=float(args.temperature_k),
+            temperature_k=_selected_temperatures(args)[0],
             wavenumber_grid_cm1=grid,
         ),
         dtype=np.float64,
@@ -594,7 +625,7 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
         },
         attrs={
             "pair_name": pair,
-            "temperature_k": float(args.temperature_k),
+            "temperature_k": _selected_temperatures(args)[0],
             "source_filename": filename,
             **_band_attr_values(args.wn_range),
         },
@@ -675,6 +706,74 @@ def _parallel_band_results(
         return list(executor.map(worker, tasks))
 
 
+def _stack_temperature_datasets(datasets: list[xr.Dataset], *, temperatures: list[float]) -> xr.Dataset:
+    if not datasets:
+        raise ValueError("at least one dataset is required")
+    stacked = xr.concat(
+        datasets,
+        dim=xr.IndexVariable("temperature", np.asarray(temperatures, dtype=np.float64)),
+    )
+    stacked["temperature"].attrs = dict(TEMPERATURE_COORD_ATTRS)
+    attrs = dict(datasets[0].attrs)
+    attrs.pop("temperature_k", None)
+    attrs.pop("number_density_cm3", None)
+    stacked.attrs = attrs
+    return stacked
+
+
+def _compute_temperature_stacked_dataset(
+    *,
+    base_args: argparse.Namespace,
+    target_kind: str,
+    worker,
+) -> tuple[xr.Dataset, list[str]]:
+    temperatures = _selected_temperatures(base_args)
+    tasks = [
+        (target_kind, _args_for_temperature(base_args, temperature_k))
+        for temperature_k in temperatures
+    ]
+    results = _parallel_band_results(tasks, worker=worker)
+    datasets = [dataset for dataset, _ in results]
+    broadening_summaries = [summary for _, summary in results if summary]
+    try:
+        stacked = _stack_temperature_datasets(datasets, temperatures=temperatures)
+    finally:
+        for dataset in datasets:
+            dataset.close()
+    return stacked, broadening_summaries
+
+
+def _compute_range_temperature_datasets(
+    *,
+    args: argparse.Namespace,
+    wn_ranges: list[tuple[float, float]],
+    target_kind: str,
+    worker,
+) -> list[tuple[tuple[float, float], xr.Dataset, list[str]]]:
+    temperatures = _selected_temperatures(args)
+    tasks: list[tuple[str, argparse.Namespace]] = []
+    for wn_range in wn_ranges:
+        range_args = _args_for_wn_range(args, wn_range)
+        for temperature_k in temperatures:
+            tasks.append((target_kind, _args_for_temperature(range_args, temperature_k)))
+
+    results = _parallel_band_results(tasks, worker=worker)
+    grouped: list[tuple[tuple[float, float], xr.Dataset, list[str]]] = []
+    index = 0
+    for wn_range in wn_ranges:
+        range_results = results[index:index + len(temperatures)]
+        index += len(temperatures)
+        datasets = [dataset for dataset, _ in range_results]
+        broadening_summaries = [summary for _, summary in range_results if summary]
+        try:
+            stacked = _stack_temperature_datasets(datasets, temperatures=temperatures)
+        finally:
+            for dataset in datasets:
+                dataset.close()
+        grouped.append((wn_range, stacked, broadening_summaries))
+    return grouped
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the dump CLI parser."""
     parser = argparse.ArgumentParser(
@@ -736,78 +835,36 @@ def main() -> None:
     if args.command == "xsection":
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)
-        if target_kind in {"pair", "composition"}:
-            if len(wn_ranges) == 1:
-                output_path = _output_path_for_wn_range(args, wn_range=wn_ranges[0], suffix=".nc")
-                dataset, _ = _compute_xsection_band((target_kind, _args_for_wn_range(args, wn_ranges[0])))
-                try:
-                    write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
-                finally:
-                    dataset.close()
-                print(f"Wrote NetCDF: {output_path}")
-                return
-            tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
-            results = _parallel_band_results(tasks, worker=_compute_xsection_band)
-            for wn_range, (dataset, _) in zip(wn_ranges, results, strict=True):
-                output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
-                try:
-                    write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
-                finally:
-                    dataset.close()
-                print(f"Wrote NetCDF: {output_path}")
-            return
-        if len(wn_ranges) == 1:
-            range_args = _args_for_wn_range(args, wn_ranges[0])
-            broadening_summary: str | None = None
-            spectrum, broadening_summary, secondary_component = _compute_species_xsection(range_args)
-            output_path = _output_path_for_wn_range(args, wn_range=wn_ranges[0], suffix=".nc")
-            _write_xsection_dataset(
-                spectrum,
-                output_path,
-                species_name=str(range_args.species or "CO2"),
-                secondary_component=secondary_component,
-                wn_range=range_args.wn_range,
-            )
-            print(f"Wrote NetCDF: {output_path}")
-            if broadening_summary:
-                print(f"Broadening: {broadening_summary}")
-            return
-        tasks = [("species", _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
-        results = _parallel_band_results(tasks, worker=_compute_xsection_band)
-        for wn_range, (dataset, broadening_summary) in zip(wn_ranges, results, strict=True):
+        for wn_range, dataset, broadening_summaries in _compute_range_temperature_datasets(
+            args=args,
+            wn_ranges=wn_ranges,
+            target_kind=target_kind,
+            worker=_compute_xsection_band,
+        ):
             output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
             try:
                 write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
             finally:
                 dataset.close()
             print(f"Wrote NetCDF: {output_path}")
-            if broadening_summary:
+            for broadening_summary in broadening_summaries:
                 print(f"Broadening: {broadening_summary}")
         return
     if args.command == "transmission":
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)
-        if len(wn_ranges) == 1:
-            range_args = _args_for_wn_range(args, wn_ranges[0])
-            dataset, broadening_summary = _compute_transmission_band((target_kind, range_args))
-            output_path = _output_path_for_wn_range(args, wn_range=wn_ranges[0], suffix=".nc")
-            try:
-                write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
-            finally:
-                dataset.close()
-            print(f"Wrote NetCDF: {output_path}")
-            if broadening_summary:
-                print(f"Broadening: {broadening_summary}")
-            return
-        tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
-        results = _parallel_band_results(tasks, worker=_compute_transmission_band)
-        for wn_range, (dataset, broadening_summary) in zip(wn_ranges, results, strict=True):
+        for wn_range, dataset, broadening_summaries in _compute_range_temperature_datasets(
+            args=args,
+            wn_ranges=wn_ranges,
+            target_kind=target_kind,
+            worker=_compute_transmission_band,
+        ):
             output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
             try:
                 write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
             finally:
                 dataset.close()
             print(f"Wrote NetCDF: {output_path}")
-            if broadening_summary:
+            for broadening_summary in broadening_summaries:
                 print(f"Broadening: {broadening_summary}")
         return
