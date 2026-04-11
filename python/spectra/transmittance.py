@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from pathlib import Path
-import shutil
-import tempfile
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,6 +11,7 @@ import xarray as xr
 
 from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig, SpectralBandConfig
+from .dataset_io import DEFAULT_NETCDF_ENGINE, write_dataset_via_tmp
 from .spectrum import AbsorptionSpectrum, compute_absorption_spectrum
 
 
@@ -92,14 +90,9 @@ def write_transmittance_dataset(transmittance: TransmittanceSpectrum, output_pat
     """Write a transmittance spectrum dataset to NetCDF."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset = transmittance_to_dataset(transmittance)
-    fd, tmp_name = tempfile.mkstemp(prefix="pyharp_", suffix=".nc", dir="/tmp")
-    os.close(fd)
     try:
-        Path(tmp_name).unlink(missing_ok=True)
-        dataset.to_netcdf(tmp_name, engine="scipy")
-        shutil.move(tmp_name, output_path)
+        write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
     finally:
-        Path(tmp_name).unlink(missing_ok=True)
         dataset.close()
 
 

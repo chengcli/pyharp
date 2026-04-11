@@ -5,7 +5,8 @@ from pathlib import Path
 
 import xarray as xr
 
-from pyharp.spectra.dump_cli import _args_for_wn_range, _combine_band_datasets, _composition_transmission_dataset, _composition_xsection_dataset, _pair_xsection_dataset, _species_transmission_dataset, _write_dataset_via_tmp, _xsection_dataset, build_parser, main
+from pyharp.spectra.dataset_io import combine_band_datasets, write_dataset_via_tmp
+from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _pair_xsection_dataset, _species_transmission_dataset, _xsection_dataset, build_parser, main
 from pyharp.spectra.shared_cli import default_hitran_dir, default_output_path, project_root
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 
@@ -247,7 +248,7 @@ def test_cli_xsection_composition_writes_one_file_with_component_fields(monkeypa
         ),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli._write_dataset_via_tmp",
+        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
         lambda dataset, output_path, *, engine: written.append((sorted(dataset.data_vars), output_path, engine)),
     )
 
@@ -276,7 +277,7 @@ def test_combine_band_datasets_preserves_band_metadata() -> None:
         attrs={"species_name": "H2O"},
     )
 
-    combined = _combine_band_datasets([first, second], wn_ranges=[(20.0, 22.0), (30.0, 33.0)])
+    combined = combine_band_datasets([first, second], wn_ranges=[(20.0, 22.0), (30.0, 33.0)])
     try:
         assert combined.attrs["species_name"] == "H2O"
         assert combined.attrs["num_bands"] == 2
@@ -296,7 +297,7 @@ def test_write_dataset_via_tmp_creates_missing_output_parent(tmp_path) -> None:
     output_path = tmp_path / "nested" / "pair.nc"
 
     try:
-        _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+        write_dataset_via_tmp(dataset, output_path, engine="scipy")
         assert output_path.exists()
     finally:
         dataset.close()

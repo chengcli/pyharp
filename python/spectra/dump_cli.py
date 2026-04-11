@@ -7,8 +7,6 @@ from concurrent.futures import ProcessPoolExecutor
 import multiprocessing as mp
 import os
 from pathlib import Path
-import shutil
-import tempfile
 from textwrap import dedent
 
 import numpy as np
@@ -16,6 +14,15 @@ import xarray as xr
 
 from .atm_overview_cli import _parse_composition, compute_mixture_overview_products
 from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
+from .dataset_io import (
+    DEFAULT_NETCDF_ENGINE,
+    WAVENUMBER_ATTRS,
+    add_wavenumber_attrs,
+    build_state_attrs,
+    clean_var_token,
+    combine_band_datasets,
+    write_dataset_via_tmp,
+)
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import build_line_provider, download_hitran_lines
 from .output_names import default_output_path as default_named_output_path
@@ -112,59 +119,11 @@ def _multi_range_output_path(args: argparse.Namespace, *, suffix: str) -> Path:
     return _default_cli_output_path(scoped, suffix=suffix)
 
 
-def _clean_var_token(value: str) -> str:
-    token = "".join(char.lower() if char.isalnum() else "_" for char in str(value)).strip("_")
-    return "_".join(part for part in token.split("_") if part)
-
-
-def _combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[float, float]]) -> xr.Dataset:
-    if not datasets:
-        raise ValueError("at least one dataset is required")
-    max_points = max(int(dataset.sizes["wavenumber"]) for dataset in datasets)
-    band_count = len(datasets)
-    coords: dict[str, object] = {
-        "band": ("band", np.arange(band_count, dtype=np.int64)),
-    }
-    data_vars: dict[str, tuple[tuple[str, str], np.ndarray]] = {}
-    wavenumber_values = np.full((band_count, max_points), np.nan, dtype=np.float64)
-    band_sizes = np.zeros(band_count, dtype=np.int64)
-    band_min = np.zeros(band_count, dtype=np.float64)
-    band_max = np.zeros(band_count, dtype=np.float64)
-
-    variable_names = tuple(datasets[0].data_vars)
-    for name in variable_names:
-        data_vars[name] = (("band", "wavenumber"), np.full((band_count, max_points), np.nan, dtype=np.float64))
-
-    for band_index, (dataset, wn_range) in enumerate(zip(datasets, wn_ranges, strict=True)):
-        size = int(dataset.sizes["wavenumber"])
-        band_sizes[band_index] = size
-        band_min[band_index], band_max[band_index] = wn_range
-        wavenumber_values[band_index, :size] = np.asarray(dataset["wavenumber"].values, dtype=np.float64)
-        for name in variable_names:
-            data_vars[name][1][band_index, :size] = np.asarray(dataset[name].values, dtype=np.float64)
-
-    data_vars["band_size"] = (("band",), band_sizes)
-    data_vars["band_wavenumber_min"] = (("band",), band_min)
-    data_vars["band_wavenumber_max"] = (("band",), band_max)
-    coords["wavenumber"] = (("band", "wavenumber"), wavenumber_values)
-
-    combined = xr.Dataset(data_vars=data_vars, coords=coords, attrs=dict(datasets[0].attrs))
-    combined.attrs["num_bands"] = band_count
-    for name in variable_names:
-        combined[name].attrs = dict(datasets[0][name].attrs)
-    if "wavenumber" in datasets[0]:
-        combined["wavenumber"].attrs = dict(datasets[0]["wavenumber"].attrs)
-    combined["band_size"].attrs = {"long_name": "band sample count", "units": "1"}
-    combined["band_wavenumber_min"].attrs = {"long_name": "band minimum wavenumber", "units": "cm^-1"}
-    combined["band_wavenumber_max"].attrs = {"long_name": "band maximum wavenumber", "units": "cm^-1"}
-    return combined
-
-
 def _write_combined_dataset(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[float, float]], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    combined = _combine_band_datasets(datasets, wn_ranges=wn_ranges)
+    combined = combine_band_datasets(datasets, wn_ranges=wn_ranges)
     try:
-        _write_dataset_via_tmp(combined, output_path, engine="scipy")
+        write_dataset_via_tmp(combined, output_path, engine=DEFAULT_NETCDF_ENGINE)
     finally:
         combined.close()
         for dataset in datasets:
@@ -182,7 +141,7 @@ def _xsection_dataset(
     drop = [name for name in dataset.data_vars if name not in keep]
     if drop:
         dataset = dataset.drop_vars(drop)
-    species_token = _clean_var_token(species_name or spectrum.species_name)
+    species_token = clean_var_token(species_name or spectrum.species_name)
     rename_map = {
         "wavenumber_cm1": "wavenumber",
         "sigma_line_cm2_molecule": f"sigma_line_{species_token}",
@@ -191,7 +150,7 @@ def _xsection_dataset(
     keep_cia_generic = True
     if secondary_component is not None:
         kind = str(secondary_component.get("kind", ""))
-        label = _clean_var_token(str(secondary_component.get("label", "")))
+        label = clean_var_token(str(secondary_component.get("label", "")))
         if kind == "continuum" and label:
             rename_map["sigma_cia_cm2_molecule"] = f"sigma_continuum_{label}"
             keep_cia_generic = False
@@ -202,7 +161,7 @@ def _xsection_dataset(
         rename_map["sigma_cia_cm2_molecule"] = "sigma_cia"
     dataset = dataset.rename_vars(rename_map)
     dataset = dataset.swap_dims({"wavenumber_cm1": "wavenumber"})
-    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    add_wavenumber_attrs(dataset)
     dataset[f"sigma_line_{species_token}"].attrs = {"long_name": f"{species_name or spectrum.species_name} line absorption cross section", "units": "cm^2 molecule^-1"}
     dataset["sigma_total"].attrs = {"long_name": "total absorption cross section", "units": "cm^2 molecule^-1"}
     cia_name = rename_map["sigma_cia_cm2_molecule"]
@@ -213,7 +172,7 @@ def _xsection_dataset(
     else:
         dataset[cia_name].attrs = {"long_name": f"{secondary_component['label']} CIA absorption cross section", "units": "cm^2 molecule^-1"}
         binary = np.asarray(secondary_component["binary_absorption_coefficient"], dtype=np.float64)
-        dataset[f"binary_absorption_coefficient_{_clean_var_token(str(secondary_component['label']))}"] = (
+        dataset[f"binary_absorption_coefficient_{clean_var_token(str(secondary_component['label']))}"] = (
             "wavenumber",
             binary,
             {"long_name": f"{secondary_component['label']} CIA binary absorption coefficient", "units": "cm^5 molecule^-2"},
@@ -243,14 +202,14 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
         ),
     }
     for term in products.species_terms:
-        name = f"sigma_line_{_clean_var_token(term.species_name)}"
+        name = f"sigma_line_{clean_var_token(term.species_name)}"
         data_vars[name] = (
             "wavenumber",
             np.asarray(term.sigma_line_cm2_molecule, dtype=np.float64),
             {"long_name": f"{term.species_name} line absorption cross section", "units": "cm^2 molecule^-1"},
         )
     for source in products.secondary_sources:
-        label_token = _clean_var_token(source.label)
+        label_token = clean_var_token(source.label)
         if source.kind == "continuum":
             name = f"sigma_continuum_{label_token}"
             if source.weight > 0.0:
@@ -271,15 +230,14 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
     dataset = xr.Dataset(
         coords={"wavenumber": ("wavenumber", np.asarray(spectrum.wavenumber_cm1, dtype=np.float64))},
         data_vars={name: value for name, value in data_vars.items() if name != "wavenumber"},
-        attrs={
-            "composition_input": str(args.composition),
-            "species_name": ",".join(_composition_species_names(str(args.composition))),
-            "temperature_k": spectrum.temperature_k,
-            "pressure_pa": spectrum.pressure_pa,
-            "pressure_bar": spectrum.pressure_pa / 1.0e5,
-        },
+        attrs=build_state_attrs(
+            species_name=",".join(_composition_species_names(str(args.composition))),
+            temperature_k=spectrum.temperature_k,
+            pressure_pa=spectrum.pressure_pa,
+            extra={"composition_input": str(args.composition)},
+        ),
     )
-    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    add_wavenumber_attrs(dataset)
     return dataset
 
 
@@ -290,7 +248,7 @@ def _species_transmission_dataset(
     species_name: str,
     secondary_component: dict[str, object] | None = None,
 ) -> xr.Dataset:
-    species_token = _clean_var_token(species_name)
+    species_token = clean_var_token(species_name)
     data_vars: dict[str, tuple[tuple[str], np.ndarray, dict[str, str]]] = {
         f"transmittance_line_{species_token}": (
             "wavenumber",
@@ -326,7 +284,7 @@ def _species_transmission_dataset(
         )
     else:
         label = str(secondary_component.get("label", ""))
-        label_token = _clean_var_token(label)
+        label_token = clean_var_token(label)
         if str(secondary_component.get("kind", "")) == "continuum":
             trans_name = f"transmittance_continuum_{label_token}"
             att_name = f"attenuation_continuum_{label_token}"
@@ -350,15 +308,14 @@ def _species_transmission_dataset(
     dataset = xr.Dataset(
         coords={"wavenumber": ("wavenumber", np.asarray(transmittance.wavenumber_cm1, dtype=np.float64))},
         data_vars=data_vars,
-        attrs={
-            "species_name": str(species_name),
-            "path_length_m": float(transmittance.path_length_m),
-            "temperature_k": float(transmittance.temperature_k),
-            "pressure_pa": float(transmittance.pressure_pa),
-            "pressure_bar": float(transmittance.pressure_pa) / 1.0e5,
-        },
+        attrs=build_state_attrs(
+            species_name=str(species_name),
+            temperature_k=transmittance.temperature_k,
+            pressure_pa=transmittance.pressure_pa,
+            extra={"path_length_m": float(transmittance.path_length_m)},
+        ),
     )
-    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    add_wavenumber_attrs(dataset)
     return dataset
 
 
@@ -366,7 +323,7 @@ def _pair_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
     spectrum = _compute_pair_xsection(args)
     transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
     pair, _ = _resolve_pair_filename(args)
-    pair_token = _clean_var_token(pair)
+    pair_token = clean_var_token(pair)
     dataset = xr.Dataset(
         coords={"wavenumber": ("wavenumber", np.asarray(transmittance.wavenumber_cm1, dtype=np.float64))},
         data_vars={
@@ -391,15 +348,14 @@ def _pair_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
                 {"long_name": "total attenuation coefficient", "units": "m^-1"},
             ),
         },
-        attrs={
-            "species_name": pair,
-            "path_length_m": float(transmittance.path_length_m),
-            "temperature_k": float(transmittance.temperature_k),
-            "pressure_pa": float(transmittance.pressure_pa),
-            "pressure_bar": float(transmittance.pressure_pa) / 1.0e5,
-        },
+        attrs=build_state_attrs(
+            species_name=pair,
+            temperature_k=transmittance.temperature_k,
+            pressure_pa=transmittance.pressure_pa,
+            extra={"path_length_m": float(transmittance.path_length_m)},
+        ),
     )
-    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    add_wavenumber_attrs(dataset)
     return dataset
 
 
@@ -431,7 +387,7 @@ def _composition_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
         ),
     }
     for term in products.species_terms:
-        species_token = _clean_var_token(term.species_name)
+        species_token = clean_var_token(term.species_name)
         attenuation = np.asarray(term.mole_fraction * term.sigma_line_cm2_molecule * number_density_cm3 * 100.0, dtype=np.float64)
         data_vars[f"attenuation_line_{species_token}"] = (
             "wavenumber",
@@ -444,7 +400,7 @@ def _composition_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
             {"long_name": f"{term.species_name} weighted line transmittance", "units": "1"},
         )
     for source in products.secondary_sources:
-        label_token = _clean_var_token(source.label)
+        label_token = clean_var_token(source.label)
         attenuation = np.asarray(source.sigma_cm2_molecule * number_density_cm3 * 100.0, dtype=np.float64)
         if source.kind == "continuum":
             att_name = f"attenuation_continuum_{label_token}"
@@ -467,16 +423,14 @@ def _composition_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
     dataset = xr.Dataset(
         coords={"wavenumber": ("wavenumber", np.asarray(transmittance.wavenumber_cm1, dtype=np.float64))},
         data_vars=data_vars,
-        attrs={
-            "composition_input": str(args.composition),
-            "species_name": ",".join(_composition_species_names(str(args.composition))),
-            "path_length_m": path_length_m,
-            "temperature_k": float(transmittance.temperature_k),
-            "pressure_pa": float(transmittance.pressure_pa),
-            "pressure_bar": float(transmittance.pressure_pa) / 1.0e5,
-        },
+        attrs=build_state_attrs(
+            species_name=",".join(_composition_species_names(str(args.composition))),
+            temperature_k=transmittance.temperature_k,
+            pressure_pa=transmittance.pressure_pa,
+            extra={"composition_input": str(args.composition), "path_length_m": path_length_m},
+        ),
     )
-    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    add_wavenumber_attrs(dataset)
     return dataset
 
 
@@ -490,24 +444,9 @@ def _write_xsection_dataset(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset = _xsection_dataset(spectrum, species_name=species_name, secondary_component=secondary_component)
     try:
-        _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+        write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
     finally:
         dataset.close()
-
-
-def _write_dataset_via_tmp(dataset: xr.Dataset, output_path: Path, *, engine: str) -> None:
-    """Write to a local temporary file first, then move to the target path."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix="pyharp_", suffix=".nc", dir="/tmp")
-    import os
-
-    os.close(fd)
-    try:
-        Path(tmp_name).unlink(missing_ok=True)
-        dataset.to_netcdf(tmp_name, engine=engine)
-        shutil.move(tmp_name, output_path)
-    finally:
-        Path(tmp_name).unlink(missing_ok=True)
 
 
 def _resolve_pair_filename(args: argparse.Namespace) -> tuple[str, str]:
@@ -794,7 +733,7 @@ def main() -> None:
             if len(wn_ranges) == 1:
                 dataset, _ = _compute_xsection_band((target_kind, _args_for_wn_range(args, wn_ranges[0])))
                 try:
-                    _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+                    write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
                 finally:
                     dataset.close()
                 print(f"Wrote NetCDF: {output_path}")
@@ -839,7 +778,7 @@ def main() -> None:
             dataset, broadening_summary = _compute_transmission_band((target_kind, range_args))
             output_path = _multi_range_output_path(args, suffix=".nc")
             try:
-                _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+                write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
             finally:
                 dataset.close()
             print(f"Wrote NetCDF: {output_path}")
