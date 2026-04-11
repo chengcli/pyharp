@@ -124,7 +124,6 @@ def _combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[
     band_count = len(datasets)
     coords: dict[str, object] = {
         "band": ("band", np.arange(band_count, dtype=np.int64)),
-        "wavenumber_index": ("wavenumber_index", np.arange(max_points, dtype=np.int64)),
     }
     data_vars: dict[str, tuple[tuple[str, str], np.ndarray]] = {}
     wavenumber_values = np.full((band_count, max_points), np.nan, dtype=np.float64)
@@ -134,7 +133,7 @@ def _combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[
 
     variable_names = tuple(datasets[0].data_vars)
     for name in variable_names:
-        data_vars[name] = (("band", "wavenumber_index"), np.full((band_count, max_points), np.nan, dtype=np.float64))
+        data_vars[name] = (("band", "wavenumber"), np.full((band_count, max_points), np.nan, dtype=np.float64))
 
     for band_index, (dataset, wn_range) in enumerate(zip(datasets, wn_ranges, strict=True)):
         size = int(dataset.sizes["wavenumber"])
@@ -144,10 +143,10 @@ def _combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[
         for name in variable_names:
             data_vars[name][1][band_index, :size] = np.asarray(dataset[name].values, dtype=np.float64)
 
-    data_vars["wavenumber"] = (("band", "wavenumber_index"), wavenumber_values)
     data_vars["band_size"] = (("band",), band_sizes)
     data_vars["band_wavenumber_min"] = (("band",), band_min)
     data_vars["band_wavenumber_max"] = (("band",), band_max)
+    coords["wavenumber"] = (("band", "wavenumber"), wavenumber_values)
 
     combined = xr.Dataset(data_vars=data_vars, coords=coords, attrs=dict(datasets[0].attrs))
     combined.attrs["num_bands"] = band_count

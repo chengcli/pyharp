@@ -133,13 +133,13 @@ Repeat ``--wn-range`` to compute multiple bands in one run:
 
 Multi-band outputs contain:
 
-* ``band`` and ``wavenumber_index`` dimensions
+* ``band`` and ``wavenumber`` dimensions
 * ``wavenumber``
 * ``band_size``
 * ``band_wavenumber_min``
 * ``band_wavenumber_max``
 
-Per-band data variables are stored as ``(band, wavenumber_index)`` arrays.
+Per-band data variables are stored as ``(band, wavenumber)`` arrays.
 
 NetCDF Naming Conventions
 -------------------------
