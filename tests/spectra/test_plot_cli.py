@@ -470,6 +470,35 @@ def test_plot_overview_uses_single_output_pdf_for_multiple_state_pairs(monkeypat
     assert calls[0].pressure_bar == [1.0, 10.0]
 
 
+def test_plot_overview_uses_combined_default_name_without_duplicate_units(monkeypatch, tmp_path) -> None:
+    calls = []
+
+    def fake_run(args):
+        calls.append(args)
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_overview_batch", fake_run)
+
+    plot_cli.main(
+        [
+            "overview",
+            "--species",
+            "CO2",
+            "H2O",
+            "--temperature-k",
+            "170,400,780",
+            "--pressure-bar",
+            "0.1,1,100",
+            "--wn-range=20,2500",
+            "--wn-range=2500,10000",
+            "--output-dir",
+            str(tmp_path / "figures"),
+        ]
+    )
+
+    assert len(calls) == 1
+    assert calls[0].figure == tmp_path / "figures" / "co2_h2o_overview_0p1_100bar_170_780K_20_10000cm1.pdf"
+
+
 def test_plot_help_includes_subcommands_and_examples(capsys) -> None:
     with pytest.raises(SystemExit) as excinfo:
         plot_cli.main(["-h"])

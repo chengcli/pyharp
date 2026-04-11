@@ -188,8 +188,8 @@ def _overview_state_token(*, temperatures: list[float], pressures: list[float]) 
     if len(temperatures) == 1 and len(pressures) == 1:
         return temperatures[0], pressures[0]
     return (
-        f"{_format_value(min(temperatures))}_{_format_value(max(temperatures), 'K')}",
-        f"{_format_value(min(pressures))}_{_format_value(max(pressures), 'bar')}",
+        f"{_format_value(min(temperatures))}_{_format_value(max(temperatures))}",
+        f"{_format_value(min(pressures))}_{_format_value(max(pressures))}",
     )
 
 
