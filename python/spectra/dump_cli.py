@@ -14,8 +14,8 @@ from textwrap import dedent
 import numpy as np
 import xarray as xr
 
-from .atm_overview_cli import compute_mixture_overview_products
-from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
+from .atm_overview_cli import _parse_composition, compute_mixture_overview_products
+from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair, resolve_hitran_species
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import build_line_provider, download_hitran_lines
 from .output_names import default_output_path as default_named_output_path
@@ -28,6 +28,7 @@ from .shared_cli import (
 from .spectrum import (
     _resolve_continuum_sources,
     compute_absorption_spectrum_from_sources,
+    number_density_cm3_from_pressure_temperature,
     spectrum_to_dataset,
     write_spectrum_dataset,
 )
@@ -112,10 +113,15 @@ def _multi_range_output_path(args: argparse.Namespace, *, suffix: str) -> Path:
     return _default_cli_output_path(scoped, suffix=suffix)
 
 
+def _clean_var_token(value: str) -> str:
+    token = "".join(char.lower() if char.isalnum() else "_" for char in str(value)).strip("_")
+    return "_".join(part for part in token.split("_") if part)
+
+
 def _combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[float, float]]) -> xr.Dataset:
     if not datasets:
         raise ValueError("at least one dataset is required")
-    max_points = max(int(dataset.sizes["wavenumber_cm1"]) for dataset in datasets)
+    max_points = max(int(dataset.sizes["wavenumber"]) for dataset in datasets)
     band_count = len(datasets)
     coords: dict[str, object] = {
         "band": ("band", np.arange(band_count, dtype=np.int64)),
@@ -132,20 +138,27 @@ def _combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[
         data_vars[name] = (("band", "wavenumber_index"), np.full((band_count, max_points), np.nan, dtype=np.float64))
 
     for band_index, (dataset, wn_range) in enumerate(zip(datasets, wn_ranges, strict=True)):
-        size = int(dataset.sizes["wavenumber_cm1"])
+        size = int(dataset.sizes["wavenumber"])
         band_sizes[band_index] = size
         band_min[band_index], band_max[band_index] = wn_range
-        wavenumber_values[band_index, :size] = np.asarray(dataset["wavenumber_cm1"].values, dtype=np.float64)
+        wavenumber_values[band_index, :size] = np.asarray(dataset["wavenumber"].values, dtype=np.float64)
         for name in variable_names:
             data_vars[name][1][band_index, :size] = np.asarray(dataset[name].values, dtype=np.float64)
 
-    data_vars["wavenumber_cm1"] = (("band", "wavenumber_index"), wavenumber_values)
+    data_vars["wavenumber"] = (("band", "wavenumber_index"), wavenumber_values)
     data_vars["band_size"] = (("band",), band_sizes)
-    data_vars["band_wavenumber_min_cm1"] = (("band",), band_min)
-    data_vars["band_wavenumber_max_cm1"] = (("band",), band_max)
+    data_vars["band_wavenumber_min"] = (("band",), band_min)
+    data_vars["band_wavenumber_max"] = (("band",), band_max)
 
     combined = xr.Dataset(data_vars=data_vars, coords=coords, attrs=dict(datasets[0].attrs))
     combined.attrs["num_bands"] = band_count
+    for name in variable_names:
+        combined[name].attrs = dict(datasets[0][name].attrs)
+    if "wavenumber" in datasets[0]:
+        combined["wavenumber"].attrs = dict(datasets[0]["wavenumber"].attrs)
+    combined["band_size"].attrs = {"long_name": "band sample count", "units": "1"}
+    combined["band_wavenumber_min"].attrs = {"long_name": "band minimum wavenumber", "units": "cm^-1"}
+    combined["band_wavenumber_max"].attrs = {"long_name": "band maximum wavenumber", "units": "cm^-1"}
     return combined
 
 
@@ -160,18 +173,127 @@ def _write_combined_dataset(datasets: list[xr.Dataset], *, wn_ranges: list[tuple
             dataset.close()
 
 
-def _xsection_dataset(spectrum) -> xr.Dataset:
+def _xsection_dataset(
+    spectrum,
+    *,
+    species_name: str | None = None,
+    secondary_component: dict[str, object] | None = None,
+) -> xr.Dataset:
     dataset = spectrum_to_dataset(spectrum)
     keep = ("sigma_line_cm2_molecule", "sigma_cia_cm2_molecule", "sigma_total_cm2_molecule")
     drop = [name for name in dataset.data_vars if name not in keep]
     if drop:
         dataset = dataset.drop_vars(drop)
+    species_token = _clean_var_token(species_name or spectrum.species_name)
+    rename_map = {
+        "wavenumber_cm1": "wavenumber",
+        "sigma_line_cm2_molecule": f"sigma_line_{species_token}",
+        "sigma_total_cm2_molecule": "sigma_total",
+    }
+    keep_cia_generic = True
+    if secondary_component is not None:
+        kind = str(secondary_component.get("kind", ""))
+        label = _clean_var_token(str(secondary_component.get("label", "")))
+        if kind == "continuum" and label:
+            rename_map["sigma_cia_cm2_molecule"] = f"sigma_continuum_{label}"
+            keep_cia_generic = False
+        elif kind in {"self_cia", "binary_cia"} and label:
+            rename_map["sigma_cia_cm2_molecule"] = f"sigma_cia_{label}"
+            keep_cia_generic = False
+    if keep_cia_generic:
+        rename_map["sigma_cia_cm2_molecule"] = "sigma_cia"
+    dataset = dataset.rename_vars(rename_map)
+    dataset = dataset.swap_dims({"wavenumber_cm1": "wavenumber"})
+    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    dataset[f"sigma_line_{species_token}"].attrs = {"long_name": f"{species_name or spectrum.species_name} line absorption cross section", "units": "cm^2 molecule^-1"}
+    dataset["sigma_total"].attrs = {"long_name": "total absorption cross section", "units": "cm^2 molecule^-1"}
+    cia_name = rename_map["sigma_cia_cm2_molecule"]
+    if cia_name == "sigma_cia":
+        dataset["sigma_cia"].attrs = {"long_name": "CIA or continuum absorption cross section", "units": "cm^2 molecule^-1"}
+    elif cia_name.startswith("sigma_continuum_"):
+        dataset[cia_name].attrs = {"long_name": f"{secondary_component['label']} absorption cross section", "units": "cm^2 molecule^-1"}
+    else:
+        dataset[cia_name].attrs = {"long_name": f"{secondary_component['label']} CIA absorption cross section", "units": "cm^2 molecule^-1"}
+        binary = np.asarray(secondary_component["binary_absorption_coefficient"], dtype=np.float64)
+        dataset[f"binary_absorption_coefficient_{_clean_var_token(str(secondary_component['label']))}"] = (
+            "wavenumber",
+            binary,
+            {"long_name": f"{secondary_component['label']} CIA binary absorption coefficient", "units": "cm^5 molecule^-2"},
+        )
     return dataset
 
 
-def _write_xsection_dataset(spectrum, output_path: Path) -> None:
+def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
+    products = _compute_composition_products(args)
+    spectrum = products.spectrum
+    number_density_cm3 = float(
+        getattr(
+            spectrum,
+            "number_density_cm3",
+            number_density_cm3_from_pressure_temperature(
+                pressure_pa=float(spectrum.pressure_pa),
+                temperature_k=float(spectrum.temperature_k),
+            ),
+        )
+    )
+    data_vars: dict[str, tuple[tuple[str], np.ndarray, dict[str, str]]] = {
+        "wavenumber": ("wavenumber", np.asarray(spectrum.wavenumber_cm1, dtype=np.float64), {"long_name": "wavenumber", "units": "cm^-1"}),
+        "sigma_total": (
+            "wavenumber",
+            np.asarray(spectrum.sigma_total_cm2_molecule, dtype=np.float64),
+            {"long_name": "total absorption cross section", "units": "cm^2 molecule^-1"},
+        ),
+    }
+    for term in products.species_terms:
+        name = f"sigma_line_{_clean_var_token(term.species_name)}"
+        data_vars[name] = (
+            "wavenumber",
+            np.asarray(term.sigma_line_cm2_molecule, dtype=np.float64),
+            {"long_name": f"{term.species_name} line absorption cross section", "units": "cm^2 molecule^-1"},
+        )
+    for source in products.secondary_sources:
+        label_token = _clean_var_token(source.label)
+        if source.kind == "continuum":
+            name = f"sigma_continuum_{label_token}"
+            if source.weight > 0.0:
+                values = np.asarray(source.sigma_cm2_molecule, dtype=np.float64) / float(source.weight)
+            else:
+                values = np.zeros_like(np.asarray(source.sigma_cm2_molecule, dtype=np.float64))
+            attrs = {"long_name": f"{source.label} absorption cross section", "units": "cm^2 molecule^-1"}
+        elif source.kind in {"self_cia", "binary_cia"}:
+            if source.weight > 0.0 and number_density_cm3 > 0.0:
+                values = np.asarray(source.sigma_cm2_molecule, dtype=np.float64) / (float(source.weight) * number_density_cm3)
+            else:
+                values = np.zeros_like(np.asarray(source.sigma_cm2_molecule, dtype=np.float64))
+            name = f"binary_absorption_coefficient_{label_token}"
+            attrs = {"long_name": f"{source.label} CIA binary absorption coefficient", "units": "cm^5 molecule^-2"}
+        else:
+            continue
+        data_vars[name] = ("wavenumber", values, attrs)
+    dataset = xr.Dataset(
+        coords={"wavenumber": ("wavenumber", np.asarray(spectrum.wavenumber_cm1, dtype=np.float64))},
+        data_vars={name: value for name, value in data_vars.items() if name != "wavenumber"},
+        attrs={
+            "composition_input": str(args.composition),
+            "species_name": ",".join(_composition_species_names(str(args.composition))),
+            "temperature_k": spectrum.temperature_k,
+            "pressure_pa": spectrum.pressure_pa,
+            "pressure_bar": spectrum.pressure_pa / 1.0e5,
+        },
+    )
+    dataset["wavenumber"].attrs = {"long_name": "wavenumber", "units": "cm^-1"}
+    return dataset
+
+
+def _write_xsection_dataset(
+    spectrum,
+    output_path: Path,
+    *,
+    species_name: str | None = None,
+    secondary_component: dict[str, object] | None = None,
+) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    dataset = _xsection_dataset(spectrum)
+    dataset = _xsection_dataset(spectrum, species_name=species_name, secondary_component=secondary_component)
     try:
         _write_dataset_via_tmp(dataset, output_path, engine="scipy")
     finally:
@@ -200,21 +322,24 @@ def _resolve_pair_filename(args: argparse.Namespace) -> tuple[str, str]:
     return metadata.pair, metadata.filename
 
 
-def _resolve_species_cia(args: argparse.Namespace, config: SpectroscopyConfig):
+def _resolve_species_cia_selection(args: argparse.Namespace, config: SpectroscopyConfig) -> tuple[str, str] | None:
     explicit_filename = getattr(args, "cia_filename", None)
     explicit_pair = getattr(args, "cia_pair", None)
     if explicit_filename:
-        pair = str(explicit_pair or f"{config.hitran_species.name}-{config.hitran_species.name}")
-        filename = str(explicit_filename)
-    elif explicit_pair:
+        return str(explicit_pair or f"{config.hitran_species.name}-{config.hitran_species.name}"), str(explicit_filename)
+    if explicit_pair:
         metadata = resolve_hitran_cia_pair(str(explicit_pair))
-        pair = metadata.pair
-        filename = metadata.filename
-    elif config.hitran_species.cia_filename is not None:
-        pair = config.cia_pair
-        filename = config.cia_filename
-    else:
+        return metadata.pair, metadata.filename
+    if config.hitran_species.cia_filename is not None:
+        return config.cia_pair, config.cia_filename
+    return None
+
+
+def _resolve_species_cia(args: argparse.Namespace, config: SpectroscopyConfig):
+    selection = _resolve_species_cia_selection(args, config)
+    if selection is None:
         return None
+    pair, filename = selection
     return load_cia_dataset(
         cache_dir=args.hitran_dir,
         filename=filename,
@@ -237,10 +362,12 @@ def _compute_species_xsection(args: argparse.Namespace):
     line_db = download_hitran_lines(config, band)
     line_provider = build_line_provider(config, line_db)
     cia_dataset = _resolve_species_cia(args, config)
+    cia_selection = _resolve_species_cia_selection(args, config)
     temperature_k = float(args.temperature_k)
     pressure_pa = float(args.pressure_bar) * 1.0e5
     grid = band.grid()
     cia_cross_section_cm2_molecule = None
+    secondary_component: dict[str, object] | None = None
     if cia_dataset is None:
         cia_dataset, cia_cross_section_cm2_molecule = _resolve_continuum_sources(
             config=config,
@@ -248,6 +375,21 @@ def _compute_species_xsection(args: argparse.Namespace):
             temperature_k=temperature_k,
             pressure_pa=pressure_pa,
         )
+        if cia_cross_section_cm2_molecule is not None:
+            secondary_component = {"kind": "continuum", "label": "H2O continuum (MT_CKD)"}
+    elif cia_selection is not None:
+        pair, _ = cia_selection
+        secondary_component = {
+            "kind": "binary_cia",
+            "label": pair,
+            "binary_absorption_coefficient": np.asarray(
+                cia_dataset.interpolate_to_grid(
+                    temperature_k=temperature_k,
+                    wavenumber_grid_cm1=grid,
+                ),
+                dtype=np.float64,
+            ),
+        }
     spectrum = compute_absorption_spectrum_from_sources(
         species_name=config.hitran_species.name,
         wavenumber_grid_cm1=grid,
@@ -257,7 +399,7 @@ def _compute_species_xsection(args: argparse.Namespace):
         cia_dataset=cia_dataset,
         cia_cross_section_cm2_molecule=cia_cross_section_cm2_molecule,
     )
-    return spectrum, line_provider.broadening_summary()
+    return spectrum, line_provider.broadening_summary(), secondary_component
 
 
 def _compute_pair_xsection(args: argparse.Namespace):
@@ -281,6 +423,43 @@ def _compute_pair_xsection(args: argparse.Namespace):
     return spectrum
 
 
+def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
+    pair, filename = _resolve_pair_filename(args)
+    band = build_band(args)
+    cia_dataset = load_cia_dataset(
+        cache_dir=args.hitran_dir,
+        filename=filename,
+        pair=pair,
+        index_url=str(args.cia_index_url),
+        refresh=bool(args.refresh_cia),
+    )
+    grid = band.grid()
+    binary = np.asarray(
+        cia_dataset.interpolate_to_grid(
+            temperature_k=float(args.temperature_k),
+            wavenumber_grid_cm1=grid,
+        ),
+        dtype=np.float64,
+    )
+    return xr.Dataset(
+        coords={
+            "wavenumber": ("wavenumber", grid, {"long_name": "wavenumber", "units": "cm^-1"}),
+        },
+        data_vars={
+            "binary_absorption_coefficient": (
+                "wavenumber",
+                binary,
+                {"long_name": f"{pair} CIA binary absorption coefficient", "units": "cm^5 molecule^-2"},
+            ),
+        },
+        attrs={
+            "pair_name": pair,
+            "temperature_k": float(args.temperature_k),
+            "source_filename": filename,
+        },
+    )
+
+
 def _compute_composition_products(args: argparse.Namespace):
     mixture_args = argparse.Namespace(
         composition=args.composition,
@@ -302,13 +481,19 @@ def _compute_xsection_band(task: tuple[str, argparse.Namespace]) -> tuple[xr.Dat
     target_kind, args = task
     broadening_summary: str | None = None
     if target_kind == "pair":
-        spectrum = _compute_pair_xsection(args)
+        dataset = _pair_xsection_dataset(args)
+        return dataset, broadening_summary
     elif target_kind == "composition":
-        products = _compute_composition_products(args)
-        spectrum = products.spectrum
+        dataset = _composition_xsection_dataset(args)
+        return dataset, broadening_summary
     else:
-        spectrum, broadening_summary = _compute_species_xsection(args)
-    return _xsection_dataset(spectrum), broadening_summary
+        spectrum, broadening_summary, secondary_component = _compute_species_xsection(args)
+        dataset = _xsection_dataset(
+            spectrum,
+            species_name=str(args.species or "CO2"),
+            secondary_component=secondary_component,
+        )
+        return dataset, broadening_summary
 
 
 def _compute_transmission_band(task: tuple[str, argparse.Namespace]) -> tuple[xr.Dataset, str | None]:
@@ -324,6 +509,10 @@ def _compute_transmission_band(task: tuple[str, argparse.Namespace]) -> tuple[xr
         spectrum, broadening_summary = _compute_species_xsection(args)
         transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
     return transmittance_to_dataset(transmittance), broadening_summary
+
+
+def _composition_species_names(composition: str) -> tuple[str, ...]:
+    return tuple(_parse_composition(composition).keys())
 
 
 def _parallel_band_results(
@@ -400,23 +589,38 @@ def main() -> None:
     if args.command == "xsection":
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)
+        if target_kind in {"pair", "composition"}:
+            output_path = _multi_range_output_path(args, suffix=".nc")
+            if len(wn_ranges) == 1:
+                dataset, _ = _compute_xsection_band((target_kind, _args_for_wn_range(args, wn_ranges[0])))
+                try:
+                    _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+                finally:
+                    dataset.close()
+                print(f"Wrote NetCDF: {output_path}")
+                return
+            tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
+            results = _parallel_band_results(tasks, worker=_compute_xsection_band)
+            datasets = [dataset for dataset, _ in results]
+            _write_combined_dataset(datasets, wn_ranges=wn_ranges, output_path=output_path)
+            print(f"Wrote NetCDF: {output_path}")
+            return
         if len(wn_ranges) == 1:
             range_args = _args_for_wn_range(args, wn_ranges[0])
             broadening_summary: str | None = None
-            if target_kind == "pair":
-                spectrum = _compute_pair_xsection(range_args)
-            elif target_kind == "composition":
-                products = _compute_composition_products(range_args)
-                spectrum = products.spectrum
-            else:
-                spectrum, broadening_summary = _compute_species_xsection(range_args)
+            spectrum, broadening_summary, secondary_component = _compute_species_xsection(range_args)
             output_path = _multi_range_output_path(args, suffix=".nc")
-            _write_xsection_dataset(spectrum, output_path)
+            _write_xsection_dataset(
+                spectrum,
+                output_path,
+                species_name=str(range_args.species or "CO2"),
+                secondary_component=secondary_component,
+            )
             print(f"Wrote NetCDF: {output_path}")
             if broadening_summary:
                 print(f"Broadening: {broadening_summary}")
             return
-        tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
+        tasks = [("species", _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
         results = _parallel_band_results(tasks, worker=_compute_xsection_band)
         datasets = [dataset for dataset, _ in results]
         for _, broadening_summary in results:
@@ -440,7 +644,7 @@ def main() -> None:
                 products = _compute_composition_products(range_args)
                 transmittance = products.transmittance
             else:
-                spectrum, broadening_summary = _compute_species_xsection(range_args)
+                spectrum, broadening_summary, _ = _compute_species_xsection(range_args)
                 transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=range_args.path_length_m)
             output_path = _multi_range_output_path(args, suffix=".nc")
             write_transmittance_dataset(transmittance, output_path)
