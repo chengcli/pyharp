@@ -185,7 +185,7 @@ Xsection outputs
 Single-species xsection dumps use names such as:
 
 * ``sigma_line_h2o``
-* ``sigma_continuum_h2o_continuum_mt_ckd``
+* ``sigma_continuum_h2o_mt_ckd``
 * ``sigma_cia_h2o_h2o``
 * ``binary_absorption_coefficient_h2o_h2o``
 * ``sigma_total``
@@ -214,8 +214,8 @@ Examples:
 
 * ``transmittance_line_h2o``
 * ``attenuation_line_h2o``
-* ``transmittance_continuum_h2o_continuum_mt_ckd``
-* ``attenuation_continuum_h2o_continuum_mt_ckd``
+* ``transmittance_continuum_h2o_mt_ckd``
+* ``attenuation_continuum_h2o_mt_ckd``
 * ``transmittance_cia_h2_he``
 * ``attenuation_cia_h2_he``
 * ``transmittance_total``

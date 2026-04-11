@@ -236,6 +236,14 @@ def _output_path_for_wn_range(args: argparse.Namespace, *, wn_range: tuple[float
     )
 
 
+def _continuum_label_token(label: object) -> str:
+    token = clean_var_token(label)
+    parts = [part for part in token.split("_") if part and part != "continuum"]
+    if parts:
+        return "_".join(parts)
+    return token
+
+
 def _xsection_dataset(
     spectrum,
     *,
@@ -257,7 +265,10 @@ def _xsection_dataset(
     keep_cia_generic = True
     if secondary_component is not None:
         kind = str(secondary_component.get("kind", ""))
-        label = clean_var_token(str(secondary_component.get("label", "")))
+        if kind == "continuum":
+            label = _continuum_label_token(str(secondary_component.get("label", "")))
+        else:
+            label = clean_var_token(str(secondary_component.get("label", "")))
         if kind == "continuum" and label:
             rename_map["sigma_cia_cm2_molecule"] = f"sigma_continuum_{label}"
             keep_cia_generic = False
@@ -318,8 +329,8 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
             {"long_name": f"{term.species_name} line absorption cross section", "units": "cm^2 molecule^-1"},
         )
     for source in products.secondary_sources:
-        label_token = clean_var_token(source.label)
         if source.kind == "continuum":
+            label_token = _continuum_label_token(source.label)
             name = f"sigma_continuum_{label_token}"
             if source.weight > 0.0:
                 values = np.asarray(source.sigma_cm2_molecule, dtype=np.float64) / float(source.weight)
@@ -327,6 +338,7 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
                 values = np.zeros_like(np.asarray(source.sigma_cm2_molecule, dtype=np.float64))
             attrs = {"long_name": f"{source.label} absorption cross section", "units": "cm^2 molecule^-1"}
         elif source.kind in {"self_cia", "binary_cia"}:
+            label_token = clean_var_token(source.label)
             if source.weight > 0.0 and number_density_cm3 > 0.0:
                 values = np.asarray(source.sigma_cm2_molecule, dtype=np.float64) / (float(source.weight) * number_density_cm3)
             else:
@@ -394,13 +406,14 @@ def _species_transmission_dataset(
         )
     else:
         label = str(secondary_component.get("label", ""))
-        label_token = clean_var_token(label)
         if str(secondary_component.get("kind", "")) == "continuum":
+            label_token = _continuum_label_token(label)
             trans_name = f"transmittance_continuum_{label_token}"
             att_name = f"attenuation_continuum_{label_token}"
             trans_long = f"{label} transmittance"
             att_long = f"{label} attenuation coefficient"
         else:
+            label_token = clean_var_token(label)
             trans_name = f"transmittance_cia_{label_token}"
             att_name = f"attenuation_cia_{label_token}"
             trans_long = f"{label} CIA transmittance"
@@ -510,13 +523,14 @@ def _composition_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
             {"long_name": f"{term.species_name} weighted line transmittance", "units": "1"},
         )
     for source in products.secondary_sources:
-        label_token = clean_var_token(source.label)
         attenuation = np.asarray(source.sigma_cm2_molecule * number_density_cm3 * 100.0, dtype=np.float64)
         if source.kind == "continuum":
+            label_token = _continuum_label_token(source.label)
             att_name = f"attenuation_continuum_{label_token}"
             trans_name = f"transmittance_continuum_{label_token}"
             prefix = f"{source.label} weighted"
         else:
+            label_token = clean_var_token(source.label)
             att_name = f"attenuation_cia_{label_token}"
             trans_name = f"transmittance_cia_{label_token}"
             prefix = f"{source.label} weighted CIA"

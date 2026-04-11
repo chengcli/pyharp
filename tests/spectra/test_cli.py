@@ -697,7 +697,7 @@ def test_xsection_dataset_keeps_only_sigma_fields() -> None:
     try:
         assert set(dataset.data_vars) == {
             "sigma_line_h2o",
-            "sigma_continuum_h2o_continuum_mt_ckd",
+            "sigma_continuum_h2o_mt_ckd",
             "sigma_total",
         }
         assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
@@ -831,7 +831,7 @@ def test_composition_xsection_dataset_uses_one_field_per_species_or_cia(monkeypa
         assert set(dataset.data_vars) == {
             "sigma_total",
             "sigma_line_h2o",
-            "sigma_continuum_h2o_continuum_mt_ckd",
+            "sigma_continuum_h2o_mt_ckd",
             "binary_absorption_coefficient_h2_he",
         }
         assert dataset.attrs["species_name"] == "H2,He,H2O"
@@ -839,8 +839,8 @@ def test_composition_xsection_dataset_uses_one_field_per_species_or_cia(monkeypa
         assert dataset.attrs["band_wavenumber_max_cm1"] == 21.0
         assert dataset["sigma_line_h2o"].attrs["units"] == "cm^2 molecule^-1"
         assert np.allclose(dataset["sigma_line_h2o"].values, np.array([3.0, 4.0]))
-        assert dataset["sigma_continuum_h2o_continuum_mt_ckd"].attrs["units"] == "cm^2 molecule^-1"
-        assert np.allclose(dataset["sigma_continuum_h2o_continuum_mt_ckd"].values, np.array([0.5, 0.6]) / 0.2)
+        assert dataset["sigma_continuum_h2o_mt_ckd"].attrs["units"] == "cm^2 molecule^-1"
+        assert np.allclose(dataset["sigma_continuum_h2o_mt_ckd"].values, np.array([0.5, 0.6]) / 0.2)
         assert dataset["binary_absorption_coefficient_h2_he"].attrs["units"] == "cm^5 molecule^-2"
         assert dataset["binary_absorption_coefficient_h2_he"].attrs["long_name"].startswith("H2-He")
         assert np.allclose(dataset["binary_absorption_coefficient_h2_he"].values, np.array([5.0, 6.0]) / (0.09 * 1.0e5 / (1.380649e-16 * 300.0)))
@@ -937,15 +937,15 @@ def test_species_transmission_dataset_matches_xsection_naming() -> None:
         assert set(dataset.data_vars) == {
             "transmittance_line_h2o",
             "attenuation_line_h2o",
-            "transmittance_continuum_h2o_continuum_mt_ckd",
-            "attenuation_continuum_h2o_continuum_mt_ckd",
+            "transmittance_continuum_h2o_mt_ckd",
+            "attenuation_continuum_h2o_mt_ckd",
             "transmittance_total",
             "attenuation_total",
         }
         assert dataset.attrs["species_name"] == "H2O"
         assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
         assert dataset.attrs["band_wavenumber_max_cm1"] == 22.0
-        assert dataset["attenuation_continuum_h2o_continuum_mt_ckd"].attrs["units"] == "m^-1"
+        assert dataset["attenuation_continuum_h2o_mt_ckd"].attrs["units"] == "m^-1"
     finally:
         dataset.close()
 
@@ -1024,13 +1024,13 @@ def test_composition_transmission_dataset_uses_component_names_and_attrs(monkeyp
             "attenuation_total",
             "attenuation_line_h2o",
             "transmittance_line_h2o",
-            "attenuation_continuum_h2o_continuum_mt_ckd",
-            "transmittance_continuum_h2o_continuum_mt_ckd",
+            "attenuation_continuum_h2o_mt_ckd",
+            "transmittance_continuum_h2o_mt_ckd",
             "attenuation_cia_h2_he",
             "transmittance_cia_h2_he",
         }
         assert np.allclose(dataset["attenuation_line_h2o"].values, np.array([600.0, 800.0]))
-        assert np.allclose(dataset["attenuation_continuum_h2o_continuum_mt_ckd"].values, np.array([5000.0, 6000.0]))
+        assert np.allclose(dataset["attenuation_continuum_h2o_mt_ckd"].values, np.array([5000.0, 6000.0]))
         assert np.allclose(dataset["attenuation_cia_h2_he"].values, np.array([7000.0, 8000.0]))
     finally:
         dataset.close()
@@ -1103,7 +1103,7 @@ def test_composition_transmission_total_equals_product_of_weighted_components(mo
     try:
         component_product = (
             dataset["transmittance_line_h2o"].values
-            * dataset["transmittance_continuum_h2o_continuum_mt_ckd"].values
+            * dataset["transmittance_continuum_h2o_mt_ckd"].values
             * dataset["transmittance_cia_h2_he"].values
         )
         assert np.allclose(component_product, dataset["transmittance_total"].values)
