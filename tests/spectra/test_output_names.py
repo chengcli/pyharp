@@ -13,7 +13,7 @@ def test_default_output_path_uses_requested_pattern() -> None:
         suffix=".png",
     )
 
-    assert path == Path("output/co2_xsection_1bar_300K_20_2500cm1.png")
+    assert path == Path("output/co2_xsection_300K_1bar_20_2500cm1.png")
 
 
 def test_default_output_path_sanitizes_cia_and_composition_names() -> None:
@@ -34,5 +34,5 @@ def test_default_output_path_sanitizes_cia_and_composition_names() -> None:
         suffix=".pdf",
     )
 
-    assert cia_path == Path("output/h2_he_attenuation_0p25bar_275p5K_25_30p5cm1.png")
-    assert composition_path == Path("output/h2o_0p1_h2_0p9_overview_1bar_300K_25_2500cm1.pdf")
+    assert cia_path == Path("output/h2_he_attenuation_275p5K_0p25bar_25_30p5cm1.png")
+    assert composition_path == Path("output/h2o_0p1_h2_0p9_overview_300K_1bar_25_2500cm1.pdf")

@@ -14,7 +14,7 @@ from pyharp.spectra.spectrum import AbsorptionSpectrum
 def test_default_paths_are_inside_project_root() -> None:
     root = project_root()
     assert default_output_path().is_relative_to(root)
-    assert default_output_path().name == "co2_xsection_1bar_300K_20_2500cm1.nc"
+    assert default_output_path().name == "co2_xsection_300K_1bar_20_2500cm1.nc"
     assert default_output_path().parent.name == "output"
     assert default_hitran_dir() == default_hitran_dir().parent / "hitran"
     assert default_hitran_dir().is_absolute() is False

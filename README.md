@@ -133,7 +133,14 @@ for gas mixtures such as `H2O:0.1,H2:0.9`. All plot commands accept
 multi-page PDFs. These ranges are lower-inclusive and upper-exclusive. Use
 `--output` to choose the output path. Without `--output`, plots are written
 under `--output-dir` (default `output/`) with names derived from the target,
-plot type, pressure, temperature, and wavenumber range.
+plot type, temperature, pressure, and wavenumber range.
+For plot commands that use pressure, `--temperature-k` and `--pressure-bar`
+also accept matched comma-separated vectors such as
+`--temperature-k 300,400 --pressure-bar 1,10`. `pyharp-plot` then runs one
+plot per `(T,P)` pair in parallel. For `xsection`, `attenuation`, and
+`transmission`, one explicit `--output` path reused across multiple state
+pairs is expanded with `_<temperature>K_<pressure>bar` suffixes. For
+`overview`, all state/range pages are combined into one PDF.
 
 Molecular line calculations also accept `--broadening-composition BROADENER:FRACTION,...`,
 for example `air:0.8,self:0.2` or `H2:0.85,He:0.15`.

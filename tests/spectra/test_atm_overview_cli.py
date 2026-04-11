@@ -1,6 +1,8 @@
+import json
+
 import numpy as np
 
-from pyharp.spectra.atm_overview_cli import _find_binary_pairs, _parse_composition, compute_mixture_overview_products, build_atm_overview_parser
+from pyharp.spectra.atm_overview_cli import _find_binary_pairs, _parse_composition, compute_mixture_overview_products, build_atm_overview_parser, run_atm_overview
 
 
 def test_parse_composition_normalizes_and_merges_duplicates() -> None:
@@ -101,3 +103,78 @@ def test_compute_mixture_overview_reports_broadening_fallback(monkeypatch, tmp_p
 
     out = capsys.readouterr().out
     assert "CO2 broadening: requested=h2:0.900,he:0.100 -> effective=air:1.000" in out
+
+
+def test_run_atm_overview_manifest_always_uses_state_lists(monkeypatch, tmp_path) -> None:
+    parser = build_atm_overview_parser()
+    args = parser.parse_args(
+        [
+            "--composition",
+            "H2:0.9,He:0.1",
+            "--temperature-k",
+            "300",
+            "--pressure-bar",
+            "1",
+            "--wn-range=20,2500",
+            "--figure",
+            str(tmp_path / "overview.pdf"),
+            "--manifest",
+            str(tmp_path / "overview.manifest.json"),
+        ]
+    )
+    written = {}
+
+    class _DummyPdf:
+        def __init__(self, path):
+            self.path = path
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def savefig(self, fig):
+            return None
+
+    products = type(
+        "Products",
+        (),
+        {
+            "band": type(
+                "Band",
+                (),
+                {"wavenumber_min_cm1": 20.0, "wavenumber_max_cm1": 2500.0, "resolution_cm1": 1.0},
+            )(),
+            "spectrum": type(
+                "Spectrum",
+                (),
+                {"wavenumber_cm1": np.array([20.0, 21.0]), "temperature_k": 300.0, "pressure_pa": 1.0e5},
+            )(),
+            "species_terms": (),
+            "manifest_sources": (),
+            "transmittance": object(),
+        },
+    )()
+
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview_cli._parallel_mixture_overview_products",
+        lambda tasks: iter([products]),
+    )
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._render_mixture_overview", lambda fig, axes, *, products: None)
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.PdfPages", _DummyPdf)
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview_cli.plt.subplots",
+        lambda **kwargs: (object(), np.array([[object()], [object()], [object()], [object()]])),
+    )
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.plt.close", lambda fig: None)
+    monkeypatch.setattr(
+        "pathlib.Path.write_text",
+        lambda self, text: written.setdefault(str(self), text),
+    )
+
+    run_atm_overview(args)
+
+    manifest = json.loads(written[str(tmp_path / "overview.manifest.json")])
+    assert manifest["temperature_k"] == [300.0]
+    assert manifest["pressure_bar"] == [1.0]
