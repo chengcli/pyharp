@@ -186,17 +186,23 @@ def test_cli_xsection_writes_multiple_ranges_to_one_file(monkeypatch, tmp_path, 
     )
     calls = []
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli._compute_species_xsection",
-        lambda args: (calls.append(args.wn_range) or (type("Spectrum", (), {})(), "requested=self:1.000 -> effective=self:1.000")),
+        "pyharp.spectra.dump_cli._parallel_band_results",
+        lambda tasks, *, worker: [
+            (
+                calls.append(task_args.wn_range)
+                or xr.Dataset(
+                    coords={"wavenumber_cm1": ("wavenumber_cm1", np.array([1.0, 2.0]))},
+                    data_vars={"sigma_total_cm2_molecule": ("wavenumber_cm1", np.array([3.0, 4.0]))},
+                ),
+                "requested=self:1.000 -> effective=self:1.000",
+            )
+            for _, task_args in tasks
+        ],
     )
     written = []
     monkeypatch.setattr(
         "pyharp.spectra.dump_cli._write_combined_dataset",
         lambda datasets, *, wn_ranges, output_path: written.append((len(datasets), wn_ranges, output_path)),
-    )
-    monkeypatch.setattr(
-        "pyharp.spectra.dump_cli.spectrum_to_dataset",
-        lambda spectrum: xr.Dataset(coords={"wavenumber_cm1": ("wavenumber_cm1", np.array([1.0, 2.0]))}, data_vars={"sigma_total_cm2_molecule": ("wavenumber_cm1", np.array([3.0, 4.0]))}),
     )
 
     main()
@@ -205,6 +211,7 @@ def test_cli_xsection_writes_multiple_ranges_to_one_file(monkeypatch, tmp_path, 
     assert written == [(2, [(20.0, 2500.0), (2500.0, 10000.0)], tmp_path / "xsection.nc")]
     out = capsys.readouterr().out
     assert "Wrote NetCDF:" in out
+    assert out.count("Broadening: requested=self:1.000 -> effective=self:1.000") == 2
 
 
 def test_combine_band_datasets_preserves_band_metadata() -> None:

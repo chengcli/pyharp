@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing as mp
+import os
 from pathlib import Path
+import shutil
+import tempfile
 from textwrap import dedent
 
 import numpy as np
@@ -147,10 +152,12 @@ def _combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[
 def _write_combined_dataset(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[float, float]], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     combined = _combine_band_datasets(datasets, wn_ranges=wn_ranges)
-    combined.to_netcdf(output_path)
-    combined.close()
-    for dataset in datasets:
-        dataset.close()
+    try:
+        _write_dataset_via_tmp(combined, output_path, engine="scipy")
+    finally:
+        combined.close()
+        for dataset in datasets:
+            dataset.close()
 
 
 def _xsection_dataset(spectrum) -> xr.Dataset:
@@ -165,8 +172,24 @@ def _xsection_dataset(spectrum) -> xr.Dataset:
 def _write_xsection_dataset(spectrum, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset = _xsection_dataset(spectrum)
-    dataset.to_netcdf(output_path)
-    dataset.close()
+    try:
+        _write_dataset_via_tmp(dataset, output_path, engine="scipy")
+    finally:
+        dataset.close()
+
+
+def _write_dataset_via_tmp(dataset: xr.Dataset, output_path: Path, *, engine: str) -> None:
+    """Write to a local temporary file first, then move to the target path."""
+    fd, tmp_name = tempfile.mkstemp(prefix="pyharp_", suffix=".nc", dir="/tmp")
+    import os
+
+    os.close(fd)
+    try:
+        Path(tmp_name).unlink(missing_ok=True)
+        dataset.to_netcdf(tmp_name, engine=engine)
+        shutil.move(tmp_name, output_path)
+    finally:
+        Path(tmp_name).unlink(missing_ok=True)
 
 
 def _resolve_pair_filename(args: argparse.Namespace) -> tuple[str, str]:
@@ -275,6 +298,47 @@ def _compute_composition_products(args: argparse.Namespace):
     return compute_mixture_overview_products(mixture_args, wn_range=args.wn_range)
 
 
+def _compute_xsection_band(task: tuple[str, argparse.Namespace]) -> tuple[xr.Dataset, str | None]:
+    target_kind, args = task
+    broadening_summary: str | None = None
+    if target_kind == "pair":
+        spectrum = _compute_pair_xsection(args)
+    elif target_kind == "composition":
+        products = _compute_composition_products(args)
+        spectrum = products.spectrum
+    else:
+        spectrum, broadening_summary = _compute_species_xsection(args)
+    return _xsection_dataset(spectrum), broadening_summary
+
+
+def _compute_transmission_band(task: tuple[str, argparse.Namespace]) -> tuple[xr.Dataset, str | None]:
+    target_kind, args = task
+    broadening_summary: str | None = None
+    if target_kind == "pair":
+        spectrum = _compute_pair_xsection(args)
+        transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
+    elif target_kind == "composition":
+        products = _compute_composition_products(args)
+        transmittance = products.transmittance
+    else:
+        spectrum, broadening_summary = _compute_species_xsection(args)
+        transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
+    return transmittance_to_dataset(transmittance), broadening_summary
+
+
+def _parallel_band_results(
+    tasks: list[tuple[str, argparse.Namespace]],
+    *,
+    worker,
+) -> list[tuple[xr.Dataset, str | None]]:
+    if len(tasks) <= 1:
+        return [worker(task) for task in tasks]
+    max_workers = min(len(tasks), os.cpu_count() or 1)
+    ctx = mp.get_context("fork")
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+        return list(executor.map(worker, tasks))
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the dump CLI parser."""
     parser = argparse.ArgumentParser(
@@ -336,9 +400,8 @@ def main() -> None:
     if args.command == "xsection":
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)
-        datasets: list[xr.Dataset] = []
-        for wn_range in wn_ranges:
-            range_args = _args_for_wn_range(args, wn_range)
+        if len(wn_ranges) == 1:
+            range_args = _args_for_wn_range(args, wn_ranges[0])
             broadening_summary: str | None = None
             if target_kind == "pair":
                 spectrum = _compute_pair_xsection(range_args)
@@ -347,12 +410,16 @@ def main() -> None:
                 spectrum = products.spectrum
             else:
                 spectrum, broadening_summary = _compute_species_xsection(range_args)
-            if len(wn_ranges) == 1:
-                output_path = _multi_range_output_path(args, suffix=".nc")
-                _write_xsection_dataset(spectrum, output_path)
-                print(f"Wrote NetCDF: {output_path}")
-            else:
-                datasets.append(_xsection_dataset(spectrum))
+            output_path = _multi_range_output_path(args, suffix=".nc")
+            _write_xsection_dataset(spectrum, output_path)
+            print(f"Wrote NetCDF: {output_path}")
+            if broadening_summary:
+                print(f"Broadening: {broadening_summary}")
+            return
+        tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
+        results = _parallel_band_results(tasks, worker=_compute_xsection_band)
+        datasets = [dataset for dataset, _ in results]
+        for _, broadening_summary in results:
             if broadening_summary:
                 print(f"Broadening: {broadening_summary}")
         if len(wn_ranges) > 1:
@@ -363,9 +430,8 @@ def main() -> None:
     if args.command == "transmission":
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)
-        datasets: list[xr.Dataset] = []
-        for wn_range in wn_ranges:
-            range_args = _args_for_wn_range(args, wn_range)
+        if len(wn_ranges) == 1:
+            range_args = _args_for_wn_range(args, wn_ranges[0])
             broadening_summary: str | None = None
             if target_kind == "pair":
                 spectrum = _compute_pair_xsection(range_args)
@@ -376,12 +442,16 @@ def main() -> None:
             else:
                 spectrum, broadening_summary = _compute_species_xsection(range_args)
                 transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=range_args.path_length_m)
-            if len(wn_ranges) == 1:
-                output_path = _multi_range_output_path(args, suffix=".nc")
-                write_transmittance_dataset(transmittance, output_path)
-                print(f"Wrote NetCDF: {output_path}")
-            else:
-                datasets.append(transmittance_to_dataset(transmittance))
+            output_path = _multi_range_output_path(args, suffix=".nc")
+            write_transmittance_dataset(transmittance, output_path)
+            print(f"Wrote NetCDF: {output_path}")
+            if broadening_summary:
+                print(f"Broadening: {broadening_summary}")
+            return
+        tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
+        results = _parallel_band_results(tasks, worker=_compute_transmission_band)
+        datasets = [dataset for dataset, _ in results]
+        for _, broadening_summary in results:
             if broadening_summary:
                 print(f"Broadening: {broadening_summary}")
         if len(wn_ranges) > 1:
