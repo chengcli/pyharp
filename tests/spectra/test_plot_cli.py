@@ -116,7 +116,7 @@ def test_plot_main_dispatches_pair_attenuation(monkeypatch) -> None:
     assert len(calls) == 1
     assert calls[0].pair == "H2-He"
     assert calls[0].wn_range == (25.0, 30.0)
-    assert calls[0].figure.name == "h2_he_attenuation_1bar_300K_25_30cm1.png"
+    assert calls[0].figure.name == "h2_he_attenuation_300K_1bar_25_30cm1.png"
 
 
 def test_plot_main_dispatches_molecule_xsection_with_default_figure(monkeypatch) -> None:
@@ -130,7 +130,7 @@ def test_plot_main_dispatches_molecule_xsection_with_default_figure(monkeypatch)
     plot_cli.main(["xsection", "--species", "CO2", "--temperature-k", "275.5", "--pressure-bar", "0.25", "--wn-range", "25,30.5"])
 
     assert len(calls) == 1
-    assert calls[0].figure.name == "co2_xsection_0p25bar_275p5K_25_30p5cm1.png"
+    assert calls[0].figure.name == "co2_xsection_275p5K_0p25bar_25_30p5cm1.png"
 
 
 def test_plot_main_dispatches_one_xsection_per_state_pair(monkeypatch, tmp_path) -> None:
@@ -162,8 +162,8 @@ def test_plot_main_dispatches_one_xsection_per_state_pair(monkeypatch, tmp_path)
     )
 
     assert [(call.temperature_k, call.pressure_bar, call.figure.name) for call in calls] == [
-        (275.5, 0.25, "co2_xsection_0p25bar_275p5K_25_30p5cm1.png"),
-        (300.0, 1.0, "co2_xsection_1bar_300K_25_30p5cm1.png"),
+        (275.5, 0.25, "co2_xsection_275p5K_0p25bar_25_30p5cm1.png"),
+        (300.0, 1.0, "co2_xsection_300K_1bar_25_30p5cm1.png"),
     ]
 
 
@@ -224,7 +224,7 @@ def test_plot_main_uses_output_dir_for_default_figure(monkeypatch, tmp_path) -> 
     )
 
     assert len(calls) == 1
-    assert calls[0].figure == tmp_path / "figures" / "co2_xsection_0p25bar_275p5K_25_30p5cm1.png"
+    assert calls[0].figure == tmp_path / "figures" / "co2_xsection_275p5K_0p25bar_25_30p5cm1.png"
 
 
 def test_plot_main_passes_broadening_composition_to_molecule_workflow(monkeypatch) -> None:
@@ -252,7 +252,7 @@ def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:
 
     assert len(calls) == 1
     assert calls[0][0].composition == "H2:0.9,He:0.1"
-    assert calls[0][0].figure.name == "h2_0p9_he_0p1_attenuation_1bar_300K_25_30cm1.png"
+    assert calls[0][0].figure.name == "h2_0p9_he_0p1_attenuation_300K_1bar_25_30cm1.png"
     assert calls[0][1] == (25.0, 30.0)
 
 
@@ -496,7 +496,7 @@ def test_plot_overview_uses_combined_default_name_without_duplicate_units(monkey
     )
 
     assert len(calls) == 1
-    assert calls[0].figure == tmp_path / "figures" / "co2_h2o_overview_0p1_100bar_170_780K_20_10000cm1.pdf"
+    assert calls[0].figure == tmp_path / "figures" / "co2_h2o_overview_170_780K_0p1_100bar_20_10000cm1.pdf"
 
 
 def test_plot_help_includes_subcommands_and_examples(capsys) -> None:

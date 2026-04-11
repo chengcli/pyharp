@@ -46,8 +46,8 @@ def default_output_path(
         [
             _clean_token(target_name),
             _clean_token(plot_type),
-            _format_value(pressure_bar, "bar"),
             _format_value(temperature_k, "K"),
+            _format_value(pressure_bar, "bar"),
             _format_value(wn_min),
             _format_value(wn_max, "cm1"),
         ]

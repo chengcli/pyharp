@@ -133,7 +133,7 @@ for gas mixtures such as `H2O:0.1,H2:0.9`. All plot commands accept
 multi-page PDFs. These ranges are lower-inclusive and upper-exclusive. Use
 `--output` to choose the output path. Without `--output`, plots are written
 under `--output-dir` (default `output/`) with names derived from the target,
-plot type, pressure, temperature, and wavenumber range.
+plot type, temperature, pressure, and wavenumber range.
 For plot commands that use pressure, `--temperature-k` and `--pressure-bar`
 also accept matched comma-separated vectors such as
 `--temperature-k 300,400 --pressure-bar 1,10`. `pyharp-plot` then runs one

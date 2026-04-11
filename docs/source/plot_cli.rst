@@ -22,9 +22,9 @@ Choose one subcommand, then choose the target data source with ``--pair``,
 
 Every command writes a figure. Use ``--output`` to select an explicit output
 path. Without ``--output``, plots are written under ``--output-dir`` using a
-name derived from the target, plot type, pressure, temperature, and
+name derived from the target, plot type, temperature, pressure, and
 wavenumber range, such as
-``output/co2_xsection_1bar_300K_20_2500cm1.png``.
+``output/co2_xsection_300K_1bar_20_2500cm1.png``.
 For subcommands that use pressure, ``--temperature-k`` and ``--pressure-bar``
 also accept matched comma-separated vectors such as ``300,400`` and ``1,10``.
 ``pyharp-plot`` runs one plot per ``(T,P)`` pair in parallel. For
@@ -213,8 +213,8 @@ Default filenames are normalized for shells and filesystems:
 .. code-block:: bash
 
    pyharp-plot xsection --species CO2 --temperature-k 275.5 --pressure-bar 0.25 --wn-range=25,30.5
-   # writes output/co2_xsection_0p25bar_275p5K_25_30p5cm1.png
+   # writes output/co2_xsection_275p5K_0p25bar_25_30p5cm1.png
 
    pyharp-plot overview --composition H2O:0.1,H2:0.9 --wn-range=25,2500
-   # writes output/h2o_0p1_h2_0p9_overview_1bar_300K_25_2500cm1.pdf
-   # also writes output/h2o_0p1_h2_0p9_overview_1bar_300K_25_2500cm1.manifest.json
+   # writes output/h2o_0p1_h2_0p9_overview_300K_1bar_25_2500cm1.pdf
+   # also writes output/h2o_0p1_h2_0p9_overview_300K_1bar_25_2500cm1.manifest.json
