@@ -18,8 +18,8 @@ import numpy as np
 from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig, SpectralBandConfig, parse_broadening_composition, resolve_hitran_cia_pair
 from .hitran_cia import load_cia_dataset
-from .hitran_lines import HapiLineProvider, LineDatabase, build_line_provider, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
-from .spectrum import compute_absorption_spectrum, compute_absorption_spectrum_from_sources, plot_absorption_spectrum, plot_attenuation_spectrum
+from .hitran_lines import LineDatabase, build_line_provider, download_hitran_lines, load_hitran_line_list, plot_hitran_line_positions
+from .spectrum import _resolve_continuum_sources, compute_absorption_spectrum_from_sources, plot_absorption_spectrum, plot_attenuation_spectrum
 from .transmittance import compute_transmittance_spectrum, plot_transmittance_spectrum
 
 
@@ -134,23 +134,24 @@ def _compute_requested_absorption_spectrum(
         cia_dataset = _load_requested_cia_dataset(args, config)
     line_db = line_db or download_hitran_lines(config, band)
     line_provider = build_line_provider(config, line_db)
-    if cia_dataset is not None:
-        spectrum = compute_absorption_spectrum_from_sources(
-            species_name=config.hitran_species.name,
-            wavenumber_grid_cm1=band.grid(),
-            temperature_k=temperature_k,
-            pressure_pa=pressure_pa,
-            line_provider=line_provider,
-            cia_dataset=cia_dataset,
-        )
-    else:
-        spectrum = compute_absorption_spectrum(
+    grid = band.grid()
+    cia_cross_section_cm2_molecule = None
+    if cia_dataset is None:
+        cia_dataset, cia_cross_section_cm2_molecule = _resolve_continuum_sources(
             config=config,
-            band=band,
+            wavenumber_grid_cm1=grid,
             temperature_k=temperature_k,
             pressure_pa=pressure_pa,
-            line_db=line_db,
         )
+    spectrum = compute_absorption_spectrum_from_sources(
+        species_name=config.hitran_species.name,
+        wavenumber_grid_cm1=grid,
+        temperature_k=temperature_k,
+        pressure_pa=pressure_pa,
+        line_provider=line_provider,
+        cia_dataset=cia_dataset,
+        cia_cross_section_cm2_molecule=cia_cross_section_cm2_molecule,
+    )
     return band, config, spectrum, line_provider
 
 

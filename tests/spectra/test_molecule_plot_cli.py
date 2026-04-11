@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import numpy as np
 
 from pyharp.spectra.hitran_lines import LineDatabase
+from pyharp.spectra.molecule_plot_cli import _compute_overview_products, _compute_requested_absorption_spectrum
 from pyharp.spectra.molecule_plot_cli import build_molecule_overview_batch_parser, build_overview_parser, run_xsection
-from pyharp.spectra.molecule_plot_cli import _compute_overview_products
 
 
 def test_overview_parser_accepts_optional_cia_and_pdf_output(tmp_path) -> None:
@@ -125,16 +125,26 @@ def test_overview_products_reuses_downloaded_line_database(monkeypatch, tmp_path
         assert line_db.table_name == "co2_lines_20_22"
         return SimpleNamespace(wavenumber_cm1=np.array([20.0]), line_intensity=np.array([1.0e-25]))
 
-    def fake_compute_absorption_spectrum(*, config, band, temperature_k, pressure_pa, line_db=None):
-        assert line_db is not None
-        assert line_db.table_name == "co2_lines_20_22"
-        grid = band.grid()
+    def fake_compute_from_sources(
+        *,
+        species_name,
+        wavenumber_grid_cm1,
+        temperature_k,
+        pressure_pa,
+        line_provider,
+        cia_dataset=None,
+        cia_cross_section_cm2_molecule=None,
+    ):
+        assert species_name == "CO2"
+        assert line_provider is not None
+        assert cia_dataset is None
+        assert cia_cross_section_cm2_molecule is None
         return SimpleNamespace(
             species_name="CO2",
-            wavenumber_cm1=grid,
-            attenuation_line_m1=np.ones_like(grid),
-            attenuation_cia_m1=np.zeros_like(grid),
-            attenuation_total_m1=np.ones_like(grid),
+            wavenumber_cm1=wavenumber_grid_cm1,
+            attenuation_line_m1=np.ones_like(wavenumber_grid_cm1),
+            attenuation_cia_m1=np.zeros_like(wavenumber_grid_cm1),
+            attenuation_total_m1=np.ones_like(wavenumber_grid_cm1),
             temperature_k=temperature_k,
             pressure_pa=pressure_pa,
         )
@@ -146,11 +156,91 @@ def test_overview_products_reuses_downloaded_line_database(monkeypatch, tmp_path
         "pyharp.spectra.molecule_plot_cli.build_line_provider",
         lambda config, line_db: SimpleNamespace(broadening_summary=lambda: "requested=self:1.000 -> effective=self:1.000"),
     )
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.compute_absorption_spectrum", fake_compute_absorption_spectrum)
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._resolve_continuum_sources", lambda **kwargs: (None, None))
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.compute_absorption_spectrum_from_sources", fake_compute_from_sources)
 
     _compute_overview_products(args)
 
     assert calls["download"] == 1
+
+
+def test_compute_requested_absorption_spectrum_reuses_built_line_provider_without_external_cia(monkeypatch, tmp_path) -> None:
+    parser = build_overview_parser()
+    args = parser.parse_args(
+        [
+            "--species",
+            "CO2",
+            "--temperature-k",
+            "300",
+            "--pressure-bar",
+            "1",
+            "--wn-range",
+            "20,22",
+            "--path-length-km",
+            "1",
+            "--hitran-dir",
+            str(tmp_path / "hitran"),
+            "--figure",
+            str(tmp_path / "overview.pdf"),
+        ]
+    )
+
+    line_db = LineDatabase(
+        table_name="co2_lines_20_22",
+        cache_dir=tmp_path / "hitran",
+        wavenumber_min_cm1=20.0,
+        wavenumber_max_cm1=22.0,
+    )
+    fake_provider = SimpleNamespace(broadening_summary=lambda: "requested=self:1.000 -> effective=self:1.000")
+    calls = {"resolve": 0, "compute": 0}
+
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.download_hitran_lines", lambda config, band: line_db)
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._load_requested_cia_dataset", lambda args, config: None)
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.build_line_provider", lambda config, line_db: fake_provider)
+
+    def fake_resolve_continuum_sources(*, config, wavenumber_grid_cm1, temperature_k, pressure_pa):
+        calls["resolve"] += 1
+        assert config.hitran_species.name == "CO2"
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
+        assert temperature_k == 300.0
+        assert pressure_pa == 1.0e5
+        return None, None
+
+    def fake_compute_from_sources(
+        *,
+        species_name,
+        wavenumber_grid_cm1,
+        temperature_k,
+        pressure_pa,
+        line_provider,
+        cia_dataset=None,
+        cia_cross_section_cm2_molecule=None,
+    ):
+        calls["compute"] += 1
+        assert species_name == "CO2"
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
+        assert temperature_k == 300.0
+        assert pressure_pa == 1.0e5
+        assert line_provider is fake_provider
+        assert cia_dataset is None
+        assert cia_cross_section_cm2_molecule is None
+        return SimpleNamespace(
+            species_name="CO2",
+            wavenumber_cm1=wavenumber_grid_cm1,
+            attenuation_line_m1=np.ones_like(wavenumber_grid_cm1),
+            attenuation_cia_m1=np.zeros_like(wavenumber_grid_cm1),
+            attenuation_total_m1=np.ones_like(wavenumber_grid_cm1),
+            temperature_k=temperature_k,
+            pressure_pa=pressure_pa,
+        )
+
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._resolve_continuum_sources", fake_resolve_continuum_sources)
+    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.compute_absorption_spectrum_from_sources", fake_compute_from_sources)
+
+    _, _, _, line_provider = _compute_requested_absorption_spectrum(args)
+
+    assert calls == {"resolve": 1, "compute": 1}
+    assert line_provider is fake_provider
 
 
 def test_run_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:

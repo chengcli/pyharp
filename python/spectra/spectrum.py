@@ -103,6 +103,29 @@ def compute_absorption_spectrum_from_sources(
     )
 
 
+def _resolve_continuum_sources(
+    *,
+    config: SpectroscopyConfig,
+    wavenumber_grid_cm1: np.ndarray,
+    temperature_k: float,
+    pressure_pa: float,
+) -> tuple[CiaDataset | None, np.ndarray | None]:
+    """Resolve optional continuum inputs for a spectrum calculation."""
+    cia_dataset: CiaDataset | None = None
+    cia_cross_section_cm2_molecule: np.ndarray | None = None
+    if config.hitran_species.name == "H2O":
+        cia_cross_section_cm2_molecule = compute_mt_ckd_h2o_continuum_cross_section(
+            wavenumber_grid_cm1=wavenumber_grid_cm1,
+            temperature_k=temperature_k,
+            pressure_pa=pressure_pa,
+            h2o_vmr=1.0,
+        )
+    elif config.hitran_species.cia_filename is not None:
+        cia_path = download_cia_file(config)
+        cia_dataset = parse_cia_file(cia_path, config.cia_pair)
+    return cia_dataset, cia_cross_section_cm2_molecule
+
+
 def compute_absorption_spectrum(
     config: SpectroscopyConfig,
     band: SpectralBandConfig,
@@ -116,18 +139,12 @@ def compute_absorption_spectrum(
     grid = band.grid()
     line_db = line_db or download_hitran_lines(config, band)
     line_provider = build_line_provider(config, line_db)
-    cia_dataset: CiaDataset | None = None
-    cia_cross_section_cm2_molecule: np.ndarray | None = None
-    if config.hitran_species.name == "H2O":
-        cia_cross_section_cm2_molecule = compute_mt_ckd_h2o_continuum_cross_section(
-            wavenumber_grid_cm1=grid,
-            temperature_k=temperature_k,
-            pressure_pa=pressure_pa,
-            h2o_vmr=1.0,
-        )
-    elif config.hitran_species.cia_filename is not None:
-        cia_path = download_cia_file(config)
-        cia_dataset = parse_cia_file(cia_path, config.cia_pair)
+    cia_dataset, cia_cross_section_cm2_molecule = _resolve_continuum_sources(
+        config=config,
+        wavenumber_grid_cm1=grid,
+        temperature_k=temperature_k,
+        pressure_pa=pressure_pa,
+    )
     return compute_absorption_spectrum_from_sources(
         species_name=config.hitran_species.name,
         wavenumber_grid_cm1=grid,
