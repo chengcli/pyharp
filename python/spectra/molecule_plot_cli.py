@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 import os
 from pathlib import Path
 import tempfile
+import multiprocessing as mp
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "spectra_matplotlib"))
 import matplotlib
@@ -608,15 +610,16 @@ def run_overview_batch(args: argparse.Namespace) -> None:
         raise ValueError("path-length-km must be positive")
     figure_path = args.figure
     figure_path.parent.mkdir(parents=True, exist_ok=True)
-    page_count = 0
-    with PdfPages(figure_path) as pdf:
+    page_tasks: list[argparse.Namespace] = []
+    page_metadata: list[tuple[float, float, str, float, float]] = []
+    for temperature_k, pressure_bar in _state_pairs(args):
         for species in args.species:
             for wn_min, wn_max in args.wn_ranges:
                 page_args = argparse.Namespace(
                     hitran_dir=args.hitran_dir,
                     species=species,
-                    temperature_k=args.temperature_k,
-                    pressure_bar=args.pressure_bar,
+                    temperature_k=float(temperature_k),
+                    pressure_bar=float(pressure_bar),
                     wn_range=(wn_min, wn_max),
                     resolution=args.resolution,
                     refresh_hitran=args.refresh_hitran,
@@ -628,25 +631,31 @@ def run_overview_batch(args: argparse.Namespace) -> None:
                     path_length_km=args.path_length_km,
                     figure=figure_path,
                 )
-                band, config, line_list, spectrum, transmittance, cia_dataset, line_provider = _compute_overview_products(page_args)
-                fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8.5, 11.0), squeeze=False)
-                _render_overview_page(
-                    fig,
-                    axes[:, 0],
-                    band=band,
-                    config=config,
-                    spectrum=spectrum,
-                    transmittance=transmittance,
-                    line_list=line_list,
-                    cia_dataset=cia_dataset,
-                )
-                pdf.savefig(fig)
-                plt.close(fig)
-                page_count += 1
-                component_label = _resolve_overview_component_label(cia_dataset=cia_dataset, spectrum=spectrum) if np.any(np.asarray(spectrum.sigma_cia_cm2_molecule, dtype=np.float64) > 0.0) else "none"
-                print(
-                    f"Added page {page_count}: {species} | {wn_min:.3f}-{wn_max:.3f} cm^-1 | secondary={component_label}"
-                )
+                page_tasks.append(page_args)
+                page_metadata.append((float(temperature_k), float(pressure_bar), species, wn_min, wn_max))
+    page_results = _parallel_overview_page_products(page_tasks)
+    page_count = 0
+    with PdfPages(figure_path) as pdf:
+        for (temperature_k, pressure_bar, species, wn_min, wn_max), result in zip(page_metadata, page_results, strict=True):
+            band, config, line_list, spectrum, transmittance, cia_dataset, _ = result
+            fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8.5, 11.0), squeeze=False)
+            _render_overview_page(
+                fig,
+                axes[:, 0],
+                band=band,
+                config=config,
+                spectrum=spectrum,
+                transmittance=transmittance,
+                line_list=line_list,
+                cia_dataset=cia_dataset,
+            )
+            pdf.savefig(fig)
+            plt.close(fig)
+            page_count += 1
+            component_label = _resolve_overview_component_label(cia_dataset=cia_dataset, spectrum=spectrum) if np.any(np.asarray(spectrum.sigma_cia_cm2_molecule, dtype=np.float64) > 0.0) else "none"
+            print(
+                f"Added page {page_count}: T={temperature_k:.1f} K | p={pressure_bar:.3f} bar | {species} | {wn_min:.3f}-{wn_max:.3f} cm^-1 | secondary={component_label}"
+            )
     print(f"Combined overview figure: {figure_path}")
     print(f"Pages: {page_count}")
 
@@ -668,28 +677,75 @@ def main_overview() -> None:
 
 
 def run_overview(args: argparse.Namespace) -> None:
-    band, config, line_list, spectrum, transmittance, cia_dataset, line_provider = _compute_overview_products(args)
     figure_path = args.figure
     figure_path.parent.mkdir(parents=True, exist_ok=True)
+    page_tasks: list[argparse.Namespace] = []
+    for temperature_k, pressure_bar in _state_pairs(args):
+        page_args = argparse.Namespace(**vars(args))
+        page_args.temperature_k = float(temperature_k)
+        page_args.pressure_bar = float(pressure_bar)
+        page_tasks.append(page_args)
+    page_results = _parallel_overview_page_products(page_tasks)
 
-    fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8.5, 11.0), squeeze=False)
-    _render_overview_page(
-        fig,
-        axes[:, 0],
-        band=band,
-        config=config,
-        spectrum=spectrum,
-        transmittance=transmittance,
-        line_list=line_list,
-        cia_dataset=cia_dataset,
-    )
-    fig.savefig(figure_path)
-    plt.close(fig)
+    with PdfPages(figure_path) as pdf:
+        for temperature_k, pressure_bar, result in zip(_selected_temperatures(args), _selected_pressure_bars(args), page_results, strict=True):
+            band, config, line_list, spectrum, transmittance, cia_dataset, broadening_summary = result
+            fig, axes = plt.subplots(nrows=5, ncols=1, figsize=(8.5, 11.0), squeeze=False)
+            _render_overview_page(
+                fig,
+                axes[:, 0],
+                band=band,
+                config=config,
+                spectrum=spectrum,
+                transmittance=transmittance,
+                line_list=line_list,
+                cia_dataset=cia_dataset,
+            )
+            pdf.savefig(fig)
+            plt.close(fig)
+            print(f"Added page: T={temperature_k:.1f} K | p={pressure_bar:.3f} bar")
 
+    band, config, line_list, spectrum, transmittance, cia_dataset, broadening_summary = page_results[-1]
     _print_overview_summary(
         figure_path=figure_path,
         spectrum=spectrum,
         transmittance=transmittance,
         cia_dataset=cia_dataset,
-        line_provider=line_provider,
+        line_provider=type("_Summary", (), {"broadening_summary": lambda self: broadening_summary})(),
     )
+
+
+def _compute_overview_page_task(args: argparse.Namespace):
+    band, config, line_list, spectrum, transmittance, cia_dataset, line_provider = _compute_overview_products(args)
+    return band, config, line_list, spectrum, transmittance, cia_dataset, line_provider.broadening_summary()
+
+
+def _parallel_overview_page_products(tasks: list[argparse.Namespace]):
+    if len(tasks) <= 1:
+        return [_compute_overview_page_task(task) for task in tasks]
+    max_workers = min(len(tasks), os.cpu_count() or 1)
+    ctx = mp.get_context("fork")
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+        return list(executor.map(_compute_overview_page_task, tasks))
+
+
+def _selected_temperatures(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "temperature_k", [300.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _selected_pressure_bars(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "pressure_bar", [1.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _state_pairs(args: argparse.Namespace) -> list[tuple[float, float]]:
+    temperatures = _selected_temperatures(args)
+    pressures = _selected_pressure_bars(args)
+    if len(temperatures) != len(pressures):
+        raise ValueError("temperature_k and pressure_bar must have the same number of values")
+    return list(zip(temperatures, pressures, strict=True))

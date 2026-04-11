@@ -52,9 +52,29 @@ def test_plot_parser_accepts_molecule_xsection_with_wn_range(tmp_path) -> None:
 
     assert args.command == "xsection"
     assert args.species == "CO2"
+    assert args.temperature_k == [300.0]
+    assert args.pressure_bar == [1.0]
     assert args.broadening_composition == "air:0.8,self:0.2"
     assert args.wn_range == (20.0, 2500.0)
     assert args.figure == tmp_path / "co2.png"
+
+
+def test_plot_parser_accepts_matched_temperature_pressure_vectors() -> None:
+    parser = plot_cli.build_parser()
+    args = parser.parse_args(
+        [
+            "transmission",
+            "--species",
+            "CO2",
+            "--temperature-k",
+            "300,400",
+            "--pressure-bar",
+            "1,10",
+        ]
+    )
+
+    assert args.temperature_k == [300.0, 400.0]
+    assert args.pressure_bar == [1.0, 10.0]
 
 
 def test_plot_parser_accepts_atm_overview_ranges(tmp_path) -> None:
@@ -111,6 +131,72 @@ def test_plot_main_dispatches_molecule_xsection_with_default_figure(monkeypatch)
 
     assert len(calls) == 1
     assert calls[0].figure.name == "co2_xsection_0p25bar_275p5K_25_30p5cm1.png"
+
+
+def test_plot_main_dispatches_one_xsection_per_state_pair(monkeypatch, tmp_path) -> None:
+    calls = []
+
+    def fake_run(args):
+        calls.append(args)
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+    monkeypatch.setattr(
+        "pyharp.spectra.plot_cli._parallel_plot_results",
+        lambda tasks, *, worker: [worker(task) for task in tasks],
+    )
+
+    plot_cli.main(
+        [
+            "xsection",
+            "--species",
+            "CO2",
+            "--temperature-k",
+            "275.5,300",
+            "--pressure-bar",
+            "0.25,1",
+            "--wn-range",
+            "25,30.5",
+            "--output-dir",
+            str(tmp_path / "figures"),
+        ]
+    )
+
+    assert [(call.temperature_k, call.pressure_bar, call.figure.name) for call in calls] == [
+        (275.5, 0.25, "co2_xsection_0p25bar_275p5K_25_30p5cm1.png"),
+        (300.0, 1.0, "co2_xsection_1bar_300K_25_30p5cm1.png"),
+    ]
+
+
+def test_plot_main_appends_state_suffix_to_explicit_output_for_multiple_pairs(monkeypatch, tmp_path) -> None:
+    calls = []
+
+    def fake_run(args):
+        calls.append(args)
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+    monkeypatch.setattr(
+        "pyharp.spectra.plot_cli._parallel_plot_results",
+        lambda tasks, *, worker: [worker(task) for task in tasks],
+    )
+
+    plot_cli.main(
+        [
+            "xsection",
+            "--species",
+            "CO2",
+            "--temperature-k",
+            "300,400",
+            "--pressure-bar",
+            "1,10",
+            "--output",
+            str(tmp_path / "co2.png"),
+        ]
+    )
+
+    assert [call.figure for call in calls] == [
+        tmp_path / "co2_300K_1bar.png",
+        tmp_path / "co2_400K_10bar.png",
+    ]
 
 
 def test_plot_main_uses_output_dir_for_default_figure(monkeypatch, tmp_path) -> None:
@@ -294,6 +380,94 @@ def test_plot_composition_transmission_matches_dump_total(monkeypatch, tmp_path)
 def test_plot_main_rejects_multiple_selectors() -> None:
     with pytest.raises(SystemExit):
         plot_cli.main(["attenuation", "--pair", "H2-H2", "--species", "H2O"])
+
+
+def test_plot_main_rejects_mismatched_temperature_pressure_vectors() -> None:
+    with pytest.raises(SystemExit):
+        plot_cli.main(["xsection", "--species", "CO2", "--temperature-k", "300,400", "--pressure-bar", "1"])
+
+
+def test_plot_overview_parallelizes_over_state_pairs_and_wn_ranges(monkeypatch, tmp_path) -> None:
+    inner_task_counts = []
+    calls = []
+
+    def fake_parallel_products(tasks):
+        inner_task_counts.append(len(tasks))
+        calls.append(tasks)
+        return [
+            type("Products", (), {"spectrum": type("Spectrum", (), {"temperature_k": 300.0, "pressure_pa": 1.0e5})()})()
+            for _ in tasks
+        ]
+
+    class _DummyPdf:
+        def __init__(self, path):
+            self.path = path
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def savefig(self, fig):
+            return None
+
+    dummy_figure = type("Figure", (), {})()
+    dummy_axis = type("Axis", (), {})()
+
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._parallel_mixture_overview_products", fake_parallel_products)
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._render_mixture_overview", lambda fig, axes, *, products: None)
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._page_manifest", lambda products: {})
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.PdfPages", _DummyPdf)
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.plt.subplots", lambda **kwargs: (dummy_figure, np.array([[dummy_axis], [dummy_axis], [dummy_axis], [dummy_axis]])))
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.plt.close", lambda fig: None)
+
+    plot_cli.main(
+        [
+            "overview",
+            "--composition",
+            "H2:0.9,He:0.1",
+            "--temperature-k",
+            "300,400,500",
+            "--pressure-bar",
+            "1,2,3",
+            "--wn-range=20,2500",
+            "--wn-range=2500,10000",
+            "--output",
+            str(tmp_path / "atm.pdf"),
+        ]
+    )
+
+    assert inner_task_counts == [6]
+    assert all(task_args.figure == tmp_path / "atm.pdf" for task_args, _ in calls[0])
+
+
+def test_plot_overview_uses_single_output_pdf_for_multiple_state_pairs(monkeypatch, tmp_path) -> None:
+    calls = []
+
+    def fake_run(args):
+        calls.append(args)
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_overview", fake_run)
+
+    plot_cli.main(
+        [
+            "overview",
+            "--species",
+            "CO2",
+            "--temperature-k",
+            "300,400",
+            "--pressure-bar",
+            "1,10",
+            "--output",
+            str(tmp_path / "overview.pdf"),
+        ]
+    )
+
+    assert len(calls) == 1
+    assert calls[0].figure == tmp_path / "overview.pdf"
+    assert calls[0].temperature_k == [300.0, 400.0]
+    assert calls[0].pressure_bar == [1.0, 10.0]
 
 
 def test_plot_help_includes_subcommands_and_examples(capsys) -> None:

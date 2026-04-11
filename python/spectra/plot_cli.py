@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing as mp
+import os
 from pathlib import Path
 from textwrap import dedent
 
 from . import atm_overview_cli, cia_plot_cli, molecule_plot_cli
-from .output_names import default_output_path
+from .output_names import _format_value, default_output_path
 
 
 class _SplitSpeciesAction(argparse.Action):
@@ -32,9 +35,19 @@ class _HelpFormatter(argparse.RawDescriptionHelpFormatter):
         return help_text
 
 
+def _parse_float_list(value: str) -> list[float]:
+    parts = [part.strip() for part in str(value).split(",")]
+    if not parts or any(part == "" for part in parts):
+        raise argparse.ArgumentTypeError("value must be a number or comma-separated list of numbers")
+    try:
+        return [float(part) for part in parts]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must contain numeric values") from exc
+
+
 def _add_state_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--temperature-k", type=float, default=300.0, metavar="K", help="Gas temperature in kelvin.")
-    parser.add_argument("--pressure-bar", type=float, default=1.0, metavar="BAR", help="Gas pressure in bar.")
+    parser.add_argument("--temperature-k", type=_parse_float_list, default=[300.0], metavar="K[,K...]", help="Gas temperature in kelvin. Use a comma-separated list paired one-to-one with --pressure-bar.")
+    parser.add_argument("--pressure-bar", type=_parse_float_list, default=[1.0], metavar="BAR[,BAR...]", help="Gas pressure in bar. Use a comma-separated list paired one-to-one with --temperature-k.")
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser, *, allow_multiple_ranges: bool = False) -> None:
@@ -85,6 +98,27 @@ def _validate_single_selector(args: argparse.Namespace, parser: argparse.Argumen
         parser.error("choose only one of --pair, --species, or --composition")
 
 
+def _selected_temperatures(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "temperature_k", [300.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _selected_pressure_bars(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "pressure_bar", [1.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _validate_state_grid(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    temperatures = _selected_temperatures(args)
+    pressures = _selected_pressure_bars(args)
+    if len(temperatures) != len(pressures):
+        parser.error("--temperature-k and --pressure-bar must have the same number of values")
+
+
 def _combined_range(wn_ranges: list[tuple[float, float]]) -> tuple[float, float]:
     return min(wn_min for wn_min, _ in wn_ranges), max(wn_max for _, wn_max in wn_ranges)
 
@@ -107,6 +141,55 @@ def _default_figure(
         wn_range=wn_range,
         suffix=suffix,
         output_dir=output_dir,
+    )
+
+
+def _state_output_suffix(temperature_k: float, pressure_bar: float) -> str:
+    return f"_{_format_value(temperature_k, 'K')}_{_format_value(pressure_bar, 'bar')}"
+
+
+def _stateful_output_path(
+    output_path: Path | None,
+    *,
+    num_states: int,
+    temperature_k: float,
+    pressure_bar: float,
+    default_path: Path,
+) -> Path:
+    if output_path is None:
+        return default_path
+    if num_states <= 1:
+        return output_path
+    suffix = output_path.suffix or default_path.suffix
+    return output_path.with_name(f"{output_path.stem}{_state_output_suffix(temperature_k, pressure_bar)}{suffix}")
+
+
+def _stateful_manifest_path(
+    manifest_path: Path | None,
+    *,
+    num_states: int,
+    temperature_k: float,
+    pressure_bar: float,
+) -> Path | None:
+    if manifest_path is None or num_states <= 1:
+        return manifest_path
+    suffix = manifest_path.suffix or ".json"
+    return manifest_path.with_name(f"{manifest_path.stem}{_state_output_suffix(temperature_k, pressure_bar)}{suffix}")
+
+
+def _args_for_state(args: argparse.Namespace, *, temperature_k: float, pressure_bar: float) -> argparse.Namespace:
+    scoped = argparse.Namespace(**vars(args))
+    scoped.temperature_k = float(temperature_k)
+    scoped.pressure_bar = float(pressure_bar)
+    return scoped
+
+
+def _overview_state_token(*, temperatures: list[float], pressures: list[float]) -> tuple[float | str, float | str]:
+    if len(temperatures) == 1 and len(pressures) == 1:
+        return temperatures[0], pressures[0]
+    return (
+        f"{_format_value(min(temperatures))}_{_format_value(max(temperatures), 'K')}",
+        f"{_format_value(min(pressures))}_{_format_value(max(pressures), 'bar')}",
     )
 
 
@@ -257,6 +340,7 @@ def _as_atm_args(args: argparse.Namespace, *, plot_type: str, wn_range: tuple[fl
         pressure_bar=args.pressure_bar,
         path_length_km=getattr(args, "path_length_km", 1.0),
         resolution=args.resolution,
+        wn_range=wn_range,
         cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
@@ -271,6 +355,54 @@ def _as_atm_args(args: argparse.Namespace, *, plot_type: str, wn_range: tuple[fl
             output_dir=args.output_dir,
         ),
     )
+
+
+def _parallel_plot_results(
+    tasks: list[tuple[str, argparse.Namespace]],
+    *,
+    worker,
+) -> list[None]:
+    if len(tasks) <= 1:
+        return [worker(task) for task in tasks]
+    max_workers = min(len(tasks), os.cpu_count() or 1)
+    ctx = mp.get_context("fork")
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+        return list(executor.map(worker, tasks))
+
+
+def _run_plot_task(task: tuple[str, argparse.Namespace]) -> None:
+    task_kind, task_args = task
+    if task_kind == "molecule_xsection":
+        molecule_plot_cli.run_xsection(task_args)
+        return
+    if task_kind == "molecule_attenuation":
+        molecule_plot_cli.run_attenuation(task_args)
+        return
+    if task_kind == "molecule_transmission":
+        molecule_plot_cli.run_transmission(task_args)
+        return
+    if task_kind == "molecule_overview":
+        molecule_plot_cli.run_overview(task_args)
+        return
+    if task_kind == "molecule_overview_batch":
+        molecule_plot_cli.run_overview_batch(task_args)
+        return
+    if task_kind == "cia_attenuation":
+        cia_plot_cli.run_attenuation(task_args)
+        return
+    if task_kind == "cia_transmission":
+        cia_plot_cli.run_transmission(task_args)
+        return
+    if task_kind == "atm_attenuation":
+        atm_overview_cli.run_atm_attenuation(task_args, wn_range=task_args.wn_range)
+        return
+    if task_kind == "atm_transmission":
+        atm_overview_cli.run_atm_transmission(task_args, wn_range=task_args.wn_range)
+        return
+    if task_kind == "atm_overview":
+        atm_overview_cli.run_atm_overview(task_args)
+        return
+    raise ValueError(f"unsupported plot task: {task_kind}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -408,44 +540,141 @@ def main(argv: list[str] | None = None) -> None:
         cia_plot_cli.run_binary(_as_cia_args(args, default_pair="H2-H2", plot_type="binary"))
         return
 
+    _validate_state_grid(args, parser)
+    state_pairs = list(zip(_selected_temperatures(args), _selected_pressure_bars(args), strict=True))
+
     if args.command == "xsection":
-        molecule_plot_cli.run_xsection(_as_molecule_args(args, plot_type="xsection"))
+        tasks = []
+        wn_range = args.wn_range or (20.0, 2500.0)
+        for temperature_k, pressure_bar in state_pairs:
+            state_args = _args_for_state(args, temperature_k=temperature_k, pressure_bar=pressure_bar)
+            default_path = _default_figure(
+                target_name=state_args.species or "H2O",
+                plot_type="xsection",
+                temperature_k=temperature_k,
+                pressure_bar=pressure_bar,
+                wn_range=wn_range,
+                output_dir=state_args.output_dir,
+            )
+            state_args.figure = _stateful_output_path(
+                state_args.figure,
+                num_states=len(state_pairs),
+                temperature_k=temperature_k,
+                pressure_bar=pressure_bar,
+                default_path=default_path,
+            )
+            tasks.append(("molecule_xsection", _as_molecule_args(state_args, plot_type="xsection")))
+        _parallel_plot_results(tasks, worker=_run_plot_task)
         return
 
     if args.command in {"attenuation", "transmission"}:
         _validate_single_selector(args, parser)
         if args.composition:
+            tasks = []
             wn_range = args.wn_range or (20.0, 2500.0)
-            atm_args = _as_atm_args(args, plot_type=args.command, wn_range=wn_range)
-            if args.command == "attenuation":
-                atm_overview_cli.run_atm_attenuation(atm_args, wn_range=wn_range)
-            else:
-                atm_overview_cli.run_atm_transmission(atm_args, wn_range=wn_range)
+            for temperature_k, pressure_bar in state_pairs:
+                state_args = _args_for_state(args, temperature_k=temperature_k, pressure_bar=pressure_bar)
+                default_path = _default_figure(
+                    target_name=state_args.composition,
+                    plot_type=args.command,
+                    temperature_k=temperature_k,
+                    pressure_bar=pressure_bar,
+                    wn_range=wn_range,
+                    output_dir=state_args.output_dir,
+                )
+                state_args.figure = _stateful_output_path(
+                    state_args.figure,
+                    num_states=len(state_pairs),
+                    temperature_k=temperature_k,
+                    pressure_bar=pressure_bar,
+                    default_path=default_path,
+                )
+                tasks.append((f"atm_{args.command}", _as_atm_args(state_args, plot_type=args.command, wn_range=wn_range)))
+            _parallel_plot_results(tasks, worker=_run_plot_task)
             return
         if args.pair:
-            cia_args = _as_cia_args(args, default_pair=args.pair, plot_type=args.command)
-            if args.command == "attenuation":
-                cia_plot_cli.run_attenuation(cia_args)
-            else:
-                cia_plot_cli.run_transmission(cia_args)
+            tasks = []
+            wn_range = args.wn_range or (20.0, 10000.0)
+            for temperature_k, pressure_bar in state_pairs:
+                state_args = _args_for_state(args, temperature_k=temperature_k, pressure_bar=pressure_bar)
+                default_path = _default_figure(
+                    target_name=state_args.pair,
+                    plot_type=args.command,
+                    temperature_k=temperature_k,
+                    pressure_bar=pressure_bar,
+                    wn_range=wn_range,
+                    output_dir=state_args.output_dir,
+                )
+                state_args.figure = _stateful_output_path(
+                    state_args.figure,
+                    num_states=len(state_pairs),
+                    temperature_k=temperature_k,
+                    pressure_bar=pressure_bar,
+                    default_path=default_path,
+                )
+                task_kind = "cia_attenuation" if args.command == "attenuation" else "cia_transmission"
+                tasks.append((task_kind, _as_cia_args(state_args, default_pair=state_args.pair, plot_type=args.command)))
+            _parallel_plot_results(tasks, worker=_run_plot_task)
             return
 
-        molecule_args = _as_molecule_args(args, plot_type=args.command)
-        if args.command == "attenuation":
-            molecule_plot_cli.run_attenuation(molecule_args)
-        else:
-            molecule_plot_cli.run_transmission(molecule_args)
+        tasks = []
+        wn_range = args.wn_range or (20.0, 2500.0)
+        for temperature_k, pressure_bar in state_pairs:
+            state_args = _args_for_state(args, temperature_k=temperature_k, pressure_bar=pressure_bar)
+            default_path = _default_figure(
+                target_name=state_args.species or "H2O",
+                plot_type=args.command,
+                temperature_k=temperature_k,
+                pressure_bar=pressure_bar,
+                wn_range=wn_range,
+                output_dir=state_args.output_dir,
+            )
+            state_args.figure = _stateful_output_path(
+                state_args.figure,
+                num_states=len(state_pairs),
+                temperature_k=temperature_k,
+                pressure_bar=pressure_bar,
+                default_path=default_path,
+            )
+            task_kind = "molecule_attenuation" if args.command == "attenuation" else "molecule_transmission"
+            tasks.append((task_kind, _as_molecule_args(state_args, plot_type=args.command)))
+        _parallel_plot_results(tasks, worker=_run_plot_task)
         return
 
     if args.command == "overview":
         if args.composition and args.species:
             parser.error("choose only one of --composition or --species")
         wn_ranges = args.wn_ranges or [(20.0, 2500.0)]
+        temperatures = _selected_temperatures(args)
+        pressures = _selected_pressure_bars(args)
+        temperature_token, pressure_token = _overview_state_token(temperatures=temperatures, pressures=pressures)
         if args.composition:
+            combined_range = _combined_range(wn_ranges)
+            default_path = _default_figure(
+                target_name=args.composition,
+                plot_type="overview",
+                temperature_k=temperature_token,
+                pressure_bar=pressure_token,
+                wn_range=combined_range,
+                output_dir=args.output_dir,
+                suffix=".pdf",
+            )
+            args.figure = args.figure or default_path
             atm_overview_cli.run_atm_overview(_as_atm_overview_args(args, wn_ranges=wn_ranges))
             return
 
         species = args.species or ["H2O"]
+        combined_range = _combined_range(wn_ranges)
+        default_path = _default_figure(
+            target_name=species[0] if len(species) == 1 else "_".join(species),
+            plot_type="overview",
+            temperature_k=temperature_token,
+            pressure_bar=pressure_token,
+            wn_range=combined_range,
+            output_dir=args.output_dir,
+            suffix=".pdf",
+        )
+        args.figure = args.figure or default_path
         if len(species) == 1 and len(wn_ranges) == 1:
             molecule_plot_cli.run_overview(_as_molecule_overview_args(args, species=species[0], wn_range=wn_ranges[0]))
         else:

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 import json
+import multiprocessing as mp
 import os
 from pathlib import Path
 import tempfile
@@ -499,9 +501,33 @@ def _page_manifest(products: MixtureOverviewProducts) -> dict[str, object]:
         "wavenumber_max_cm1": products.band.wavenumber_max_cm1,
         "resolution_cm1": products.band.resolution_cm1,
         "grid_points": int(products.spectrum.wavenumber_cm1.size),
+        "temperature_k": float(products.spectrum.temperature_k),
+        "pressure_bar": float(products.spectrum.pressure_pa) / 1.0e5,
         "line_species": [term.species_name for term in products.species_terms],
         "opacity_sources": list(products.manifest_sources),
     }
+
+
+def _selected_temperatures(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "temperature_k", [300.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _selected_pressure_bars(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "pressure_bar", [1.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def _state_pairs(args: argparse.Namespace) -> list[tuple[float, float]]:
+    temperatures = _selected_temperatures(args)
+    pressures = _selected_pressure_bars(args)
+    if len(temperatures) != len(pressures):
+        raise ValueError("temperature_k and pressure_bar must have the same number of values")
+    return list(zip(temperatures, pressures, strict=True))
 
 
 def build_atm_overview_parser() -> argparse.ArgumentParser:
@@ -533,22 +559,35 @@ def run_atm_overview(args: argparse.Namespace) -> None:
     figure_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
+    wn_ranges = list(args.wn_ranges)
+    state_pairs = _state_pairs(args)
+    tasks: list[tuple[argparse.Namespace, tuple[float, float]]] = []
+    page_metadata: list[tuple[float, float, tuple[float, float]]] = []
+    for temperature_k, pressure_bar in state_pairs:
+        state_args = argparse.Namespace(**vars(args))
+        state_args.temperature_k = float(temperature_k)
+        state_args.pressure_bar = float(pressure_bar)
+        for wn_range in wn_ranges:
+            tasks.append((state_args, wn_range))
+            page_metadata.append((float(temperature_k), float(pressure_bar), wn_range))
+    page_results = _parallel_mixture_overview_products(
+        tasks
+    )
     pages: list[dict[str, object]] = []
     with PdfPages(figure_path) as pdf:
-        for wn_range in args.wn_ranges:
-            products = compute_mixture_overview_products(args, wn_range=wn_range)
+        for (temperature_k, pressure_bar, wn_range), products in zip(page_metadata, page_results, strict=True):
             fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(8.5, 11.0), squeeze=False)
             _render_mixture_overview(fig, axes[:, 0], products=products)
             pdf.savefig(fig)
             plt.close(fig)
             pages.append(_page_manifest(products))
-            print(f"Added page: {wn_range[0]:.3f}-{wn_range[1]:.3f} cm^-1")
+            print(f"Added page: T={temperature_k:.1f} K | p={pressure_bar:.3f} bar | {wn_range[0]:.3f}-{wn_range[1]:.3f} cm^-1")
 
     manifest = {
         "composition_input": str(args.composition),
         "composition_normalized": _parse_composition(args.composition),
-        "temperature_k": float(args.temperature_k),
-        "pressure_bar": float(args.pressure_bar),
+        "temperature_k": _selected_temperatures(args) if len(state_pairs) > 1 else float(state_pairs[0][0]),
+        "pressure_bar": _selected_pressure_bars(args) if len(state_pairs) > 1 else float(state_pairs[0][1]),
         "path_length_km": float(args.path_length_km),
         "figure_path": str(figure_path),
         "manifest_path": str(manifest_path),
@@ -559,3 +598,19 @@ def run_atm_overview(args: argparse.Namespace) -> None:
     print(f"Atmosphere overview figure: {figure_path}")
     print(f"Manifest: {manifest_path}")
     print(f"Pages: {len(pages)}")
+
+
+def _compute_mixture_overview_product_task(task: tuple[argparse.Namespace, tuple[float, float]]) -> MixtureOverviewProducts:
+    args, wn_range = task
+    return compute_mixture_overview_products(args, wn_range=wn_range)
+
+
+def _parallel_mixture_overview_products(
+    tasks: list[tuple[argparse.Namespace, tuple[float, float]]],
+) -> list[MixtureOverviewProducts]:
+    if len(tasks) <= 1:
+        return [_compute_mixture_overview_product_task(task) for task in tasks]
+    max_workers = min(len(tasks), os.cpu_count() or 1)
+    ctx = mp.get_context("fork")
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+        return list(executor.map(_compute_mixture_overview_product_task, tasks))
