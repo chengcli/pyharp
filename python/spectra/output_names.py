@@ -34,7 +34,7 @@ def default_output_path(
     *,
     target_name: object,
     plot_type: str,
-    temperature_k: float,
+    temperature_k: float | str,
     pressure_bar: float,
     wn_range: tuple[float, float],
     suffix: str,
@@ -46,10 +46,10 @@ def default_output_path(
         [
             _clean_token(target_name),
             _clean_token(plot_type),
-            _format_value(temperature_k, "K"),
             _format_value(pressure_bar, "bar"),
+            _format_value(temperature_k, "K"),
             _format_value(wn_min),
-            _format_value(wn_max),
+            _format_value(wn_max, "cm1"),
         ]
     )
     return output_dir / f"{stem}{suffix}"
