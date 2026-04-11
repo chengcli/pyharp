@@ -104,6 +104,26 @@ def test_download_hitran_lines_refetches_contaminated_cache(monkeypatch, tmp_pat
     ]
 
 
+def test_download_hitran_lines_wraps_fetch_failures(monkeypatch, tmp_path) -> None:
+    fake = FakeHapi()
+    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+
+    def fail_fetch(table_name, iso_ids, numin, numax):
+        raise RuntimeError("network down")
+
+    fake.fetch_by_ids = fail_fetch
+    config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache", species_name="CO2")
+    band = SpectralBandConfig("single_state", 2500.0, 10000.0, 1.0)
+
+    try:
+        download_hitran_lines(config, band)
+    except RuntimeError as exc:
+        assert "Failed to download HITRAN lines for CO2" in str(exc)
+        assert "2500-10000 cm^-1" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+
+
 def test_load_hitran_line_list_filters_by_min_line_strength(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
     table_name = "co2_lines_25_2500"
@@ -175,11 +195,12 @@ def test_build_line_provider_uses_config_broadening_composition(monkeypatch, tmp
         species_name="CO2",
         broadening_composition="CO2:0.25,H2:0.75",
     )
-    line_db = type("LineDb", (), {"table_name": "mock", "cache_dir": tmp_path})()
+    line_db = type("LineDb", (), {"table_name": "mock", "cache_dir": tmp_path, "available_broadener_keys": ("air", "h2")})()
 
     provider = build_line_provider(config, line_db)
 
     assert provider.diluent == {"self": 0.25, "h2": 0.75}
+    assert fake.storage_calls == []
 
 
 def test_plot_hitran_line_positions_writes_png(tmp_path):
