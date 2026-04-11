@@ -39,6 +39,7 @@ def _add_state_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_common_arguments(parser: argparse.ArgumentParser, *, allow_multiple_ranges: bool = False) -> None:
     parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"), metavar="DIR", help="Directory for downloaded HITRAN line and CIA data.")
+    parser.add_argument("--output-dir", type=Path, default=Path("output"), metavar="DIR", help="Directory for auto-generated figure output paths.")
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
     parser.add_argument(
         "--broadening-composition",
@@ -95,6 +96,7 @@ def _default_figure(
     temperature_k: float,
     pressure_bar: float,
     wn_range: tuple[float, float],
+    output_dir: Path = Path("output"),
     suffix: str = ".png",
 ) -> Path:
     return default_output_path(
@@ -104,6 +106,7 @@ def _default_figure(
         pressure_bar=pressure_bar,
         wn_range=wn_range,
         suffix=suffix,
+        output_dir=output_dir,
     )
 
 
@@ -131,6 +134,7 @@ def _as_cia_args(args: argparse.Namespace, *, default_pair: str, plot_type: str)
             temperature_k=args.temperature_k,
             pressure_bar=pressure_bar,
             wn_range=wn_range,
+            output_dir=args.output_dir,
         ),
     )
 
@@ -159,6 +163,7 @@ def _as_molecule_args(args: argparse.Namespace, *, plot_type: str) -> argparse.N
             temperature_k=args.temperature_k,
             pressure_bar=args.pressure_bar,
             wn_range=wn_range,
+            output_dir=args.output_dir,
         ),
     )
 
@@ -185,6 +190,7 @@ def _as_molecule_overview_args(args: argparse.Namespace, *, species: str, wn_ran
             temperature_k=args.temperature_k,
             pressure_bar=args.pressure_bar,
             wn_range=wn_range,
+            output_dir=args.output_dir,
             suffix=".pdf",
         ),
     )
@@ -210,6 +216,7 @@ def _as_molecule_overview_batch_args(args: argparse.Namespace, *, species: list[
             temperature_k=args.temperature_k,
             pressure_bar=args.pressure_bar,
             wn_range=_combined_range(wn_ranges),
+            output_dir=args.output_dir,
             suffix=".pdf",
         ),
     )
@@ -235,6 +242,7 @@ def _as_atm_overview_args(args: argparse.Namespace, *, wn_ranges: list[tuple[flo
             temperature_k=args.temperature_k,
             pressure_bar=args.pressure_bar,
             wn_range=_combined_range(wn_ranges),
+            output_dir=args.output_dir,
             suffix=".pdf",
         ),
         manifest=args.manifest,
@@ -260,6 +268,7 @@ def _as_atm_args(args: argparse.Namespace, *, plot_type: str, wn_range: tuple[fl
             temperature_k=args.temperature_k,
             pressure_bar=args.pressure_bar,
             wn_range=wn_range,
+            output_dir=args.output_dir,
         ),
     )
 
@@ -295,7 +304,7 @@ def build_parser() -> argparse.ArgumentParser:
             """\
             Examples:
               pyharp-plot binary --pair H2-H2 --temperature-k 300 --wn-range=20,10000
-              pyharp-plot binary --pair H2-He --temperature-k 500 --resolution 5 --figure output/h2_he_cia.png
+              pyharp-plot binary --pair H2-He --temperature-k 500 --resolution 5 --output output/h2_he_cia.png
             """
         ),
     )
@@ -304,7 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
     binary.add_argument("--filename", default=None, metavar="FILE", help="Use a specific CIA filename instead of resolving one from --pair.")
     binary.add_argument("--temperature-k", type=float, default=300.0, metavar="K", help="Gas temperature in kelvin.")
     binary.add_argument("--refresh", action="store_true", help="Re-download the CIA file even if cached.")
-    binary.add_argument("--figure", type=Path, default=None, metavar="PATH", help="Output PNG path. Defaults to an auto-generated path under output/.")
+    binary.add_argument("--output", dest="figure", type=Path, default=None, metavar="PATH", help="Output PNG path. Defaults to an auto-generated path under --output-dir.")
 
     xsection = subparsers.add_parser(
         "xsection",
@@ -325,7 +334,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_cache_arguments(xsection)
     xsection.add_argument("--cia-filename", default=None, metavar="FILE", help="Optional CIA filename to include as the secondary continuum source.")
     xsection.add_argument("--cia-pair", default=None, metavar="PAIR", help="Optional CIA pair to resolve as the secondary continuum source.")
-    xsection.add_argument("--figure", type=Path, default=None, metavar="PATH", help="Output PNG path. Defaults to an auto-generated path under output/.")
+    xsection.add_argument("--output", dest="figure", type=Path, default=None, metavar="PATH", help="Output PNG path. Defaults to an auto-generated path under --output-dir.")
 
     for name in ("attenuation", "transmission"):
         path_help = "Transmission path length in kilometers." if name == "transmission" else None
@@ -354,7 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
         subparser.add_argument("--cia-pair", default=None, metavar="PAIR", help="Optional CIA pair to include for molecular targets.")
         if name == "transmission":
             subparser.add_argument("--path-length-km", type=float, default=1.0, metavar="KM", help=path_help)
-        subparser.add_argument("--figure", type=Path, default=None, metavar="PATH", help="Output PNG path. Defaults to an auto-generated path under output/.")
+        subparser.add_argument("--output", dest="figure", type=Path, default=None, metavar="PATH", help="Output PNG path. Defaults to an auto-generated path under --output-dir.")
 
     overview = subparsers.add_parser(
         "overview",
@@ -385,7 +394,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_cache_arguments(overview)
     overview.add_argument("--cia-filename", default=None, metavar="FILE", help="Optional CIA filename to include for molecular overview pages.")
     overview.add_argument("--cia-pair", default=None, metavar="PAIR", help="Optional CIA pair to include for molecular overview pages.")
-    overview.add_argument("--figure", type=Path, default=None, metavar="PATH", help="Output PDF path. Defaults to an auto-generated path under output/.")
+    overview.add_argument("--output", dest="figure", type=Path, default=None, metavar="PATH", help="Output PDF path. Defaults to an auto-generated path under --output-dir.")
     overview.add_argument("--manifest", type=Path, default=None, metavar="PATH", help="Output manifest JSON path for composition overview PDFs.")
 
     return parser

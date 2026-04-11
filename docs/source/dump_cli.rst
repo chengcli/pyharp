@@ -15,10 +15,11 @@ or ``--composition`` where supported.
 
    pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
    pyharp-dump xsection --pair H2-He --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-   pyharp-dump transmission --composition H2:0.9,He:0.1,H2O:0.002 --path-length-m 1000 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+   pyharp-dump transmission --composition H2:0.9,He:0.1,H2O:0.002 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 
-Without ``--output``, files are written under ``output/`` with names derived
-from the target, product type, thermodynamic state, and wavenumber range.
+Without ``--output``, files are written under ``--output-dir`` using names
+derived from the target, product type, thermodynamic state, and wavenumber
+range.
 
 Subcommands
 -----------
@@ -57,17 +58,19 @@ Examples:
 
 .. code-block:: bash
 
-   pyharp-dump transmission --species H2O --path-length-m 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-   pyharp-dump transmission --pair H2-He --path-length-m 1000 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
-   pyharp-dump transmission --composition H2:0.9,He:0.1,H2O:0.002 --path-length-m 1000 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+   pyharp-dump transmission --species H2O --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+   pyharp-dump transmission --pair H2-He --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
+   pyharp-dump transmission --composition H2:0.9,He:0.1,H2O:0.002 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 
 Shared Options
 --------------
 
 ``--wn-range=min,max``
-    Wavenumber bounds in ``cm^-1``. Repeat this option to write multiple bands
-    into one NetCDF file. Ranges are lower-inclusive and upper-exclusive, so
-    ``--wn-range=20,22`` with ``--resolution 1`` samples ``20`` and ``21``.
+    Wavenumber bounds in ``cm^-1``. Repeat this option to write one NetCDF
+    file per band. When ``--output`` is provided with multiple ranges,
+    pyharp appends ``_<wnmin>_<wnmax>`` to the requested stem. Ranges are
+    lower-inclusive and upper-exclusive, so ``--wn-range=20,22`` with
+    ``--resolution 1`` samples ``20`` and ``21``.
 
 ``--resolution value``
     Wavenumber spacing in ``cm^-1``. The default is ``1``.
@@ -78,12 +81,16 @@ Shared Options
 ``--pressure-bar value``
     Pressure in bar. The default is ``1``.
 
-``--path-length-m value``
-    Propagation path length in meters. This option is required only for
+``--path-length-km value``
+    Transmission path length in kilometers. This option is required only for
     ``transmission`` and defaults to ``1``.
 
 ``--output path``
     Explicit NetCDF output path.
+
+``--output-dir path``
+    Directory used for auto-generated NetCDF filenames. This is ignored when
+    ``--output`` is provided.
 
 ``--hitran-dir path``
     Directory used for cached HITRAN line and CIA files. The default is
@@ -132,18 +139,10 @@ Repeat ``--wn-range`` to compute multiple bands in one run:
    pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 \
        --wn-range=20,2500 --wn-range=2500,10000
 
-This produces bands on ``[20, 2500)`` and ``[2500, 10000)``, so adjacent
-repeated ranges do not duplicate the boundary sample.
-
-Multi-band outputs contain:
-
-* ``band`` and ``wavenumber`` dimensions
-* ``wavenumber``
-* ``band_size``
-* ``band_wavenumber_min``
-* ``band_wavenumber_max``
-
-Per-band data variables are stored as ``(band, wavenumber)`` arrays.
+This writes one file for ``[20, 2500)`` and one file for ``[2500, 10000)``.
+Adjacent repeated ranges do not duplicate the boundary sample. If
+``--output output/h2o.nc`` is provided, the generated files are
+``output/h2o_20_2500.nc`` and ``output/h2o_2500_10000.nc``.
 
 NetCDF Naming Conventions
 -------------------------
@@ -235,7 +234,7 @@ Composition transmission dump:
 
    pyharp-dump transmission \
        --composition H2:0.9,He:0.1,CH4:0.004,H2O:0.002 \
-       --path-length-m 1000 \
+       --path-length-km 1 \
        --temperature-k 300 \
        --pressure-bar 1 \
        --wn-range=20,2500

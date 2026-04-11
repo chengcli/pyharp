@@ -20,7 +20,6 @@ from .dataset_io import (
     add_wavenumber_attrs,
     build_state_attrs,
     clean_var_token,
-    combine_band_datasets,
     write_dataset_via_tmp,
 )
 from .hitran_cia import load_cia_dataset
@@ -46,6 +45,9 @@ class _ZeroLineProvider:
         return np.zeros_like(np.asarray(wavenumber_grid_cm1, dtype=np.float64))
 
 
+TRANSMISSION_PATH_LENGTH_HELP = "Transmission path length in kilometers."
+
+
 def _add_selector_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--pair", default=None, metavar="PAIR", help="CIA pair target, for example H2-H2 or H2-He.")
     parser.add_argument("--species", default=None, metavar="NAME", help="Molecular target, for example CO2, H2O, CH4, NH3, or H2S.")
@@ -54,11 +56,12 @@ def _add_selector_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_length: bool = False) -> None:
     _add_selector_arguments(parser)
-    parser.add_argument("--output", type=Path, default=None, metavar="PATH", help="Output NetCDF path. Defaults to an auto-generated path under output/.")
+    parser.add_argument("--output", type=Path, default=None, metavar="PATH", help="Output NetCDF path. Defaults to an auto-generated path under --output-dir.")
+    parser.add_argument("--output-dir", type=Path, default=Path("output"), metavar="DIR", help="Directory for auto-generated NetCDF output paths.")
     parser.add_argument("--hitran-dir", type=Path, default=default_hitran_dir(), metavar="DIR", help="Directory for downloaded HITRAN line and CIA data.")
     parser.add_argument("--temperature-k", type=float, default=300.0, metavar="K", help="Gas temperature in kelvin.")
     parser.add_argument("--pressure-bar", type=float, default=1.0, metavar="BAR", help="Gas pressure in bar.")
-    parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=parse_wn_range, metavar="MIN,MAX", help="Wavenumber range in cm^-1. Repeat to store multiple bands in one NetCDF.")
+    parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=parse_wn_range, metavar="MIN,MAX", help="Wavenumber range in cm^-1. Repeat to write one NetCDF per band.")
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
     parser.add_argument("--refresh-hitran", action="store_true", help="Re-download HITRAN line tables even if cached.")
     parser.add_argument("--broadening-composition", default=None, metavar="BROADENER:FRACTION,...", help="Line-broadening gas composition for molecular line calculations, for example air:0.8,self:0.2 or H2:0.85,He:0.15.")
@@ -68,7 +71,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--cia-index-url", default="https://hitran.org/cia/", metavar="URL", help="HITRAN CIA index URL used to resolve CIA files.")
     parser.add_argument("--refresh-cia", action="store_true", help="Re-download HITRAN CIA files even if cached.")
     if include_path_length:
-        parser.add_argument("--path-length-m", type=float, default=1.0, metavar="M", help="Propagation path length in meters.")
+        parser.add_argument("--path-length-km", type=float, default=1.0, metavar="KM", help=TRANSMISSION_PATH_LENGTH_HELP)
 
 
 def _validate_single_selector(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
@@ -94,7 +97,7 @@ def _default_cli_output_path(args: argparse.Namespace, *, suffix: str) -> Path:
         pressure_bar=args.pressure_bar,
         wn_range=args.wn_range,
         suffix=suffix,
-        output_dir=Path("output"),
+        output_dir=Path(args.output_dir),
     )
 
 
@@ -102,8 +105,12 @@ def _selected_wn_ranges(args: argparse.Namespace) -> list[tuple[float, float]]:
     return list(args.wn_ranges or [(20.0, 2500.0)])
 
 
-def _combined_wn_range(wn_ranges: list[tuple[float, float]]) -> tuple[float, float]:
-    return min(wn_min for wn_min, _ in wn_ranges), max(wn_max for _, wn_max in wn_ranges)
+def _band_attr_values(wn_range: tuple[float, float]) -> dict[str, float]:
+    wn_min, wn_max = wn_range
+    return {
+        "band_wavenumber_min_cm1": float(wn_min),
+        "band_wavenumber_max_cm1": float(wn_max),
+    }
 
 
 def _args_for_wn_range(args: argparse.Namespace, wn_range: tuple[float, float]) -> argparse.Namespace:
@@ -112,22 +119,15 @@ def _args_for_wn_range(args: argparse.Namespace, wn_range: tuple[float, float]) 
     return scoped
 
 
-def _multi_range_output_path(args: argparse.Namespace, *, suffix: str) -> Path:
-    if args.output is not None:
-        return args.output
-    scoped = _args_for_wn_range(args, _combined_wn_range(_selected_wn_ranges(args)))
-    return _default_cli_output_path(scoped, suffix=suffix)
-
-
-def _write_combined_dataset(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[float, float]], output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    combined = combine_band_datasets(datasets, wn_ranges=wn_ranges)
-    try:
-        write_dataset_via_tmp(combined, output_path, engine=DEFAULT_NETCDF_ENGINE)
-    finally:
-        combined.close()
-        for dataset in datasets:
-            dataset.close()
+def _output_path_for_wn_range(args: argparse.Namespace, *, wn_range: tuple[float, float], suffix: str) -> Path:
+    if args.output is None:
+        scoped = _args_for_wn_range(args, wn_range)
+        return _default_cli_output_path(scoped, suffix=suffix)
+    output_path = Path(args.output)
+    if len(_selected_wn_ranges(args)) <= 1:
+        return output_path
+    wn_min, wn_max = wn_range
+    return output_path.with_name(f"{output_path.stem}_{wn_min:g}_{wn_max:g}{output_path.suffix or suffix}")
 
 
 def _xsection_dataset(
@@ -135,6 +135,7 @@ def _xsection_dataset(
     *,
     species_name: str | None = None,
     secondary_component: dict[str, object] | None = None,
+    wn_range: tuple[float, float] | None = None,
 ) -> xr.Dataset:
     dataset = spectrum_to_dataset(spectrum)
     keep = ("sigma_line_cm2_molecule", "sigma_cia_cm2_molecule", "sigma_total_cm2_molecule")
@@ -177,6 +178,8 @@ def _xsection_dataset(
             binary,
             {"long_name": f"{secondary_component['label']} CIA binary absorption coefficient", "units": "cm^5 molecule^-2"},
         )
+    if wn_range is not None:
+        dataset.attrs.update(_band_attr_values(wn_range))
     return dataset
 
 
@@ -234,7 +237,7 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
             species_name=",".join(_composition_species_names(str(args.composition))),
             temperature_k=spectrum.temperature_k,
             pressure_pa=spectrum.pressure_pa,
-            extra={"composition_input": str(args.composition)},
+            extra={"composition_input": str(args.composition), **_band_attr_values(args.wn_range)},
         ),
     )
     add_wavenumber_attrs(dataset)
@@ -247,6 +250,7 @@ def _species_transmission_dataset(
     transmittance,
     species_name: str,
     secondary_component: dict[str, object] | None = None,
+    wn_range: tuple[float, float] | None = None,
 ) -> xr.Dataset:
     species_token = clean_var_token(species_name)
     data_vars: dict[str, tuple[tuple[str], np.ndarray, dict[str, str]]] = {
@@ -312,7 +316,7 @@ def _species_transmission_dataset(
             species_name=str(species_name),
             temperature_k=transmittance.temperature_k,
             pressure_pa=transmittance.pressure_pa,
-            extra={"path_length_m": float(transmittance.path_length_m)},
+            extra={"path_length_m": float(transmittance.path_length_m), **({} if wn_range is None else _band_attr_values(wn_range))},
         ),
     )
     add_wavenumber_attrs(dataset)
@@ -321,7 +325,7 @@ def _species_transmission_dataset(
 
 def _pair_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
     spectrum = _compute_pair_xsection(args)
-    transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
+    transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=float(args.path_length_km) * 1000.0)
     pair, _ = _resolve_pair_filename(args)
     pair_token = clean_var_token(pair)
     dataset = xr.Dataset(
@@ -352,7 +356,7 @@ def _pair_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
             species_name=pair,
             temperature_k=transmittance.temperature_k,
             pressure_pa=transmittance.pressure_pa,
-            extra={"path_length_m": float(transmittance.path_length_m)},
+            extra={"path_length_m": float(transmittance.path_length_m), **_band_attr_values(args.wn_range)},
         ),
     )
     add_wavenumber_attrs(dataset)
@@ -427,7 +431,7 @@ def _composition_transmission_dataset(args: argparse.Namespace) -> xr.Dataset:
             species_name=",".join(_composition_species_names(str(args.composition))),
             temperature_k=transmittance.temperature_k,
             pressure_pa=transmittance.pressure_pa,
-            extra={"composition_input": str(args.composition), "path_length_m": path_length_m},
+            extra={"composition_input": str(args.composition), "path_length_m": path_length_m, **_band_attr_values(args.wn_range)},
         ),
     )
     add_wavenumber_attrs(dataset)
@@ -440,9 +444,10 @@ def _write_xsection_dataset(
     *,
     species_name: str | None = None,
     secondary_component: dict[str, object] | None = None,
+    wn_range: tuple[float, float] | None = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    dataset = _xsection_dataset(spectrum, species_name=species_name, secondary_component=secondary_component)
+    dataset = _xsection_dataset(spectrum, species_name=species_name, secondary_component=secondary_component, wn_range=wn_range)
     try:
         write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
     finally:
@@ -591,6 +596,7 @@ def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
             "pair_name": pair,
             "temperature_k": float(args.temperature_k),
             "source_filename": filename,
+            **_band_attr_values(args.wn_range),
         },
     )
 
@@ -606,7 +612,7 @@ def _compute_composition_products(args: argparse.Namespace):
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
         broadening_composition=args.broadening_composition,
-        path_length_km=getattr(args, "path_length_m", 1000.0) / 1000.0,
+        path_length_km=getattr(args, "path_length_km", 1.0),
         manifest=None,
     )
     return compute_mixture_overview_products(mixture_args, wn_range=args.wn_range)
@@ -627,6 +633,7 @@ def _compute_xsection_band(task: tuple[str, argparse.Namespace]) -> tuple[xr.Dat
             spectrum,
             species_name=str(args.species or "CO2"),
             secondary_component=secondary_component,
+            wn_range=args.wn_range,
         )
         return dataset, broadening_summary
 
@@ -640,12 +647,13 @@ def _compute_transmission_band(task: tuple[str, argparse.Namespace]) -> tuple[xr
         dataset = _composition_transmission_dataset(args)
     else:
         spectrum, broadening_summary, secondary_component = _compute_species_xsection(args)
-        transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=args.path_length_m)
+        transmittance = compute_transmittance_spectrum(spectrum=spectrum, path_length_m=float(args.path_length_km) * 1000.0)
         dataset = _species_transmission_dataset(
             spectrum=spectrum,
             transmittance=transmittance,
             species_name=str(args.species or "CO2"),
             secondary_component=secondary_component,
+            wn_range=args.wn_range,
         )
     return dataset, broadening_summary
 
@@ -677,7 +685,7 @@ def build_parser() -> argparse.ArgumentParser:
             Examples:
               pyharp-dump xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
               pyharp-dump xsection --pair H2-He --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-              pyharp-dump transmission --composition H2:0.9,He:0.1,CH4:0.004 --path-length-m 1000 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+              pyharp-dump transmission --composition H2:0.9,He:0.1,CH4:0.004 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 
             Run "pyharp-dump COMMAND -h" for command-specific options.
             """
@@ -710,9 +718,9 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=dedent(
             """\
             Examples:
-              pyharp-dump transmission --species CO2 --path-length-m 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
-              pyharp-dump transmission --pair H2-H2 --path-length-m 1000 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
-              pyharp-dump transmission --composition H2:0.9,He:0.1,CH4:0.004 --path-length-m 1000 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+              pyharp-dump transmission --species CO2 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+              pyharp-dump transmission --pair H2-H2 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
+              pyharp-dump transmission --composition H2:0.9,He:0.1,CH4:0.004 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
             """
         ),
     )
@@ -729,8 +737,8 @@ def main() -> None:
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)
         if target_kind in {"pair", "composition"}:
-            output_path = _multi_range_output_path(args, suffix=".nc")
             if len(wn_ranges) == 1:
+                output_path = _output_path_for_wn_range(args, wn_range=wn_ranges[0], suffix=".nc")
                 dataset, _ = _compute_xsection_band((target_kind, _args_for_wn_range(args, wn_ranges[0])))
                 try:
                     write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
@@ -740,20 +748,25 @@ def main() -> None:
                 return
             tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
             results = _parallel_band_results(tasks, worker=_compute_xsection_band)
-            datasets = [dataset for dataset, _ in results]
-            _write_combined_dataset(datasets, wn_ranges=wn_ranges, output_path=output_path)
-            print(f"Wrote NetCDF: {output_path}")
+            for wn_range, (dataset, _) in zip(wn_ranges, results, strict=True):
+                output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
+                try:
+                    write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
+                finally:
+                    dataset.close()
+                print(f"Wrote NetCDF: {output_path}")
             return
         if len(wn_ranges) == 1:
             range_args = _args_for_wn_range(args, wn_ranges[0])
             broadening_summary: str | None = None
             spectrum, broadening_summary, secondary_component = _compute_species_xsection(range_args)
-            output_path = _multi_range_output_path(args, suffix=".nc")
+            output_path = _output_path_for_wn_range(args, wn_range=wn_ranges[0], suffix=".nc")
             _write_xsection_dataset(
                 spectrum,
                 output_path,
                 species_name=str(range_args.species or "CO2"),
                 secondary_component=secondary_component,
+                wn_range=range_args.wn_range,
             )
             print(f"Wrote NetCDF: {output_path}")
             if broadening_summary:
@@ -761,14 +774,15 @@ def main() -> None:
             return
         tasks = [("species", _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
         results = _parallel_band_results(tasks, worker=_compute_xsection_band)
-        datasets = [dataset for dataset, _ in results]
-        for _, broadening_summary in results:
+        for wn_range, (dataset, broadening_summary) in zip(wn_ranges, results, strict=True):
+            output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
+            try:
+                write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
+            finally:
+                dataset.close()
+            print(f"Wrote NetCDF: {output_path}")
             if broadening_summary:
                 print(f"Broadening: {broadening_summary}")
-        if len(wn_ranges) > 1:
-            output_path = _multi_range_output_path(args, suffix=".nc")
-            _write_combined_dataset(datasets, wn_ranges=wn_ranges, output_path=output_path)
-            print(f"Wrote NetCDF: {output_path}")
         return
     if args.command == "transmission":
         wn_ranges = _selected_wn_ranges(args)
@@ -776,7 +790,7 @@ def main() -> None:
         if len(wn_ranges) == 1:
             range_args = _args_for_wn_range(args, wn_ranges[0])
             dataset, broadening_summary = _compute_transmission_band((target_kind, range_args))
-            output_path = _multi_range_output_path(args, suffix=".nc")
+            output_path = _output_path_for_wn_range(args, wn_range=wn_ranges[0], suffix=".nc")
             try:
                 write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
             finally:
@@ -787,12 +801,13 @@ def main() -> None:
             return
         tasks = [(target_kind, _args_for_wn_range(args, wn_range)) for wn_range in wn_ranges]
         results = _parallel_band_results(tasks, worker=_compute_transmission_band)
-        datasets = [dataset for dataset, _ in results]
-        for _, broadening_summary in results:
+        for wn_range, (dataset, broadening_summary) in zip(wn_ranges, results, strict=True):
+            output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
+            try:
+                write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
+            finally:
+                dataset.close()
+            print(f"Wrote NetCDF: {output_path}")
             if broadening_summary:
                 print(f"Broadening: {broadening_summary}")
-        if len(wn_ranges) > 1:
-            output_path = _multi_range_output_path(args, suffix=".nc")
-            _write_combined_dataset(datasets, wn_ranges=wn_ranges, output_path=output_path)
-            print(f"Wrote NetCDF: {output_path}")
         return

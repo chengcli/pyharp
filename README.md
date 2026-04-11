@@ -89,10 +89,14 @@ CIA pairs, and gas mixtures:
 ```bash
 pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 pyharp-dump xsection --pair H2-H2 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
-pyharp-dump transmission --species H2O --path-length-m 1 --wn-range=20,2500
+pyharp-dump transmission --species H2O --path-length-km 1 --wn-range=20,2500
 ```
 
-Use repeated `--wn-range=min,max` values to store multiple bands in one file.
+Use repeated `--wn-range=min,max` values to write one NetCDF file per band.
+When you also pass `--output`, pyharp appends `_<wnmin>_<wnmax>` to the
+requested stem for each generated file.
+Use `--output-dir` to place auto-generated filenames under a different
+directory without overriding the filename pattern.
 Across `pyharp.spectra`, wavenumber ranges are interpreted as
 lower-inclusive and upper-exclusive: `--wn-range=20,22` with `1 cm^-1`
 resolution samples `20` and `21`, not `22`.
@@ -115,9 +119,9 @@ Use `--pair` for CIA pairs, `--species` for molecules, and `--composition`
 for gas mixtures such as `H2O:0.1,H2:0.9`. All plot commands accept
 `--wn-range=min,max`; `overview` accepts multiple `--wn-range` values for
 multi-page PDFs. These ranges are lower-inclusive and upper-exclusive. Use
-`--figure` to choose the output path. Without `--figure`,
-plots are written under `output/` with names derived from the target, plot
-type, temperature, pressure, and wavenumber range.
+`--output` to choose the output path. Without `--output`, plots are written
+under `--output-dir` (default `output/`) with names derived from the target,
+plot type, temperature, pressure, and wavenumber range.
 
 Molecular line calculations also accept `--broadening-composition BROADENER:FRACTION,...`,
 for example `air:0.8,self:0.2` or `H2:0.85,He:0.15`.

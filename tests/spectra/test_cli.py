@@ -6,7 +6,7 @@ from pathlib import Path
 import xarray as xr
 
 from pyharp.spectra.dataset_io import combine_band_datasets, write_dataset_via_tmp
-from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _pair_xsection_dataset, _species_transmission_dataset, _xsection_dataset, build_parser, main
+from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _output_path_for_wn_range, _pair_xsection_dataset, _species_transmission_dataset, _xsection_dataset, build_parser, main
 from pyharp.spectra.shared_cli import default_hitran_dir, default_output_path, project_root
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 
@@ -34,6 +34,8 @@ def test_xsection_parser_accepts_species_pressure_temperature_and_outputs(tmp_pa
             "xsection",
             "--output",
             str(tmp_path / "xsection.nc"),
+            "--output-dir",
+            str(tmp_path / "named"),
             "--temperature-k",
             "300",
             "--pressure-bar",
@@ -48,6 +50,7 @@ def test_xsection_parser_accepts_species_pressure_temperature_and_outputs(tmp_pa
     )
     assert args.command == "xsection"
     assert args.output == tmp_path / "xsection.nc"
+    assert args.output_dir == tmp_path / "named"
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
     assert args.species == "co2"
@@ -94,7 +97,7 @@ def test_transmission_parser_accepts_path_length_and_outputs(tmp_path) -> None:
             "300",
             "--pressure-bar",
             "1",
-            "--path-length-m",
+            "--path-length-km",
             "1.5",
             "--species",
             "CO2",
@@ -108,10 +111,25 @@ def test_transmission_parser_accepts_path_length_and_outputs(tmp_path) -> None:
     assert args.output == tmp_path / "trans.nc"
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
-    assert args.path_length_m == 1.5
+    assert args.path_length_km == 1.5
     assert args.species == "CO2"
     assert args.broadening_composition == "H2:0.85,He:0.15"
     assert args.wn_ranges == [(50.0, 150.0)]
+
+
+def test_transmission_parser_defaults_path_length_to_one_km() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "transmission",
+            "--species",
+            "CO2",
+            "--wn-range",
+            "50,150",
+        ]
+    )
+
+    assert args.path_length_km == 1.0
 
 
 def test_xsection_parser_accepts_repeated_wn_ranges(tmp_path) -> None:
@@ -129,6 +147,40 @@ def test_xsection_parser_accepts_repeated_wn_ranges(tmp_path) -> None:
     )
 
     assert args.wn_ranges == [(20.0, 2500.0), (2500.0, 10000.0)]
+
+
+def test_output_path_for_multiple_ranges_appends_band_suffix(tmp_path) -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "xsection",
+            "--species",
+            "H2O",
+            "--wn-range=20,2500",
+            "--wn-range=2500,10000",
+            "--output",
+            str(tmp_path / "xsection.nc"),
+        ]
+    )
+
+    assert _output_path_for_wn_range(args, wn_range=(20.0, 2500.0), suffix=".nc") == tmp_path / "xsection_20_2500.nc"
+    assert _output_path_for_wn_range(args, wn_range=(2500.0, 10000.0), suffix=".nc") == tmp_path / "xsection_2500_10000.nc"
+
+
+def test_output_path_for_wn_range_uses_output_dir_for_generated_names(tmp_path) -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "xsection",
+            "--species",
+            "H2O",
+            "--wn-range=20,2500",
+            "--output-dir",
+            str(tmp_path / "products"),
+        ]
+    )
+
+    assert _output_path_for_wn_range(args, wn_range=(20.0, 2500.0), suffix=".nc") == tmp_path / "products" / "h2o_xsection_300K_1bar_20_2500.nc"
 
 
 def test_cli_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) -> None:
@@ -172,7 +224,7 @@ def test_cli_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
     assert "Broadening: requested=h2:0.900,he:0.100 -> effective=air:1.000" in out
 
 
-def test_cli_xsection_writes_multiple_ranges_to_one_file(monkeypatch, tmp_path, capsys) -> None:
+def test_cli_xsection_writes_one_file_per_range(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
@@ -188,6 +240,7 @@ def test_cli_xsection_writes_multiple_ranges_to_one_file(monkeypatch, tmp_path, 
         ],
     )
     calls = []
+    written = []
     monkeypatch.setattr(
         "pyharp.spectra.dump_cli._parallel_band_results",
         lambda tasks, *, worker: [
@@ -202,18 +255,21 @@ def test_cli_xsection_writes_multiple_ranges_to_one_file(monkeypatch, tmp_path, 
             for _, task_args in tasks
         ],
     )
-    written = []
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli._write_combined_dataset",
-        lambda datasets, *, wn_ranges, output_path: written.append((len(datasets), wn_ranges, output_path)),
+        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
+        lambda dataset, output_path, *, engine: written.append((tuple(dataset["wavenumber"].values), output_path, engine)),
     )
 
     main()
 
     assert calls == [(20.0, 2500.0), (2500.0, 10000.0)]
-    assert written == [(2, [(20.0, 2500.0), (2500.0, 10000.0)], tmp_path / "xsection.nc")]
+    assert written == [
+        ((1.0, 2.0), tmp_path / "xsection_20_2500.nc", "scipy"),
+        ((1.0, 2.0), tmp_path / "xsection_2500_10000.nc", "scipy"),
+    ]
     out = capsys.readouterr().out
-    assert "Wrote NetCDF:" in out
+    assert "Wrote NetCDF: " + str(tmp_path / "xsection_20_2500.nc") in out
+    assert "Wrote NetCDF: " + str(tmp_path / "xsection_2500_10000.nc") in out
     assert out.count("Broadening: requested=self:1.000 -> effective=self:1.000") == 2
 
 
@@ -263,6 +319,37 @@ def test_cli_xsection_composition_writes_one_file_with_component_fields(monkeypa
     ]
     out = capsys.readouterr().out
     assert "Wrote NetCDF:" in out
+
+
+def test_cli_xsection_uses_output_dir_for_generated_path(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "pyharp-dump",
+            "xsection",
+            "--species",
+            "H2O",
+            "--wn-range=20,2500",
+            "--output-dir",
+            str(tmp_path / "products"),
+        ],
+    )
+    monkeypatch.setattr(
+        "pyharp.spectra.dump_cli._compute_species_xsection",
+        lambda args: (type("Spectrum", (), {})(), None, None),
+    )
+    written = []
+    monkeypatch.setattr(
+        "pyharp.spectra.dump_cli._write_xsection_dataset",
+        lambda spectrum, output_path, **kwargs: written.append(output_path),
+    )
+
+    main()
+
+    assert written == [tmp_path / "products" / "h2o_xsection_300K_1bar_20_2500.nc"]
+    out = capsys.readouterr().out
+    assert "Wrote NetCDF: " + str(tmp_path / "products" / "h2o_xsection_300K_1bar_20_2500.nc") in out
 
 
 def test_combine_band_datasets_preserves_band_metadata() -> None:
@@ -325,6 +412,7 @@ def test_xsection_dataset_keeps_only_sigma_fields() -> None:
         spectrum,
         species_name="H2O",
         secondary_component={"kind": "continuum", "label": "H2O continuum (MT_CKD)"},
+        wn_range=(20.0, 22.0),
     )
     try:
         assert set(dataset.data_vars) == {
@@ -332,6 +420,8 @@ def test_xsection_dataset_keeps_only_sigma_fields() -> None:
             "sigma_continuum_h2o_continuum_mt_ckd",
             "sigma_total",
         }
+        assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
+        assert dataset.attrs["band_wavenumber_max_cm1"] == 22.0
     finally:
         dataset.close()
 
@@ -401,6 +491,8 @@ def test_pair_xsection_dataset_uses_binary_absorption_units(monkeypatch, tmp_pat
         assert dataset["binary_absorption_coefficient"].attrs["units"] == "cm^5 molecule^-2"
         assert "binary absorption coefficient" in dataset["binary_absorption_coefficient"].attrs["long_name"].lower()
         assert dataset.attrs["pair_name"] == "H2-He"
+        assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
+        assert dataset.attrs["band_wavenumber_max_cm1"] == 22.0
     finally:
         dataset.close()
 
@@ -463,6 +555,8 @@ def test_composition_xsection_dataset_uses_one_field_per_species_or_cia(monkeypa
             "binary_absorption_coefficient_h2_he",
         }
         assert dataset.attrs["species_name"] == "H2,He,H2O"
+        assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
+        assert dataset.attrs["band_wavenumber_max_cm1"] == 21.0
         assert dataset["sigma_line_h2o"].attrs["units"] == "cm^2 molecule^-1"
         assert np.allclose(dataset["sigma_line_h2o"].values, np.array([3.0, 4.0]))
         assert dataset["sigma_continuum_h2o_continuum_mt_ckd"].attrs["units"] == "cm^2 molecule^-1"
@@ -507,16 +601,20 @@ def test_cli_xsection_composition_multi_range_uses_composition_worker(monkeypatc
         ],
     )
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli._write_combined_dataset",
-        lambda datasets, *, wn_ranges, output_path: written.append((len(datasets), wn_ranges, output_path)),
+        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
+        lambda dataset, output_path, *, engine: written.append((tuple(dataset["wavenumber"].values), output_path, engine)),
     )
 
     main()
 
     assert worker_calls == [("composition", (20.0, 2500.0)), ("composition", (2500.0, 10000.0))]
-    assert written == [(2, [(20.0, 2500.0), (2500.0, 10000.0)], tmp_path / "mixture.nc")]
+    assert written == [
+        ((20.0, 21.0), tmp_path / "mixture_20_2500.nc", "scipy"),
+        ((20.0, 21.0), tmp_path / "mixture_2500_10000.nc", "scipy"),
+    ]
     out = capsys.readouterr().out
-    assert "Wrote NetCDF:" in out
+    assert "Wrote NetCDF: " + str(tmp_path / "mixture_20_2500.nc") in out
+    assert "Wrote NetCDF: " + str(tmp_path / "mixture_2500_10000.nc") in out
 
 
 def test_species_transmission_dataset_matches_xsection_naming() -> None:
@@ -555,6 +653,7 @@ def test_species_transmission_dataset_matches_xsection_naming() -> None:
         transmittance=transmittance,
         species_name="H2O",
         secondary_component={"kind": "continuum", "label": "H2O continuum (MT_CKD)"},
+        wn_range=(20.0, 22.0),
     )
     try:
         assert set(dataset.data_vars) == {
@@ -566,6 +665,8 @@ def test_species_transmission_dataset_matches_xsection_naming() -> None:
             "attenuation_total",
         }
         assert dataset.attrs["species_name"] == "H2O"
+        assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
+        assert dataset.attrs["band_wavenumber_max_cm1"] == 22.0
         assert dataset["attenuation_continuum_h2o_continuum_mt_ckd"].attrs["units"] == "m^-1"
     finally:
         dataset.close()
@@ -625,8 +726,8 @@ def test_composition_transmission_dataset_uses_component_names_and_attrs(monkeyp
             "transmission",
             "--composition",
             "H2:0.9,He:0.1,H2O:0.002",
-            "--path-length-m",
-            "2",
+            "--path-length-km",
+            "0.002",
             "--wn-range",
             "20,21",
             "--hitran-dir",
@@ -638,6 +739,8 @@ def test_composition_transmission_dataset_uses_component_names_and_attrs(monkeyp
     try:
         assert dataset.attrs["composition_input"] == "H2:0.9,He:0.1,H2O:0.002"
         assert dataset.attrs["species_name"] == "H2,He,H2O"
+        assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
+        assert dataset.attrs["band_wavenumber_max_cm1"] == 21.0
         assert set(dataset.data_vars) == {
             "transmittance_total",
             "attenuation_total",
@@ -651,6 +754,81 @@ def test_composition_transmission_dataset_uses_component_names_and_attrs(monkeyp
         assert np.allclose(dataset["attenuation_line_h2o"].values, np.array([600.0, 800.0]))
         assert np.allclose(dataset["attenuation_continuum_h2o_continuum_mt_ckd"].values, np.array([5000.0, 6000.0]))
         assert np.allclose(dataset["attenuation_cia_h2_he"].values, np.array([7000.0, 8000.0]))
+    finally:
+        dataset.close()
+
+
+def test_composition_transmission_total_equals_product_of_weighted_components(monkeypatch, tmp_path) -> None:
+    products = type(
+        "Products",
+        (),
+        {
+            "spectrum": type(
+                "Spectrum",
+                (),
+                {
+                    "wavenumber_cm1": np.array([20.0, 21.0]),
+                    "attenuation_total_m1": np.array([18.0, 24.0]),
+                    "temperature_k": 300.0,
+                    "pressure_pa": 1.0e5,
+                    "number_density_cm3": 10.0,
+                },
+            )(),
+            "transmittance": type(
+                "Trans",
+                (),
+                {
+                    "wavenumber_cm1": np.array([20.0, 21.0]),
+                    "transmittance_total": np.exp(-2.0 * np.array([18.0, 24.0])),
+                    "path_length_m": 2.0,
+                    "temperature_k": 300.0,
+                    "pressure_pa": 1.0e5,
+                },
+            )(),
+            "species_terms": (
+                type(
+                    "SpeciesTerm",
+                    (),
+                    {"species_name": "H2O", "mole_fraction": 0.2, "sigma_line_cm2_molecule": np.array([3.0, 4.0])},
+                )(),
+            ),
+            "secondary_sources": (
+                type(
+                    "Secondary",
+                    (),
+                    {"kind": "continuum", "label": "H2O continuum (MT_CKD)", "sigma_cm2_molecule": np.array([5.0, 6.0])},
+                )(),
+                type(
+                    "Secondary",
+                    (),
+                    {"kind": "binary_cia", "label": "H2-He", "sigma_cm2_molecule": np.array([7.0, 8.0])},
+                )(),
+            ),
+        },
+    )()
+    monkeypatch.setattr("pyharp.spectra.dump_cli._compute_composition_products", lambda args: products)
+    args = build_parser().parse_args(
+        [
+            "transmission",
+            "--composition",
+            "H2:0.9,He:0.1,H2O:0.002",
+            "--path-length-km",
+            "0.002",
+            "--wn-range",
+            "20,21",
+            "--hitran-dir",
+            str(tmp_path / "hitran"),
+        ]
+    )
+
+    dataset = _composition_transmission_dataset(_args_for_wn_range(args, args.wn_ranges[0]))
+    try:
+        component_product = (
+            dataset["transmittance_line_h2o"].values
+            * dataset["transmittance_continuum_h2o_continuum_mt_ckd"].values
+            * dataset["transmittance_cia_h2_he"].values
+        )
+        assert np.allclose(component_product, dataset["transmittance_total"].values)
     finally:
         dataset.close()
 
@@ -753,5 +931,7 @@ def test_cli_transmission_help_describes_broadening_and_path_length(capsys) -> N
     help_text = capsys.readouterr().out
     assert "Compute line, CIA, and total transmission over a fixed path length and write a NetCDF dataset." in help_text
     assert "--broadening-composition BROADENER:FRACTION,..." in help_text
-    assert "Propagation path length in meters." in help_text
+    assert "Transmission path length in kilometers." in help_text
+    assert "Output NetCDF path. Defaults to an auto-generated path" in help_text
+    assert "under --output-dir." in help_text
     assert "pyharp-dump transmission --composition H2:0.9,He:0.1,CH4:0.004" in help_text
