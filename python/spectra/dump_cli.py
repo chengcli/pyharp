@@ -24,7 +24,7 @@ from .dataset_io import (
 )
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import build_line_provider, download_hitran_lines
-from .output_names import default_output_path as default_named_output_path
+from .output_names import _format_value, default_output_path as default_named_output_path
 from .shared_cli import (
     HelpFormatter,
     build_band,
@@ -158,7 +158,9 @@ def _output_path_for_wn_range(args: argparse.Namespace, *, wn_range: tuple[float
     if len(_selected_wn_ranges(args)) <= 1:
         return output_path
     wn_min, wn_max = wn_range
-    return output_path.with_name(f"{output_path.stem}_{wn_min:g}_{wn_max:g}{output_path.suffix or suffix}")
+    return output_path.with_name(
+        f"{output_path.stem}_{_format_value(wn_min)}_{_format_value(wn_max)}{output_path.suffix or suffix}"
+    )
 
 
 def _xsection_dataset(

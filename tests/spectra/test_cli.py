@@ -184,6 +184,24 @@ def test_output_path_for_multiple_ranges_appends_band_suffix(tmp_path) -> None:
     assert _output_path_for_wn_range(args, wn_range=(2500.0, 10000.0), suffix=".nc") == tmp_path / "xsection_2500_10000.nc"
 
 
+def test_output_path_for_multiple_ranges_normalizes_suffix_tokens(tmp_path) -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "xsection",
+            "--species",
+            "H2O",
+            "--wn-range=-1,30.5",
+            "--wn-range=30.5,100",
+            "--output",
+            str(tmp_path / "xsection.nc"),
+        ]
+    )
+
+    assert _output_path_for_wn_range(args, wn_range=(-1.0, 30.5), suffix=".nc") == tmp_path / "xsection_m1_30p5.nc"
+    assert _output_path_for_wn_range(args, wn_range=(30.5, 100.0), suffix=".nc") == tmp_path / "xsection_30p5_100.nc"
+
+
 def test_output_path_for_wn_range_uses_output_dir_for_generated_names(tmp_path) -> None:
     parser = build_parser()
     args = parser.parse_args(
