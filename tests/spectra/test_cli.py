@@ -378,7 +378,7 @@ def test_xsection_dataset_adds_binary_cia_field_for_species_dump() -> None:
 def test_pair_xsection_dataset_uses_binary_absorption_units(monkeypatch, tmp_path) -> None:
     class FakeCia:
         def interpolate_to_grid(self, *, temperature_k, wavenumber_grid_cm1):
-            return np.array([1.0e-46, 2.0e-46, 3.0e-46], dtype=np.float64)
+            return np.array([1.0e-46, 2.0e-46], dtype=np.float64)
 
     monkeypatch.setattr("pyharp.spectra.dump_cli.load_cia_dataset", lambda **kwargs: FakeCia())
     args = build_parser().parse_args(
@@ -691,10 +691,10 @@ def test_cli_xsection_reuses_built_provider_for_species_spectrum(monkeypatch, tm
     def fake_resolve_continuum_sources(*, config, wavenumber_grid_cm1, temperature_k, pressure_pa):
         calls["resolve"] += 1
         assert config.hitran_species.name == "H2O"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
-        return None, np.array([1.0e-24, 2.0e-24, 3.0e-24])
+        return None, np.array([1.0e-24, 2.0e-24])
 
     def fake_compute_from_sources(
         *,
@@ -708,12 +708,12 @@ def test_cli_xsection_reuses_built_provider_for_species_spectrum(monkeypatch, tm
     ):
         calls["compute"] += 1
         assert species_name == "H2O"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
         assert line_provider is fake_provider
         assert cia_dataset is None
-        assert np.allclose(cia_cross_section_cm2_molecule, np.array([1.0e-24, 2.0e-24, 3.0e-24]))
+        assert np.allclose(cia_cross_section_cm2_molecule, np.array([1.0e-24, 2.0e-24]))
         return type("Spectrum", (), {})()
 
     monkeypatch.setattr("pyharp.spectra.dump_cli._resolve_continuum_sources", fake_resolve_continuum_sources)

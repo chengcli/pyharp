@@ -66,7 +66,8 @@ Shared Options
 
 ``--wn-range=min,max``
     Wavenumber bounds in ``cm^-1``. Repeat this option to write multiple bands
-    into one NetCDF file.
+    into one NetCDF file. Ranges are lower-inclusive and upper-exclusive, so
+    ``--wn-range=20,22`` with ``--resolution 1`` samples ``20`` and ``21``.
 
 ``--resolution value``
     Wavenumber spacing in ``cm^-1``. The default is ``1``.
@@ -130,6 +131,9 @@ Repeat ``--wn-range`` to compute multiple bands in one run:
 
    pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 \
        --wn-range=20,2500 --wn-range=2500,10000
+
+This produces bands on ``[20, 2500)`` and ``[2500, 10000)``, so adjacent
+repeated ranges do not duplicate the boundary sample.
 
 Multi-band outputs contain:
 

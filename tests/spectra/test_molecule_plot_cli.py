@@ -201,7 +201,7 @@ def test_compute_requested_absorption_spectrum_reuses_built_line_provider_withou
     def fake_resolve_continuum_sources(*, config, wavenumber_grid_cm1, temperature_k, pressure_pa):
         calls["resolve"] += 1
         assert config.hitran_species.name == "CO2"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
         return None, None
@@ -218,7 +218,7 @@ def test_compute_requested_absorption_spectrum_reuses_built_line_provider_withou
     ):
         calls["compute"] += 1
         assert species_name == "CO2"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
         assert line_provider is fake_provider

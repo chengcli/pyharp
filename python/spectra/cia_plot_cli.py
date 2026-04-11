@@ -5,9 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
-
-from .config import resolve_hitran_cia_pair
+from .config import SpectralBandConfig, resolve_hitran_cia_pair
 from .hitran_cia import (
     load_cia_dataset,
     plot_cia_attenuation_coefficient,
@@ -46,12 +44,13 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _validate_and_build_grid(args: argparse.Namespace) -> np.ndarray:
     wn_min, wn_max = _wn_bounds(args)
-    if args.resolution <= 0.0:
-        raise ValueError("resolution must be positive")
-    if wn_max < wn_min:
-        raise ValueError("wn-range max must be >= min")
-    count = int(round((wn_max - wn_min) / args.resolution))
-    return wn_min + np.arange(count + 1, dtype=np.float64) * args.resolution
+    band = SpectralBandConfig(
+        name="cia_plot",
+        wavenumber_min_cm1=wn_min,
+        wavenumber_max_cm1=wn_max,
+        resolution_cm1=args.resolution,
+    )
+    return band.grid()
 
 
 def _resolve_filename(args: argparse.Namespace) -> str:
