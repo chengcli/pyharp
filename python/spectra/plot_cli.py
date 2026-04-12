@@ -188,9 +188,8 @@ def _as_cia_args(args: argparse.Namespace, *, default_pair: str, plot_type: str)
     return argparse.Namespace(
         hitran_dir=args.hitran_dir,
         cia_dir=getattr(args, "cia_dir", None),
-        cia_database=getattr(args, "cia_database", "hitran"),
-        cia_model=getattr(args, "cia_model", "xiz"),
-        cia_state=getattr(args, "cia_state", "eq"),
+        cia_model=getattr(args, "cia_model", "auto"),
+        h2_state=getattr(args, "h2_state", "eq"),
         filename=getattr(args, "filename", None),
         pair=pair,
         temperature_k=args.temperature_k,
@@ -434,10 +433,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_arguments(binary)
     binary.add_argument("--pair", default="H2-H2", metavar="PAIR", help="CIA pair target, for example H2-H2 or H2-He.")
     binary.add_argument("--filename", default=None, metavar="FILE", help="Use a specific CIA filename instead of resolving one from --pair.")
-    binary.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN defaults to hitran/; Orton/Xiz defaults to orton_xiz_cia/.")
-    binary.add_argument("--cia-database", choices=("hitran", "orton_xiz"), default="hitran", help="CIA database backend.")
-    binary.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. For HITRAN, use auto/2011/2018. For Orton/Xiz, use auto/xiz/orton.")
-    binary.add_argument("--cia-state", choices=("eq", "nm"), default="eq", help="Legacy H2 spin-state table when --cia-database=orton_xiz.")
+    binary.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN uses hitran/; xiz/orton use orton_xiz_cia/ by default.")
+    binary.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. auto/2011/2018 use HITRAN. xiz/orton use the legacy Orton/Xiz tables.")
+    binary.add_argument("--h2-state", choices=("eq", "nm"), default="eq", help="H2 spin-state selector used by HITRAN 2018 and xiz/orton H2 tables.")
     binary.add_argument("--temperature-k", type=float, default=300.0, metavar="K", help="Gas temperature in kelvin.")
     binary.add_argument("--refresh", action="store_true", help="Re-download the CIA file even if cached.")
     binary.add_argument("--output", dest="figure", type=Path, default=None, metavar="PATH", help="Output PNG path. Defaults to an auto-generated path under --output-dir.")
@@ -486,10 +484,9 @@ def build_parser() -> argparse.ArgumentParser:
         _add_selector_arguments(subparser, include_composition=True)
         _add_cache_arguments(subparser)
         subparser.add_argument("--filename", default=None, metavar="FILE", help="Use a specific CIA filename for --pair targets.")
-        subparser.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN defaults to hitran/; Orton/Xiz defaults to orton_xiz_cia/.")
-        subparser.add_argument("--cia-database", choices=("hitran", "orton_xiz"), default="hitran", help="CIA database backend for --pair targets.")
-        subparser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. For HITRAN, use auto/2011/2018. For Orton/Xiz, use auto/xiz/orton.")
-        subparser.add_argument("--cia-state", choices=("eq", "nm"), default="eq", help="Legacy H2 spin-state table when --cia-database=orton_xiz.")
+        subparser.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN uses hitran/; xiz/orton use orton_xiz_cia/ by default.")
+        subparser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. auto/2011/2018 use HITRAN. xiz/orton use the legacy Orton/Xiz tables.")
+        subparser.add_argument("--h2-state", choices=("eq", "nm"), default="eq", help="H2 spin-state selector used by HITRAN 2018 and xiz/orton H2 tables.")
         subparser.add_argument("--cia-filename", default=None, metavar="FILE", help="Optional CIA filename to include for molecular targets.")
         subparser.add_argument("--cia-pair", default=None, metavar="PAIR", help="Optional CIA pair to include for molecular targets.")
         if name == "transmission":

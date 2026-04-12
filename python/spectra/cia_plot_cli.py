@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 
-from .config import SpectralBandConfig, resolve_hitran_cia_filename, resolve_hitran_cia_pair
+from .config import SpectralBandConfig, cia_database_for_model, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .hitran_cia import (
     load_cia_dataset,
     plot_cia_attenuation_coefficient,
@@ -38,9 +38,8 @@ def _wn_bounds(args: argparse.Namespace) -> tuple[float, float]:
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"))
     parser.add_argument("--cia-dir", type=Path, default=None)
-    parser.add_argument("--cia-database", choices=("hitran", "orton_xiz"), default="hitran")
     parser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto")
-    parser.add_argument("--cia-state", choices=("eq", "nm"), default="eq")
+    parser.add_argument("--h2-state", choices=("eq", "nm"), default="eq")
     parser.add_argument("--filename", default=None)
     parser.add_argument("--pair", default="H2-H2")
     parser.add_argument("--temperature-k", type=float, default=300.0)
@@ -63,19 +62,18 @@ def _validate_and_build_grid(args: argparse.Namespace) -> np.ndarray:
 def _resolve_filename(args: argparse.Namespace) -> str:
     if args.filename:
         return str(args.filename)
-    if args.cia_database == "orton_xiz":
-        legacy_model = "xiz" if args.cia_model == "auto" else args.cia_model
-        return resolve_orton_xiz_cia_filename(pair=args.pair, model=legacy_model, state=args.cia_state)
-    return resolve_hitran_cia_filename(pair=args.pair, model=args.cia_model, state=args.cia_state).filename
+    if cia_database_for_model(args.cia_model) == "orton_xiz":
+        return resolve_orton_xiz_cia_filename(pair=args.pair, model=args.cia_model, state=args.h2_state)
+    return resolve_hitran_cia_filename(pair=args.pair, model=args.cia_model, state=args.h2_state).filename
 
 
 def _load_dataset(args: argparse.Namespace):
-    if args.cia_database == "orton_xiz":
+    if cia_database_for_model(args.cia_model) == "orton_xiz":
         return load_orton_xiz_cia_dataset(
             cache_dir=args.cia_dir or default_orton_xiz_cia_dir(),
             pair=args.pair,
-            model="xiz" if args.cia_model == "auto" else args.cia_model,
-            state=args.cia_state,
+            model=args.cia_model,
+            state=args.h2_state,
             refresh=args.refresh,
         )
     return load_cia_dataset(

@@ -13,7 +13,7 @@ import numpy as np
 import xarray as xr
 
 from .atm_overview_cli import _parse_composition, compute_mixture_overview_products
-from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
+from .config import SpectroscopyConfig, cia_database_for_model, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .dataset_io import (
     DEFAULT_NETCDF_ENGINE,
     WAVENUMBER_ATTRS,
@@ -108,10 +108,9 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--filename", default=None, metavar="FILE", help="Use a specific CIA filename instead of resolving one from --pair.")
     parser.add_argument("--cia-filename", default=None, metavar="FILE", help="Optional CIA filename to include for molecular targets.")
     parser.add_argument("--cia-pair", default=None, metavar="PAIR", help="Optional CIA pair to include for molecular targets.")
-    parser.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN defaults to --hitran-dir; Orton/Xiz defaults to orton_xiz_cia/.")
-    parser.add_argument("--cia-database", choices=("hitran", "orton_xiz"), default="hitran", help="CIA database backend for --pair targets.")
-    parser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. For HITRAN, use auto/2011/2018. For Orton/Xiz, use auto/xiz/orton.")
-    parser.add_argument("--cia-state", choices=("eq", "nm"), default="eq", help="Legacy H2 spin-state table when --cia-database=orton_xiz.")
+    parser.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN uses --hitran-dir; xiz/orton use orton_xiz_cia/ by default.")
+    parser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. auto/2011/2018 use HITRAN. xiz/orton use the legacy Orton/Xiz tables.")
+    parser.add_argument("--h2-state", choices=("eq", "nm"), default="eq", help="H2 spin-state selector used by HITRAN 2018 and xiz/orton H2 tables.")
     parser.add_argument("--cia-index-url", default="https://hitran.org/cia/", metavar="URL", help="HITRAN CIA index URL used to resolve CIA files.")
     parser.add_argument("--refresh-cia", action="store_true", help="Re-download HITRAN CIA files even if cached.")
     if include_path_length:
@@ -591,21 +590,20 @@ def _resolve_pair_filename(args: argparse.Namespace) -> tuple[str, str]:
     pair = str(args.pair or "H2-H2")
     if args.filename:
         return pair, str(args.filename)
-    if getattr(args, "cia_database", "hitran") == "orton_xiz":
-        legacy_model = "xiz" if args.cia_model == "auto" else args.cia_model
-        return pair, resolve_orton_xiz_cia_filename(pair=pair, model=legacy_model, state=args.cia_state)
-    metadata = resolve_hitran_cia_filename(pair=pair, model=args.cia_model, state=args.cia_state)
+    if cia_database_for_model(args.cia_model) == "orton_xiz":
+        return pair, resolve_orton_xiz_cia_filename(pair=pair, model=args.cia_model, state=args.h2_state)
+    metadata = resolve_hitran_cia_filename(pair=pair, model=args.cia_model, state=args.h2_state)
     return metadata.pair, metadata.filename
 
 
 def _load_pair_cia_dataset(args: argparse.Namespace):
     pair, filename = _resolve_pair_filename(args)
-    if getattr(args, "cia_database", "hitran") == "orton_xiz":
+    if cia_database_for_model(args.cia_model) == "orton_xiz":
         return load_orton_xiz_cia_dataset(
             cache_dir=args.cia_dir or default_orton_xiz_cia_dir(),
             pair=pair,
-            model="xiz" if args.cia_model == "auto" else args.cia_model,
-            state=args.cia_state,
+            model=args.cia_model,
+            state=args.h2_state,
             refresh=bool(args.refresh_cia),
         )
     return load_cia_dataset(

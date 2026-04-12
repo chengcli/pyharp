@@ -99,11 +99,9 @@ def test_xsection_parser_accepts_orton_xiz_pair_selector(tmp_path) -> None:
             "1",
             "--pair",
             "H2-H2",
-            "--cia-database",
-            "orton_xiz",
             "--cia-model",
             "xiz",
-            "--cia-state",
+            "--h2-state",
             "eq",
             "--cia-dir",
             str(tmp_path / "orton_xiz_cia"),
@@ -111,9 +109,8 @@ def test_xsection_parser_accepts_orton_xiz_pair_selector(tmp_path) -> None:
             "50,150",
         ]
     )
-    assert args.cia_database == "orton_xiz"
     assert args.cia_model == "xiz"
-    assert args.cia_state == "eq"
+    assert args.h2_state == "eq"
     assert args.cia_dir == tmp_path / "orton_xiz_cia"
 
 
@@ -123,8 +120,6 @@ def test_resolve_pair_filename_supports_hitran_2011_override() -> None:
             "xsection",
             "--pair",
             "H2-He",
-            "--cia-database",
-            "hitran",
             "--cia-model",
             "2011",
         ]
@@ -138,11 +133,9 @@ def test_resolve_pair_filename_supports_hitran_2018_h2_h2_states() -> None:
             "xsection",
             "--pair",
             "H2-H2",
-            "--cia-database",
-            "hitran",
             "--cia-model",
             "2018",
-            "--cia-state",
+            "--h2-state",
             "nm",
         ]
     )
@@ -155,8 +148,6 @@ def test_resolve_pair_filename_errors_when_hitran_model_has_no_matching_file() -
             "xsection",
             "--pair",
             "H2-He",
-            "--cia-database",
-            "hitran",
             "--cia-model",
             "2018",
         ]
@@ -186,11 +177,9 @@ def test_pair_xsection_dataset_uses_orton_xiz_backend(monkeypatch, tmp_path) -> 
             "1",
             "--pair",
             "H2-H2",
-            "--cia-database",
-            "orton_xiz",
             "--cia-model",
             "xiz",
-            "--cia-state",
+            "--h2-state",
             "eq",
             "--wn-range",
             "20,22",

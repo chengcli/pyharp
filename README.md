@@ -89,6 +89,7 @@ CIA pairs, and gas mixtures:
 ```bash
 pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 pyharp-dump xsection --pair H2-H2 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
+pyharp-dump xsection --pair H2-H2 --cia-model xiz --h2-state eq --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
 pyharp-dump transmission --species H2O --path-length-km 1 --wn-range=20,2500
 ```
 
@@ -121,6 +122,8 @@ transmission, and overview plot subcommands:
 
 ```bash
 pyharp-plot binary --pair H2-H2 --temperature-k 300 --wn-range=20,10000
+pyharp-plot binary --pair H2-H2 --cia-model 2018 --h2-state eq --temperature-k 300 --wn-range=20,10000
+pyharp-plot binary --pair H2-H2 --cia-model xiz --h2-state eq --temperature-k 300 --wn-range=20,10000
 pyharp-plot xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 pyharp-plot attenuation --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 pyharp-plot transmission --composition H2O:0.1,H2:0.9 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=25,2500
@@ -146,6 +149,18 @@ Molecular line calculations also accept `--broadening-composition BROADENER:FRAC
 for example `air:0.8,self:0.2` or `H2:0.85,He:0.15`.
 If a requested foreign broadener is unavailable in the HITRAN table for the
 active absorber, Pyharp falls back to `air` for that fraction.
+
+CIA pair workflows now derive the backend directly from `--cia-model`:
+
+- `--cia-model auto` keeps the built-in HITRAN default filename mapping under `hitran/`
+- `--cia-model 2011` resolves `H2-H2_2011.cia` or `H2-He_2011.cia` from HITRAN
+- `--cia-model 2018 --h2-state eq|nm` resolves `H2-H2_eq_2018.cia` or `H2-H2_nm_2018.cia` from HITRAN
+- `--cia-model xiz|orton --h2-state eq|nm` selects one of the legacy H2-H2 or H2-He tables under `orton_xiz_cia/`
+
+If a requested HITRAN pair/model/state combination does not have a configured
+file, pyharp raises an error rather than silently falling back to another CIA
+dataset. HITRAN `2011` does not distinguish `eq` vs `nm`, while `xiz` and
+`orton` require an explicit H2 spin-state choice through `--h2-state`.
 
 See the [pyharp-plot CLI documentation](https://pyharp.readthedocs.io/en/latest/plot_cli.html)
 for command-specific options and more examples.

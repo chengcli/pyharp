@@ -187,6 +187,16 @@ def resolve_hitran_cia_filename(*, pair: str, model: str = "auto", state: str = 
     raise ValueError(f"Unsupported HITRAN CIA model {model!r}. Supported values: auto, 2011, 2018.")
 
 
+def cia_database_for_model(model: str) -> str:
+    """Return the CIA backend implied by one CLI model selector."""
+    model_key = str(model).strip().lower()
+    if model_key in {"auto", "2011", "2018"}:
+        return "hitran"
+    if model_key in {"xiz", "orton"}:
+        return "orton_xiz"
+    raise ValueError(f"Unsupported CIA model {model!r}. Supported values: auto, 2011, 2018, xiz, orton.")
+
+
 def supported_hitran_cia_pairs() -> tuple[HitranCiaPair, ...]:
     """Return the built-in HITRAN CIA pair metadata."""
     return tuple(_HITRAN_CIA_PAIRS_BY_NAME[key] for key in sorted(_HITRAN_CIA_PAIRS_BY_NAME))

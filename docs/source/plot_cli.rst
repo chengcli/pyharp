@@ -2,9 +2,10 @@ pyharp-plot CLI
 ================
 
 ``pyharp-plot`` is the unified command line entry point for spectroscopy
-diagnostic figures. It can plot HITRAN collision-induced absorption (CIA)
-binary coefficients, molecular cross sections, attenuation coefficients,
-transmission, and multi-panel overview PDFs.
+diagnostic figures. It can plot collision-induced absorption (CIA) binary
+coefficients from HITRAN or the legacy Orton/Xiz H2 tables, molecular cross
+sections, attenuation coefficients, transmission, and multi-panel overview
+PDFs.
 
 Basic Usage
 -----------
@@ -15,6 +16,8 @@ Choose one subcommand, then choose the target data source with ``--pair``,
 .. code-block:: bash
 
    pyharp-plot binary --pair H2-H2 --temperature-k 300 --wn-range=20,10000
+   pyharp-plot binary --pair H2-H2 --cia-model 2018 --h2-state eq --temperature-k 300 --wn-range=20,10000
+   pyharp-plot binary --pair H2-H2 --cia-model xiz --h2-state eq --temperature-k 300 --wn-range=20,10000
    pyharp-plot xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
    pyharp-plot attenuation --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=25,2500
    pyharp-plot transmission --composition H2O:0.1,H2:0.9 --temperature-k 300 --pressure-bar 1 --path-length-km 1 --wn-range=25,2500
@@ -39,12 +42,15 @@ Subcommands
 ``binary``
 ~~~~~~~~~~
 
-Plot a HITRAN CIA binary absorption coefficient spectrum. This subcommand
-uses a CIA pair selected by ``--pair``.
+Plot a CIA binary absorption coefficient spectrum. This subcommand uses a CIA
+pair selected by ``--pair`` and a file family selected by ``--cia-model`` and
+``--h2-state``.
 
 .. code-block:: bash
 
    pyharp-plot binary --pair H2-H2 --temperature-k 300 --wn-range=20,10000
+   pyharp-plot binary --pair H2-H2 --cia-model 2018 --h2-state nm --temperature-k 300 --wn-range=20,10000
+   pyharp-plot binary --pair H2-H2 --cia-model orton --h2-state eq --temperature-k 300 --wn-range=20,10000
    pyharp-plot binary --pair H2-He --temperature-k 500 --resolution 5 --output output/h2_he_cia.png
 
 ``xsection``
@@ -129,6 +135,19 @@ Shared Options
     Directory used for downloaded HITRAN line and CIA data. The default is
     ``hitran``.
 
+``--cia-dir path``
+    Directory used for alternate CIA tables when ``--cia-model`` is ``xiz``
+    or ``orton``. The default is ``orton_xiz_cia``.
+
+``--cia-model value``
+    CIA model selector for pair-target workflows. ``auto``, ``2011``, and
+    ``2018`` use HITRAN. ``xiz`` and ``orton`` use the legacy H2 tables.
+
+``--h2-state {eq,nm}``
+    H2 spin-state selector for pair-target workflows. This affects HITRAN
+    ``2018`` H2-H2 tables and the legacy ``xiz``/``orton`` tables. HITRAN
+    ``2011`` does not distinguish ``eq`` and ``nm``.
+
 ``--refresh-hitran`` and ``--refresh-cia``
     Re-download cached HITRAN line or CIA data.
 
@@ -154,6 +173,18 @@ Target Selection
 Use ``--pair`` for a CIA pair, for example ``H2-H2`` or ``H2-He``. Built-in
 CIA pair resolution includes ``CH4-CH4``, ``CO2-CH4``, ``CO2-CO2``,
 ``CO2-H2``, ``H2-H2``, ``H2-He``, ``N2-CH4``, and ``N2-N2``.
+
+For pair workflows, ``--cia-model`` determines both the backend and the file
+family:
+
+* ``--cia-model auto`` uses the built-in HITRAN default filename mapping
+* ``--cia-model 2011`` resolves ``H2-H2_2011.cia`` or ``H2-He_2011.cia``
+* ``--cia-model 2018 --h2-state eq|nm`` resolves ``H2-H2_eq_2018.cia`` or ``H2-H2_nm_2018.cia``
+* ``--cia-model xiz|orton --h2-state eq|nm`` resolves one of the downloaded legacy H2 tables
+
+If a requested HITRAN pair/model/state combination has no configured file,
+pyharp raises an error instead of silently falling back to a different CIA
+dataset.
 
 Use ``--species`` for molecular line calculations. Built-in HITRAN line
 species are ``CH4``, ``CO2``, ``H2``, ``H2O``, ``H2S``, ``N2``, and ``NH3``.
