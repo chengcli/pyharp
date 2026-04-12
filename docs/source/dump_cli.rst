@@ -3,7 +3,8 @@ pyharp-dump CLI
 
 ``pyharp-dump`` writes spectroscopy products as NetCDF files. It supports
 single-species molecular products, CIA pair products, and gas-mixture
-products built from HITRAN line and CIA data.
+products built from HITRAN line data plus CIA data from either HITRAN or the
+legacy Orton/Xiz H2 tables.
 
 Basic Usage
 -----------
@@ -15,6 +16,7 @@ or ``--composition`` where supported.
 
    pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
    pyharp-dump xsection --pair H2-He --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
+   pyharp-dump xsection --pair H2-H2 --cia-model xiz --h2-state eq --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
    pyharp-dump transmission --composition H2:0.9,He:0.1,H2O:0.002 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 
 Without ``--output``, files are written under ``--output-dir`` using names
@@ -43,6 +45,7 @@ Examples:
 
    pyharp-dump xsection --species CO2 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
    pyharp-dump xsection --pair H2-He --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
+   pyharp-dump xsection --pair H2-H2 --cia-model 2018 --h2-state nm --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
    pyharp-dump xsection --composition H2:0.9,He:0.1,CH4:0.004,H2O:0.002 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 
 ``transmission``
@@ -62,6 +65,7 @@ Examples:
 
    pyharp-dump transmission --species H2O --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
    pyharp-dump transmission --pair H2-He --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
+   pyharp-dump transmission --pair H2-H2 --cia-model orton --h2-state eq --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,10000
    pyharp-dump transmission --composition H2:0.9,He:0.1,H2O:0.002 --path-length-km 1 --temperature-k 300 --pressure-bar 1 --wn-range=20,2500
 
 Shared Options
@@ -106,6 +110,19 @@ Shared Options
     Directory used for cached HITRAN line and CIA files. The default is
     ``hitran``.
 
+``--cia-dir path``
+    Directory used for alternate CIA tables when ``--cia-model`` is ``xiz``
+    or ``orton``. The default is ``orton_xiz_cia``.
+
+``--cia-model value``
+    CIA model selector for ``--pair`` workflows. ``auto``, ``2011``, and
+    ``2018`` use HITRAN. ``xiz`` and ``orton`` use the legacy H2 tables.
+
+``--h2-state {eq,nm}``
+    H2 spin-state selector for ``--pair`` workflows. This affects HITRAN
+    ``2018`` H2-H2 tables and the legacy ``xiz``/``orton`` tables. HITRAN
+    ``2011`` does not distinguish ``eq`` and ``nm``.
+
 ``--refresh-hitran`` and ``--refresh-cia``
     Re-download cached HITRAN line or CIA inputs.
 
@@ -120,6 +137,17 @@ Use ``--species`` for HITRAN line species such as ``CH4``, ``CO2``, ``H2``,
 ``H2O``, ``H2S``, ``N2``, and ``NH3``.
 
 Use ``--pair`` for CIA pairs such as ``H2-H2`` and ``H2-He``.
+
+For pair workflows, ``--cia-model`` determines both the backend and the file
+family:
+
+* ``--cia-model auto`` uses the built-in HITRAN default filename mapping
+* ``--cia-model 2011`` resolves ``H2-H2_2011.cia`` or ``H2-He_2011.cia``
+* ``--cia-model 2018 --h2-state eq|nm`` resolves ``H2-H2_eq_2018.cia`` or ``H2-H2_nm_2018.cia``
+* ``--cia-model xiz|orton --h2-state eq|nm`` resolves one of the downloaded legacy H2 tables
+
+If a requested HITRAN pair/model/state combination has no configured file,
+pyharp raises an error instead of silently falling back to another CIA file.
 
 Use ``--composition`` for gas mixtures:
 

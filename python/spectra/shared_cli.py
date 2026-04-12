@@ -47,6 +47,11 @@ def default_hitran_dir() -> Path:
     return Path("hitran")
 
 
+def default_orton_xiz_cia_dir() -> Path:
+    """Return the default legacy Orton/Xiz CIA cache directory."""
+    return Path("orton_xiz_cia")
+
+
 def process_pool_context() -> mp.context.BaseContext:
     """Return a process start context that is safe for the current platform."""
     if sys.platform == "darwin":

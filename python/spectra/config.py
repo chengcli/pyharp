@@ -163,6 +163,40 @@ def resolve_hitran_cia_pair(pair: str) -> HitranCiaPair:
     raise ValueError(f"Unsupported CIA pair {pair!r}. Supported pairs: {supported}.")
 
 
+def resolve_hitran_cia_filename(*, pair: str, model: str = "auto", state: str = "eq") -> HitranCiaPair:
+    """Resolve a HITRAN CIA filename for an optional H2-pair vintage/state override."""
+    resolved_pair = _normalize_cia_pair_name(pair)
+    model_key = str(model).strip().lower()
+    state_key = str(state).strip().lower()
+    if model_key == "auto":
+        return resolve_hitran_cia_pair(pair)
+    if model_key == "2011":
+        if resolved_pair == "H2-H2":
+            return HitranCiaPair(pair="H2-H2", filename="H2-H2_2011.cia")
+        if resolved_pair in {"H2-HE", "HE-H2"}:
+            return HitranCiaPair(pair="H2-He", filename="H2-He_2011.cia")
+        raise ValueError(f"No HITRAN {model_key} CIA file is configured for pair {pair!r}.")
+    if model_key == "2018":
+        if resolved_pair != "H2-H2":
+            raise ValueError(f"No HITRAN {model_key} CIA file is configured for pair {pair!r}.")
+        if state_key == "eq":
+            return HitranCiaPair(pair="H2-H2", filename="H2-H2_eq_2018.cia")
+        if state_key == "nm":
+            return HitranCiaPair(pair="H2-H2", filename="H2-H2_nm_2018.cia")
+        raise ValueError(f"Unsupported HITRAN CIA state {state!r}. Supported states: eq, nm.")
+    raise ValueError(f"Unsupported HITRAN CIA model {model!r}. Supported values: auto, 2011, 2018.")
+
+
+def cia_database_for_model(model: str) -> str:
+    """Return the CIA backend implied by one CLI model selector."""
+    model_key = str(model).strip().lower()
+    if model_key in {"auto", "2011", "2018"}:
+        return "hitran"
+    if model_key in {"xiz", "orton"}:
+        return "orton_xiz"
+    raise ValueError(f"Unsupported CIA model {model!r}. Supported values: auto, 2011, 2018, xiz, orton.")
+
+
 def supported_hitran_cia_pairs() -> tuple[HitranCiaPair, ...]:
     """Return the built-in HITRAN CIA pair metadata."""
     return tuple(_HITRAN_CIA_PAIRS_BY_NAME[key] for key in sorted(_HITRAN_CIA_PAIRS_BY_NAME))
