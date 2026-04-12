@@ -112,6 +112,65 @@ def test_compute_mixture_overview_reports_broadening_fallback(monkeypatch, tmp_p
     assert "CO2 broadening: requested=h2:0.900,he:0.100 -> effective=air:1.000" in out
 
 
+def test_compute_mixture_overview_weights_h2o_continuum_by_h2o_fraction(monkeypatch, tmp_path) -> None:
+    parser = build_atm_overview_parser()
+    args = parser.parse_args(
+        [
+            "--composition",
+            "H2O:0.2,H2:0.8",
+            "--temperature-k",
+            "300",
+            "--pressure-bar",
+            "1",
+            "--wn-range=20,22",
+            "--path-length-km",
+            "1",
+            "--hitran-dir",
+            str(tmp_path / "hitran"),
+        ]
+    )
+
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview_cli.download_hitran_lines",
+        lambda config, band: type("LineDb", (), {"table_name": f"{config.hitran_species.name.lower()}_lines", "cache_dir": tmp_path})(),
+    )
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview_cli.load_hitran_line_list",
+        lambda config, band: type(
+            "LineList",
+            (),
+            {"wavenumber_cm1": np.array([20.0]), "line_intensity": np.array([1.0e-25])},
+        )(),
+    )
+
+    class FakeLineProvider:
+        def broadening_summary(self):
+            return "requested=h2o:0.200,h2:0.800 -> effective=self:0.200,h2:0.800"
+
+        def cross_section_cm2_molecule(self, **kwargs):
+            grid = np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64)
+            return np.zeros_like(grid)
+
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.build_line_provider", lambda config, line_db: FakeLineProvider())
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview_cli.load_cia_dataset",
+        lambda *args, **kwargs: type("Cia", (), {"source_path": tmp_path / "cia", "pair": "H2-H2", "interpolate_to_grid": lambda self, temperature_k, grid: np.zeros_like(grid)})(),
+    )
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview_cli.compute_mt_ckd_h2o_continuum_cross_section",
+        lambda **kwargs: np.full_like(np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64), 10.0),
+    )
+
+    products = compute_mixture_overview_products(args, wn_range=(20.0, 22.0))
+
+    continuum = next(source for source in products.secondary_sources if source.kind == "continuum")
+    expected_sigma = np.array([2.0, 2.0], dtype=np.float64)
+    expected_attenuation = expected_sigma * products.spectrum.number_density_cm3 * 100.0
+    assert np.allclose(continuum.sigma_cm2_molecule, expected_sigma)
+    assert np.allclose(products.spectrum.sigma_cia_cm2_molecule, expected_sigma)
+    assert np.allclose(products.spectrum.attenuation_cia_m1, expected_attenuation)
+
+
 def test_run_atm_overview_manifest_always_uses_state_lists(monkeypatch, tmp_path) -> None:
     parser = build_atm_overview_parser()
     args = parser.parse_args(

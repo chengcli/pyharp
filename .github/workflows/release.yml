@@ -124,6 +124,9 @@ jobs:
           sudo rm -rf /var/lib/apt/lists/* || true
           python -m pip cache purge || true
 
+      - name: Check disk usage
+        run: df -h
+
       - name: Build Linux wheel
         env:
           CIBW_PLATFORM: linux
@@ -131,6 +134,11 @@ jobs:
           CIBW_BUILD: cp${{ env.PY_VERSION }}*
           CIBW_ARCHS: ${{ env.LINUX_ARCH }}
           CIBW_SKIP: "*musllinux*"
+          CIBW_ENVIRONMENT: >
+            PIP_NO_CACHE_DIR=1
+            PIP_DISABLE_PIP_VERSION_CHECK=1
+            PIP_NO_COMPILE=1
+
           CIBW_BEFORE_BUILD: |
             export PATH="/opt/python/cp${{ env.PY_VERSION }}-cp${{ env.PY_VERSION }}/bin:$PATH"
 

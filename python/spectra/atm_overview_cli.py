@@ -227,6 +227,8 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
 
     if "H2O" in composition:
         h2o_fraction = composition["H2O"]
+        # MT_CKD returns an H2O absorption coefficient per water molecule, so
+        # convert it to the mixture-mean cross section carried by this workflow.
         sigma_continuum = np.asarray(
             compute_mt_ckd_h2o_continuum_cross_section(
                 wavenumber_grid_cm1=grid,
@@ -236,14 +238,15 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
             ),
             dtype=np.float64,
         )
-        secondary_total += sigma_continuum
+        weighted_sigma_continuum = h2o_fraction * sigma_continuum
+        secondary_total += weighted_sigma_continuum
         secondary_sources.append(
             MixtureSecondarySource(
                 kind="continuum",
                 label="H2O continuum (MT_CKD)",
                 weight=h2o_fraction,
                 source_name="MT_CKD_H2O",
-                sigma_cm2_molecule=sigma_continuum,
+                sigma_cm2_molecule=weighted_sigma_continuum,
             )
         )
         manifest_sources.append(
