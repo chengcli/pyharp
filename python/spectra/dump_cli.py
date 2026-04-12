@@ -13,7 +13,7 @@ import numpy as np
 import xarray as xr
 
 from .atm_overview_cli import _parse_composition, compute_mixture_overview_products
-from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
+from .config import SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .dataset_io import (
     DEFAULT_NETCDF_ENGINE,
     WAVENUMBER_ATTRS,
@@ -24,11 +24,13 @@ from .dataset_io import (
 )
 from .hitran_cia import load_cia_dataset
 from .hitran_lines import build_line_provider, download_hitran_lines
+from .orton_xiz_cia import load_orton_xiz_cia_dataset, resolve_orton_xiz_cia_filename
 from .output_names import _clean_token, _format_value
 from .shared_cli import (
     HelpFormatter,
     build_band,
     default_hitran_dir,
+    default_orton_xiz_cia_dir,
     parse_wn_range,
     process_pool_context,
 )
@@ -106,6 +108,10 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--filename", default=None, metavar="FILE", help="Use a specific CIA filename instead of resolving one from --pair.")
     parser.add_argument("--cia-filename", default=None, metavar="FILE", help="Optional CIA filename to include for molecular targets.")
     parser.add_argument("--cia-pair", default=None, metavar="PAIR", help="Optional CIA pair to include for molecular targets.")
+    parser.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN defaults to --hitran-dir; Orton/Xiz defaults to orton_xiz_cia/.")
+    parser.add_argument("--cia-database", choices=("hitran", "orton_xiz"), default="hitran", help="CIA database backend for --pair targets.")
+    parser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. For HITRAN, use auto/2011/2018. For Orton/Xiz, use auto/xiz/orton.")
+    parser.add_argument("--cia-state", choices=("eq", "nm"), default="eq", help="Legacy H2 spin-state table when --cia-database=orton_xiz.")
     parser.add_argument("--cia-index-url", default="https://hitran.org/cia/", metavar="URL", help="HITRAN CIA index URL used to resolve CIA files.")
     parser.add_argument("--refresh-cia", action="store_true", help="Re-download HITRAN CIA files even if cached.")
     if include_path_length:
@@ -585,8 +591,30 @@ def _resolve_pair_filename(args: argparse.Namespace) -> tuple[str, str]:
     pair = str(args.pair or "H2-H2")
     if args.filename:
         return pair, str(args.filename)
-    metadata = resolve_hitran_cia_pair(pair)
+    if getattr(args, "cia_database", "hitran") == "orton_xiz":
+        legacy_model = "xiz" if args.cia_model == "auto" else args.cia_model
+        return pair, resolve_orton_xiz_cia_filename(pair=pair, model=legacy_model, state=args.cia_state)
+    metadata = resolve_hitran_cia_filename(pair=pair, model=args.cia_model, state=args.cia_state)
     return metadata.pair, metadata.filename
+
+
+def _load_pair_cia_dataset(args: argparse.Namespace):
+    pair, filename = _resolve_pair_filename(args)
+    if getattr(args, "cia_database", "hitran") == "orton_xiz":
+        return load_orton_xiz_cia_dataset(
+            cache_dir=args.cia_dir or default_orton_xiz_cia_dir(),
+            pair=pair,
+            model="xiz" if args.cia_model == "auto" else args.cia_model,
+            state=args.cia_state,
+            refresh=bool(args.refresh_cia),
+        )
+    return load_cia_dataset(
+        cache_dir=args.hitran_dir,
+        filename=filename,
+        pair=pair,
+        index_url=str(args.cia_index_url),
+        refresh=bool(args.refresh_cia),
+    )
 
 
 def _resolve_species_cia_selection(args: argparse.Namespace, config: SpectroscopyConfig) -> tuple[str, str] | None:
@@ -670,15 +698,9 @@ def _compute_species_xsection(args: argparse.Namespace):
 
 
 def _compute_pair_xsection(args: argparse.Namespace):
-    pair, filename = _resolve_pair_filename(args)
+    pair, _ = _resolve_pair_filename(args)
     band = build_band(args)
-    cia_dataset = load_cia_dataset(
-        cache_dir=args.hitran_dir,
-        filename=filename,
-        pair=pair,
-        index_url=str(args.cia_index_url),
-        refresh=bool(args.refresh_cia),
-    )
+    cia_dataset = _load_pair_cia_dataset(args)
     spectrum = compute_absorption_spectrum_from_sources(
         species_name=pair,
         wavenumber_grid_cm1=band.grid(),
@@ -693,13 +715,7 @@ def _compute_pair_xsection(args: argparse.Namespace):
 def _pair_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
     pair, filename = _resolve_pair_filename(args)
     band = build_band(args)
-    cia_dataset = load_cia_dataset(
-        cache_dir=args.hitran_dir,
-        filename=filename,
-        pair=pair,
-        index_url=str(args.cia_index_url),
-        refresh=bool(args.refresh_cia),
-    )
+    cia_dataset = _load_pair_cia_dataset(args)
     grid = band.grid()
     temperature_k, _ = _single_base_state(args)
     binary = np.asarray(

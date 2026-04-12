@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import numpy as np
 
-from .config import SpectralBandConfig, resolve_hitran_cia_pair
+from .config import SpectralBandConfig, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .hitran_cia import (
     load_cia_dataset,
     plot_cia_attenuation_coefficient,
     plot_cia_cross_section,
     plot_cia_transmission,
 )
+from .orton_xiz_cia import load_orton_xiz_cia_dataset, resolve_orton_xiz_cia_filename
+from .shared_cli import default_orton_xiz_cia_dir
 
 
 def _parse_wn_range(value: str) -> tuple[float, float]:
@@ -34,6 +37,10 @@ def _wn_bounds(args: argparse.Namespace) -> tuple[float, float]:
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"))
+    parser.add_argument("--cia-dir", type=Path, default=None)
+    parser.add_argument("--cia-database", choices=("hitran", "orton_xiz"), default="hitran")
+    parser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto")
+    parser.add_argument("--cia-state", choices=("eq", "nm"), default="eq")
     parser.add_argument("--filename", default=None)
     parser.add_argument("--pair", default="H2-H2")
     parser.add_argument("--temperature-k", type=float, default=300.0)
@@ -56,10 +63,21 @@ def _validate_and_build_grid(args: argparse.Namespace) -> np.ndarray:
 def _resolve_filename(args: argparse.Namespace) -> str:
     if args.filename:
         return str(args.filename)
-    return resolve_hitran_cia_pair(args.pair).filename
+    if args.cia_database == "orton_xiz":
+        legacy_model = "xiz" if args.cia_model == "auto" else args.cia_model
+        return resolve_orton_xiz_cia_filename(pair=args.pair, model=legacy_model, state=args.cia_state)
+    return resolve_hitran_cia_filename(pair=args.pair, model=args.cia_model, state=args.cia_state).filename
 
 
 def _load_dataset(args: argparse.Namespace):
+    if args.cia_database == "orton_xiz":
+        return load_orton_xiz_cia_dataset(
+            cache_dir=args.cia_dir or default_orton_xiz_cia_dir(),
+            pair=args.pair,
+            model="xiz" if args.cia_model == "auto" else args.cia_model,
+            state=args.cia_state,
+            refresh=args.refresh,
+        )
     return load_cia_dataset(
         cache_dir=args.hitran_dir,
         filename=_resolve_filename(args),
@@ -70,10 +88,8 @@ def _load_dataset(args: argparse.Namespace):
 
 def _print_summary(dataset, grid: np.ndarray, label: str, values: np.ndarray, unit: str = "") -> None:
     print(f"CIA file: {dataset.source_path}")
-    print(
-        f"Temperatures in file: {dataset.temperatures_k.min():.1f}.."
-        f"{dataset.temperatures_k.max():.1f} K ({dataset.temperatures_k.size} sets)"
-    )
+    temperatures = np.asarray(dataset.temperatures_k, dtype=np.float64)
+    print(f"Temperatures in file: {temperatures.min():.1f}..{temperatures.max():.1f} K ({temperatures.size} sets)")
     print(f"Grid points: {grid.size}")
     suffix = f" {unit}" if unit else ""
     print(f"{label} min/max: {values.min():.3e} .. {values.max():.3e}{suffix}")

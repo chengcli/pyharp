@@ -6,8 +6,8 @@ from pathlib import Path
 import xarray as xr
 
 from pyharp.spectra.dataset_io import combine_band_datasets, write_dataset_via_tmp
-from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _output_path_for_wn_range, _pair_xsection_dataset, _species_transmission_dataset, _stack_state_grid_datasets, _xsection_dataset, build_parser, main
-from pyharp.spectra.shared_cli import default_hitran_dir, default_output_path, project_root
+from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _output_path_for_wn_range, _pair_xsection_dataset, _resolve_pair_filename, _species_transmission_dataset, _stack_state_grid_datasets, _xsection_dataset, build_parser, main
+from pyharp.spectra.shared_cli import default_hitran_dir, default_orton_xiz_cia_dir, default_output_path, project_root
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 
 
@@ -18,6 +18,8 @@ def test_default_paths_are_inside_project_root() -> None:
     assert default_output_path().parent.name == "output"
     assert default_hitran_dir() == default_hitran_dir().parent / "hitran"
     assert default_hitran_dir().is_absolute() is False
+    assert default_orton_xiz_cia_dir() == default_orton_xiz_cia_dir().parent / "orton_xiz_cia"
+    assert default_orton_xiz_cia_dir().is_absolute() is False
 
 
 def test_parser_does_not_expose_reference_column_commands() -> None:
@@ -84,6 +86,123 @@ def test_xsection_parser_accepts_cia_pair_selector(tmp_path) -> None:
     assert args.pair == "H2-He"
     assert args.filename == "H2-He_2011.cia"
     assert args.wn_ranges == [(50.0, 150.0)]
+
+
+def test_xsection_parser_accepts_orton_xiz_pair_selector(tmp_path) -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "xsection",
+            "--temperature-k",
+            "300",
+            "--pressure-bar",
+            "1",
+            "--pair",
+            "H2-H2",
+            "--cia-database",
+            "orton_xiz",
+            "--cia-model",
+            "xiz",
+            "--cia-state",
+            "eq",
+            "--cia-dir",
+            str(tmp_path / "orton_xiz_cia"),
+            "--wn-range",
+            "50,150",
+        ]
+    )
+    assert args.cia_database == "orton_xiz"
+    assert args.cia_model == "xiz"
+    assert args.cia_state == "eq"
+    assert args.cia_dir == tmp_path / "orton_xiz_cia"
+
+
+def test_resolve_pair_filename_supports_hitran_2011_override() -> None:
+    args = build_parser().parse_args(
+        [
+            "xsection",
+            "--pair",
+            "H2-He",
+            "--cia-database",
+            "hitran",
+            "--cia-model",
+            "2011",
+        ]
+    )
+    assert _resolve_pair_filename(args) == ("H2-He", "H2-He_2011.cia")
+
+
+def test_resolve_pair_filename_supports_hitran_2018_h2_h2_states() -> None:
+    args = build_parser().parse_args(
+        [
+            "xsection",
+            "--pair",
+            "H2-H2",
+            "--cia-database",
+            "hitran",
+            "--cia-model",
+            "2018",
+            "--cia-state",
+            "nm",
+        ]
+    )
+    assert _resolve_pair_filename(args) == ("H2-H2", "H2-H2_nm_2018.cia")
+
+
+def test_resolve_pair_filename_errors_when_hitran_model_has_no_matching_file() -> None:
+    args = build_parser().parse_args(
+        [
+            "xsection",
+            "--pair",
+            "H2-He",
+            "--cia-database",
+            "hitran",
+            "--cia-model",
+            "2018",
+        ]
+    )
+    try:
+        _resolve_pair_filename(args)
+    except ValueError as exc:
+        assert "No HITRAN 2018 CIA file is configured" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_pair_xsection_dataset_uses_orton_xiz_backend(monkeypatch, tmp_path) -> None:
+    class FakeCia:
+        def interpolate_to_grid(self, *, temperature_k, wavenumber_grid_cm1):
+            assert temperature_k == 300.0
+            return np.full_like(np.asarray(wavenumber_grid_cm1, dtype=np.float64), 4.0e-46)
+
+    monkeypatch.setattr("pyharp.spectra.dump_cli.load_orton_xiz_cia_dataset", lambda **kwargs: FakeCia())
+
+    args = build_parser().parse_args(
+        [
+            "xsection",
+            "--temperature-k",
+            "300",
+            "--pressure-bar",
+            "1",
+            "--pair",
+            "H2-H2",
+            "--cia-database",
+            "orton_xiz",
+            "--cia-model",
+            "xiz",
+            "--cia-state",
+            "eq",
+            "--wn-range",
+            "20,22",
+        ]
+    )
+
+    dataset = _pair_xsection_dataset(_args_for_wn_range(args, args.wn_ranges[0]))
+    try:
+        assert dataset.attrs["pair_name"] == "H2-H2"
+        assert np.allclose(dataset["binary_absorption_coefficient"].values, np.array([4.0e-46, 4.0e-46]))
+    finally:
+        dataset.close()
 
 
 def test_transmission_parser_accepts_path_length_and_outputs(tmp_path) -> None:
