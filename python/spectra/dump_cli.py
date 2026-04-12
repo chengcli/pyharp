@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ProcessPoolExecutor
-import multiprocessing as mp
 import os
 from pathlib import Path
 import sys
@@ -31,6 +30,7 @@ from .shared_cli import (
     build_band,
     default_hitran_dir,
     parse_wn_range,
+    process_pool_context,
 )
 from .spectrum import (
     _resolve_continuum_sources,
@@ -798,7 +798,7 @@ def _parallel_band_results(
     if len(tasks) <= 1:
         return [worker(task) for task in tasks]
     max_workers = min(len(tasks), os.cpu_count() or 1)
-    ctx = mp.get_context("fork")
+    ctx = process_pool_context()
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
         return list(executor.map(worker, tasks))
 

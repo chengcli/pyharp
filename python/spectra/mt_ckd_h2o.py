@@ -50,11 +50,16 @@ def compute_mt_ckd_h2o_continuum_cross_section(
     temperature_k: float,
     pressure_pa: float,
     h2o_vmr: float = 1.0,
+    foreign_vmr: float | None = None,
     data_path: Path | None = None,
 ) -> np.ndarray:
     """Return MT_CKD H2O continuum absorption cross section in cm^2/molecule."""
     if not (0.0 <= h2o_vmr <= 1.0):
         raise ValueError("h2o_vmr must be between 0 and 1.")
+    if foreign_vmr is None:
+        foreign_vmr = max(0.0, 1.0 - float(h2o_vmr))
+    if not (0.0 <= foreign_vmr <= 1.0):
+        raise ValueError("foreign_vmr must be between 0 and 1.")
 
     resolved_path = default_mt_ckd_h2o_data_path() if data_path is None else Path(data_path)
     if not resolved_path.exists():
@@ -69,6 +74,7 @@ def compute_mt_ckd_h2o_continuum_cross_section(
     with xr.open_dataset(resolved_path) as dataset:
         reference_grid = np.asarray(dataset["wavenumbers"].values, dtype=np.float64)
         self_absco_ref = np.asarray(dataset["self_absco_ref"].values, dtype=np.float64)
+        foreign_absco_ref = np.asarray(dataset["for_absco_ref"].values, dtype=np.float64)
         self_texp = np.asarray(dataset["self_texp"].values, dtype=np.float64)
         ref_press_mbar = float(dataset["ref_press"].values)
         ref_temp_k = float(dataset["ref_temp"].values)
@@ -76,11 +82,12 @@ def compute_mt_ckd_h2o_continuum_cross_section(
     rho_ratio = (pressure_mbar / ref_press_mbar) * (ref_temp_k / float(temperature_k))
     sigma_self = self_absco_ref * (ref_temp_k / float(temperature_k)) ** self_texp
     sigma_self = sigma_self * float(h2o_vmr) * rho_ratio
-    sigma_self = sigma_self * _radiation_term(reference_grid, float(temperature_k))
+    sigma_foreign = foreign_absco_ref * float(foreign_vmr) * rho_ratio
+    continuum_ref = (sigma_self + sigma_foreign) * _radiation_term(reference_grid, float(temperature_k))
 
     interpolator = interp1d(
         reference_grid,
-        sigma_self,
+        continuum_ref,
         kind="cubic",
         bounds_error=False,
         fill_value=0.0,

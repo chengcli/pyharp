@@ -2,7 +2,14 @@ import json
 
 import numpy as np
 
-from pyharp.spectra.atm_overview_cli import _find_binary_pairs, _parse_composition, compute_mixture_overview_products, build_atm_overview_parser, run_atm_overview
+from pyharp.spectra.atm_overview_cli import (
+    _find_binary_pairs,
+    _parallel_mixture_overview_products,
+    _parse_composition,
+    build_atm_overview_parser,
+    compute_mixture_overview_products,
+    run_atm_overview,
+)
 
 
 def test_parse_composition_normalizes_and_merges_duplicates() -> None:
@@ -178,3 +185,43 @@ def test_run_atm_overview_manifest_always_uses_state_lists(monkeypatch, tmp_path
     manifest = json.loads(written[str(tmp_path / "overview.manifest.json")])
     assert manifest["temperature_k"] == [300.0]
     assert manifest["pressure_bar"] == [1.0]
+
+
+def test_parallel_mixture_overview_products_uses_selected_process_context(monkeypatch) -> None:
+    created = {}
+
+    class DummyExecutor:
+        def __init__(self, *, max_workers, mp_context):
+            created["max_workers"] = max_workers
+            created["mp_context"] = mp_context
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def map(self, worker, tasks):
+            return [worker(task) for task in tasks]
+
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.process_pool_context", lambda: "ctx-token")
+    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.ProcessPoolExecutor", DummyExecutor)
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview_cli._compute_mixture_overview_product_task",
+        lambda task: {"task": task},
+    )
+
+    result = list(
+        _parallel_mixture_overview_products(
+            [
+                ("args-1", (20.0, 25.0)),
+                ("args-2", (25.0, 30.0)),
+            ]
+        )
+    )
+
+    assert result == [
+        {"task": ("args-1", (20.0, 25.0))},
+        {"task": ("args-2", (25.0, 30.0))},
+    ]
+    assert created == {"max_workers": 2, "mp_context": "ctx-token"}
