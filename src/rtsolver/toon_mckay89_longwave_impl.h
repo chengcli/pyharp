@@ -25,9 +25,8 @@ namespace harp {
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
                                           T a_surf_in, T hard_surface_in,
-                                          T top_emission_in,
-                                          T delta_edd_lw_in, T* flx, int len1,
-                                          char* work) {
+                                          T top_emission_in, T delta_edd_lw_in,
+                                          T* flx, int len1, char* work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;

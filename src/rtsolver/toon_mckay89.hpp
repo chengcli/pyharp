@@ -57,7 +57,8 @@ struct ToonMcKay89OptionsImpl {
   ADD_ARG(double, top_emission) = 0.0;
 
   //! apply delta-Eddington scaling in longwave
-  //! (true = rescale w0, dtau, g as in FMS; false = use raw values as in PICASO)
+  //! (true = rescale w0, dtau, g as in FMS; false = use raw values as in
+  //! PICASO)
   ADD_ARG(bool, delta_eddington_lw) = false;
 };
 

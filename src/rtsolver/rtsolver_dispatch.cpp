@@ -61,7 +61,8 @@ void call_toon89_lw_cpu(at::TensorIterator& iter) {
             auto delta_edd_lw =
                 reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
             toon_mckay89_longwave(nlay, be, prop, *albedo, *hard_surface,
-                                  *top_emission, *delta_edd_lw, out, len1, work.get());
+                                  *top_emission, *delta_edd_lw, out, len1,
+                                  work.get());
           }
         },
         grain_size);
