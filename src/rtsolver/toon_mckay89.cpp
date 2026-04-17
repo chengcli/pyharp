@@ -122,6 +122,18 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                     .add_input(prop)
                     .add_input(be)
                     .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
+                    .add_owned_input(
+                        torch::full({nwave, ncol, 1, 1},
+                                    options->hard_surface() ? 1.0 : 0.0,
+                                    prop.options()))
+                    .add_owned_input(
+                        torch::full({nwave, ncol, 1, 1},
+                                    options->top_emission(),
+                                    prop.options()))
+                    .add_owned_input(
+                        torch::full({nwave, ncol, 1, 1},
+                                    options->delta_eddington_lw() ? 1.0 : 0.0,
+                                    prop.options()))
                     .build();
 
     at::native::call_toon89_lw(flx.device().type(), iter);

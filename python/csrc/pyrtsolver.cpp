@@ -26,7 +26,10 @@ void bind_rtsolver(py::module& m) {
            })
       .ADD_OPTION(std::vector<double>, harp::ToonMcKay89OptionsImpl, wave_lower)
       .ADD_OPTION(std::vector<double>, harp::ToonMcKay89OptionsImpl, wave_upper)
-      .ADD_OPTION(bool, harp::ToonMcKay89OptionsImpl, zenith_correction);
+      .ADD_OPTION(bool, harp::ToonMcKay89OptionsImpl, zenith_correction)
+      .ADD_OPTION(bool, harp::ToonMcKay89OptionsImpl, hard_surface)
+      .ADD_OPTION(double, harp::ToonMcKay89OptionsImpl, top_emission)
+      .ADD_OPTION(bool, harp::ToonMcKay89OptionsImpl, delta_eddington_lw);
 
   torch::python::bind_module<harp::ToonMcKay89Impl>(m, "ToonMcKay89")
       .def(py::init<>())

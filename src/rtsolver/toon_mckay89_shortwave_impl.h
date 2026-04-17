@@ -61,7 +61,7 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
 
   const T sqrt3 = sqrt(3.0);
   const T sqrt3d2 = sqrt3 / 2.0;
-  const T btop = 0.0, bsurf = 0.0;
+  const T btop = 0.0;
 
   // Check for zero albedo
   bool all_zero_w = true;
@@ -181,6 +181,9 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
                   E1[n_idx] * (Cm[n_idx] - Cmm1[n_idx + 1]);
       n_idx++;
     }
+    // Bottom boundary: surface reflects both diffuse and direct beam.
+    // bsurf = surface albedo * direct beam flux at surface (Toon89 Eqn 37)
+    T bsurf = w_surf_in * dir[nlev - 1];
     Af[l - 1] = E1[nlay - 1] - w_surf_in * E3[nlay - 1];
     Bf[l - 1] = E2[nlay - 1] - w_surf_in * E4[nlay - 1];
     Cf[l - 1] = 0.0;
