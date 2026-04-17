@@ -42,14 +42,18 @@ void call_toon89_lw_cuda(at::TensorIterator& iter) {
     int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
     int mem_size = toon89_lw_space<scalar_t>(nlay);
 
-    native::gpu_chunk_kernel<8, 4>(
+    native::gpu_chunk_kernel<8, 7>(
         iter, mem_size, [=] GPU_LAMBDA(
-          char* const data[4], unsigned int strides[4], char *work) {
+          char* const data[7], unsigned int strides[7], char *work) {
           auto out = reinterpret_cast<scalar_t*>(data[0] + strides[0]);
           auto prop = reinterpret_cast<scalar_t*>(data[1] + strides[1]);
           auto be = reinterpret_cast<scalar_t*>(data[2] + strides[2]);
           auto albedo = reinterpret_cast<scalar_t*>(data[3] + strides[3]);
-          toon_mckay89_longwave(nlay, be, prop, *albedo, out, len1, work);
+          auto hard_surface = reinterpret_cast<scalar_t*>(data[4] + strides[4]);
+          auto top_emission = reinterpret_cast<scalar_t*>(data[5] + strides[5]);
+          auto delta_edd_lw = reinterpret_cast<scalar_t*>(data[6] + strides[6]);
+          toon_mckay89_longwave(nlay, be, prop, *albedo, *hard_surface,
+                                *top_emission, *delta_edd_lw, out, len1, work);
         });
   });
 }

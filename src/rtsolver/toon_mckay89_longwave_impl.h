@@ -24,8 +24,9 @@ namespace harp {
 
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
-                                          T a_surf_in, T* flx, int len1,
-                                          char* work) {
+                                          T a_surf_in, T hard_surface_in,
+                                          T top_emission_in, T delta_edd_lw_in,
+                                          T* flx, int len1, char* work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;
@@ -35,6 +36,9 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   const int nmu = 5;
   const T twopi = 2.0 * M_PI;
   const T ubari = 0.5;
+  const bool hard_surface = (hard_surface_in > 0.5);
+  const T top_emission = top_emission_in;
+  const bool delta_eddington_lw = (delta_edd_lw_in > 0.5);
 
   const T uarr[] = {0.0985350858, 0.3045357266, 0.5620251898, 0.8019865821,
                     0.9601901429};
@@ -86,12 +90,20 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   T* lw_up_g = alloc_from<T>(work, nlev);
   T* lw_down_g = alloc_from<T>(work, nlev);
 
-  // Delta-Eddington Scaling
+  // Delta-Eddington scaling for longwave: configurable.
+  // When enabled (delta_eddington_lw=true), rescale w0, dtau, g as in FMS.
+  // When disabled (default), use raw values as in PICASO.
   for (int i = 0; i < nlay; i++) {
-    T gsq = G_IN(i) * G_IN(i);
-    w0[i] = (1.0 - gsq) * W_IN(i) / (1.0 - W_IN(i) * gsq);
-    dtau[i] = (1.0 - W_IN(i) * gsq) * DTAU_IN(i);
-    hg[i] = G_IN(i) / (1.0 + G_IN(i));
+    if (delta_eddington_lw) {
+      T g_sq = G_IN(i) * G_IN(i);
+      w0[i] = ((1.0 - g_sq) * W_IN(i)) / (1.0 - W_IN(i) * g_sq);
+      dtau[i] = (1.0 - W_IN(i) * g_sq) * DTAU_IN(i);
+      hg[i] = G_IN(i) / (1.0 + G_IN(i));
+    } else {
+      w0[i] = W_IN(i);
+      dtau[i] = DTAU_IN(i);
+      hg[i] = G_IN(i);
+    }
   }
 
   tau[0] = 0.0;
@@ -133,9 +145,31 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     E4[k] = gam[k] * Ep[k] - Em[k];
   }
 
-  T Btop = BE_IN(0);
+  // Top boundary: controlled by top_emission factor
+  // top_emission = 0.0: no incoming radiation at TOA (Toon 1989 default)
+  // top_emission = 1.0: full Planck at TOA (infinite isothermal slab above)
+  // top_emission < 0: auto-compute from first layer optical depth (FMS-style)
+  //   tau_top = dtau[0] * exp(-1), Btop = (1-exp(-tau_top/ubari)) * BE(0)
+  T Btop;
+  if (top_emission < 0.0) {
+    T tautop = dtau[0] * exp(-1.0);
+    Btop = (1.0 - exp(-tautop / ubari)) * BE_IN(0);
+  } else {
+    Btop = top_emission * BE_IN(0);
+  }
   T Bsurf = BE_IN(nlev - 1);
-  T bsurf_flux = Bsurf;  // Bsurf is local variable
+
+  // Bottom boundary condition depends on surface type:
+  // Gas giant (hard_surface=false): Planck + gradient extrapolation below
+  //   allows internal heat flux to emerge (matches PICASO hard_surface=0)
+  // Terrestrial (hard_surface=true): emissivity * Planck
+  //   surface emits as blackbody reduced by emissivity = 1 - albedo
+  T bsurf_flux;
+  if (hard_surface) {
+    bsurf_flux = (1.0 - a_surf_in) * Bsurf;
+  } else {
+    bsurf_flux = Bsurf + B1[nlay - 1] * ubari;
+  }
 
   // --- Matrix Construction (1-based indices for solver) ---
   Af[0] = 0.0;
@@ -209,7 +243,15 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     T u = uarr[m];
 
     // Downward loop
-    lw_down_g[0] = twopi * Btop;
+    // Top BC: for auto-compute mode, use angle-dependent tau_top
+    T Btop_g;
+    if (top_emission < 0.0) {
+      T tautop = dtau[0] * exp(-1.0);
+      Btop_g = (1.0 - exp(-tautop / u)) * BE_IN(0);
+    } else {
+      Btop_g = top_emission * BE_IN(0);
+    }
+    lw_down_g[0] = twopi * Btop_g;
     for (int k = 0; k < nlay; k++) {
       T em2 = exp(-dtau[k] / u);
       T l_u_p1 = lam[k] * u + 1.0;
@@ -222,7 +264,14 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     }
 
     // Upward loop
-    lw_up_g[nlev - 1] = twopi * (Bsurf + B1[nlay - 1] * u);
+    // Bottom BC for intensity sweep matches the tridiagonal BC:
+    // Gas giant: I_up = 2*pi*(B_surf + B1*u) [Planck + gradient]
+    // Terrestrial: I_up = 2*pi*(1-albedo)*B_surf [emissivity * Planck]
+    if (hard_surface) {
+      lw_up_g[nlev - 1] = twopi * (1.0 - a_surf_in) * Bsurf;
+    } else {
+      lw_up_g[nlev - 1] = twopi * (Bsurf + B1[nlay - 1] * u);
+    }
     for (int k = nlay - 1; k >= 0; k--) {
       T em2 = exp(-dtau[k] / u);
       T em3 = em1[k] * em2;
