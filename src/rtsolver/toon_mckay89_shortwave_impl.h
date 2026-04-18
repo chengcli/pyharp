@@ -63,13 +63,17 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
   const T sqrt3d2 = sqrt3 / 2.0;
   const T btop = 0.0;
 
-  // Check for zero albedo
+  // Check for zero scattering in all layers
   bool all_zero_w = true;
   for (int i = 0; i < nlay; i++) {
     if (W_IN(i) > 1.0e-12) {
       all_zero_w = false;
       break;
     }
+  }
+  // If surface albedo > 0, force general solver to handle surface reflection
+  if (w_surf_in > 1.0e-12) {
+    all_zero_w = false;
   }
 
   // compute integrated optical depth

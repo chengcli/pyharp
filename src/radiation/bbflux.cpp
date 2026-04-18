@@ -75,7 +75,8 @@ torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp) {
     for (int m = 1; m <= 6; ++m) {
       auto mv = static_cast<double>(m) * v[i];
       exm *= ex;
-      d[i] += exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / (m * m);
+      double m4 = static_cast<double>(m) * m * m * m;
+      d[i] += exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / m4;
     }
     d[i] *= conc;
 
@@ -145,7 +146,8 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
     for (int m = 1; m <= 6; ++m) {
       auto mv = static_cast<double>(m) * v[i];
       exm = exm * ex;
-      d[i] = d[i] + exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / (m * m);
+      double m4 = static_cast<double>(m) * m * m * m;
+      d[i] = d[i] + exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / m4;
     }
     d[i] *= conc;
 

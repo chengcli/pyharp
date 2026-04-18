@@ -79,6 +79,11 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
   auto flx = torch::zeros({nwave, ncol, nlyr + 1, 2}, prop.options());
 
+  // Ensure prop is contiguous so raw pointer access in impl is correct.
+  // Non-contiguous slices (e.g. prop[:,:,:,:3] from a larger tensor)
+  // would have strides that don't match the pointer arithmetic in the impl.
+  prop = prop.contiguous();
+
   if (!temf.has_value()) {  // shortwave
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
