@@ -61,7 +61,11 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -r requirements-ci.txt
-          pip install -r requirements-ci-${RUNNER_OS,,}.txt
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            pip install -r requirements-ci-linux.txt
+          else
+            pip install -r requirements-ci-macos.txt
+          fi
 
       - name: Install NetCDF
         run: |
