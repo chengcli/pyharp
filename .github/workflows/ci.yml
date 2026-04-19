@@ -91,7 +91,12 @@ jobs:
                 -DBUILD_EXAMPLES=OFF
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel 3
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel 4
+          else
+            cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel 3
+          fi
 
       - name: Install the project
         run: pip install --no-build-isolation --no-deps .
