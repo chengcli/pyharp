@@ -151,9 +151,6 @@ Shared Options
 ``--refresh-hitran`` and ``--refresh-cia``
     Re-download cached HITRAN line or CIA data.
 
-``--cia-index-url url``
-    HITRAN CIA index URL. The default is ``https://hitran.org/cia/``.
-
 ``--output path``
     Explicit output path. Use ``.png`` for single plots and ``.pdf`` for
     overview plots.

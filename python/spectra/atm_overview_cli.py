@@ -274,7 +274,6 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
             cache_dir=args.hitran_dir,
             filename=cia_filename,
             pair=config.cia_pair,
-            index_url=str(args.cia_index_url),
             refresh=bool(args.refresh_cia),
         )
         binary = cia_dataset.interpolate_to_grid(temperature_k, grid)
@@ -303,7 +302,6 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
             cache_dir=args.hitran_dir,
             filename=filename,
             pair=pair_name,
-            index_url=str(args.cia_index_url),
             refresh=bool(args.refresh_cia),
         )
         binary = cia_dataset.interpolate_to_grid(temperature_k, grid)
@@ -544,7 +542,6 @@ def build_atm_overview_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resolution", type=float, default=1.0)
     parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=_parse_wn_range, required=True)
     parser.add_argument("--broadening-composition", default=None)
-    parser.add_argument("--cia-index-url", default="https://hitran.org/cia/")
     parser.add_argument("--refresh-hitran", action="store_true")
     parser.add_argument("--refresh-cia", action="store_true")
     parser.add_argument("--figure", type=Path, default=Path("output/atm_overview.pdf"))

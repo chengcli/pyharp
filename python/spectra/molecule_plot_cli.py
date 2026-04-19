@@ -59,7 +59,6 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_state: boo
 def _add_external_cia_arguments(parser: argparse.ArgumentParser, *, required: bool = False) -> None:
     parser.add_argument("--cia-filename", required=required)
     parser.add_argument("--cia-pair", default=None)
-    parser.add_argument("--cia-index-url", default="https://hitran.org/cia/")
     parser.add_argument("--refresh-cia", action="store_true")
 
 
@@ -116,7 +115,6 @@ def _load_requested_cia_dataset(args: argparse.Namespace, config: SpectroscopyCo
         cache_dir=args.hitran_dir,
         filename=cia_filename,
         pair=_resolve_cia_pair(args, config),
-        index_url=str(args.cia_index_url),
         refresh=bool(args.refresh_cia),
     )
 
@@ -595,7 +593,6 @@ def build_molecule_overview_batch_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=_parse_wn_range, required=True)
     parser.add_argument("--refresh-hitran", action="store_true")
     parser.add_argument("--broadening-composition", default=None)
-    parser.add_argument("--cia-index-url", default="https://hitran.org/cia/")
     parser.add_argument("--refresh-cia", action="store_true")
     parser.add_argument("--figure", type=Path, default=Path("output/molecule_overview_collection.pdf"))
     return parser
@@ -627,7 +624,6 @@ def run_overview_batch(args: argparse.Namespace) -> None:
                     broadening_composition=args.broadening_composition,
                     cia_filename=None,
                     cia_pair=None,
-                    cia_index_url=args.cia_index_url,
                     refresh_cia=args.refresh_cia,
                     path_length_km=args.path_length_km,
                     figure=figure_path,
