@@ -35,9 +35,6 @@ struct OpacityOptionsImpl {
     os << "* verbose = " << (verbose() ? "true" : "false") << "\n";
   }
 
-  std::vector<double> query_wavenumber() const;
-  std::vector<double> query_weight() const;
-
   //! type of the opacity source
   ADD_ARG(std::string, type) = "";
 

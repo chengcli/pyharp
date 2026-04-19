@@ -8,9 +8,10 @@
 #include <harp/opacity/fourcolumn.hpp>
 #include <harp/opacity/helios.hpp>
 #include <harp/opacity/jit_opacity.hpp>
+#include <harp/opacity/molecule_cia.hpp>
+#include <harp/opacity/molecule_line.hpp>
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
-#include <harp/opacity/rfm.hpp>
 #include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/parse_yaml_input.hpp>
@@ -139,12 +140,12 @@ void RadiationBandImpl::reset() {
     if (op->type() == "jit") {
       opacities[name] = torch::nn::AnyModule(JITOpacity(op));
       nmax_prop = std::max(nmax_prop, 2 + op->nmom());
-    } else if (op->type() == "rfm-lbl") {
-      auto a = RFM(op);
+    } else if (op->type() == "molecule-line") {
+      auto a = MoleculeLine(op);
       nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op->type() == "rfm-ck") {
-      auto a = RFM(op);
+    } else if (op->type() == "molecule-cia") {
+      auto a = MoleculeCIA(op);
       nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "multiband-ck") {

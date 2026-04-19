@@ -12,8 +12,8 @@
 #
 # Required fields for 'opacities':
 #   - type: choose between the following recognized types
-#           - 'rfm-lbl': RFM line-by-line table
-#           - 'rfm-ck': correlated-k table generated from RFM line-by-line
+#           - 'molecule-line': NetCDF molecular line cross-section dump
+#           - 'cia': NetCDF collision-induced absorption dump
 #           - 'h2so4_simple': simple H2SO4 shortwave opacity model
 #           - 's8_fuller': simple S8 shortwave opacity model
 #
@@ -73,22 +73,22 @@ opacities:
     nmom: 4
 
   CO2:
-    type: rfm-ck
+    type: molecule-line
     data: [ck-h2_25-so2-3bar-<band>.nc]
     species: [CO2]
 
   H2O:
-    type: rfm-ck
+    type: molecule-line
     data: [ck-h2_25-so2-3bar-<band>.nc]
     species: [H2O]
 
   SO2:
-    type: rfm-ck
+    type: molecule-line
     data: [ck-h2_25-so2-3bar-<band>.nc]
     species: [SO2]
 
   H2:
-    type: rfm-ck
+    type: molecule-line
     data: [ck-h2_25-so2-3bar-<band>.nc]
     species: [H2]
 

@@ -9,7 +9,6 @@ except ModuleNotFoundError as exc:
         raise
 
 from .disort import *
-from .rfmlib import *
 from .compile import *
 
 try:

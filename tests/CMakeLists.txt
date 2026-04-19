@@ -4,7 +4,7 @@
 
 enable_testing()
 
-#setup_test(test_attenuator)
+setup_test(test_attenuator)
 setup_test(test_interpn)
 setup_test(test_hypsometric)
 setup_test(test_trapez)

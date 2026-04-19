@@ -31,8 +31,9 @@ using OpacityDict = std::map<std::string, OpacityOptions>;
  *
  * The `RadiationBand` object recognizes the following opacity source types:
  *  - "jit": user-defined opacity module
- *  - "rfm-lbl": line-by-line opacity defined on wavenumber grid
- *  - "rfm-ck": correlated-k opacity table computed from rfm line-by-line table
+ *  - "molecule-line": line opacity from NetCDF cross-section dumps
+ *  - "molecule-cia": CIA opacity from NetCDF binary absorption coefficient
+ * dumps
  *  - "multiband-ck": multi-band correlated-k opacity table
  *  - "wavetemp": opacity table defined on wavenumber and temperature grid (CIA)
  *  - "fourcolumn": Four-column opacity table (aerosol)

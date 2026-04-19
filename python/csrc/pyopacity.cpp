@@ -4,10 +4,11 @@
 // harp
 #include <harp/opacity/fourcolumn.hpp>
 #include <harp/opacity/jit_opacity.hpp>
+#include <harp/opacity/molecule_cia.hpp>
+#include <harp/opacity/molecule_line.hpp>
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/opacity_options.hpp>
-#include <harp/opacity/rfm.hpp>
 #include <harp/opacity/wavetemp.hpp>
 
 // python
@@ -45,5 +46,7 @@ void bind_opacity(py::module& parent) {
   ADD_HARP_MODULE(WaveTemp, OpacityOptions, py::arg("conc"), py::arg("atm"));
   ADD_HARP_MODULE(MultiBand, OpacityOptions, py::arg("conc"), py::arg("atm"));
   ADD_HARP_MODULE(FourColumn, OpacityOptions, py::arg("conc"), py::arg("atm"));
-  ADD_HARP_MODULE(RFM, OpacityOptions, py::arg("conc"), py::arg("atm"));
+  ADD_HARP_MODULE(MoleculeLine, OpacityOptions, py::arg("conc"),
+                  py::arg("atm"));
+  ADD_HARP_MODULE(MoleculeCIA, OpacityOptions, py::arg("conc"), py::arg("atm"));
 }
