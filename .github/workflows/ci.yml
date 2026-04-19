@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install build ninja setuptools-scm numpy 'pydisort==1.7.1' 'torch==2.10.0'
+          pip install build ninja setuptools-scm wheel numpy 'pydisort==1.7.1' 'torch==2.10.0'
 
       - name: Install NetCDF
         run: |
