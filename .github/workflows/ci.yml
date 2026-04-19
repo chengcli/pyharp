@@ -53,17 +53,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
-          cache-dependency-path: pyproject.toml
+          cache-dependency-path: |
+            requirements-ci.txt
+            requirements-ci-linux.txt
+            requirements-ci-macos.txt
 
       - name: Install Python dependencies
-        run: |
-          pip install build ninja setuptools-scm wheel numpy
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            pip install 'torch==2.10.0' --index-url https://download.pytorch.org/whl/cpu
-          else
-            pip install 'torch==2.10.0'
-          fi
-          pip install --no-deps 'pydisort==1.7.1'
+        run: pip install -r requirements-ci.txt -r requirements-ci-${RUNNER_OS,,}.txt
 
       - name: Install NetCDF
         run: |

@@ -1,0 +1,6 @@
+build==1.4.3
+ninja==1.13.0
+numpy==2.4.4
+pydisort==1.7.1
+setuptools-scm==9.2.2
+wheel==0.45.1
