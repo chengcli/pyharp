@@ -59,7 +59,9 @@ jobs:
             requirements-ci-macos.txt
 
       - name: Install Python dependencies
-        run: pip install -r requirements-ci.txt -r requirements-ci-${RUNNER_OS,,}.txt
+        run: |
+          pip install -r requirements-ci.txt
+          pip install -r requirements-ci-${RUNNER_OS,,}.txt
 
       - name: Install NetCDF
         run: |
