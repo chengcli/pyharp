@@ -15,7 +15,9 @@
 
 namespace harp {
 
-void call_toon89_sw_cpu(at::TensorIterator& iter) {
+void call_toon89_sw_cpu(at::TensorIterator& iter, bool zenith_correction,
+                        int /*top_emission_flag*/, bool /*hard_surface*/,
+                        bool /*delta_eddington_lw*/) {
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_toon89_sw_cpu", [&] {
     int nlay = at::native::ensure_nonempty_size(iter.input(0), -2);
     int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
@@ -39,7 +41,9 @@ void call_toon89_sw_cpu(at::TensorIterator& iter) {
   });
 }
 
-void call_toon89_lw_cpu(at::TensorIterator& iter) {
+void call_toon89_lw_cpu(at::TensorIterator& iter, bool /*zenith_correction*/,
+                        int top_emission_flag, bool hard_surface,
+                        bool delta_eddington_lw) {
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_toon89_lw_cpu", [&] {
     int nlay = at::native::ensure_nonempty_size(iter.input(0), -2);
     int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
@@ -60,8 +64,8 @@ void call_toon89_lw_cpu(at::TensorIterator& iter) {
                 reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
             auto delta_edd_lw =
                 reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
-            toon_mckay89_longwave(nlay, be, prop, *albedo, *hard_surface,
-                                  *top_emission, *delta_edd_lw, out, len1,
+            toon_mckay89_longwave(nlay, be, prop, *albedo, top_emission_flag,
+                                  hard_surface, delta_eddington_lw, out, len1,
                                   work.get());
           }
         },

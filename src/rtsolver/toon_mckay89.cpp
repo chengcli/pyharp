@@ -79,6 +79,11 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
   auto flx = torch::zeros({nwave, ncol, nlyr + 1, 2}, prop.options());
 
+  // Ensure prop is contiguous so raw pointer access in impl is correct.
+  // Non-contiguous slices (e.g. prop[:,:,:,:3] from a larger tensor)
+  // would have strides that don't match the pointer arithmetic in the impl.
+  prop = prop.contiguous();
+
   if (!temf.has_value()) {  // shortwave
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
@@ -95,7 +100,10 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                     .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
                     .build();
 
-    at::native::call_toon89_sw(flx.device().type(), iter);
+    at::native::call_toon89_sw(
+        flx.device().type(), iter, options->zenith_correction(),
+        options->top_emission_flag(), options->hard_surface(),
+        options->delta_eddington_lw());
     return flx;
   } else {  // longwave
     /*Eigen::VectorXd temp(nlay + 1);
@@ -113,27 +121,21 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
     auto be = bbflux_wavenumber(wave_lo, wave_hi, temf.value());
 
-    auto iter =
-        at::TensorIteratorConfig()
-            .resize_outputs(false)
-            .check_all_same_dtype(true)
-            .declare_static_shape({nwave, ncol, nlyr + 1, 2},
-                                  /*squash_dims=*/{2, 3})
-            .add_output(flx)
-            .add_input(prop)
-            .add_input(be)
-            .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
-            .add_owned_input(torch::full({nwave, ncol, 1, 1},
-                                         options->hard_surface() ? 1.0 : 0.0,
-                                         prop.options()))
-            .add_owned_input(torch::full(
-                {nwave, ncol, 1, 1}, options->top_emission(), prop.options()))
-            .add_owned_input(torch::full(
-                {nwave, ncol, 1, 1}, options->delta_eddington_lw() ? 1.0 : 0.0,
-                prop.options()))
-            .build();
+    auto iter = at::TensorIteratorConfig()
+                    .resize_outputs(false)
+                    .check_all_same_dtype(true)
+                    .declare_static_shape({nwave, ncol, nlyr + 1, 2},
+                                          /*squash_dims=*/{2, 3})
+                    .add_output(flx)
+                    .add_input(prop)
+                    .add_input(be)
+                    .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
+                    .build();
 
-    at::native::call_toon89_lw(flx.device().type(), iter);
+    at::native::call_toon89_lw(
+        flx.device().type(), iter, options->zenith_correction(),
+        options->top_emission_flag(), options->hard_surface(),
+        options->delta_eddington_lw());
     return flx;
   }
 }

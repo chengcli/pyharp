@@ -23,8 +23,8 @@ struct ToonMcKay89OptionsImpl {
   }
   void report(std::ostream& os) const {
     os << "* zenith_correction = " << zenith_correction() << "\n";
+    os << "* top_emission_flag = " << top_emission_flag() << "\n";
     os << "* hard_surface = " << hard_surface() << "\n";
-    os << "* top_emission = " << top_emission() << "\n";
     os << "* delta_eddington_lw = " << delta_eddington_lw() << "\n";
 
     os << "* wave_lower = ";
@@ -45,16 +45,16 @@ struct ToonMcKay89OptionsImpl {
   //! zenith correction
   ADD_ARG(bool, zenith_correction) = false;
 
+  //! top emission flag
+  //!   0 = no incoming radiation at TOA (Toon 1989 default, GCM mode)
+  //!   1 = full Planck at TOA (infinite isothermal slab above)
+  //!  -1 = auto-compute from first layer: tau_top = dtau[0]*exp(-1),
+  //!       Btop = (1-exp(-tau_top/mu)) * B(T_top)  (FMS-style)
+  ADD_ARG(int, top_emission_flag) = 0;
+
   //! hard surface (true = terrestrial with emissivity BC,
   //!               false = gas giant with Planck gradient BC)
   ADD_ARG(bool, hard_surface) = false;
-
-  //! top emission factor
-  //!   0.0 = no incoming radiation at TOA (Toon 1989 default, GCM mode)
-  //!   1.0 = full Planck at TOA (infinite isothermal slab above)
-  //!  -1.0 = auto-compute from first layer: tau_top = dtau[0]*exp(-1),
-  //!         Btop = (1-exp(-tau_top/mu)) * B(T_top)  (FMS-style)
-  ADD_ARG(double, top_emission) = 0.0;
 
   //! apply delta-Eddington scaling in longwave
   //! (true = rescale w0, dtau, g as in FMS; false = use raw values as in
