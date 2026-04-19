@@ -255,7 +255,6 @@ def test_run_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
         refresh_hitran=False,
         cia_filename=None,
         cia_pair=None,
-        cia_index_url="https://hitran.org/cia/",
         refresh_cia=False,
         figure=tmp_path / "co2.png",
     )

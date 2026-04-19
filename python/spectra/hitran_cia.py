@@ -14,6 +14,7 @@ from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig
 
 K_BOLTZMANN = 1.380649e-23
+HITRAN_CIA_INDEX_URL = "https://hitran.org/cia/"
 
 
 class _HrefCollector(HTMLParser):
@@ -110,23 +111,22 @@ def _download_text(url: str) -> str:
         return response.read().decode("utf-8")
 
 
-def find_cia_download_url(index_url: str, filename: str) -> str:
+def find_cia_download_url(filename: str) -> str:
     """Resolve the CIA download URL by scraping the HITRAN CIA index page."""
-    html = _download_text(index_url)
+    html = _download_text(HITRAN_CIA_INDEX_URL)
     parser = _HrefCollector()
     parser.feed(html)
     filename_lower = filename.lower()
     for href in parser.hrefs:
         if filename_lower in href.lower():
-            return urljoin(index_url, href)
-    return urljoin(index_url, filename)
+            return urljoin(HITRAN_CIA_INDEX_URL, href)
+    return urljoin(HITRAN_CIA_INDEX_URL, filename)
 
 
 def download_cia_file_by_name(
     *,
     cache_dir: Path,
     filename: str,
-    index_url: str = "https://hitran.org/cia/",
     refresh: bool = False,
 ) -> Path:
     """Download a named CIA file into the requested local cache directory."""
@@ -134,7 +134,7 @@ def download_cia_file_by_name(
     target = cache_dir / filename
     if target.exists() and not refresh:
         return target
-    url = find_cia_download_url(index_url, filename)
+    url = find_cia_download_url(filename)
     req = Request(url, headers={"User-Agent": "spectra/0.1"})
     with urlopen(req) as response, open(target, "wb") as handle:
         handle.write(response.read())
@@ -147,7 +147,6 @@ def download_cia_file(config: SpectroscopyConfig) -> Path:
     return download_cia_file_by_name(
         cache_dir=config.hitran_cache_dir,
         filename=config.cia_filename,
-        index_url=config.cia_index_url,
         refresh=config.refresh_hitran,
     )
 
@@ -223,14 +222,12 @@ def load_cia_dataset(
     cache_dir: Path,
     filename: str,
     pair: str,
-    index_url: str = "https://hitran.org/cia/",
     refresh: bool = False,
 ) -> CiaDataset:
     """Download and parse a CIA dataset identified by filename and pair."""
     path = download_cia_file_by_name(
         cache_dir=cache_dir,
         filename=filename,
-        index_url=index_url,
         refresh=refresh,
     )
     return parse_cia_file(path, pair)

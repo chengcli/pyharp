@@ -294,7 +294,6 @@ class SpectroscopyConfig:
     species_name: str = "CO2"
     isotopologue_ids: tuple[int, ...] | None = None
     broadening_composition: dict[str, float] | str | None = None
-    cia_index_url: str = "https://hitran.org/cia/"
     refresh_hitran: bool = False
     min_line_strength: float = 1.0e-27
 

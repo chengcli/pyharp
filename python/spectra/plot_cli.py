@@ -81,7 +81,6 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, allow_multiple_ran
 
 def _add_cache_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--refresh-hitran", action="store_true", help="Re-download HITRAN line tables even if cached.")
-    parser.add_argument("--cia-index-url", default="https://hitran.org/cia/", metavar="URL", help="HITRAN CIA index URL used to resolve CIA files.")
     parser.add_argument("--refresh-cia", action="store_true", help="Re-download HITRAN CIA files even if cached.")
 
 
@@ -197,7 +196,6 @@ def _as_cia_args(args: argparse.Namespace, *, default_pair: str, plot_type: str)
         resolution=args.resolution,
         refresh=refresh_cia,
         refresh_cia=refresh_cia,
-        cia_index_url=getattr(args, "cia_index_url", None),
         pressure_bar=pressure_bar,
         path_length_km=getattr(args, "path_length_km", 1.0),
         figure=args.figure
@@ -225,7 +223,6 @@ def _as_molecule_args(args: argparse.Namespace, *, plot_type: str) -> argparse.N
         refresh_hitran=args.refresh_hitran,
         cia_filename=getattr(args, "cia_filename", None),
         cia_pair=getattr(args, "cia_pair", None),
-        cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
         broadening_composition=getattr(args, "broadening_composition", None),
         path_length_km=getattr(args, "path_length_km", 1.0),
@@ -252,7 +249,6 @@ def _as_molecule_overview_args(args: argparse.Namespace, *, species: str, wn_ran
         refresh_hitran=args.refresh_hitran,
         cia_filename=getattr(args, "cia_filename", None),
         cia_pair=getattr(args, "cia_pair", None),
-        cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
         broadening_composition=getattr(args, "broadening_composition", None),
         path_length_km=args.path_length_km,
@@ -279,7 +275,6 @@ def _as_molecule_overview_batch_args(args: argparse.Namespace, *, species: list[
         path_length_km=args.path_length_km,
         wn_ranges=wn_ranges,
         refresh_hitran=args.refresh_hitran,
-        cia_index_url=args.cia_index_url,
         refresh_cia=args.refresh_cia,
         broadening_composition=getattr(args, "broadening_composition", None),
         figure=args.figure
@@ -304,7 +299,6 @@ def _as_atm_overview_args(args: argparse.Namespace, *, wn_ranges: list[tuple[flo
         path_length_km=args.path_length_km,
         resolution=args.resolution,
         wn_ranges=wn_ranges,
-        cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
         broadening_composition=getattr(args, "broadening_composition", None),
@@ -331,7 +325,6 @@ def _as_atm_args(args: argparse.Namespace, *, plot_type: str, wn_range: tuple[fl
         path_length_km=getattr(args, "path_length_km", 1.0),
         resolution=args.resolution,
         wn_range=wn_range,
-        cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
         broadening_composition=getattr(args, "broadening_composition", None),

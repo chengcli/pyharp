@@ -111,7 +111,6 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--cia-dir", type=Path, default=None, metavar="DIR", help="Directory for alternate CIA tables. HITRAN uses --hitran-dir; xiz/orton use orton_xiz_cia/ by default.")
     parser.add_argument("--cia-model", choices=("auto", "2011", "2018", "xiz", "orton"), default="auto", help="CIA model selector. auto/2011/2018 use HITRAN. xiz/orton use the legacy Orton/Xiz tables.")
     parser.add_argument("--h2-state", choices=("eq", "nm"), default="eq", help="H2 spin-state selector used by HITRAN 2018 and xiz/orton H2 tables.")
-    parser.add_argument("--cia-index-url", default="https://hitran.org/cia/", metavar="URL", help="HITRAN CIA index URL used to resolve CIA files.")
     parser.add_argument("--refresh-cia", action="store_true", help="Re-download HITRAN CIA files even if cached.")
     if include_path_length:
         parser.add_argument("--path-length-km", type=float, default=1.0, metavar="KM", help=TRANSMISSION_PATH_LENGTH_HELP)
@@ -610,7 +609,6 @@ def _load_pair_cia_dataset(args: argparse.Namespace):
         cache_dir=args.hitran_dir,
         filename=filename,
         pair=pair,
-        index_url=str(args.cia_index_url),
         refresh=bool(args.refresh_cia),
     )
 
@@ -637,7 +635,6 @@ def _resolve_species_cia(args: argparse.Namespace, config: SpectroscopyConfig):
         cache_dir=args.hitran_dir,
         filename=filename,
         pair=pair,
-        index_url=str(args.cia_index_url),
         refresh=bool(args.refresh_cia),
     )
 
@@ -751,7 +748,6 @@ def _compute_composition_products(args: argparse.Namespace):
         temperature_k=temperature_k,
         pressure_bar=pressure_bar,
         resolution=args.resolution,
-        cia_index_url=args.cia_index_url,
         refresh_hitran=args.refresh_hitran,
         refresh_cia=args.refresh_cia,
         broadening_composition=args.broadening_composition,
