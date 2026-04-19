@@ -15,7 +15,7 @@ namespace harp {
 class MoleculeCIAImpl : public torch::nn::Cloneable<MoleculeCIAImpl> {
  public:
   torch::Tensor wavenumber, ln_pressure, temperature_anomaly;
-  torch::Tensor sigma_binary, temperature_base;
+  torch::Tensor ln_sigma_binary, ln_temperature_base;
 
   OpacityOptions options;
 

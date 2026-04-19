@@ -26,7 +26,7 @@ extern "C" {
 }
 #endif
 
-namespace harp::opacity_netcdf {
+namespace harp {
 
 inline std::string trim_copy(std::string value) {
   auto const begin = value.find_first_not_of(" \t\r\n");
@@ -248,4 +248,4 @@ inline torch::Tensor convert_binary_cross_section_to_m5_per_mol2(
   return values;
 }
 
-}  // namespace harp::opacity_netcdf
+}  // namespace harp

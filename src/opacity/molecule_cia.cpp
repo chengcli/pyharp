@@ -2,8 +2,7 @@
 #include "molecule_cia.hpp"
 
 #include <harp/math/interpolation.hpp>
-
-#include "netcdf_opacity_utils.hpp"
+#include <harp/utils/netcdf_opacity_utils.hpp>
 
 namespace harp {
 
@@ -25,47 +24,43 @@ MoleculeCIAImpl::MoleculeCIAImpl(OpacityOptions const& options_)
 
 void MoleculeCIAImpl::reset() {
 #ifdef NETCDFOUTPUT
-  int fileid = opacity_netcdf::open_file(options->opacity_files()[0]);
+  int fileid = open_file(options->opacity_files()[0]);
 
   int wavenumber_id = -1;
-  opacity_netcdf::check_nc(nc_inq_varid(fileid, "wavenumber", &wavenumber_id),
-                           "Missing required variable wavenumber");
-  wavenumber = opacity_netcdf::convert_wavenumber_to_cm1(
-      opacity_netcdf::read_1d_variable(fileid, "wavenumber"),
-      opacity_netcdf::read_var_units(fileid, wavenumber_id), "wavenumber");
+  check_nc(nc_inq_varid(fileid, "wavenumber", &wavenumber_id),
+           "Missing required variable wavenumber");
+  wavenumber = convert_wavenumber_to_cm1(read_1d_variable(fileid, "wavenumber"),
+                                         read_var_units(fileid, wavenumber_id),
+                                         "wavenumber");
 
   int pressure_id = -1;
-  opacity_netcdf::check_nc(nc_inq_varid(fileid, "pressure", &pressure_id),
-                           "Missing required variable pressure");
+  check_nc(nc_inq_varid(fileid, "pressure", &pressure_id),
+           "Missing required variable pressure");
   ln_pressure =
-      opacity_netcdf::convert_pressure_to_pa(
-          opacity_netcdf::read_1d_variable(fileid, "pressure"),
-          opacity_netcdf::read_var_units(fileid, pressure_id), "pressure")
+      convert_pressure_to_pa(read_1d_variable(fileid, "pressure"),
+                             read_var_units(fileid, pressure_id), "pressure")
           .log();
 
   int del_temp_id = -1;
-  opacity_netcdf::check_nc(
-      nc_inq_varid(fileid, "del_temperature", &del_temp_id),
-      "Missing required variable del_temperature");
-  temperature_anomaly = opacity_netcdf::convert_temperature_to_k(
-      opacity_netcdf::read_1d_variable(fileid, "del_temperature"),
-      opacity_netcdf::read_var_units(fileid, del_temp_id), "del_temperature");
+  check_nc(nc_inq_varid(fileid, "del_temperature", &del_temp_id),
+           "Missing required variable del_temperature");
+  temperature_anomaly = convert_temperature_to_k(
+      read_1d_variable(fileid, "del_temperature"),
+      read_var_units(fileid, del_temp_id), "del_temperature");
 
   int base_temp_id = -1;
-  opacity_netcdf::check_nc(nc_inq_varid(fileid, "temperature", &base_temp_id),
-                           "Missing required variable temperature");
-  temperature_base =
-      opacity_netcdf::convert_temperature_to_k(
-          opacity_netcdf::read_1d_variable(fileid, "temperature"),
-          opacity_netcdf::read_var_units(fileid, base_temp_id), "temperature")
-          .unsqueeze(-1);
+  check_nc(nc_inq_varid(fileid, "temperature", &base_temp_id),
+           "Missing required variable temperature");
+  ln_temperature_base = convert_temperature_to_k(
+                            read_1d_variable(fileid, "temperature"),
+                            read_var_units(fileid, base_temp_id), "temperature")
+                            .log()
+                            .unsqueeze(-1);
 
-  auto first = opacity_netcdf::normalize_token(
-      species_names.at(options->species_ids().at(0)));
+  auto first = normalize_token(species_names.at(options->species_ids().at(0)));
   auto second = first;
   if (options->species_ids().size() == 2) {
-    second = opacity_netcdf::normalize_token(
-        species_names.at(options->species_ids().at(1)));
+    second = normalize_token(species_names.at(options->species_ids().at(1)));
   }
 
   std::vector<std::string> candidates = {"binary_absorption_coefficient_" +
@@ -78,7 +73,7 @@ void MoleculeCIAImpl::reset() {
   int varid = -1;
   std::string selected;
   for (auto const& candidate : candidates) {
-    if (opacity_netcdf::try_find_varid(fileid, candidate, &varid)) {
+    if (try_find_varid(fileid, candidate, &varid)) {
       selected = candidate;
       break;
     }
@@ -86,14 +81,17 @@ void MoleculeCIAImpl::reset() {
   TORCH_CHECK(!selected.empty(), "No CIA variable found for species pair ",
               first, "-", second);
 
-  sigma_binary =
-      opacity_netcdf::convert_binary_cross_section_to_m5_per_mol2(
-          opacity_netcdf::read_tensor_permuted(
-              fileid, selected, {"wavenumber", "pressure", "del_temperature"}),
-          opacity_netcdf::read_var_units(fileid, varid), selected)
+  auto sigma_binary =
+      convert_binary_cross_section_to_m5_per_mol2(
+          read_tensor_permuted(fileid, selected,
+                               {"wavenumber", "pressure", "del_temperature"}),
+          read_var_units(fileid, varid), selected)
           .unsqueeze(-1);
+  TORCH_CHECK(torch::all(sigma_binary > 0).item<bool>(),
+              "MoleculeCIA requires strictly positive CIA binary coefficients");
+  ln_sigma_binary = sigma_binary.log();
 
-  opacity_netcdf::check_nc(nc_close(fileid), "Failed to close NetCDF file");
+  check_nc(nc_close(fileid), "Failed to close NetCDF file");
 #else
   TORCH_CHECK(false, "NetCDF support is not enabled");
 #endif
@@ -101,8 +99,8 @@ void MoleculeCIAImpl::reset() {
   register_buffer("wavenumber", wavenumber);
   register_buffer("ln_pressure", ln_pressure);
   register_buffer("temperature_anomaly", temperature_anomaly);
-  register_buffer("sigma_binary", sigma_binary);
-  register_buffer("temperature_base", temperature_base);
+  register_buffer("ln_sigma_binary", ln_sigma_binary);
+  register_buffer("ln_temperature_base", ln_temperature_base);
 }
 
 torch::Tensor MoleculeCIAImpl::forward(
@@ -132,8 +130,9 @@ torch::Tensor MoleculeCIAImpl::forward(
               "MoleculeCIA expects a 1D wavenumber or wavelength grid");
 
   auto lnp = pres.log();
-  auto del_temp =
-      temp - interpn({lnp}, {ln_pressure}, temperature_base).squeeze(-1);
+  auto temperature_base =
+      interpn({lnp}, {ln_pressure}, ln_temperature_base).squeeze(-1).exp();
+  auto del_temp = temp - temperature_base;
 
   int const nwave = wave_query.size(0);
   auto wave =
@@ -143,7 +142,8 @@ torch::Tensor MoleculeCIAImpl::forward(
 
   auto coeff = interpn({wave, lnp_grid, temp_grid},
                        {wavenumber, ln_pressure, temperature_anomaly},
-                       sigma_binary, true);
+                       ln_sigma_binary, true)
+                   .exp();
 
   auto species0 = conc.select(-1, options->species_ids().at(0));
   auto species1 = conc.select(-1, options->species_ids().size() == 2

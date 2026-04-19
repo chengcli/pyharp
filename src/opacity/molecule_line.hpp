@@ -18,13 +18,13 @@ class MoleculeLineImpl : public torch::nn::Cloneable<MoleculeLineImpl> {
   //! (nwave,) (npres,) (ndeltemp,)
   torch::Tensor wavenumber, ln_pressure, temperature_anomaly;
 
-  //! tabulated line + same-species continuum cross section [m^2/mol]
+  //! tabulated ln(line + same-species continuum cross section) [ln(m^2/mol)]
   //! (nwave, npres, ndeltemp, 1)
   torch::Tensor ln_sigma_cross;
 
-  //! base temperature profile [K]
+  //! ln(base temperature profile) [ln(K)]
   //! (npres, 1)
-  torch::Tensor temperature_base;
+  torch::Tensor ln_temperature_base;
 
   //! options with which this `MoleculeLineImpl` was constructed
   OpacityOptions options;
