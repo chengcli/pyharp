@@ -53,10 +53,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
+          cache-dependency-path: pyproject.toml
 
       - name: Install Python dependencies
         run: |
-          pip install numpy 'pydisort==1.7.1' 'torch==2.10.0'
+          pip install build ninja setuptools-scm numpy 'pydisort==1.7.1' 'torch==2.10.0'
 
       - name: Install NetCDF
         run: |
@@ -64,8 +65,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y libnetcdf-dev
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            brew update
-            brew install netcdf
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install netcdf
           fi
 
       #- name: Cache CMake build
@@ -81,15 +81,17 @@ jobs:
           cmake -B ${{ github.workspace }}/build \
                 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                 -DNETCDF=ON \
-                -DBUILD_TESTS=ON
+                -DBUILD_TESTS=ON \
+                -DBUILD_EXAMPLES=OFF
 
       - name: Build
         run: cmake --build ${{ github.workspace }}/build --config ${{ env.BUILD_TYPE }} --parallel 3
 
       - name: Install the project
-        run: pip install .
+        run: pip install --no-build-isolation --no-deps .
 
-      - name: Run C++ & Pybind tests
+      - name: Run C++ tests and pyharp smoke test
         run: |
+          python -c "import pyharp"
           cd ${{ github.workspace }}/build/tests
           ctest --output-on-failure
