@@ -1,6 +1,8 @@
 include(FetchContent)
 set(FETCHCONTENT_QUIET TRUE)
 
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+
 set(PACKAGE_NAME gtest)
 set(REPO_URL "https://github.com/google/googletest")
 set(REPO_TAG "v1.13.0")

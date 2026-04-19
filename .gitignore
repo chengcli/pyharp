@@ -26,6 +26,7 @@ docs/_build/
 
 # python
 *egg-info*
+*env*/
 
 # notebook
 *.ipynb
