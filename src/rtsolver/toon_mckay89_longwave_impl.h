@@ -24,9 +24,10 @@ namespace harp {
 
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
-                                          T a_surf_in, T hard_surface_in,
-                                          T top_emission_in, T delta_edd_lw_in,
-                                          T* flx, int len1, char* work) {
+                                          T a_surf_in, int top_emission_flag,
+                                          bool hard_surface,
+                                          bool delta_eddington_lw, T* flx,
+                                          int len1, char* work) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;
@@ -36,9 +37,6 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   const int nmu = 5;
   const T twopi = 2.0 * M_PI;
   const T ubari = 0.5;
-  const bool hard_surface = (hard_surface_in > 0.5);
-  const T top_emission = top_emission_in;
-  const bool delta_eddington_lw = (delta_edd_lw_in > 0.5);
 
   const T uarr[] = {0.0985350858, 0.3045357266, 0.5620251898, 0.8019865821,
                     0.9601901429};
@@ -145,17 +143,18 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     E4[k] = gam[k] * Ep[k] - Em[k];
   }
 
-  // Top boundary: controlled by top_emission factor
-  // top_emission = 0.0: no incoming radiation at TOA (Toon 1989 default)
-  // top_emission = 1.0: full Planck at TOA (infinite isothermal slab above)
-  // top_emission < 0: auto-compute from first layer optical depth (FMS-style)
+  // Top boundary: controlled by top_emission_flag
+  // top_emission_flag = 0: no incoming radiation at TOA (Toon 1989 default)
+  // top_emission_flag = 1: full Planck at TOA (infinite isothermal slab above)
+  // top_emission_falg < 0: auto-compute from first layer optical depth
+  // (FMS-style)
   //   tau_top = dtau[0] * exp(-1), Btop = (1-exp(-tau_top/ubari)) * BE(0)
   T Btop;
-  if (top_emission < 0.0) {
+  if (top_emission_flag < 0) {
     T tautop = dtau[0] * exp(-1.0);
     Btop = (1.0 - exp(-tautop / ubari)) * BE_IN(0);
   } else {
-    Btop = top_emission * BE_IN(0);
+    Btop = top_emission_flag * BE_IN(0);
   }
   T Bsurf = BE_IN(nlev - 1);
 
@@ -245,11 +244,11 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     // Downward loop
     // Top BC: for auto-compute mode, use angle-dependent tau_top
     T Btop_g;
-    if (top_emission < 0.0) {
+    if (top_emission_flag < 0) {
       T tautop = dtau[0] * exp(-1.0);
       Btop_g = (1.0 - exp(-tautop / u)) * BE_IN(0);
     } else {
-      Btop_g = top_emission * BE_IN(0);
+      Btop_g = top_emission_flag * BE_IN(0);
     }
     lw_down_g[0] = twopi * Btop_g;
     for (int k = 0; k < nlay; k++) {
