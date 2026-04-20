@@ -87,8 +87,7 @@ void MoleculeCIAImpl::reset() {
                                {"wavenumber", "pressure", "del_temperature"}),
           read_var_units(fileid, varid), selected)
           .unsqueeze(-1);
-  TORCH_CHECK(torch::all(sigma_binary > 0).item<bool>(),
-              "MoleculeCIA requires strictly positive CIA binary coefficients");
+  sigma_binary = apply_positive_fill(sigma_binary, selected);
   ln_sigma_binary = sigma_binary.log();
 
   check_nc(nc_close(fileid), "Failed to close NetCDF file");

@@ -70,10 +70,10 @@ def init_radiation(config_file: str) -> Radiation:
             band.disort().accur(1.0e-4)
 
             data = [wmin] * ng
-            band.disort().wave_lower([x for col in zip(*data) for x in col])
+            band.set_wave_lower([x for col in zip(*data) for x in col])
 
             data = [wmax] * ng
-            band.disort().wave_upper([x for col in zip(*data) for x in col])
+            band.set_wave_upper([x for col in zip(*data) for x in col])
 
             wave_lower = np.array(band.disort().wave_lower())
             wave_upper = np.array(band.disort().wave_upper())

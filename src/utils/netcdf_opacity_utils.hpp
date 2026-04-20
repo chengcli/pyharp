@@ -3,6 +3,7 @@
 // C/C++
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <functional>
 #include <numeric>
 #include <string>
@@ -219,6 +220,22 @@ inline torch::Tensor convert_temperature_to_k(torch::Tensor values,
   TORCH_CHECK(false, "Unsupported temperature units for ", varname, ": ",
               units);
   return values;
+}
+
+inline torch::Tensor apply_positive_fill(torch::Tensor values,
+                                         std::string const& quantity_name) {
+  auto const positive_mask = values > 0;
+  double fill_value = 1.0e-300;
+  if (positive_mask.any().item<bool>()) {
+    fill_value = values.masked_select(positive_mask).min().item<double>();
+  }
+
+  TORCH_CHECK(std::isfinite(fill_value) && fill_value > 0.0,
+              "Invalid positive fill value for ", quantity_name, ": ",
+              fill_value);
+
+  return torch::where(positive_mask, values,
+                      torch::full_like(values, fill_value));
 }
 
 inline torch::Tensor convert_line_cross_section_to_m2_per_mol(

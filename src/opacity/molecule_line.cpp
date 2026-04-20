@@ -94,8 +94,7 @@ void MoleculeLineImpl::reset() {
             .unsqueeze(-1);
   }
 
-  TORCH_CHECK(torch::all(sigma_cross > 0).item<bool>(),
-              "MoleculeLine requires strictly positive line cross sections");
+  sigma_cross = apply_positive_fill(sigma_cross, line_name);
   ln_sigma_cross = sigma_cross.log();
 
   check_nc(nc_close(fileid), "Failed to close NetCDF file");

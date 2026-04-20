@@ -100,8 +100,8 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     op->disort() =
         create_disort_config(op->nwave(), op->ncol(), op->nlyr(), op->nstr());
     op->disort()->header("running disort " + bd_name);
-    op->disort()->wave_lower(std::vector<double>(op->nwave(), wmin));
-    op->disort()->wave_upper(std::vector<double>(op->nwave(), wmax));
+    op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
+    op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
     if (band["flags"]) {
       op->disort()->flags(trim_copy(band["flags"].as<std::string>()));
     }
@@ -110,8 +110,8 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     }
   } else if (op->solver_name() == "toon") {
     op->toon() = ToonMcKay89OptionsImpl::create();
-    op->toon()->wave_lower(std::vector<double>(op->nwave(), wmin));
-    op->toon()->wave_upper(std::vector<double>(op->nwave(), wmax));
+    op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
+    op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
   } else if (op->solver_name() == "twostr") {
     TORCH_CHECK(false, "twostr solver not implemented");
   } else {

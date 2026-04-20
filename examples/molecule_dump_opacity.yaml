@@ -1,0 +1,62 @@
+species:
+  - name: H2
+    composition: {H: 2}
+  - name: He
+    composition: {He: 1}
+  - name: CH4
+    composition: {C: 1, H: 4}
+  - name: H2O
+    composition: {H: 2, O: 1}
+  - name: NH3
+    composition: {N: 1, H: 3}
+
+geometry:
+  cells:
+    nx1: 8
+
+state:
+  composition: H2:0.9,He:0.1,CH4:0.004,H2O:0.002,NH3:0.0003
+  gravity_m_s2: 24.79
+  pressure_bottom_pa: 1.0e7
+  pressure_top_pa: 1.0e4
+  temperature_bottom_k: 700.0
+  temperature_top_k: 140.0
+  surface_temperature_k: 700.0
+  top_temperature_k: 140.0
+  output_dir: molecule_dump_band_outputs
+  reference_layer: 3
+
+opacities:
+  h2o_line:
+    type: molecule-line
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [H2O]
+
+  nh3_line:
+    type: molecule-line
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [NH3]
+
+  ch4_line:
+    type: molecule-line
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [CH4]
+
+  h2_h2_cia:
+    type: molecule-cia
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [H2]
+
+  h2_he_cia:
+    type: molecule-cia
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [H2, He]
+
+bands:
+  - name: dump_lw
+    range: [20.0, 2500.0]
+    opacities: [h2o_line, nh3_line, ch4_line, h2_h2_cia, h2_he_cia]
+    solver: disort
+    nwave: 2480
+    nstr: 4
+    flags: lamber,quiet,onlyfl,planck

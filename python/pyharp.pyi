@@ -432,6 +432,30 @@ class RadiationBandOptions:
         """
         ...
 
+    def set_wave_lower(self, value: list[float]) -> "RadiationBandOptions":
+        """
+        Set solver lower bin edges for the active band solver.
+
+        Args:
+            value (list[float]): lower bin edges [cm^-1]
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    def set_wave_upper(self, value: list[float]) -> "RadiationBandOptions":
+        """
+        Set solver upper bin edges for the active band solver.
+
+        Args:
+            value (list[float]): upper bin edges [cm^-1]
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
     @overload
     def verbose(self) -> bool:
         """Get verbose flag."""

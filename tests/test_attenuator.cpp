@@ -100,6 +100,10 @@ fs::path write_test_dataset() {
     }
   }
 
+  sigma_line[0] = 0.0;
+  sigma_cont[0] = 0.0;
+  sigma_cia[0] = 0.0;
+
   check_nc(nc_put_var_double(fileid, var_wavenumber, wavenumber));
   check_nc(nc_put_var_double(fileid, var_pressure, pressure));
   check_nc(nc_put_var_double(fileid, var_del_temp, del_temp));
@@ -134,7 +138,7 @@ TEST(TestOpacity, MoleculeLineAddsContinuumAndHandlesDimensionOrder) {
 
   auto result = line->forward(conc, atm).squeeze(-1).squeeze(-1).squeeze(-1);
   auto expected_sigma =
-      torch::tensor({1.1e-24, 3.1e-24, 5.1e-24}, torch::kFloat64) *
+      torch::tensor({3.1e-24, 3.1e-24, 5.1e-24}, torch::kFloat64) *
       (1.0e-4 * harp::constants::Avogadro);
   auto expected = expected_sigma * 2.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
@@ -165,7 +169,7 @@ TEST(TestOpacity, CIAHandlesBinaryPairsAndReversedSpeciesOrder) {
 
   auto result = cia->forward(conc, atm).squeeze(-1).squeeze(-1).squeeze(-1);
   auto expected_coeff =
-      torch::tensor({2.0e-46, 3.0e-46, 4.0e-46}, torch::kFloat64) *
+      torch::tensor({3.0e-46, 3.0e-46, 4.0e-46}, torch::kFloat64) *
       (1.0e-10 * harp::constants::Avogadro * harp::constants::Avogadro);
   auto expected = expected_coeff * 12.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
