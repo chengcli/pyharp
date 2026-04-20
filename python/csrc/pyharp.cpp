@@ -7,6 +7,7 @@
 // harp
 #include <harp/radiation/radiation.hpp>
 #include <harp/utils/find_resource.hpp>
+#include <harp/utils/mean_molecular_weight.hpp>
 
 namespace py = pybind11;
 
@@ -54,5 +55,7 @@ PYBIND11_MODULE(pyharp, m) {
             return harp::deserialize_search_paths(harp::search_paths);
           },
           py::arg("path"), py::arg("prepend") = true)
-      .def("find_resource", &harp::find_resource, py::arg("filename"));
+      .def("find_resource", &harp::find_resource, py::arg("filename"))
+      .def("mean_molecular_weight", &harp::mean_molecular_weight,
+           py::arg("conc"));
 }

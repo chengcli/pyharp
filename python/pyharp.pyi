@@ -107,6 +107,19 @@ def find_resource(filename: str) -> str:
     """
     ...
 
+def mean_molecular_weight(conc: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate mean molecular weight from species molar concentrations.
+
+    Args:
+        conc (torch.Tensor): concentration tensor with species on the last axis
+            and units of mol/m^3
+
+    Returns:
+        torch.Tensor: mean molecular weight [kg/mol] with the species axis reduced
+    """
+    ...
+
 # Radiation functions
 @overload
 def bbflux_wavenumber(wave: torch.Tensor, temp: float, ncol: int = 1) -> torch.Tensor:

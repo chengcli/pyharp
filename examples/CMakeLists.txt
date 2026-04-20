@@ -2,7 +2,7 @@
 # Legacy AMARS examples were removed with the RFM workflow.
 
 if (${CMAKE_SOURCE_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
-  setup_problem(example_jupiter_1d_rt)
+  setup_problem(jupiter_1d_rt)
 
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/jupiter_1d_rt.yaml

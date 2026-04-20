@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -18,42 +17,17 @@
 // harp
 #include <harp/constants.h>
 
+#include <harp/compound.hpp>
 #include <harp/radiation/calc_dz_hypsometric.hpp>
 #include <harp/radiation/radiation.hpp>
 #include <harp/radiation/radiation_band.hpp>
 #include <harp/utils/find_resource.hpp>
+#include <harp/utils/mean_molecular_weight.hpp>
 #include <harp/utils/netcdf_opacity_utils.hpp>
+#include <harp/utils/write_column_profile.hpp>
+#include <harp/utils/write_spectral_profile.hpp>
 
 namespace {
-
-using Composition = std::map<std::string, double>;
-
-double sum_composition(Composition const& composition) {
-  double total = 0.0;
-  for (auto const& [name, value] : composition) total += value;
-  return total;
-}
-
-Composition normalize_composition(Composition const& composition) {
-  auto const total = sum_composition(composition);
-  TORCH_CHECK(total > 0.0, "Composition sum must be positive");
-
-  Composition normalized;
-  for (auto const& [name, value] : composition)
-    normalized[name] = value / total;
-  return normalized;
-}
-
-std::string format_composition(Composition const& composition) {
-  std::ostringstream oss;
-  bool first = true;
-  for (auto const& [name, value] : composition) {
-    if (!first) oss << ",";
-    first = false;
-    oss << name << ":" << value;
-  }
-  return oss.str();
-}
 
 std::vector<double> tensor_to_vector(torch::Tensor tensor) {
   tensor = tensor.to(torch::kCPU).to(torch::kFloat64).contiguous();
@@ -125,14 +99,13 @@ void configure_band_grid(harp::RadiationBandOptions const& options) {
 
 struct ColumnState {
   torch::Tensor pressure_levels;
-  torch::Tensor pres;
   torch::Tensor temperature_levels;
+  torch::Tensor pres;
   torch::Tensor temp;
   torch::Tensor conc;
   torch::Tensor dz;
   double mean_molecular_weight_kg_mol;
-  Composition composition;
-  double raw_composition_sum;
+  harp::Composition composition;
 };
 
 ColumnState build_column(YAML::Node const& config) {
@@ -145,15 +118,14 @@ ColumnState build_column(YAML::Node const& config) {
   auto const gravity = config["forcing"]["const-gravity"];
   auto const nlyr = config["geometry"]["cells"]["nx1"].as<int>();
 
-  Composition composition_raw = {
+  harp::Composition composition_raw = {
       {"H2", problem["xH2"].as<double>()},
       {"He", problem["xHe"].as<double>()},
       {"CH4", problem["xCH4"].as<double>()},
       {"H2O", problem["xH2O"].as<double>()},
       {"NH3", problem["xNH3"].as<double>()},
   };
-  auto const raw_sum = sum_composition(composition_raw);
-  auto const composition = normalize_composition(composition_raw);
+  auto const composition = harp::normalize_composition(composition_raw);
 
   auto const pbot = problem["Pbot"].as<double>();
   auto const ptop = problem["Ptop"].as<double>();
@@ -185,16 +157,6 @@ ColumnState build_column(YAML::Node const& config) {
       torch::tensor(temperature_levels, torch::kFloat64);
   auto temp = torch::tensor(temperature_layers, torch::kFloat64).unsqueeze(0);
 
-  double mean_molecular_weight = 0.0;
-  for (size_t i = 0; i < harp::species_names.size(); ++i) {
-    auto it = composition.find(harp::species_names[i]);
-    if (it != composition.end()) {
-      mean_molecular_weight += it->second * harp::species_weights[i];
-    }
-  }
-  TORCH_CHECK(mean_molecular_weight > 0.0,
-              "Mean molecular weight must be positive");
-
   auto const total_molar_concentration = pres / (temp * harp::constants::Rgas);
   auto conc =
       torch::zeros({1, nlyr, static_cast<long>(harp::species_names.size())},
@@ -206,20 +168,24 @@ ColumnState build_column(YAML::Node const& config) {
                     total_molar_concentration.squeeze(0) * mixing_ratio);
   }
 
+  double mean_molecular_weight =
+      harp::mean_molecular_weight(conc)[0].mean().item<double>();
+  TORCH_CHECK(mean_molecular_weight > 0.0,
+              "Mean molecular weight must be positive");
+
   auto g_over_r = torch::tensor(
       mean_molecular_weight * grav / harp::constants::Rgas, torch::kFloat64);
   auto dz = harp::calc_dz_hypsometric(pressure_level_tensor, temp.squeeze(0),
                                       g_over_r);
 
   return {pressure_level_tensor,
-          pres,
           temperature_level_tensor,
+          pres,
           temp,
           conc,
           dz,
           mean_molecular_weight,
-          composition,
-          raw_sum};
+          composition};
 }
 
 void print_layer_summary(std::string const& label,
@@ -228,63 +194,6 @@ void print_layer_summary(std::string const& label,
   std::cout << "  " << std::setw(12) << std::left << label
             << " mean[m^-1] = " << layer.mean().item<double>()
             << "  max[m^-1] = " << layer.max().item<double>() << "\n";
-}
-
-void write_reference_layer_csv(
-    std::filesystem::path const& output_dir, int layer_index,
-    std::vector<double> const& wavenumber,
-    std::vector<std::pair<std::string, torch::Tensor>> const& spectra,
-    torch::Tensor const& total) {
-  std::filesystem::create_directories(output_dir);
-  auto path = output_dir / ("reference_layer_" + std::to_string(layer_index) +
-                            "_attenuation.csv");
-  std::ofstream out(path);
-  TORCH_CHECK(out, "Failed to open output file: ", path.string());
-
-  out << "wavenumber_cm-1";
-  for (auto const& [name, _] : spectra) out << "," << name << "_m-1";
-  out << ",total_m-1\n";
-
-  out << std::setprecision(12);
-  auto total_layer =
-      total.index({torch::indexing::Slice(), 0, layer_index, 0}).contiguous();
-  std::vector<torch::Tensor> source_layers;
-  for (auto const& [name, tensor] : spectra) {
-    source_layers.push_back(
-        tensor.index({torch::indexing::Slice(), 0, layer_index, 0})
-            .contiguous());
-  }
-
-  for (size_t i = 0; i < wavenumber.size(); ++i) {
-    out << wavenumber[i];
-    for (auto const& source : source_layers)
-      out << "," << source[i].item<double>();
-    out << "," << total_layer[static_cast<long>(i)].item<double>() << "\n";
-  }
-}
-
-void write_flux_profile_csv(std::filesystem::path const& output_dir,
-                            torch::Tensor const& pressure_levels,
-                            torch::Tensor const& band_flux) {
-  std::filesystem::create_directories(output_dir);
-  auto path = output_dir / "flux_profile.csv";
-  std::ofstream out(path);
-  TORCH_CHECK(out, "Failed to open output file: ", path.string());
-
-  auto level_pressure = pressure_levels.squeeze(0).contiguous();
-  auto upward = band_flux.index({0, torch::indexing::Slice(), 0}).contiguous();
-  auto downward =
-      band_flux.index({0, torch::indexing::Slice(), 1}).contiguous();
-  auto net = upward - downward;
-
-  out << "level,pressure_pa,upward_flux_w_m-2,downward_flux_w_m-2,net_flux_w_m-"
-         "2\n";
-  out << std::setprecision(12);
-  for (int64_t i = 0; i < level_pressure.size(0); ++i) {
-    out << i << "," << level_pressure[i].item<double>() << ","
-        << upward[i].item<double>() << "," << downward[i].item<double>() << ","
-        << net[i].item<double>() << "\n";
-  }
 }
 
 }  // namespace
@@ -357,11 +266,16 @@ int main(int argc, char** argv) {
 
   auto const wavenumber = band_options->wavenumber();
   std::vector<std::pair<std::string, torch::Tensor>> source_attenuation;
+  std::vector<std::pair<std::string, torch::Tensor>> source_transmittance;
   torch::Tensor total_attenuation;
   bool first = true;
   for (auto& [name, module] : band->opacities) {
     auto attenuation = module.forward<torch::Tensor>(conc, atm);
     source_attenuation.push_back({name, attenuation});
+    auto tau = (attenuation.squeeze(-1) * column.dz.view({1, 1, -1}))
+                   .sum(-1)
+                   .squeeze(1);
+    source_transmittance.push_back({name, torch::exp(-tau)});
     if (first) {
       total_attenuation = attenuation.clone();
       first = false;
@@ -372,12 +286,7 @@ int main(int argc, char** argv) {
 
   std::cout << "Band: " << band_options->name() << "\n";
   std::cout << "Species composition = "
-            << format_composition(column.composition) << "\n";
-  std::cout << "Composition sum = " << column.raw_composition_sum << "\n";
-  if (std::abs(column.raw_composition_sum - 1.0) > 1.e-12) {
-    std::cout << "Normalized composition = "
-              << format_composition(column.composition) << "\n";
-  }
+            << harp::format_composition(column.composition) << "\n";
   std::cout << "Mean molecular weight = " << column.mean_molecular_weight_kg_mol
             << " kg/mol\n";
   std::cout << "Layers = " << band_options->nlyr()
@@ -409,9 +318,12 @@ int main(int argc, char** argv) {
   auto const output_dir =
       std::filesystem::absolute(cli_output_dir) /
       config["problem"]["output_dir"].as<std::string>("jupiter_1d_rt_outputs");
-  write_reference_layer_csv(output_dir, reference_layer, wavenumber,
-                            source_attenuation, total_attenuation);
-  write_flux_profile_csv(output_dir, column.pressure_levels, band_flux);
+  harp::write_column_profile(output_dir / "column_profile.txt", column.dz, pres,
+                             temp, conc, band_flux);
+  harp::write_spectral_profile(
+      output_dir / "spectral_profile.txt", wavenumber, source_transmittance,
+      band->spectrum.index({torch::indexing::Slice(), 0, -1, 0}),
+      band->spectrum.index({torch::indexing::Slice(), 0, 0, 1}));
 
   std::cout << "\nWrote diagnostics to " << output_dir.string() << "\n";
   return 0;
