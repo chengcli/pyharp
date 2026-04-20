@@ -139,10 +139,10 @@ void configure_band_grid(harp::RadiationBandOptions const& options) {
 
 struct ColumnState {
   torch::Tensor pressure_levels;
-  torch::Tensor pressure_layers;
+  torch::Tensor pres;
   torch::Tensor temperature_levels;
-  torch::Tensor temperature_layers;
-  torch::Tensor concentrations;
+  torch::Tensor temp;
+  torch::Tensor conc;
   torch::Tensor dz;
   double mean_molecular_weight_kg_mol;
   Composition composition;
@@ -181,14 +181,11 @@ ColumnState build_column(YAML::Node const& config) {
         0.5 * (temperature_levels[i] + temperature_levels[i + 1]);
   }
 
-  auto pressure_level_tensor =
-      torch::tensor(pressure_levels, torch::kFloat64).unsqueeze(0);
-  auto pressure_layer_tensor =
-      torch::tensor(pressure_layers, torch::kFloat64).unsqueeze(0);
+  auto pressure_level_tensor = torch::tensor(pressure_levels, torch::kFloat64);
+  auto pres = torch::tensor(pressure_layers, torch::kFloat64).unsqueeze(0);
   auto temperature_level_tensor =
-      torch::tensor(temperature_levels, torch::kFloat64).unsqueeze(0);
-  auto temperature_layer_tensor =
-      torch::tensor(temperature_layers, torch::kFloat64).unsqueeze(0);
+      torch::tensor(temperature_levels, torch::kFloat64);
+  auto temp = torch::tensor(temperature_layers, torch::kFloat64).unsqueeze(0);
 
   double mean_molecular_weight = 0.0;
   for (size_t i = 0; i < harp::species_names.size(); ++i) {
@@ -200,29 +197,31 @@ ColumnState build_column(YAML::Node const& config) {
   TORCH_CHECK(mean_molecular_weight > 0.0,
               "Mean molecular weight must be positive");
 
-  auto const total_molar_concentration =
-      pressure_layer_tensor /
-      (temperature_layer_tensor * harp::constants::Rgas);
-  auto concentrations =
+  auto const total_molar_concentration = pres / (temp * harp::constants::Rgas);
+  auto conc =
       torch::zeros({1, nlyr, static_cast<long>(harp::species_names.size())},
                    torch::kFloat64);
   for (size_t i = 0; i < harp::species_names.size(); ++i) {
     auto it = composition.find(harp::species_names[i]);
     double const mixing_ratio = (it == composition.end()) ? 0.0 : it->second;
-    concentrations.index_put_(
-        {0, torch::indexing::Slice(), static_cast<long>(i)},
-        total_molar_concentration.squeeze(0) * mixing_ratio);
+    conc.index_put_({0, torch::indexing::Slice(), static_cast<long>(i)},
+                    total_molar_concentration.squeeze(0) * mixing_ratio);
   }
 
   auto g_over_r = torch::tensor(
       mean_molecular_weight * grav / harp::constants::Rgas, torch::kFloat64);
-  auto dz = harp::calc_dz_hypsometric(pressure_level_tensor,
-                                      temperature_layer_tensor, g_over_r);
+  auto dz = harp::calc_dz_hypsometric(pressure_level_tensor, temp.squeeze(0),
+                                      g_over_r);
 
-  return {
-      pressure_level_tensor,    pressure_layer_tensor, temperature_level_tensor,
-      temperature_layer_tensor, concentrations,        dz,
-      mean_molecular_weight,    composition,           raw_sum};
+  return {pressure_level_tensor,
+          pres,
+          temperature_level_tensor,
+          temp,
+          conc,
+          dz,
+          mean_molecular_weight,
+          composition,
+          raw_sum};
 }
 
 void print_layer_summary(std::string const& label,
@@ -317,9 +316,13 @@ int main(int argc, char** argv) {
   TORCH_CHECK(reference_layer >= 0 && reference_layer < band_options->nlyr(),
               "Invalid reference_layer index: ", reference_layer);
 
+  auto conc = column.conc;
+  auto pres = column.pres;
+  auto temp = column.temp;
+
   std::map<std::string, torch::Tensor> atm;
-  atm["pres"] = column.pressure_layers;
-  atm["temp"] = column.temperature_layers;
+  atm["pres"] = pres;
+  atm["temp"] = temp;
 
   auto const ncol = band_options->ncol();
   auto const nwave = band_options->nwave();
@@ -338,8 +341,7 @@ int main(int argc, char** argv) {
   torch::Tensor total_attenuation;
   bool first = true;
   for (auto& [name, module] : band->opacities) {
-    auto attenuation =
-        module.forward<torch::Tensor>(column.concentrations, atm);
+    auto attenuation = module.forward<torch::Tensor>(conc, atm);
     source_attenuation.push_back({name, attenuation});
     if (first) {
       total_attenuation = attenuation.clone();
@@ -362,11 +364,9 @@ int main(int argc, char** argv) {
   std::cout << "Layers = " << band_options->nlyr()
             << ", spectral points = " << band_options->nwave() << "\n";
   std::cout << "Reference layer = " << reference_layer << "\n";
-  std::cout << "  pressure = "
-            << column.pressure_layers[0][reference_layer].item<double>()
+  std::cout << "  pressure = " << pres[0][reference_layer].item<double>()
             << " Pa\n";
-  std::cout << "  temperature = "
-            << column.temperature_layers[0][reference_layer].item<double>()
+  std::cout << "  temperature = " << temp[0][reference_layer].item<double>()
             << " K\n";
 
   for (auto const& [name, attenuation] : source_attenuation) {
@@ -374,7 +374,7 @@ int main(int argc, char** argv) {
   }
   print_layer_summary("total", total_attenuation, reference_layer);
 
-  auto band_flux = band->forward(column.concentrations, column.dz, &bc, &atm);
+  auto band_flux = band->forward(conc, column.dz.unsqueeze(0), &bc, &atm);
   auto upward = band_flux.index({0, torch::indexing::Slice(), 0});
   auto downward = band_flux.index({0, torch::indexing::Slice(), 1});
   auto net = upward - downward;
