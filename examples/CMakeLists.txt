@@ -2,11 +2,11 @@
 # Legacy AMARS examples were removed with the RFM workflow.
 
 if (${CMAKE_SOURCE_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
-  setup_problem(example_molecule_dump_opacity)
+  setup_problem(example_jupiter_1d_rt)
 
   configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/molecule_dump_opacity.yaml
-    ${CMAKE_BINARY_DIR}/bin/molecule_dump_opacity.yaml
+    ${CMAKE_CURRENT_SOURCE_DIR}/jupiter_1d_rt.yaml
+    ${CMAKE_BINARY_DIR}/bin/jupiter_1d_rt.yaml
     COPYONLY)
 
   configure_file(

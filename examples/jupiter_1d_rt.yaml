@@ -14,18 +14,6 @@ geometry:
   cells:
     nx1: 8
 
-state:
-  composition: H2:0.9,He:0.1,CH4:0.004,H2O:0.002,NH3:0.0003
-  gravity_m_s2: 24.79
-  pressure_bottom_pa: 1.0e7
-  pressure_top_pa: 1.0e4
-  temperature_bottom_k: 700.0
-  temperature_top_k: 140.0
-  surface_temperature_k: 700.0
-  top_temperature_k: 140.0
-  output_dir: molecule_dump_band_outputs
-  reference_layer: 3
-
 opacities:
   h2o_line:
     type: molecule-line
@@ -60,3 +48,20 @@ bands:
     nwave: 2480
     nstr: 4
     flags: lamber,quiet,onlyfl,planck
+
+forcing:
+  const-gravity:
+    grav1: -24.79
+
+problem:
+  xH2: 0.9
+  xHe: 0.1
+  xCH4: 0.004
+  xH2O: 0.002
+  xNH3: 0.0003
+
+  Pbot: 100.e5
+  Ptop: 1.e4
+
+  Tbot: 600.
+  Ttop: 130.

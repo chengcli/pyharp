@@ -28,20 +28,6 @@ namespace {
 
 using Composition = std::map<std::string, double>;
 
-Composition parse_composition_string(std::string const& text) {
-  Composition composition;
-  std::stringstream ss(text);
-  std::string token;
-
-  while (std::getline(ss, token, ',')) {
-    auto const colon = token.find(':');
-    TORCH_CHECK(colon != std::string::npos,
-                "Invalid composition entry: ", token);
-    composition[token.substr(0, colon)] = std::stod(token.substr(colon + 1));
-  }
-  return composition;
-}
-
 double sum_composition(Composition const& composition) {
   double total = 0.0;
   for (auto const& [name, value] : composition) total += value;
@@ -150,18 +136,30 @@ struct ColumnState {
 };
 
 ColumnState build_column(YAML::Node const& config) {
-  auto const state = config["state"];
+  TORCH_CHECK(config["problem"], "Missing 'problem' section");
+  TORCH_CHECK(config["forcing"], "Missing 'forcing' section");
+  TORCH_CHECK(config["forcing"]["const-gravity"],
+              "Missing 'forcing.const-gravity' section");
+
+  auto const problem = config["problem"];
+  auto const gravity = config["forcing"]["const-gravity"];
   auto const nlyr = config["geometry"]["cells"]["nx1"].as<int>();
-  auto const composition_raw =
-      parse_composition_string(state["composition"].as<std::string>());
+
+  Composition composition_raw = {
+      {"H2", problem["xH2"].as<double>()},
+      {"He", problem["xHe"].as<double>()},
+      {"CH4", problem["xCH4"].as<double>()},
+      {"H2O", problem["xH2O"].as<double>()},
+      {"NH3", problem["xNH3"].as<double>()},
+  };
   auto const raw_sum = sum_composition(composition_raw);
   auto const composition = normalize_composition(composition_raw);
 
-  auto const pbot = state["pressure_bottom_pa"].as<double>();
-  auto const ptop = state["pressure_top_pa"].as<double>();
-  auto const tbot = state["temperature_bottom_k"].as<double>();
-  auto const ttop = state["temperature_top_k"].as<double>();
-  auto const grav = state["gravity_m_s2"].as<double>();
+  auto const pbot = problem["Pbot"].as<double>();
+  auto const ptop = problem["Ptop"].as<double>();
+  auto const tbot = problem["Tbot"].as<double>();
+  auto const ttop = problem["Ttop"].as<double>();
+  auto const grav = std::abs(gravity["grav1"].as<double>());
 
   std::vector<double> pressure_levels(nlyr + 1);
   std::vector<double> temperature_levels(nlyr + 1);
@@ -298,8 +296,25 @@ int main(int argc, char** argv) {
     harp::add_resource_directory(exe_dir.string(), true);
   }
 
-  auto yaml_path = (exe_dir / "molecule_dump_opacity.yaml").string();
-  if (argc > 1) yaml_path = argv[1];
+  auto yaml_path = (exe_dir / "jupiter_1d_rt.yaml").string();
+  std::filesystem::path cli_output_dir = ".";
+
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg == "--config") {
+      TORCH_CHECK(i + 1 < argc, "--config requires a file path");
+      yaml_path = argv[++i];
+    } else if (arg == "--output-dir") {
+      TORCH_CHECK(i + 1 < argc, "--output-dir requires a directory path");
+      cli_output_dir = argv[++i];
+    } else {
+      TORCH_CHECK(false, "Unknown argument: ", arg,
+                  ". Supported options are --config and --output-dir");
+    }
+  }
+
+  auto yaml_dir = std::filesystem::absolute(yaml_path).parent_path();
+  harp::add_resource_directory(yaml_dir.string(), true);
 
   auto config = YAML::LoadFile(yaml_path);
   auto rad_options = harp::RadiationOptionsImpl::from_yaml(yaml_path);
@@ -312,7 +327,7 @@ int main(int argc, char** argv) {
 
   auto column = build_column(config);
   auto const reference_layer =
-      config["state"]["reference_layer"].as<int>(band_options->nlyr() / 2);
+      config["problem"]["reference_layer"].as<int>(band_options->nlyr() / 2);
   TORCH_CHECK(reference_layer >= 0 && reference_layer < band_options->nlyr(),
               "Invalid reference_layer index: ", reference_layer);
 
@@ -331,10 +346,14 @@ int main(int argc, char** argv) {
       torch::zeros({nwave, ncol}, torch::kFloat64);
   bc[band_options->name() + "/temis"] =
       torch::zeros({nwave, ncol}, torch::kFloat64);
-  bc["btemp"] = torch::tensor(
-      {config["state"]["surface_temperature_k"].as<double>()}, torch::kFloat64);
-  bc["ttemp"] = torch::tensor(
-      {config["state"]["top_temperature_k"].as<double>()}, torch::kFloat64);
+  bc["btemp"] =
+      torch::tensor({config["problem"]["surface_temperature_k"].as<double>(
+                        config["problem"]["Tbot"].as<double>())},
+                    torch::kFloat64);
+  bc["ttemp"] =
+      torch::tensor({config["problem"]["top_temperature_k"].as<double>(
+                        config["problem"]["Ttop"].as<double>())},
+                    torch::kFloat64);
 
   auto const wavenumber = band_options->wavenumber();
   std::vector<std::pair<std::string, torch::Tensor>> source_attenuation;
@@ -353,7 +372,7 @@ int main(int argc, char** argv) {
 
   std::cout << "Band: " << band_options->name() << "\n";
   std::cout << "Species composition = "
-            << config["state"]["composition"].as<std::string>() << "\n";
+            << format_composition(column.composition) << "\n";
   std::cout << "Composition sum = " << column.raw_composition_sum << "\n";
   if (std::abs(column.raw_composition_sum - 1.0) > 1.e-12) {
     std::cout << "Normalized composition = "
@@ -388,8 +407,8 @@ int main(int argc, char** argv) {
   std::cout << "  TOA net          = " << net[-1].item<double>() << "\n";
 
   auto const output_dir =
-      exe_dir / config["state"]["output_dir"].as<std::string>(
-                    "molecule_dump_band_outputs");
+      std::filesystem::absolute(cli_output_dir) /
+      config["problem"]["output_dir"].as<std::string>("jupiter_1d_rt_outputs");
   write_reference_layer_csv(output_dir, reference_layer, wavenumber,
                             source_attenuation, total_attenuation);
   write_flux_profile_csv(output_dir, column.pressure_levels, band_flux);
