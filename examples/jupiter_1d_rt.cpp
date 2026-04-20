@@ -104,8 +104,6 @@ struct ColumnState {
   torch::Tensor temp;
   torch::Tensor conc;
   torch::Tensor dz;
-  double mean_molecular_weight_kg_mol;
-  harp::Composition composition;
 };
 
 ColumnState build_column(YAML::Node const& config) {
@@ -178,14 +176,8 @@ ColumnState build_column(YAML::Node const& config) {
   auto dz = harp::calc_dz_hypsometric(pressure_level_tensor, temp.squeeze(0),
                                       g_over_r);
 
-  return {pressure_level_tensor,
-          temperature_level_tensor,
-          pres,
-          temp,
-          conc,
-          dz,
-          mean_molecular_weight,
-          composition};
+  return {
+      pressure_level_tensor, temperature_level_tensor, pres, temp, conc, dz};
 }
 
 void print_layer_summary(std::string const& label,
@@ -285,10 +277,6 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "Band: " << band_options->name() << "\n";
-  std::cout << "Species composition = "
-            << harp::format_composition(column.composition) << "\n";
-  std::cout << "Mean molecular weight = " << column.mean_molecular_weight_kg_mol
-            << " kg/mol\n";
   std::cout << "Layers = " << band_options->nlyr()
             << ", spectral points = " << band_options->nwave() << "\n";
   std::cout << "Reference layer = " << reference_layer << "\n";

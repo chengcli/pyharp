@@ -8,6 +8,8 @@
 #include <harp/radiation/radiation.hpp>
 #include <harp/utils/find_resource.hpp>
 #include <harp/utils/mean_molecular_weight.hpp>
+#include <harp/utils/write_column_profile.hpp>
+#include <harp/utils/write_spectral_profile.hpp>
 
 namespace py = pybind11;
 
@@ -57,5 +59,25 @@ PYBIND11_MODULE(pyharp, m) {
           py::arg("path"), py::arg("prepend") = true)
       .def("find_resource", &harp::find_resource, py::arg("filename"))
       .def("mean_molecular_weight", &harp::mean_molecular_weight,
-           py::arg("conc"));
+           py::arg("conc"))
+      .def(
+          "write_column_profile",
+          [](const std::string& filename, torch::Tensor dz, torch::Tensor pres,
+             torch::Tensor temp, torch::Tensor conc, torch::Tensor band_flux) {
+            harp::write_column_profile(filename, dz, pres, temp, conc,
+                                       band_flux);
+          },
+          py::arg("filename"), py::arg("dz"), py::arg("pres"), py::arg("temp"),
+          py::arg("conc"), py::arg("band_flux"))
+      .def(
+          "write_spectral_profile",
+          [](const std::string& filename, const std::vector<double>& wavenumber,
+             const std::vector<std::pair<std::string, torch::Tensor>>&
+                 transmittance,
+             torch::Tensor flux_up_toa, torch::Tensor flux_down_boa) {
+            harp::write_spectral_profile(filename, wavenumber, transmittance,
+                                         flux_up_toa, flux_down_boa);
+          },
+          py::arg("filename"), py::arg("wavenumber"), py::arg("transmittance"),
+          py::arg("flux_up_toa"), py::arg("flux_down_boa"));
 }
