@@ -11,7 +11,7 @@ import xarray as xr
 
 from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig, SpectralBandConfig
-from .dataset_io import DEFAULT_NETCDF_ENGINE, write_dataset_via_tmp
+from .dataset_io import DEFAULT_NETCDF_ENGINE, write_dataset
 from .spectrum import AbsorptionSpectrum, compute_absorption_spectrum
 
 
@@ -91,7 +91,7 @@ def write_transmittance_dataset(transmittance: TransmittanceSpectrum, output_pat
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset = transmittance_to_dataset(transmittance)
     try:
-        write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
+        write_dataset(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
     finally:
         dataset.close()
 

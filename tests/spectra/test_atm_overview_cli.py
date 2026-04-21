@@ -283,4 +283,21 @@ def test_parallel_mixture_overview_products_uses_selected_process_context(monkey
         {"task": ("args-1", (20.0, 25.0))},
         {"task": ("args-2", (25.0, 30.0))},
     ]
+
+
+def test_parallel_mixture_overview_products_falls_back_to_subprocess_workers_when_process_pool_locks_are_unavailable(monkeypatch) -> None:
+    class FailingExecutor:
+        def __init__(self, *args, **kwargs):
+            raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("pyharp.spectra.atm_overview.process_pool_context", lambda: "ctx-token")
+    monkeypatch.setattr("pyharp.spectra.atm_overview.ProcessPoolExecutor", FailingExecutor)
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview._parallel_mixture_overview_products_via_subprocess",
+        lambda tasks, *, max_workers: iter([{"task": "subprocess"}]),
+    )
+
+    result = list(_parallel_mixture_overview_products([("args-1", (20.0, 25.0)), ("args-2", (25.0, 30.0))]))
+
+    assert result == [{"task": "subprocess"}]
     assert created == {"max_workers": 2, "mp_context": "ctx-token"}

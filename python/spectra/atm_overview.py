@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterator
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import pickle
+import subprocess
+import sys
 import tempfile
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "spectra_matplotlib"))
@@ -603,5 +606,45 @@ def _parallel_mixture_overview_products(
         return
     max_workers = min(len(tasks), os.cpu_count() or 1)
     ctx = process_pool_context()
-    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
-        yield from executor.map(_compute_mixture_overview_product_task, tasks)
+    try:
+        with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+            yield from executor.map(_compute_mixture_overview_product_task, tasks)
+    except PermissionError:
+        yield from _parallel_mixture_overview_products_via_subprocess(tasks, max_workers=max_workers)
+
+
+def _subprocess_worker_entry(task_pickle_path: str, result_pickle_path: str, worker_name: str) -> None:
+    with Path(task_pickle_path).open("rb") as handle:
+        task = pickle.load(handle)
+    worker = globals()[worker_name]
+    result = worker(task)
+    with Path(result_pickle_path).open("wb") as handle:
+        pickle.dump(result, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def _run_task_via_subprocess(task: tuple[argparse.Namespace, tuple[float, float]]) -> MixtureOverviewProducts:
+    code = (
+        "from pyharp.spectra.atm_overview import _subprocess_worker_entry; "
+        "import sys; "
+        "_subprocess_worker_entry(sys.argv[1], sys.argv[2], sys.argv[3])"
+    )
+    with tempfile.TemporaryDirectory(prefix="pyharp_overview_task_") as tmpdir:
+        task_path = Path(tmpdir) / "task.pkl"
+        result_path = Path(tmpdir) / "result.pkl"
+        with task_path.open("wb") as handle:
+            pickle.dump(task, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        subprocess.run(
+            [sys.executable, "-c", code, str(task_path), str(result_path), "_compute_mixture_overview_product_task"],
+            check=True,
+        )
+        with result_path.open("rb") as handle:
+            return pickle.load(handle)
+
+
+def _parallel_mixture_overview_products_via_subprocess(
+    tasks: list[tuple[argparse.Namespace, tuple[float, float]]],
+    *,
+    max_workers: int,
+) -> Iterator[MixtureOverviewProducts]:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        yield from executor.map(_run_task_via_subprocess, tasks)

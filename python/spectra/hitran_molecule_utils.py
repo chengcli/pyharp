@@ -17,8 +17,6 @@ os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "spectra
 from .config import SpectralBandConfig, SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
 from .hitran_cia_utils import load_cia_dataset
 from .utils import build_band_from_range
-from .spectrum import _resolve_continuum_sources, compute_absorption_spectrum_from_sources
-from .transmittance import compute_transmittance_spectrum
 
 
 def _import_hapi():
@@ -26,6 +24,24 @@ def _import_hapi():
         return importlib.import_module("hapi")
     except ImportError as exc:  # pragma: no cover - depends on environment
         raise RuntimeError("HAPI is required for HITRAN line downloads.") from exc
+
+
+def _resolve_continuum_sources(**kwargs):
+    from .spectrum import _resolve_continuum_sources as resolve_continuum_sources
+
+    return resolve_continuum_sources(**kwargs)
+
+
+def compute_absorption_spectrum_from_sources(**kwargs):
+    from .spectrum import compute_absorption_spectrum_from_sources as compute_from_sources
+
+    return compute_from_sources(**kwargs)
+
+
+def compute_transmittance_spectrum(**kwargs):
+    from .transmittance import compute_transmittance_spectrum as compute_transmittance
+
+    return compute_transmittance(**kwargs)
 
 
 @dataclass(frozen=True)

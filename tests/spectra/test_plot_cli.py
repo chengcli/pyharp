@@ -266,6 +266,23 @@ def test_parallel_plot_results_uses_selected_process_context(monkeypatch) -> Non
     assert created == {"max_workers": 2, "mp_context": "ctx-token"}
 
 
+def test_parallel_plot_results_falls_back_to_subprocess_workers_when_process_pool_locks_are_unavailable(monkeypatch) -> None:
+    class FailingExecutor:
+        def __init__(self, *args, **kwargs):
+            raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("pyharp.spectra.plot_cli.process_pool_context", lambda: "ctx-token")
+    monkeypatch.setattr("pyharp.spectra.plot_cli.ProcessPoolExecutor", FailingExecutor)
+    monkeypatch.setattr(
+        "pyharp.spectra.plot_cli._parallel_plot_results_via_subprocess",
+        lambda tasks, *, worker, max_workers: ["subprocess-result"],
+    )
+
+    result = plot_cli._parallel_plot_results([("x", 1), ("y", 2)], worker=plot_cli._run_plot_task)
+
+    assert result == ["subprocess-result"]
+
+
 def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:
     calls = []
 
