@@ -27,11 +27,21 @@ from .config import (
     supported_hitran_cia_pairs,
     supported_hitran_species_names,
 )
-from .hitran_cia import load_cia_dataset
-from .hitran_lines import build_line_provider, download_hitran_lines, load_hitran_line_list
-from .molecule_plot_cli import _add_legend_if_needed, _apply_positive_log_scale, _mask_nonpositive, _plot_transmittance_panel, _style_shared_axis
+from .hitran_cia_utils import load_cia_dataset
+from .hitran_molecule_plot import (
+    _add_legend_if_needed,
+    _apply_positive_log_scale,
+    _mask_nonpositive,
+    _plot_transmittance_panel,
+    _style_shared_axis,
+)
+from .hitran_molecule_utils import (
+    build_line_provider,
+    download_hitran_lines,
+    load_hitran_line_list,
+)
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
-from .shared_cli import process_pool_context
+from .utils import build_band_from_range, default_hitran_dir, parse_wn_range, process_pool_context
 from .spectrum import AbsorptionSpectrum, number_density_cm3_from_pressure_temperature
 from .transmittance import compute_transmittance_spectrum
 
@@ -75,7 +85,7 @@ def _canonical_mixture_species_names() -> dict[str, str]:
     return mapping
 
 
-def _parse_composition(value: str) -> dict[str, float]:
+def parse_composition(value: str) -> dict[str, float]:
     canonical_names = _canonical_mixture_species_names()
     entries: list[tuple[str, float]] = []
     for chunk in str(value).split(","):
@@ -107,29 +117,6 @@ def _parse_composition(value: str) -> dict[str, float]:
     if total_fraction <= 0.0:
         raise ValueError("composition fractions must sum to a positive value")
     return {species_name: value / total_fraction for species_name, value in totals.items()}
-
-
-def _parse_wn_range(value: str) -> tuple[float, float]:
-    lower_text, sep, upper_text = str(value).partition(",")
-    if not sep:
-        raise argparse.ArgumentTypeError("wn-range must have the form min,max")
-    try:
-        lower = float(lower_text)
-        upper = float(upper_text)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("wn-range must contain numeric min,max values") from exc
-    if upper < lower:
-        raise argparse.ArgumentTypeError("wn-range max must be >= min")
-    return lower, upper
-
-
-def _build_band(*, wn_min: float, wn_max: float, resolution: float) -> SpectralBandConfig:
-    if resolution <= 0.0:
-        raise ValueError("resolution must be positive")
-    if wn_max < wn_min:
-        raise ValueError("wn-range max must be >= min")
-    return SpectralBandConfig("single_state", float(wn_min), float(wn_max), float(resolution))
-
 
 def _build_species_config(
     *,
@@ -168,11 +155,11 @@ def _line_supported_species(composition: dict[str, float]) -> tuple[tuple[str, f
 def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tuple[float, float]) -> MixtureOverviewProducts:
     if args.path_length_km <= 0.0:
         raise ValueError("path-length-km must be positive")
-    composition = _parse_composition(args.composition)
+    composition = parse_composition(args.composition)
     broadening_composition = parse_broadening_composition(
         getattr(args, "broadening_composition", None) or composition
     )
-    band = _build_band(wn_min=wn_range[0], wn_max=wn_range[1], resolution=float(args.resolution))
+    band = build_band_from_range(wn_range, float(args.resolution))
     grid = band.grid()
     temperature_k = float(args.temperature_k)
     pressure_pa = float(args.pressure_bar) * 1.0e5
@@ -534,13 +521,13 @@ def _state_pairs(args: argparse.Namespace) -> list[tuple[float, float]]:
 
 def build_atm_overview_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate a 4-row atmospheric opacity overview PDF for a gas mixture.")
-    parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"))
+    parser.add_argument("--hitran-dir", type=Path, default=default_hitran_dir())
     parser.add_argument("--composition", required=True)
     parser.add_argument("--temperature-k", type=float, default=300.0)
     parser.add_argument("--pressure-bar", type=float, default=1.0)
     parser.add_argument("--path-length-km", type=float, default=1.0)
     parser.add_argument("--resolution", type=float, default=1.0)
-    parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=_parse_wn_range, required=True)
+    parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=parse_wn_range, required=True)
     parser.add_argument("--broadening-composition", default=None)
     parser.add_argument("--refresh-hitran", action="store_true")
     parser.add_argument("--refresh-cia", action="store_true")
@@ -587,7 +574,7 @@ def run_atm_overview(args: argparse.Namespace) -> None:
 
     manifest = {
         "composition_input": str(args.composition),
-        "composition_normalized": _parse_composition(args.composition),
+        "composition_normalized": parse_composition(args.composition),
         "temperature_k": _selected_temperatures(args),
         "pressure_bar": _selected_pressure_bars(args),
         "path_length_km": float(args.path_length_km),

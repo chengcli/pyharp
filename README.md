@@ -110,9 +110,9 @@ written on `(del_temperature, pressure, wavenumber)`, include a
 `pressure` coordinate in Pa, and still retain
 degenerate `del_temperature` and `pressure` dimensions when only one state is
 requested.
-Across `pyharp.spectra`, wavenumber ranges are interpreted as
-lower-inclusive and upper-exclusive: `--wn-range=20,22` with `1 cm^-1`
-resolution samples `20` and `21`, not `22`.
+Across `pyharp.spectra`, wavenumber ranges are interpreted as inclusive at
+both ends: `--wn-range=20,22` with `1 cm^-1` resolution samples `20`, `21`,
+and `22`.
 See the [pyharp-dump CLI documentation](https://pyharp.readthedocs.io/en/latest/dump_cli.html)
 for the full command reference, output naming conventions, and NetCDF schema.
 
@@ -133,10 +133,11 @@ pyharp-plot overview --species H2O CO2 --temperature-k 300 --pressure-bar 1 --wn
 Use `--pair` for CIA pairs, `--species` for molecules, and `--composition`
 for gas mixtures such as `H2O:0.1,H2:0.9`. All plot commands accept
 `--wn-range=min,max`; `overview` accepts multiple `--wn-range` values for
-multi-page PDFs. These ranges are lower-inclusive and upper-exclusive. Use
-`--output` to choose the output path. Without `--output`, plots are written
-under `--output-dir` (default `output/`) with names derived from the target,
-plot type, temperature, pressure, and wavenumber range.
+multi-page PDFs. These ranges include both endpoints, so adjacent repeated
+ranges such as `20,2500` and `2500,10000` both include `2500`. Use `--output`
+to choose the output path. Without `--output`, plots are written under
+`--output-dir` (default `output/`) with names derived from the target, plot
+type, temperature, pressure, and wavenumber range.
 For plot commands that use pressure, `--temperature-k` and `--pressure-bar`
 also accept matched comma-separated vectors such as
 `--temperature-k 300,400 --pressure-bar 1,10`. `pyharp-plot` then runs one

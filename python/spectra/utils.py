@@ -7,7 +7,7 @@ import multiprocessing as mp
 from pathlib import Path
 import sys
 
-from .output_names import default_output_path as default_named_output_path
+from .config import SpectralBandConfig
 
 
 class HelpFormatter(argparse.RawDescriptionHelpFormatter):
@@ -29,17 +29,56 @@ def project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def default_output_path() -> Path:
-    """Return the default NetCDF output path inside the project root."""
-    return default_named_output_path(
-        target_name="CO2",
-        plot_type="xsection",
-        temperature_k=300.0,
-        pressure_bar=1.0,
-        wn_range=(20.0, 2500.0),
-        suffix=".nc",
-        output_dir=project_root() / "output",
+def _format_value(value: float | int | str, unit: str = "") -> str:
+    if isinstance(value, str):
+        text = value
+    else:
+        text = f"{float(value):g}"
+    return f"{text.replace('-', 'm').replace('.', 'p')}{unit}"
+
+
+def _clean_token(value: object) -> str:
+    text = str(value).strip().lower()
+    pieces: list[str] = []
+    previous_was_separator = False
+    for char in text:
+        if char.isalnum():
+            pieces.append(char)
+            previous_was_separator = False
+        elif char == ".":
+            pieces.append("p")
+            previous_was_separator = False
+        elif not previous_was_separator:
+            pieces.append("_")
+            previous_was_separator = True
+    return "".join(pieces).strip("_") or "output"
+
+
+def default_output_path(
+    *,
+    target_name: object = "CO2",
+    plot_type: str = "xsection",
+    temperature_k: float | str = 300.0,
+    pressure_bar: float | str = 1.0,
+    wn_range: tuple[float, float] = (20.0, 2500.0),
+    suffix: str = ".nc",
+    output_dir: Path | None = None,
+) -> Path:
+    """Return a default spectroscopy CLI output path."""
+    if output_dir is None:
+        output_dir = project_root() / "output"
+    wn_min, wn_max = wn_range
+    stem = "_".join(
+        [
+            _clean_token(target_name),
+            _clean_token(plot_type),
+            _format_value(temperature_k, "K"),
+            _format_value(pressure_bar, "bar"),
+            _format_value(wn_min),
+            _format_value(wn_max, "cm1"),
+        ]
     )
+    return Path(output_dir) / f"{stem}{suffix}"
 
 
 def default_hitran_dir() -> Path:
@@ -80,17 +119,34 @@ def parse_wn_range(value: str) -> tuple[float, float]:
     return lower, upper
 
 
+def build_band_from_range(
+    wn_range: tuple[float, float],
+    resolution_cm1: float,
+    *,
+    name: str = "single_state",
+) -> SpectralBandConfig:
+    """Build a validated regular spectral band from explicit bounds."""
+    wn_min, wn_max = wn_range
+    if resolution_cm1 <= 0.0:
+        raise ValueError("resolution must be positive")
+    if wn_max < wn_min:
+        raise ValueError("wn-range max must be >= min")
+    return SpectralBandConfig(name, float(wn_min), float(wn_max), float(resolution_cm1))
+
+
 def build_band(args: argparse.Namespace):
     """Build the standard single-state spectral band config."""
-    from .config import SpectralBandConfig
+    return build_band_from_range(tuple(args.wn_range), float(args.resolution))
 
-    wn_min, wn_max = args.wn_range
-    return SpectralBandConfig("single_state", wn_min, wn_max, args.resolution)
+
+def build_grid(args: argparse.Namespace, *, name: str = "single_state"):
+    """Build a validated spectral grid from CLI-style args."""
+    return build_band_from_range(tuple(args.wn_range), float(args.resolution), name=name).grid()
 
 
 def default_cli_output_path(args: argparse.Namespace, *, suffix: str) -> Path:
     """Return the default named output path for a CLI command."""
-    return default_named_output_path(
+    return default_output_path(
         target_name=args.species,
         plot_type=args.command,
         temperature_k=args.temperature_k,

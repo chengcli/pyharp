@@ -75,8 +75,8 @@ Shared Options
     Wavenumber bounds in ``cm^-1``. Repeat this option to write one NetCDF
     file per band. When ``--output`` is provided with multiple ranges,
     pyharp appends ``_<wnmin>_<wnmax>`` to the requested stem. Ranges are
-    lower-inclusive and upper-exclusive, so ``--wn-range=20,22`` with
-    ``--resolution 1`` samples ``20`` and ``21``.
+    inclusive at both ends, so ``--wn-range=20,22`` with ``--resolution 1``
+    samples ``20``, ``21``, and ``22``.
 
 ``--resolution value``
     Wavenumber spacing in ``cm^-1``. The default is ``1``.
@@ -177,8 +177,8 @@ Repeat ``--wn-range`` to compute multiple bands in one run:
    pyharp-dump xsection --species H2O --temperature-k 300 --pressure-bar 1 \
        --wn-range=20,2500 --wn-range=2500,10000
 
-This writes one file for ``[20, 2500)`` and one file for ``[2500, 10000)``.
-Adjacent repeated ranges do not duplicate the boundary sample. If
+This writes one file for ``[20, 2500]`` and one file for ``[2500, 10000]``.
+Adjacent repeated ranges duplicate the shared boundary sample. If
 ``--output output/h2o.nc`` is provided, the generated files are
 ``output/h2o_20_2500.nc`` and ``output/h2o_2500_10000.nc``.
 

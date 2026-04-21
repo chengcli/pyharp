@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
-from pyharp.spectra.hitran_cia import CiaBlock, CiaDataset
+from pyharp.spectra.hitran_cia_utils import CiaBlock, CiaDataset
 from pyharp.spectra.spectrum import (
     compute_absorption_spectrum_from_sources,
     plot_absorption_spectrum,

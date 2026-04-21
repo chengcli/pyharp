@@ -2,7 +2,8 @@ from pathlib import Path
 
 import numpy as np
 
-from pyharp.spectra.hitran_cia import compute_cia_attenuation_m1, compute_cia_transmission, download_cia_file, download_cia_file_by_name, find_cia_download_url, parse_cia_file, plot_cia_cross_section, plot_cia_attenuation_coefficient, plot_cia_transmission
+from pyharp.spectra.hitran_cia_plot import plot_cia_attenuation_coefficient, plot_cia_cross_section, plot_cia_transmission
+from pyharp.spectra.hitran_cia_utils import compute_cia_attenuation_m1, compute_cia_transmission, download_cia_file, download_cia_file_by_name, find_cia_download_url, parse_cia_file
 from pyharp.spectra.config import SpectroscopyConfig
 
 
@@ -65,7 +66,7 @@ def test_interpolate_uses_only_temperatures_with_spectral_coverage(tmp_path: Pat
 
 def test_find_cia_download_url_prefers_matching_link(monkeypatch) -> None:
     html = '<html><body><a href="/files/CO2-CO2_2024.cia">file</a></body></html>'
-    monkeypatch.setattr("pyharp.spectra.hitran_cia._download_text", lambda _: html)
+    monkeypatch.setattr("pyharp.spectra.hitran_cia_utils._download_text", lambda _: html)
     url = find_cia_download_url("https://hitran.org/cia/", "CO2-CO2_2024.cia")
     assert url == "https://hitran.org/files/CO2-CO2_2024.cia"
 
@@ -82,7 +83,7 @@ def test_download_cia_file_uses_cache(monkeypatch, tmp_path: Path) -> None:
         called["value"] = True
         raise AssertionError("network should not be used when cache exists")
 
-    monkeypatch.setattr("pyharp.spectra.hitran_cia.urlopen", _fail)
+    monkeypatch.setattr("pyharp.spectra.hitran_cia_utils.urlopen", _fail)
     path = download_cia_file(config)
     assert path == target
     assert called["value"] is False
@@ -98,7 +99,7 @@ def test_download_cia_file_by_name_uses_cache(monkeypatch, tmp_path: Path) -> No
         called["value"] = True
         raise AssertionError("network should not be used when cache exists")
 
-    monkeypatch.setattr("pyharp.spectra.hitran_cia.urlopen", _fail)
+    monkeypatch.setattr("pyharp.spectra.hitran_cia_utils.urlopen", _fail)
     path = download_cia_file_by_name(cache_dir=tmp_path, filename="H2-H2_2011.cia")
     assert path == target
     assert called["value"] is False

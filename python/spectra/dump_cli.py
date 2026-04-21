@@ -12,7 +12,7 @@ from textwrap import dedent
 import numpy as np
 import xarray as xr
 
-from .atm_overview_cli import _parse_composition, compute_mixture_overview_products
+from .atm_overview import compute_mixture_overview_products, parse_composition
 from .config import SpectroscopyConfig, cia_database_for_model, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .dataset_io import (
     DEFAULT_NETCDF_ENGINE,
@@ -22,12 +22,13 @@ from .dataset_io import (
     clean_var_token,
     write_dataset_via_tmp,
 )
-from .hitran_cia import load_cia_dataset
-from .hitran_lines import build_line_provider, download_hitran_lines
+from .hitran_cia_utils import load_cia_dataset
+from .hitran_molecule_utils import build_line_provider, download_hitran_lines
 from .orton_xiz_cia import load_orton_xiz_cia_dataset, resolve_orton_xiz_cia_filename
-from .output_names import _clean_token, _format_value
-from .shared_cli import (
+from .utils import (
     HelpFormatter,
+    _clean_token,
+    _format_value,
     build_band,
     default_hitran_dir,
     default_orton_xiz_cia_dir,
@@ -797,7 +798,7 @@ def _compute_transmission_band(task: tuple[str, argparse.Namespace]) -> tuple[xr
 
 
 def _composition_species_names(composition: str) -> tuple[str, ...]:
-    return tuple(_parse_composition(composition).keys())
+    return tuple(parse_composition(composition).keys())
 
 
 def _parallel_band_results(

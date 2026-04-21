@@ -87,7 +87,7 @@ def test_plot_parser_accepts_atm_overview_ranges(tmp_path) -> None:
             "--broadening-composition",
             "H2:0.85,He:0.15",
             "--wn-range=25,2500",
-            "--wn-range=2501,20000",
+            "--wn-range=2500,20000",
             "--manifest",
             str(tmp_path / "sources.json"),
             "--output",
@@ -98,7 +98,7 @@ def test_plot_parser_accepts_atm_overview_ranges(tmp_path) -> None:
     assert args.command == "overview"
     assert args.composition == "H2O:0.1,H2:0.9"
     assert args.broadening_composition == "H2:0.85,He:0.15"
-    assert args.wn_ranges == [(25.0, 2500.0), (2501.0, 20000.0)]
+    assert args.wn_ranges == [(25.0, 2500.0), (2500.0, 20000.0)]
     assert args.manifest == tmp_path / "sources.json"
     assert args.figure == tmp_path / "atm.pdf"
 
@@ -109,7 +109,7 @@ def test_plot_main_dispatches_pair_attenuation(monkeypatch) -> None:
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.cia_plot_cli.run_attenuation", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_cia_plot.run_attenuation", fake_run)
 
     plot_cli.main(["attenuation", "--pair", "H2-He", "--wn-range", "25,30"])
 
@@ -125,7 +125,7 @@ def test_plot_main_dispatches_molecule_xsection_with_default_figure(monkeypatch)
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_molecule_plot.run_xsection", fake_run)
 
     plot_cli.main(["xsection", "--species", "CO2", "--temperature-k", "275.5", "--pressure-bar", "0.25", "--wn-range", "25,30.5"])
 
@@ -139,7 +139,7 @@ def test_plot_main_dispatches_one_xsection_per_state_pair(monkeypatch, tmp_path)
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_molecule_plot.run_xsection", fake_run)
     monkeypatch.setattr(
         "pyharp.spectra.plot_cli._parallel_plot_results",
         lambda tasks, *, worker: [worker(task) for task in tasks],
@@ -173,7 +173,7 @@ def test_plot_main_appends_state_suffix_to_explicit_output_for_multiple_pairs(mo
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_molecule_plot.run_xsection", fake_run)
     monkeypatch.setattr(
         "pyharp.spectra.plot_cli._parallel_plot_results",
         lambda tasks, *, worker: [worker(task) for task in tasks],
@@ -205,7 +205,7 @@ def test_plot_main_uses_output_dir_for_default_figure(monkeypatch, tmp_path) -> 
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_molecule_plot.run_xsection", fake_run)
 
     plot_cli.main(
         [
@@ -233,7 +233,7 @@ def test_plot_main_passes_broadening_composition_to_molecule_workflow(monkeypatc
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_xsection", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_molecule_plot.run_xsection", fake_run)
 
     plot_cli.main(["xsection", "--species", "CO2", "--broadening-composition", "air:0.8,self:0.2"])
 
@@ -272,7 +272,7 @@ def test_plot_main_dispatches_composition_attenuation(monkeypatch) -> None:
     def fake_run(args, *, wn_range):
         calls.append((args, wn_range))
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.atm_overview_cli.run_atm_attenuation", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.atm_overview.run_atm_attenuation", fake_run)
 
     plot_cli.main(["attenuation", "--composition", "H2:0.9,He:0.1", "--wn-range", "25,30"])
 
@@ -288,7 +288,7 @@ def test_plot_main_preserves_explicit_figure_over_output_dir(monkeypatch, tmp_pa
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.cia_plot_cli.run_binary", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_cia_plot.run_binary", fake_run)
 
     plot_cli.main(
         [
@@ -360,7 +360,7 @@ def test_plot_composition_transmission_matches_dump_total(monkeypatch, tmp_path)
     def fake_run(args, *, wn_range):
         calls.append((args, wn_range))
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.atm_overview_cli.run_atm_transmission", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.atm_overview.run_atm_transmission", fake_run)
 
     composition = "H2:0.9,He:0.1,H2O:0.002"
     plot_cli.main(
@@ -441,12 +441,12 @@ def test_plot_overview_parallelizes_over_state_pairs_and_wn_ranges(monkeypatch, 
     dummy_figure = type("Figure", (), {})()
     dummy_axis = type("Axis", (), {})()
 
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._parallel_mixture_overview_products", fake_parallel_products)
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._render_mixture_overview", lambda fig, axes, *, products: None)
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._page_manifest", lambda products: {})
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.PdfPages", _DummyPdf)
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.plt.subplots", lambda **kwargs: (dummy_figure, np.array([[dummy_axis], [dummy_axis], [dummy_axis], [dummy_axis]])))
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.plt.close", lambda fig: None)
+    monkeypatch.setattr("pyharp.spectra.atm_overview._parallel_mixture_overview_products", fake_parallel_products)
+    monkeypatch.setattr("pyharp.spectra.atm_overview._render_mixture_overview", lambda fig, axes, *, products: None)
+    monkeypatch.setattr("pyharp.spectra.atm_overview._page_manifest", lambda products: {})
+    monkeypatch.setattr("pyharp.spectra.atm_overview.PdfPages", _DummyPdf)
+    monkeypatch.setattr("pyharp.spectra.atm_overview.plt.subplots", lambda **kwargs: (dummy_figure, np.array([[dummy_axis], [dummy_axis], [dummy_axis], [dummy_axis]])))
+    monkeypatch.setattr("pyharp.spectra.atm_overview.plt.close", lambda fig: None)
 
     plot_cli.main(
         [
@@ -474,7 +474,7 @@ def test_plot_overview_uses_single_output_pdf_for_multiple_state_pairs(monkeypat
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_overview", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_molecule_plot.run_overview", fake_run)
 
     plot_cli.main(
         [
@@ -502,7 +502,7 @@ def test_plot_overview_uses_combined_default_name_without_duplicate_units(monkey
     def fake_run(args):
         calls.append(args)
 
-    monkeypatch.setattr("pyharp.spectra.plot_cli.molecule_plot_cli.run_overview_batch", fake_run)
+    monkeypatch.setattr("pyharp.spectra.plot_cli.hitran_molecule_plot.run_overview_batch", fake_run)
 
     plot_cli.main(
         [

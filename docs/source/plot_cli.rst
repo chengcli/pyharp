@@ -116,8 +116,8 @@ Shared Options
     Wavenumber bounds in ``cm^-1``. CIA plots default to ``20,10000`` when it
     is omitted. Molecular and mixture plots default to ``20,2500``. The
     ``overview`` subcommand accepts this option more than once. Ranges are
-    lower-inclusive and upper-exclusive, so ``--wn-range=20,22`` with
-    ``--resolution 1`` samples ``20`` and ``21``.
+    inclusive at both ends, so ``--wn-range=20,22`` with ``--resolution 1``
+    samples ``20``, ``21``, and ``22``.
 
 ``--resolution value``
     Wavenumber grid spacing in ``cm^-1``. The default is ``1``.

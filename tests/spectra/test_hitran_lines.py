@@ -1,12 +1,12 @@
 import numpy as np
 from pyharp.spectra.config import SpectralBandConfig, SpectroscopyConfig
-from pyharp.spectra.hitran_lines import (
+from pyharp.spectra.hitran_molecule_plot import plot_hitran_line_positions
+from pyharp.spectra.hitran_molecule_utils import (
     HapiLineProvider,
     HitranLineList,
     build_line_provider,
     download_hitran_lines,
     load_hitran_line_list,
-    plot_hitran_line_positions,
 )
 
 
@@ -45,7 +45,7 @@ class FakeHapi:
 
 def test_download_hitran_lines_uses_band_bounds(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
     band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
 
@@ -65,7 +65,7 @@ def test_download_hitran_lines_uses_band_bounds(monkeypatch, tmp_path) -> None:
 
 def test_download_hitran_lines_skips_fetch_when_cache_exists(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
     band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
     config.hitran_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,7 @@ def test_download_hitran_lines_skips_fetch_when_cache_exists(monkeypatch, tmp_pa
 
 def test_download_hitran_lines_refetches_contaminated_cache(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
     band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
     config.hitran_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -106,7 +106,7 @@ def test_download_hitran_lines_refetches_contaminated_cache(monkeypatch, tmp_pat
 
 def test_download_hitran_lines_wraps_fetch_failures(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
 
     def fail_fetch(table_name, iso_ids, numin, numax):
         raise RuntimeError("network down")
@@ -134,9 +134,9 @@ def test_load_hitran_line_list_filters_by_min_line_strength(monkeypatch, tmp_pat
             "sw": [1.0e-30, 1.0e-27, 1.0e-25],
         }
     }
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     monkeypatch.setattr(
-        "pyharp.spectra.hitran_lines.download_hitran_lines",
+        "pyharp.spectra.hitran_molecule_utils.download_hitran_lines",
         lambda config, band: type("LineDb", (), {"table_name": table_name, "cache_dir": config.hitran_cache_dir})(),
     )
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
@@ -150,7 +150,7 @@ def test_load_hitran_line_list_filters_by_min_line_strength(monkeypatch, tmp_pat
 
 def test_hapi_line_provider_passes_min_line_strength_to_hapi(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     fake.LOCAL_TABLE_CACHE["mock"] = {"data": {"gamma_self": [0.1]}}
 
     provider = HapiLineProvider("mock", cache_dir=tmp_path, min_line_strength=1.0e-27)
@@ -163,7 +163,7 @@ def test_hapi_line_provider_passes_min_line_strength_to_hapi(monkeypatch, tmp_pa
 def test_hapi_line_provider_falls_back_missing_broadener_to_air(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
     fake.LOCAL_TABLE_CACHE["mock"] = {"data": {"gamma_air": [0.1], "gamma_self": [0.2]}}
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
 
     provider = HapiLineProvider("mock", cache_dir=tmp_path, diluent={"h2": 0.7, "self": 0.3})
 
@@ -174,7 +174,7 @@ def test_hapi_line_provider_falls_back_missing_broadener_to_air(monkeypatch, tmp
 def test_hapi_line_provider_raises_when_air_fallback_unavailable(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
     fake.LOCAL_TABLE_CACHE["mock"] = {"data": {"gamma_self": [0.2]}}
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
 
     try:
         HapiLineProvider("mock", cache_dir=tmp_path, diluent={"h2": 1.0})
@@ -187,7 +187,7 @@ def test_hapi_line_provider_raises_when_air_fallback_unavailable(monkeypatch, tm
 def test_build_line_provider_uses_config_broadening_composition(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
     fake.LOCAL_TABLE_CACHE["mock"] = {"data": {"gamma_air": [0.1], "gamma_self": [0.2], "gamma_h2": [0.3]}}
-    monkeypatch.setattr("pyharp.spectra.hitran_lines._import_hapi", lambda: fake)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
 
     config = SpectroscopyConfig(
         output_path=tmp_path / "out.nc",

@@ -7,7 +7,7 @@ import xarray as xr
 
 from pyharp.spectra.dataset_io import combine_band_datasets, write_dataset_via_tmp
 from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _output_path_for_wn_range, _pair_xsection_dataset, _resolve_pair_filename, _species_transmission_dataset, _stack_state_grid_datasets, _xsection_dataset, build_parser, main
-from pyharp.spectra.shared_cli import default_hitran_dir, default_orton_xiz_cia_dir, default_output_path, project_root
+from pyharp.spectra.utils import default_hitran_dir, default_orton_xiz_cia_dir, default_output_path, project_root
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 
 
@@ -189,7 +189,7 @@ def test_pair_xsection_dataset_uses_orton_xiz_backend(monkeypatch, tmp_path) -> 
     dataset = _pair_xsection_dataset(_args_for_wn_range(args, args.wn_ranges[0]))
     try:
         assert dataset.attrs["pair_name"] == "H2-H2"
-        assert np.allclose(dataset["binary_absorption_coefficient"].values, np.array([4.0e-46, 4.0e-46]))
+        assert np.allclose(dataset["binary_absorption_coefficient"].values, np.array([4.0e-46, 4.0e-46, 4.0e-46]))
     finally:
         dataset.close()
 
