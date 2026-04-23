@@ -7,6 +7,11 @@
 #include <torch/nn/modules/common.h>
 #include <torch/nn/modules/container/any.h>
 
+// C/C++
+#include <cctype>
+#include <sstream>
+#include <string>
+
 // harp
 #include <harp/add_arg.h>
 
@@ -21,7 +26,36 @@ struct ToonMcKay89OptionsImpl {
   std::shared_ptr<ToonMcKay89OptionsImpl> clone() const {
     return std::make_shared<ToonMcKay89OptionsImpl>(*this);
   }
+  bool has_flag(std::string flag) const {
+    auto normalize = [](std::string value) {
+      auto start = value.find_first_not_of(" \t\n\r");
+      if (start == std::string::npos) {
+        return std::string{};
+      }
+      auto end = value.find_last_not_of(" \t\n\r");
+      value = value.substr(start, end - start + 1);
+      for (auto& c : value) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      return value;
+    };
+    flag = normalize(flag);
+    std::stringstream ss(flags());
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+      if (normalize(item) == flag) {
+        return true;
+      }
+    }
+    return false;
+  }
+  bool planck() const { return has_flag("planck"); }
+  bool zenith_correction() const { return has_flag("zenith_correction"); }
+  bool hard_surface() const { return has_flag("hard_surface"); }
+  bool delta_eddington_lw() const { return has_flag("delta_eddington_lw"); }
   void report(std::ostream& os) const {
+    os << "* flags = " << flags() << "\n";
+    os << "* planck = " << planck() << "\n";
     os << "* zenith_correction = " << zenith_correction() << "\n";
     os << "* top_emission_flag = " << top_emission_flag() << "\n";
     os << "* hard_surface = " << hard_surface() << "\n";
@@ -42,8 +76,8 @@ struct ToonMcKay89OptionsImpl {
   //! set upper wavenumber(length) at each bin
   ADD_ARG(std::vector<double>, wave_upper) = {};
 
-  //! zenith correction
-  ADD_ARG(bool, zenith_correction) = false;
+  //! comma-separated solver flags
+  ADD_ARG(std::string, flags) = "";
 
   //! top emission flag
   //!   0 = no incoming radiation at TOA (Toon 1989 default, GCM mode)
@@ -51,15 +85,6 @@ struct ToonMcKay89OptionsImpl {
   //!  -1 = auto-compute from first layer: tau_top = dtau[0]*exp(-1),
   //!       Btop = (1-exp(-tau_top/mu)) * B(T_top)  (FMS-style)
   ADD_ARG(int, top_emission_flag) = 0;
-
-  //! hard surface (true = terrestrial with emissivity BC,
-  //!               false = gas giant with Planck gradient BC)
-  ADD_ARG(bool, hard_surface) = false;
-
-  //! apply delta-Eddington scaling in longwave
-  //! (true = rescale w0, dtau, g as in FMS; false = use raw values as in
-  //! PICASO)
-  ADD_ARG(bool, delta_eddington_lw) = false;
 };
 
 using ToonMcKay89Options = std::shared_ptr<ToonMcKay89OptionsImpl>;

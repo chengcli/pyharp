@@ -30,8 +30,11 @@ bands:
     range: [200., 2000.]
     opacities: [scatterer]
     solver: toon
+    flags: planck,zenith_correction,hard_surface,delta_eddington_lw
     integration: wavenumber
     nwave: 3
+    toon:
+      top_emission_flag: -1
 
   - name: B_disort
     range: [200., 2000.]

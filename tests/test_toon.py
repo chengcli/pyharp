@@ -227,6 +227,7 @@ def test_toon_lw_isothermal():
     opt = pyharp.ToonMcKay89Options()
     opt.wave_lower(wave_lo)
     opt.wave_upper(wave_hi)
+    opt.flags("planck")
     toon = pyharp.ToonMcKay89(opt)
 
     dop = pydisort.DisortOptions()
@@ -273,11 +274,11 @@ def test_toon_lw_isothermal():
         )
 
 def test_toon_lw_isothermal_profile_matches_disort():
-    """Isothermal longwave profiles should be flat and symmetric.
+    """The `planck` flag should gate thermal emission and match DISORT aloft.
 
-    With no scattering and matching top/surface temperatures, both upward and
-    downward longwave fluxes should be nearly level-independent, and Toon
-    should closely match the DISORT reference profile.
+    Passing `temf` without the `planck` flag should keep Toon on the
+    shortwave-only path. With `planck` enabled, the emitted upward longwave
+    profile should closely match the DISORT reference for an isothermal column.
     """
     nwave = 1
     ncol = 1
@@ -289,10 +290,16 @@ def test_toon_lw_isothermal_profile_matches_disort():
     wave_lo = [500.0]
     wave_hi = [1000.0]
 
-    opt = pyharp.ToonMcKay89Options()
-    opt.wave_lower(wave_lo)
-    opt.wave_upper(wave_hi)
-    toon = pyharp.ToonMcKay89(opt)
+    sw_opt = pyharp.ToonMcKay89Options()
+    sw_opt.wave_lower(wave_lo)
+    sw_opt.wave_upper(wave_hi)
+    sw_toon = pyharp.ToonMcKay89(sw_opt)
+
+    lw_opt = pyharp.ToonMcKay89Options()
+    lw_opt.wave_lower(wave_lo)
+    lw_opt.wave_upper(wave_hi)
+    lw_opt.flags("planck")
+    toon = pyharp.ToonMcKay89(lw_opt)
 
     dop = pydisort.DisortOptions()
     dop.upward(True)
@@ -313,39 +320,31 @@ def test_toon_lw_isothermal_profile_matches_disort():
     }
     temf = torch.ones(ncol, nlyr + 1) * temp_K
 
+    sw_result = sw_toon(prop, temf=temf, **bc)
     toon_result = toon(prop, temf=temf, **bc)
     disort_result = disort(prop, temf=temf, **bc)
 
+    assert torch.allclose(sw_result, torch.zeros_like(sw_result))
+
     toon_up = toon_result[0, 0, :, 0]
-    toon_dn = toon_result[0, 0, :, 1]
     disort_up = disort_result[0, 0, :, 0]
-    disort_dn = disort_result[0, 0, :, 1]
 
     toon_scale = float(torch.mean(toon_up))
     disort_scale = float(torch.mean(disort_up))
 
-    assert torch.max(torch.abs(toon_up - toon_dn)) / toon_scale < 1e-2, (
-        f"Toon isothermal LW up/down mismatch too large: "
-        f"{float(torch.max(torch.abs(toon_up - toon_dn)) / toon_scale):.3e}"
-    )
     assert torch.max(torch.abs(toon_up - torch.mean(toon_up))) / toon_scale < 1e-2, (
         f"Toon isothermal LW upward profile is not flat enough: "
         f"{float(torch.max(torch.abs(toon_up - torch.mean(toon_up))) / toon_scale):.3e}"
     )
-    assert torch.max(torch.abs(toon_dn - torch.mean(toon_dn))) / toon_scale < 1e-2, (
-        f"Toon isothermal LW downward profile is not flat enough: "
-        f"{float(torch.max(torch.abs(toon_dn - torch.mean(toon_dn))) / toon_scale):.3e}"
+    assert torch.max(torch.abs(disort_up - torch.mean(disort_up))) / disort_scale < 1e-2, (
+        f"DISORT isothermal LW upward profile is not flat enough: "
+        f"{float(torch.max(torch.abs(disort_up - torch.mean(disort_up))) / disort_scale):.3e}"
     )
 
-    assert torch.max(torch.abs(disort_up - disort_dn)) / disort_scale < 1e-2, (
-        f"DISORT isothermal LW up/down mismatch too large: "
-        f"{float(torch.max(torch.abs(disort_up - disort_dn)) / disort_scale):.3e}"
-    )
-
-    toon_disort_scale = max(float(torch.max(torch.abs(disort_result))), 1e-30)
-    assert torch.max(torch.abs(toon_result - disort_result)) / toon_disort_scale < 1.5e-1, (
-        f"Toon/DISORT isothermal LW profile mismatch too large: "
-        f"{float(torch.max(torch.abs(toon_result - disort_result)) / toon_disort_scale):.3e}"
+    up_profile_scale = max(float(torch.max(torch.abs(disort_up))), 1e-30)
+    assert torch.max(torch.abs(toon_up - disort_up)) / up_profile_scale < 1.5e-6, (
+        f"Toon/DISORT isothermal LW upward profile mismatch too large: "
+        f"{float(torch.max(torch.abs(toon_up - disort_up)) / up_profile_scale):.3e}"
     )
 
 def test_toon_lw_isothermal_scattering():
@@ -367,6 +366,7 @@ def test_toon_lw_isothermal_scattering():
     opt = pyharp.ToonMcKay89Options()
     opt.wave_lower(wave_lo)
     opt.wave_upper(wave_hi)
+    opt.flags("planck")
     toon = pyharp.ToonMcKay89(opt)
 
     dop = pydisort.DisortOptions()

@@ -110,6 +110,37 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     }
   } else if (op->solver_name() == "toon") {
     op->toon() = ToonMcKay89OptionsImpl::create();
+    if (band["flags"]) {
+      op->toon()->flags(trim_copy(band["flags"].as<std::string>()));
+    }
+    if (band["toon"]) {
+      auto const toon = band["toon"];
+      op->toon()->top_emission_flag(
+          toon["top_emission_flag"].as<int>(op->toon()->top_emission_flag()));
+      if (toon["flags"]) {
+        op->toon()->flags(trim_copy(toon["flags"].as<std::string>()));
+      }
+      std::vector<std::string> legacy_flags;
+      if (toon["zenith_correction"].as<bool>(false)) {
+        legacy_flags.push_back("zenith_correction");
+      }
+      if (toon["hard_surface"].as<bool>(false)) {
+        legacy_flags.push_back("hard_surface");
+      }
+      if (toon["delta_eddington_lw"].as<bool>(false)) {
+        legacy_flags.push_back("delta_eddington_lw");
+      }
+      if (!legacy_flags.empty()) {
+        auto flags = op->toon()->flags();
+        for (auto const& flag : legacy_flags) {
+          if (!flags.empty()) {
+            flags += ",";
+          }
+          flags += flag;
+        }
+        op->toon()->flags(flags);
+      }
+    }
     op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
     op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
   } else if (op->solver_name() == "twostr") {
@@ -180,6 +211,7 @@ void RadiationBandImpl::reset() {
     register_module("solver", rtsolver.ptr());
   } else if (options->solver_name() == "toon") {
     rtsolver = torch::nn::AnyModule(ToonMcKay89(options->toon()));
+    register_module("solver", rtsolver.ptr());
   } else {
     TORCH_CHECK(false, "Unknown solver: ", options->solver_name());
   }

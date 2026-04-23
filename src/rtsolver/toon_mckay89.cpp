@@ -22,20 +22,20 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                                        torch::optional<torch::Tensor> temf) {
   // check dimensions
   TORCH_CHECK(prop.dim() == 4, "ToonMcKay89::forward: prop.dim() != 4");
-  TORCH_CHECK(prop.size(3) >= 3, "ToonMcKay89::forward: prop.size(3) < 3");
+  TORCH_CHECK(prop.size(3) >= 1, "ToonMcKay89::forward: prop.size(3) < 1");
 
   int nwave = prop.size(0);
   int ncol = prop.size(1);
   int nlyr = prop.size(2);
 
-  // optical thickness
-  auto tau = prop.select(-1, 0).flip(-1);
-
-  // single scattering albedo
-  auto w0 = prop.select(-1, 1).flip(-1);
-
-  // scattering asymmetry parameter
-  auto g = prop.select(-1, 2).flip(-1);
+  // The low-level Toon kernels expect at least 3 optical-property channels:
+  // tau, single-scattering albedo, and asymmetry parameter. Pure-absorption
+  // inputs provide only tau, so pad missing scattering fields with zeros.
+  if (prop.size(3) < 3) {
+    auto padded = torch::zeros({nwave, ncol, nlyr, 3}, prop.options());
+    padded.narrow(-1, 0, prop.size(3)).copy_(prop);
+    prop = padded;
+  }
 
   // add slash
   if (bname.size() > 0 && bname.back() != '/') {
@@ -84,7 +84,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
   // would have strides that don't match the pointer arithmetic in the impl.
   prop = prop.contiguous();
 
-  if (!temf.has_value()) {  // shortwave
+  if (!options->planck()) {  // shortwave
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)
@@ -106,6 +106,8 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
         options->delta_eddington_lw());
     return flx;
   } else {  // longwave
+    TORCH_CHECK(temf.has_value(),
+                "ToonMcKay89::forward: 'planck' flag requires temf");
     /*Eigen::VectorXd temp(nlay + 1);
     Eigen::VectorXd be(nlay + 1);
     for (int i = 0; i < nlay + 1; ++i) {
