@@ -75,3 +75,7 @@ output
 
 # cache
 *__pycache__*
+
+# release/debug
+*.release
+*.debug

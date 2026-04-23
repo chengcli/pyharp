@@ -30,8 +30,6 @@ void bind_opacity(py::module& parent) {
              a->report(ss);
              return fmt::format("OpacityOptions(\n{})", ss.str());
            })
-      //.def("query_wavenumber", &harp::OpacityOptionsImpl::query_wavenumber)
-      //.def("query_weight", &harp::OpacityOptionsImpl::query_weight)
       .ADD_OPTION(std::string, harp::OpacityOptionsImpl, type)
       .ADD_OPTION(std::string, harp::OpacityOptionsImpl, bname)
       .ADD_OPTION(std::vector<std::string>, harp::OpacityOptionsImpl,
