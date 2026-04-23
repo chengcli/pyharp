@@ -162,7 +162,7 @@ ColumnState build_column(YAML::Node const& config) {
   for (size_t i = 0; i < harp::species_names.size(); ++i) {
     auto it = composition.find(harp::species_names[i]);
     double const mixing_ratio = (it == composition.end()) ? 0.0 : it->second;
-    conc.index_put_({0, torch::indexing::Slice(), static_cast<long>(i)},
+    conc.index_put_({0, torch::indexing::Slice(), (int64_t)i},
                     total_molar_concentration.squeeze(0) * mixing_ratio);
   }
 
