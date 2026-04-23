@@ -1,0 +1,66 @@
+species:
+  - name: H2
+    composition: {H: 2}
+  - name: He
+    composition: {He: 1}
+  - name: CH4
+    composition: {C: 1, H: 4}
+  - name: H2O
+    composition: {H: 2, O: 1}
+  - name: NH3
+    composition: {N: 1, H: 3}
+
+geometry:
+  cells:
+    nx1: 100
+
+opacities:
+  h2o_line:
+    type: molecule-line
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [H2O]
+
+  nh3_line:
+    type: molecule-line
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [NH3]
+
+  ch4_line:
+    type: molecule-line
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [CH4]
+
+  h2_h2_cia:
+    type: molecule-cia
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [H2]
+
+  h2_he_cia:
+    type: molecule-cia
+    data: [h2_0p9_he_0p1_ch4_0p004_h2o_0p002_nh3_0p0003_xsection_120_730K_1_100bar_20_2500cm1.nc]
+    species: [H2, He]
+
+bands:
+  - name: dump_lw
+    range: [20.0, 2500.0]
+    opacities: [h2o_line, nh3_line, ch4_line, h2_h2_cia, h2_he_cia]
+    solver: toon
+    nwave: 2481
+    nstr: 4
+
+forcing:
+  const-gravity:
+    grav1: -24.79
+
+problem:
+  xH2: 0.9
+  xHe: 0.1
+  xCH4: 0.004
+  xH2O: 0.002
+  xNH3: 0.0003
+
+  Pbot: 100.e5
+  Ptop: 1.e4
+
+  Tbot: 600.
+  Ttop: 130.

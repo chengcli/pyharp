@@ -110,6 +110,17 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     }
   } else if (op->solver_name() == "toon") {
     op->toon() = ToonMcKay89OptionsImpl::create();
+    if (band["toon"]) {
+      auto const toon = band["toon"];
+      op->toon()->zenith_correction(
+          toon["zenith_correction"].as<bool>(op->toon()->zenith_correction()));
+      op->toon()->top_emission_flag(
+          toon["top_emission_flag"].as<int>(op->toon()->top_emission_flag()));
+      op->toon()->hard_surface(
+          toon["hard_surface"].as<bool>(op->toon()->hard_surface()));
+      op->toon()->delta_eddington_lw(toon["delta_eddington_lw"].as<bool>(
+          op->toon()->delta_eddington_lw()));
+    }
     op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
     op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
   } else if (op->solver_name() == "twostr") {
@@ -180,6 +191,7 @@ void RadiationBandImpl::reset() {
     register_module("solver", rtsolver.ptr());
   } else if (options->solver_name() == "toon") {
     rtsolver = torch::nn::AnyModule(ToonMcKay89(options->toon()));
+    register_module("solver", rtsolver.ptr());
   } else {
     TORCH_CHECK(false, "Unknown solver: ", options->solver_name());
   }

@@ -1,13 +1,56 @@
 // external
 #include <gtest/gtest.h>
 
+// C/C++
+#include <filesystem>
+
 // harp
+#include <harp/radiation/radiation.hpp>
+#include <harp/radiation/radiation_band.hpp>
 #include <harp/rtsolver/toon_mckay89.hpp>
 
 // tests
 #include "device_testing.hpp"
 
 using namespace harp;
+
+TEST(ToonConfig, from_yaml_reads_toon_options) {
+  auto yaml_path =
+      std::filesystem::path(__FILE__).parent_path() / "toon_test.yaml";
+  auto rad = harp::RadiationOptionsImpl::from_yaml(yaml_path.string());
+  ASSERT_EQ(rad->bands().size(), 2u);
+
+  auto const& op = rad->bands().front();
+
+  ASSERT_EQ(op->solver_name(), "toon");
+  ASSERT_NE(op->toon(), nullptr);
+  EXPECT_TRUE(op->toon()->zenith_correction());
+  EXPECT_EQ(op->toon()->top_emission_flag(), -1);
+  EXPECT_TRUE(op->toon()->hard_surface());
+  EXPECT_TRUE(op->toon()->delta_eddington_lw());
+  EXPECT_EQ(op->toon()->wave_lower(),
+            (std::vector<double>{200.0, 200.0, 200.0}));
+  EXPECT_EQ(op->toon()->wave_upper(),
+            (std::vector<double>{2000.0, 2000.0, 2000.0}));
+}
+
+TEST(ToonConfig, radiation_band_registers_solver_module) {
+  auto op = harp::RadiationBandOptionsImpl::create();
+  op->name("B_toon");
+  op->solver_name("toon");
+  op->toon(harp::ToonMcKay89OptionsImpl::create());
+  op->nwave(2);
+  op->ncol(1);
+  op->nlyr(3);
+  op->wavenumber({300.0, 900.0});
+  op->weight({600.0, 600.0});
+  op->set_wave_lower({0.0, 600.0});
+  op->set_wave_upper({600.0, 1200.0});
+
+  harp::RadiationBand band(op);
+
+  EXPECT_NO_THROW({ (void)band->named_modules()["solver"]; });
+}
 
 TEST_P(DeviceTest, simple_toon_mckay89) {
   auto op = harp::ToonMcKay89OptionsImpl::create();
