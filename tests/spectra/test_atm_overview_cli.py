@@ -2,24 +2,24 @@ import json
 
 import numpy as np
 
-from pyharp.spectra.atm_overview_cli import (
+from pyharp.spectra.atm_overview import (
     _find_binary_pairs,
     _parallel_mixture_overview_products,
-    _parse_composition,
     build_atm_overview_parser,
     compute_mixture_overview_products,
+    parse_composition,
     run_atm_overview,
 )
 
 
 def test_parse_composition_normalizes_and_merges_duplicates() -> None:
-    composition = _parse_composition("H2O:1,H2:8,H2O:1")
+    composition = parse_composition("H2O:1,H2:8,H2O:1")
 
     assert composition == {"H2O": 0.2, "H2": 0.8}
 
 
 def test_parse_composition_accepts_cia_only_species() -> None:
-    composition = _parse_composition("H2:0.9,He:0.1")
+    composition = parse_composition("H2:0.9,He:0.1")
 
     assert composition == {"H2": 0.9, "He": 0.1}
 
@@ -46,7 +46,7 @@ def test_atm_overview_parser_accepts_manifest_path_and_ranges(tmp_path) -> None:
             "--broadening-composition",
             "H2:0.85,He:0.15",
             "--wn-range=25,2500",
-            "--wn-range=2501,20000",
+            "--wn-range=2500,20000",
             "--manifest",
             str(tmp_path / "sources.json"),
             "--figure",
@@ -56,7 +56,7 @@ def test_atm_overview_parser_accepts_manifest_path_and_ranges(tmp_path) -> None:
 
     assert args.composition == "H2O:0.1,H2:0.9"
     assert args.broadening_composition == "H2:0.85,He:0.15"
-    assert args.wn_ranges == [(25.0, 2500.0), (2501.0, 20000.0)]
+    assert args.wn_ranges == [(25.0, 2500.0), (2500.0, 20000.0)]
     assert args.manifest == tmp_path / "sources.json"
     assert args.figure == tmp_path / "overview.pdf"
 
@@ -76,11 +76,11 @@ def test_compute_mixture_overview_reports_broadening_fallback(monkeypatch, tmp_p
     )
 
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.download_hitran_lines",
+        "pyharp.spectra.atm_overview.download_hitran_lines",
         lambda config, band: type("LineDb", (), {"table_name": "co2_lines_20_22", "cache_dir": tmp_path})(),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.load_hitran_line_list",
+        "pyharp.spectra.atm_overview.load_hitran_line_list",
         lambda config, band: type(
             "LineList",
             (),
@@ -96,13 +96,13 @@ def test_compute_mixture_overview_reports_broadening_fallback(monkeypatch, tmp_p
             grid = np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64)
             return np.ones_like(grid)
 
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.build_line_provider", lambda config, line_db: FakeLineProvider())
+    monkeypatch.setattr("pyharp.spectra.atm_overview.build_line_provider", lambda config, line_db: FakeLineProvider())
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.load_cia_dataset",
+        "pyharp.spectra.atm_overview.load_cia_dataset",
         lambda *args, **kwargs: type("Cia", (), {"source_path": tmp_path / "cia", "pair": "CO2-CO2", "interpolate_to_grid": lambda self, temperature_k, grid: np.zeros_like(grid)})(),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.compute_mt_ckd_h2o_continuum_cross_section",
+        "pyharp.spectra.atm_overview.compute_mt_ckd_h2o_continuum_cross_section",
         lambda **kwargs: np.zeros_like(kwargs["wavenumber_grid_cm1"]),
     )
 
@@ -131,11 +131,11 @@ def test_compute_mixture_overview_weights_h2o_continuum_by_h2o_fraction(monkeypa
     )
 
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.download_hitran_lines",
+        "pyharp.spectra.atm_overview.download_hitran_lines",
         lambda config, band: type("LineDb", (), {"table_name": f"{config.hitran_species.name.lower()}_lines", "cache_dir": tmp_path})(),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.load_hitran_line_list",
+        "pyharp.spectra.atm_overview.load_hitran_line_list",
         lambda config, band: type(
             "LineList",
             (),
@@ -151,13 +151,13 @@ def test_compute_mixture_overview_weights_h2o_continuum_by_h2o_fraction(monkeypa
             grid = np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64)
             return np.zeros_like(grid)
 
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.build_line_provider", lambda config, line_db: FakeLineProvider())
+    monkeypatch.setattr("pyharp.spectra.atm_overview.build_line_provider", lambda config, line_db: FakeLineProvider())
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.load_cia_dataset",
+        "pyharp.spectra.atm_overview.load_cia_dataset",
         lambda *args, **kwargs: type("Cia", (), {"source_path": tmp_path / "cia", "pair": "H2-H2", "interpolate_to_grid": lambda self, temperature_k, grid: np.zeros_like(grid)})(),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.compute_mt_ckd_h2o_continuum_cross_section",
+        "pyharp.spectra.atm_overview.compute_mt_ckd_h2o_continuum_cross_section",
         lambda **kwargs: np.full_like(np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64), 10.0),
     )
 
@@ -224,16 +224,16 @@ def test_run_atm_overview_manifest_always_uses_state_lists(monkeypatch, tmp_path
     )()
 
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli._parallel_mixture_overview_products",
+        "pyharp.spectra.atm_overview._parallel_mixture_overview_products",
         lambda tasks: iter([products]),
     )
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli._render_mixture_overview", lambda fig, axes, *, products: None)
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.PdfPages", _DummyPdf)
+    monkeypatch.setattr("pyharp.spectra.atm_overview._render_mixture_overview", lambda fig, axes, *, products: None)
+    monkeypatch.setattr("pyharp.spectra.atm_overview.PdfPages", _DummyPdf)
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli.plt.subplots",
+        "pyharp.spectra.atm_overview.plt.subplots",
         lambda **kwargs: (object(), np.array([[object()], [object()], [object()], [object()]])),
     )
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.plt.close", lambda fig: None)
+    monkeypatch.setattr("pyharp.spectra.atm_overview.plt.close", lambda fig: None)
     monkeypatch.setattr(
         "pathlib.Path.write_text",
         lambda self, text: written.setdefault(str(self), text),
@@ -263,10 +263,10 @@ def test_parallel_mixture_overview_products_uses_selected_process_context(monkey
         def map(self, worker, tasks):
             return [worker(task) for task in tasks]
 
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.process_pool_context", lambda: "ctx-token")
-    monkeypatch.setattr("pyharp.spectra.atm_overview_cli.ProcessPoolExecutor", DummyExecutor)
+    monkeypatch.setattr("pyharp.spectra.atm_overview.process_pool_context", lambda: "ctx-token")
+    monkeypatch.setattr("pyharp.spectra.atm_overview.ProcessPoolExecutor", DummyExecutor)
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview_cli._compute_mixture_overview_product_task",
+        "pyharp.spectra.atm_overview._compute_mixture_overview_product_task",
         lambda task: {"task": task},
     )
 
@@ -283,4 +283,21 @@ def test_parallel_mixture_overview_products_uses_selected_process_context(monkey
         {"task": ("args-1", (20.0, 25.0))},
         {"task": ("args-2", (25.0, 30.0))},
     ]
+
+
+def test_parallel_mixture_overview_products_falls_back_to_subprocess_workers_when_process_pool_locks_are_unavailable(monkeypatch) -> None:
+    class FailingExecutor:
+        def __init__(self, *args, **kwargs):
+            raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("pyharp.spectra.atm_overview.process_pool_context", lambda: "ctx-token")
+    monkeypatch.setattr("pyharp.spectra.atm_overview.ProcessPoolExecutor", FailingExecutor)
+    monkeypatch.setattr(
+        "pyharp.spectra.atm_overview._parallel_mixture_overview_products_via_subprocess",
+        lambda tasks, *, max_workers: iter([{"task": "subprocess"}]),
+    )
+
+    result = list(_parallel_mixture_overview_products([("args-1", (20.0, 25.0)), ("args-2", (25.0, 30.0))]))
+
+    assert result == [{"task": "subprocess"}]
     assert created == {"max_workers": 2, "mp_context": "ctx-token"}

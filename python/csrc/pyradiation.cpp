@@ -59,7 +59,11 @@ void bind_radiation(py::module& m) {
       .ADD_OPTION(int, harp::RadiationBandOptionsImpl, ncol)
       .ADD_OPTION(int, harp::RadiationBandOptionsImpl, nlyr)
       .ADD_OPTION(int, harp::RadiationBandOptionsImpl, nstr)
-      .ADD_OPTION(bool, harp::RadiationBandOptionsImpl, verbose);
+      .ADD_OPTION(bool, harp::RadiationBandOptionsImpl, verbose)
+      .def("set_wave_lower", &harp::RadiationBandOptionsImpl::set_wave_lower,
+           py::arg("value"), py::return_value_policy::reference)
+      .def("set_wave_upper", &harp::RadiationBandOptionsImpl::set_wave_upper,
+           py::arg("value"), py::return_value_policy::reference);
 
   auto pyRadiationOptions =
       py::class_<harp::RadiationOptionsImpl, harp::RadiationOptions>(

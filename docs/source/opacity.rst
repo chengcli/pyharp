@@ -23,12 +23,12 @@ A complete list of built-in opacity types is given in the table below.
   * - 'jit'
     - '.pt' (saved by :func:`torch.jit.save` or :func:`pyharp.compile`)
     - Just-In-Time scripted opacity model
-  * - 'rfm-lbl'
+  * - 'molecule-line'
     - NetCDF
-    - Line-by-line absorption data computed by RFM
-  * - 'rfm-ck'
+    - Molecular line cross sections on ``(wavenumber, pressure, del_temperature)`` with optional same-species continuum fields
+  * - 'molecule-cia'
     - NetCDF
-    - Correlated-k absorption computed from line-by-line data
+    - Collision-induced absorption binary coefficients on ``(wavenumber, pressure, del_temperature)``
   * - 'multiband-ck'
     - '.pt' (saved by :func:`torch.jit.save`)
     - Three-dimensional correlated-k opacity lookup table. The axis are
@@ -51,6 +51,13 @@ A complete list of built-in opacity types is given in the table below.
       #. Henyey-Greenstein asymmetry factor (g)
 
 We give a few examples showing how to use these opacity class to load and compute optical properties.
+
+The NetCDF dump-backed molecular opacities expect the coordinate variables
+``wavenumber``, ``pressure``, ``del_temperature``, and ``temperature``.
+Line opacity variables follow the naming convention ``sigma_line_<species>``.
+Optional same-species continuum terms use ``sigma_continuum_<species>_*`` and
+are summed into the line attenuation automatically. CIA variables use
+``binary_absorption_coefficient_<species_a>_<species_b>``.
 
 .. _example_sonora:
 

@@ -8,9 +8,10 @@
 #include <harp/opacity/fourcolumn.hpp>
 #include <harp/opacity/helios.hpp>
 #include <harp/opacity/jit_opacity.hpp>
+#include <harp/opacity/molecule_cia.hpp>
+#include <harp/opacity/molecule_line.hpp>
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
-#include <harp/opacity/rfm.hpp>
 #include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/parse_yaml_input.hpp>
@@ -99,8 +100,8 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     op->disort() =
         create_disort_config(op->nwave(), op->ncol(), op->nlyr(), op->nstr());
     op->disort()->header("running disort " + bd_name);
-    op->disort()->wave_lower(std::vector<double>(op->nwave(), wmin));
-    op->disort()->wave_upper(std::vector<double>(op->nwave(), wmax));
+    op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
+    op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
     if (band["flags"]) {
       op->disort()->flags(trim_copy(band["flags"].as<std::string>()));
     }
@@ -109,8 +110,8 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     }
   } else if (op->solver_name() == "toon") {
     op->toon() = ToonMcKay89OptionsImpl::create();
-    op->toon()->wave_lower(std::vector<double>(op->nwave(), wmin));
-    op->toon()->wave_upper(std::vector<double>(op->nwave(), wmax));
+    op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
+    op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
   } else if (op->solver_name() == "twostr") {
     TORCH_CHECK(false, "twostr solver not implemented");
   } else {
@@ -139,12 +140,12 @@ void RadiationBandImpl::reset() {
     if (op->type() == "jit") {
       opacities[name] = torch::nn::AnyModule(JITOpacity(op));
       nmax_prop = std::max(nmax_prop, 2 + op->nmom());
-    } else if (op->type() == "rfm-lbl") {
-      auto a = RFM(op);
+    } else if (op->type() == "molecule-line") {
+      auto a = MoleculeLine(op);
       nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
-    } else if (op->type() == "rfm-ck") {
-      auto a = RFM(op);
+    } else if (op->type() == "molecule-cia") {
+      auto a = MoleculeCIA(op);
       nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "multiband-ck") {

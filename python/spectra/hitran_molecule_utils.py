@@ -1,7 +1,8 @@
-"""HITRAN/HAPI line-download and line-opacity helpers."""
+"""Utility helpers for HITRAN molecular line workflows."""
 
 from __future__ import annotations
 
+import argparse
 import importlib
 import os
 from dataclasses import dataclass
@@ -13,7 +14,9 @@ import numpy as np
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "spectra_matplotlib"))
 
-from .config import SpectralBandConfig, SpectroscopyConfig
+from .config import SpectralBandConfig, SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
+from .hitran_cia_utils import load_cia_dataset
+from .utils import build_band_from_range
 
 
 def _import_hapi():
@@ -21,6 +24,24 @@ def _import_hapi():
         return importlib.import_module("hapi")
     except ImportError as exc:  # pragma: no cover - depends on environment
         raise RuntimeError("HAPI is required for HITRAN line downloads.") from exc
+
+
+def _resolve_continuum_sources(**kwargs):
+    from .spectrum import _resolve_continuum_sources as resolve_continuum_sources
+
+    return resolve_continuum_sources(**kwargs)
+
+
+def compute_absorption_spectrum_from_sources(**kwargs):
+    from .spectrum import compute_absorption_spectrum_from_sources as compute_from_sources
+
+    return compute_from_sources(**kwargs)
+
+
+def compute_transmittance_spectrum(**kwargs):
+    from .transmittance import compute_transmittance_spectrum as compute_transmittance
+
+    return compute_transmittance(**kwargs)
 
 
 @dataclass(frozen=True)
@@ -296,39 +317,109 @@ def build_line_provider(
     )
 
 
-def plot_hitran_line_positions(
-    line_list: HitranLineList,
-    figure_path: Path,
+def _build_band_and_config(args: argparse.Namespace) -> tuple[SpectralBandConfig, SpectroscopyConfig]:
+    band = build_band_from_range(tuple(args.wn_range), float(args.resolution))
+    config = SpectroscopyConfig(
+        output_path=Path("output") / "unused.nc",
+        hitran_cache_dir=args.hitran_dir,
+        species_name=args.species,
+        broadening_composition=parse_broadening_composition(getattr(args, "broadening_composition", None)),
+        refresh_hitran=args.refresh_hitran,
+    )
+    return band, config
+
+
+def _resolve_cia_pair(args: argparse.Namespace, config: SpectroscopyConfig) -> str:
+    return str(args.cia_pair or f"{config.hitran_species.name}-{config.hitran_species.name}")
+
+
+def _resolve_self_component_filename(args: argparse.Namespace, config: SpectroscopyConfig) -> str | None:
+    explicit = getattr(args, "cia_filename", None)
+    if explicit:
+        return str(explicit)
+    explicit_pair = getattr(args, "cia_pair", None)
+    if explicit_pair:
+        return resolve_hitran_cia_pair(explicit_pair).filename
+    return config.hitran_species.cia_filename
+
+
+def load_requested_cia_dataset(args: argparse.Namespace, config: SpectroscopyConfig):
+    cia_filename = _resolve_self_component_filename(args, config)
+    if cia_filename is None:
+        return None
+    return load_cia_dataset(
+        cache_dir=args.hitran_dir,
+        filename=cia_filename,
+        pair=_resolve_cia_pair(args, config),
+        refresh=bool(args.refresh_cia),
+    )
+
+
+_MISSING = object()
+
+
+def compute_requested_absorption_spectrum(
+    args: argparse.Namespace,
     *,
-    wavenumber_min_cm1: float | None = None,
-    wavenumber_max_cm1: float | None = None,
-    min_line_strength: float = 1.0e-27,
-) -> None:
-    """Plot discrete HITRAN line positions and line intensities on log-log axes."""
-    import matplotlib
+    line_db: LineDatabase | None = None,
+    cia_dataset=_MISSING,
+):
+    band, config = _build_band_and_config(args)
+    temperature_k = float(args.temperature_k)
+    pressure_pa = float(args.pressure_bar) * 1.0e5
+    if cia_dataset is _MISSING:
+        cia_dataset = load_requested_cia_dataset(args, config)
+    line_db = line_db or download_hitran_lines(config, band)
+    line_provider = build_line_provider(config, line_db)
+    grid = band.grid()
+    cia_cross_section_cm2_molecule = None
+    if cia_dataset is None:
+        cia_dataset, cia_cross_section_cm2_molecule = _resolve_continuum_sources(
+            config=config,
+            wavenumber_grid_cm1=grid,
+            temperature_k=temperature_k,
+            pressure_pa=pressure_pa,
+        )
+    spectrum = compute_absorption_spectrum_from_sources(
+        species_name=config.hitran_species.name,
+        wavenumber_grid_cm1=grid,
+        temperature_k=temperature_k,
+        pressure_pa=pressure_pa,
+        line_provider=line_provider,
+        cia_dataset=cia_dataset,
+        cia_cross_section_cm2_molecule=cia_cross_section_cm2_molecule,
+    )
+    return band, config, spectrum, line_provider
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
 
-    figure_path.parent.mkdir(parents=True, exist_ok=True)
-    threshold = float(min_line_strength)
-    positive = line_list.line_intensity[line_list.line_intensity >= threshold]
-    if positive.size == 0:
-        raise ValueError("Line list does not contain any intensities above the minimum threshold.")
-    ymin = threshold
+def compute_requested_transmittance(args: argparse.Namespace):
+    if args.path_length_km <= 0.0:
+        raise ValueError("path-length-km must be positive")
+    _, _, spectrum, line_provider = compute_requested_absorption_spectrum(args)
+    transmittance = compute_transmittance_spectrum(
+        spectrum=spectrum,
+        path_length_m=float(args.path_length_km) * 1000.0,
+    )
+    return spectrum, transmittance, line_provider
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.vlines(line_list.wavenumber_cm1, ymin, line_list.line_intensity, color="0.2", alpha=0.2, linewidth=0.35)
-    ax.scatter(line_list.wavenumber_cm1, line_list.line_intensity, s=4.0, color="tab:blue", alpha=0.7, linewidths=0.0)
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_ylim(ymin, max(float(np.max(positive)) * 1.2, ymin * 10.0))
-    if wavenumber_min_cm1 is not None and wavenumber_max_cm1 is not None:
-        ax.set_xlim(float(wavenumber_min_cm1), float(wavenumber_max_cm1))
-    ax.set_xlabel("Wavenumber [cm$^{-1}$]")
-    ax.set_ylabel("Line intensity $S$ [cm$^{-1}$/ (molecule cm$^{-2}$)]")
-    ax.set_title(f"{line_list.species_name} HITRAN line positions and intensities")
-    ax.grid(True, which="both", alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(figure_path, dpi=150)
-    plt.close(fig)
+
+def selected_temperatures(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "temperature_k", [300.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def selected_pressure_bars(args: argparse.Namespace) -> list[float]:
+    values = getattr(args, "pressure_bar", [1.0])
+    if isinstance(values, (list, tuple)):
+        return [float(value) for value in values]
+    return [float(values)]
+
+
+def state_pairs(args: argparse.Namespace) -> list[tuple[float, float]]:
+    temperatures = selected_temperatures(args)
+    pressures = selected_pressure_bars(args)
+    if len(temperatures) != len(pressures):
+        raise ValueError("temperature_k and pressure_bar must have the same number of values")
+    return list(zip(temperatures, pressures, strict=True))

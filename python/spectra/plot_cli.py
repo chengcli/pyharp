@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import os
 from pathlib import Path
+import pickle
+import subprocess
+import sys
+import tempfile
 from textwrap import dedent
 
-from . import atm_overview_cli, cia_plot_cli, molecule_plot_cli
-from .output_names import _format_value, default_output_path
-from .shared_cli import process_pool_context
+from . import atm_overview, hitran_cia_plot, hitran_molecule_plot
+from .utils import _format_value, default_hitran_dir, default_output_path, parse_wn_range, process_pool_context
 
 
 class _SplitSpeciesAction(argparse.Action):
@@ -51,7 +54,7 @@ def _add_state_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser, *, allow_multiple_ranges: bool = False) -> None:
-    parser.add_argument("--hitran-dir", type=Path, default=Path("hitran"), metavar="DIR", help="Directory for downloaded HITRAN line and CIA data.")
+    parser.add_argument("--hitran-dir", type=Path, default=default_hitran_dir(), metavar="DIR", help="Directory for downloaded HITRAN line and CIA data.")
     parser.add_argument("--output-dir", type=Path, default=Path("output"), metavar="DIR", help="Directory for auto-generated figure output paths.")
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
     parser.add_argument(
@@ -65,14 +68,14 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, allow_multiple_ran
             "--wn-range",
             dest="wn_ranges",
             action="append",
-            type=molecule_plot_cli._parse_wn_range,
+            type=parse_wn_range,
             metavar="MIN,MAX",
             help="Wavenumber range in cm^-1. Repeat for multi-page overview PDFs.",
         )
     else:
         parser.add_argument(
             "--wn-range",
-            type=molecule_plot_cli._parse_wn_range,
+            type=parse_wn_range,
             default=None,
             metavar="MIN,MAX",
             help="Wavenumber range in cm^-1. CIA plots default to 20,10000; molecular and mixture plots default to 20,2500.",
@@ -349,41 +352,85 @@ def _parallel_plot_results(
         return [worker(task) for task in tasks]
     max_workers = min(len(tasks), os.cpu_count() or 1)
     ctx = process_pool_context()
-    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
-        return list(executor.map(worker, tasks))
+    try:
+        with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+            return list(executor.map(worker, tasks))
+    except PermissionError:
+        return _parallel_plot_results_via_subprocess(tasks, worker=worker, max_workers=max_workers)
+
+
+def _subprocess_worker_entry(task_pickle_path: str, result_pickle_path: str, worker_name: str) -> None:
+    with Path(task_pickle_path).open("rb") as handle:
+        task = pickle.load(handle)
+    worker = globals()[worker_name]
+    result = worker(task)
+    with Path(result_pickle_path).open("wb") as handle:
+        pickle.dump(result, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def _run_task_via_subprocess(task: tuple[str, argparse.Namespace], *, worker_name: str) -> None:
+    code = (
+        "from pyharp.spectra.plot_cli import _subprocess_worker_entry; "
+        "import sys; "
+        "_subprocess_worker_entry(sys.argv[1], sys.argv[2], sys.argv[3])"
+    )
+    with tempfile.TemporaryDirectory(prefix="pyharp_plot_task_") as tmpdir:
+        task_path = Path(tmpdir) / "task.pkl"
+        result_path = Path(tmpdir) / "result.pkl"
+        with task_path.open("wb") as handle:
+            pickle.dump(task, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        subprocess.run(
+            [sys.executable, "-c", code, str(task_path), str(result_path), worker_name],
+            check=True,
+        )
+        with result_path.open("rb") as handle:
+            return pickle.load(handle)
+
+
+def _parallel_plot_results_via_subprocess(
+    tasks: list[tuple[str, argparse.Namespace]],
+    *,
+    worker,
+    max_workers: int,
+) -> list[None]:
+    worker_name = getattr(worker, "__name__", None)
+    if worker_name is None or globals().get(worker_name) is not worker:
+        raise ValueError("worker must be a module-level plot_cli function for subprocess fallback")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        return list(executor.map(lambda task: _run_task_via_subprocess(task, worker_name=worker_name), tasks))
 
 
 def _run_plot_task(task: tuple[str, argparse.Namespace]) -> None:
     task_kind, task_args = task
     if task_kind == "molecule_xsection":
-        molecule_plot_cli.run_xsection(task_args)
+        hitran_molecule_plot.run_xsection(task_args)
         return
     if task_kind == "molecule_attenuation":
-        molecule_plot_cli.run_attenuation(task_args)
+        hitran_molecule_plot.run_attenuation(task_args)
         return
     if task_kind == "molecule_transmission":
-        molecule_plot_cli.run_transmission(task_args)
+        hitran_molecule_plot.run_transmission(task_args)
         return
     if task_kind == "molecule_overview":
-        molecule_plot_cli.run_overview(task_args)
+        hitran_molecule_plot.run_overview(task_args)
         return
     if task_kind == "molecule_overview_batch":
-        molecule_plot_cli.run_overview_batch(task_args)
+        hitran_molecule_plot.run_overview_batch(task_args)
         return
     if task_kind == "cia_attenuation":
-        cia_plot_cli.run_attenuation(task_args)
+        hitran_cia_plot.run_attenuation(task_args)
         return
     if task_kind == "cia_transmission":
-        cia_plot_cli.run_transmission(task_args)
+        hitran_cia_plot.run_transmission(task_args)
         return
     if task_kind == "atm_attenuation":
-        atm_overview_cli.run_atm_attenuation(task_args, wn_range=task_args.wn_range)
+        atm_overview.run_atm_attenuation(task_args, wn_range=task_args.wn_range)
         return
     if task_kind == "atm_transmission":
-        atm_overview_cli.run_atm_transmission(task_args, wn_range=task_args.wn_range)
+        atm_overview.run_atm_transmission(task_args, wn_range=task_args.wn_range)
         return
     if task_kind == "atm_overview":
-        atm_overview_cli.run_atm_overview(task_args)
+        atm_overview.run_atm_overview(task_args)
         return
     raise ValueError(f"unsupported plot task: {task_kind}")
 
@@ -526,7 +573,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     if args.command == "binary":
-        cia_plot_cli.run_binary(_as_cia_args(args, default_pair="H2-H2", plot_type="binary"))
+        hitran_cia_plot.run_binary(_as_cia_args(args, default_pair="H2-H2", plot_type="binary"))
         return
 
     _validate_state_grid(args, parser)
@@ -649,7 +696,7 @@ def main(argv: list[str] | None = None) -> None:
                 suffix=".pdf",
             )
             args.figure = args.figure or default_path
-            atm_overview_cli.run_atm_overview(_as_atm_overview_args(args, wn_ranges=wn_ranges))
+            atm_overview.run_atm_overview(_as_atm_overview_args(args, wn_ranges=wn_ranges))
             return
 
         species = args.species or ["H2O"]
@@ -665,9 +712,9 @@ def main(argv: list[str] | None = None) -> None:
         )
         args.figure = args.figure or default_path
         if len(species) == 1 and len(wn_ranges) == 1:
-            molecule_plot_cli.run_overview(_as_molecule_overview_args(args, species=species[0], wn_range=wn_ranges[0]))
+            hitran_molecule_plot.run_overview(_as_molecule_overview_args(args, species=species[0], wn_range=wn_ranges[0]))
         else:
-            molecule_plot_cli.run_overview_batch(_as_molecule_overview_batch_args(args, species=species, wn_ranges=wn_ranges))
+            hitran_molecule_plot.run_overview_batch(_as_molecule_overview_batch_args(args, species=species, wn_ranges=wn_ranges))
         return
 
     parser.error(f"unsupported plot command: {args.command}")

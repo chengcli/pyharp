@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import os
 from pathlib import Path
+import pickle
+import subprocess
 import sys
+import tempfile
 from textwrap import dedent
 
 import numpy as np
 import xarray as xr
 
-from .atm_overview_cli import _parse_composition, compute_mixture_overview_products
+from .atm_overview import compute_mixture_overview_products, parse_composition
 from .config import SpectroscopyConfig, cia_database_for_model, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .dataset_io import (
     DEFAULT_NETCDF_ENGINE,
@@ -20,14 +23,15 @@ from .dataset_io import (
     add_wavenumber_attrs,
     build_state_attrs,
     clean_var_token,
-    write_dataset_via_tmp,
+    write_dataset,
 )
-from .hitran_cia import load_cia_dataset
-from .hitran_lines import build_line_provider, download_hitran_lines
+from .hitran_cia_utils import load_cia_dataset
+from .hitran_molecule_utils import build_line_provider, download_hitran_lines
 from .orton_xiz_cia import load_orton_xiz_cia_dataset, resolve_orton_xiz_cia_filename
-from .output_names import _clean_token, _format_value
-from .shared_cli import (
+from .utils import (
     HelpFormatter,
+    _clean_token,
+    _format_value,
     build_band,
     default_hitran_dir,
     default_orton_xiz_cia_dir,
@@ -580,7 +584,7 @@ def _write_xsection_dataset(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset = _xsection_dataset(spectrum, species_name=species_name, secondary_component=secondary_component, wn_range=wn_range)
     try:
-        write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
+        write_dataset(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
     finally:
         dataset.close()
 
@@ -797,7 +801,7 @@ def _compute_transmission_band(task: tuple[str, argparse.Namespace]) -> tuple[xr
 
 
 def _composition_species_names(composition: str) -> tuple[str, ...]:
-    return tuple(_parse_composition(composition).keys())
+    return tuple(parse_composition(composition).keys())
 
 
 def _parallel_band_results(
@@ -809,8 +813,52 @@ def _parallel_band_results(
         return [worker(task) for task in tasks]
     max_workers = min(len(tasks), os.cpu_count() or 1)
     ctx = process_pool_context()
-    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
-        return list(executor.map(worker, tasks))
+    try:
+        with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
+            return list(executor.map(worker, tasks))
+    except PermissionError:
+        return _parallel_band_results_via_subprocess(tasks, worker=worker, max_workers=max_workers)
+
+
+def _subprocess_worker_entry(task_pickle_path: str, result_pickle_path: str, worker_name: str) -> None:
+    with Path(task_pickle_path).open("rb") as handle:
+        task = pickle.load(handle)
+    worker = globals()[worker_name]
+    result = worker(task)
+    with Path(result_pickle_path).open("wb") as handle:
+        pickle.dump(result, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def _run_task_via_subprocess(task: tuple[str, argparse.Namespace], *, worker_name: str) -> tuple[xr.Dataset, str | None]:
+    code = (
+        "from pyharp.spectra.dump_cli import _subprocess_worker_entry; "
+        "import sys; "
+        "_subprocess_worker_entry(sys.argv[1], sys.argv[2], sys.argv[3])"
+    )
+    with tempfile.TemporaryDirectory(prefix="pyharp_dump_task_") as tmpdir:
+        task_path = Path(tmpdir) / "task.pkl"
+        result_path = Path(tmpdir) / "result.pkl"
+        with task_path.open("wb") as handle:
+            pickle.dump(task, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        subprocess.run(
+            [sys.executable, "-c", code, str(task_path), str(result_path), worker_name],
+            check=True,
+        )
+        with result_path.open("rb") as handle:
+            return pickle.load(handle)
+
+
+def _parallel_band_results_via_subprocess(
+    tasks: list[tuple[str, argparse.Namespace]],
+    *,
+    worker,
+    max_workers: int,
+) -> list[tuple[xr.Dataset, str | None]]:
+    worker_name = getattr(worker, "__name__", None)
+    if worker_name is None or globals().get(worker_name) is not worker:
+        raise ValueError("worker must be a module-level dump_cli function for subprocess fallback")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        return list(executor.map(lambda task: _run_task_via_subprocess(task, worker_name=worker_name), tasks))
 
 
 def _stack_state_grid_datasets(
@@ -974,7 +1022,7 @@ def main() -> None:
         ):
             output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
             try:
-                write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
+                write_dataset(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
             finally:
                 dataset.close()
             print(f"Wrote NetCDF: {output_path}")
@@ -992,7 +1040,7 @@ def main() -> None:
         ):
             output_path = _output_path_for_wn_range(args, wn_range=wn_range, suffix=".nc")
             try:
-                write_dataset_via_tmp(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
+                write_dataset(dataset, output_path, engine=DEFAULT_NETCDF_ENGINE)
             finally:
                 dataset.close()
             print(f"Wrote NetCDF: {output_path}")

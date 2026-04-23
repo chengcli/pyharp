@@ -15,7 +15,10 @@ Opacity Classes
 .. autoclass:: pyharp.opacity.WaveTemp
    :members: __init__, forward
 
-.. autoclass:: pyharp.opacity.RFM
+.. autoclass:: pyharp.opacity.MoleculeLine
+   :members: __init__, forward
+
+.. autoclass:: pyharp.opacity.MoleculeCIA
    :members: __init__, forward
 
 .. autoclass:: pyharp.opacity.JITOpacity

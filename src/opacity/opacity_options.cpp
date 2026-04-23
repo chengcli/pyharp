@@ -98,39 +98,4 @@ OpacityOptions OpacityOptionsImpl::from_yaml(std::string const& filename,
   return op;
 }
 
-std::vector<double> OpacityOptionsImpl::query_wavenumber() const {
-  if (type().compare(0, 3, "rfm") == 0) {
-    if (opacity_files().size() < 1) {
-      throw std::runtime_error("no opacity files specified for RFM opacity");
-    }
-    return read_dimvar_netcdf<double>(opacity_files()[0], "Wavenumber");
-  } else if (type().compare(0, 9, "multiband") == 0) {
-    if (opacity_files().size() < 1) {
-      throw std::runtime_error(
-          "no opacity files specified for multiband opacity");
-    }
-    return read_var_pt<double>(opacity_files()[0], "wavenumber");
-  } else {
-    throw std::runtime_error(
-        "unsupported opacity type for querying wavenumber");
-  }
-}
-
-std::vector<double> OpacityOptionsImpl::query_weight() const {
-  if (type().compare(0, 3, "rfm") == 0) {
-    if (opacity_files().size() < 1) {
-      throw std::runtime_error("no opacity files specified for RFM opacity");
-    }
-    return read_dimvar_netcdf<double>(opacity_files()[0], "weights");
-  } else if (type().compare(0, 9, "multiband") == 0) {
-    if (opacity_files().size() < 1) {
-      throw std::runtime_error(
-          "no opacity files specified for multiband opacity");
-    }
-    return read_var_pt<double>(opacity_files()[0], "weights");
-  } else {
-    throw std::runtime_error("unsupported opacity type for querying weight");
-  }
-}
-
 }  // namespace harp

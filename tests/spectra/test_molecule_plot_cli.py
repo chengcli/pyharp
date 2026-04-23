@@ -2,9 +2,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from pyharp.spectra.hitran_lines import LineDatabase
-from pyharp.spectra.molecule_plot_cli import _compute_overview_products, _compute_requested_absorption_spectrum
-from pyharp.spectra.molecule_plot_cli import build_molecule_overview_batch_parser, build_overview_parser, run_xsection
+from pyharp.spectra.hitran_molecule_plot import build_molecule_overview_batch_parser, build_overview_parser, compute_overview_products, run_xsection
+from pyharp.spectra.hitran_molecule_utils import LineDatabase, compute_requested_absorption_spectrum
 
 
 def test_overview_parser_accepts_optional_cia_and_pdf_output(tmp_path) -> None:
@@ -48,7 +47,7 @@ def test_batch_overview_parser_accepts_repeated_ranges_and_default_species(tmp_p
     args = parser.parse_args(
         [
             "--wn-range=25,2500",
-            "--wn-range=2501,20000",
+            "--wn-range=2500,20000",
             "--temperature-k",
             "300",
             "--pressure-bar",
@@ -63,7 +62,7 @@ def test_batch_overview_parser_accepts_repeated_ranges_and_default_species(tmp_p
     )
 
     assert args.species == ["H2", "CO2", "H2O", "CH4", "N2"]
-    assert args.wn_ranges == [(25.0, 2500.0), (2501.0, 20000.0)]
+    assert args.wn_ranges == [(25.0, 2500.0), (2500.0, 20000.0)]
     assert args.temperature_k == 300.0
     assert args.pressure_bar == 1.0
     assert args.broadening_composition == "H2:0.85,He:0.15"
@@ -149,17 +148,17 @@ def test_overview_products_reuses_downloaded_line_database(monkeypatch, tmp_path
             pressure_pa=pressure_pa,
         )
 
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.download_hitran_lines", fake_download)
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.load_hitran_line_list", fake_load_line_list)
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._load_requested_cia_dataset", lambda args, config: None)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.download_hitran_lines", fake_download)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.load_hitran_line_list", fake_load_line_list)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.load_requested_cia_dataset", lambda args, config: None)
     monkeypatch.setattr(
-        "pyharp.spectra.molecule_plot_cli.build_line_provider",
+        "pyharp.spectra.hitran_molecule_utils.build_line_provider",
         lambda config, line_db: SimpleNamespace(broadening_summary=lambda: "requested=self:1.000 -> effective=self:1.000"),
     )
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._resolve_continuum_sources", lambda **kwargs: (None, None))
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.compute_absorption_spectrum_from_sources", fake_compute_from_sources)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._resolve_continuum_sources", lambda **kwargs: (None, None))
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.compute_absorption_spectrum_from_sources", fake_compute_from_sources)
 
-    _compute_overview_products(args)
+    compute_overview_products(args)
 
     assert calls["download"] == 1
 
@@ -194,14 +193,14 @@ def test_compute_requested_absorption_spectrum_reuses_built_line_provider_withou
     fake_provider = SimpleNamespace(broadening_summary=lambda: "requested=self:1.000 -> effective=self:1.000")
     calls = {"resolve": 0, "compute": 0}
 
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.download_hitran_lines", lambda config, band: line_db)
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._load_requested_cia_dataset", lambda args, config: None)
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.build_line_provider", lambda config, line_db: fake_provider)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.download_hitran_lines", lambda config, band: line_db)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.load_requested_cia_dataset", lambda args, config: None)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.build_line_provider", lambda config, line_db: fake_provider)
 
     def fake_resolve_continuum_sources(*, config, wavenumber_grid_cm1, temperature_k, pressure_pa):
         calls["resolve"] += 1
         assert config.hitran_species.name == "CO2"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
         return None, None
@@ -218,7 +217,7 @@ def test_compute_requested_absorption_spectrum_reuses_built_line_provider_withou
     ):
         calls["compute"] += 1
         assert species_name == "CO2"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
         assert line_provider is fake_provider
@@ -234,10 +233,10 @@ def test_compute_requested_absorption_spectrum_reuses_built_line_provider_withou
             pressure_pa=pressure_pa,
         )
 
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli._resolve_continuum_sources", fake_resolve_continuum_sources)
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.compute_absorption_spectrum_from_sources", fake_compute_from_sources)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._resolve_continuum_sources", fake_resolve_continuum_sources)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.compute_absorption_spectrum_from_sources", fake_compute_from_sources)
 
-    _, _, _, line_provider = _compute_requested_absorption_spectrum(args)
+    _, _, _, line_provider = compute_requested_absorption_spectrum(args)
 
     assert calls == {"resolve": 1, "compute": 1}
     assert line_provider is fake_provider
@@ -269,10 +268,10 @@ def test_run_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
     )
 
     monkeypatch.setattr(
-        "pyharp.spectra.molecule_plot_cli._compute_requested_absorption_spectrum",
+        "pyharp.spectra.hitran_molecule_utils.compute_requested_absorption_spectrum",
         lambda *call_args, **call_kwargs: (None, None, fake_spectrum, fake_provider),
     )
-    monkeypatch.setattr("pyharp.spectra.molecule_plot_cli.plot_absorption_spectrum", lambda spectrum, figure: None)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.plot_absorption_spectrum", lambda spectrum, figure: None)
 
     run_xsection(args)
 

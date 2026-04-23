@@ -107,6 +107,60 @@ def find_resource(filename: str) -> str:
     """
     ...
 
+def mean_molecular_weight(conc: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate mean molecular weight from species molar concentrations.
+
+    Args:
+        conc (torch.Tensor): concentration tensor with species on the last axis
+            and units of mol/m^3
+
+    Returns:
+        torch.Tensor: mean molecular weight [kg/mol] with the species axis reduced
+    """
+    ...
+
+def write_column_profile(
+    filename: str,
+    dz: torch.Tensor,
+    pres: torch.Tensor,
+    temp: torch.Tensor,
+    conc: torch.Tensor,
+    band_flux: torch.Tensor,
+) -> None:
+    """
+    Write a formatted 1D column profile text table.
+
+    Args:
+        filename (str): output path
+        dz (torch.Tensor): layer thickness [m], shape (nlyr,)
+        pres (torch.Tensor): pressure [Pa], shape (ncol, nlyr)
+        temp (torch.Tensor): temperature [K], shape (ncol, nlyr)
+        conc (torch.Tensor): molar concentration [mol/m^3], shape (ncol, nlyr, nspecies)
+        band_flux (torch.Tensor): band flux [W/m^2], shape (ncol, nlyr+1, 2)
+    """
+    ...
+
+def write_spectral_profile(
+    filename: str,
+    wavenumber: list[float],
+    transmittance: list[tuple[str, torch.Tensor]],
+    flux_up_toa: torch.Tensor,
+    flux_down_boa: torch.Tensor,
+) -> None:
+    """
+    Write a formatted spectral profile text table.
+
+    Args:
+        filename (str): output path
+        wavenumber (list[float]): wavenumber grid [cm^-1]
+        transmittance (list[tuple[str, torch.Tensor]]): named total transmittance
+            arrays, each tensor shape (nwave,)
+        flux_up_toa (torch.Tensor): upward spectral flux at TOA [W/m^2/cm^-1], shape (nwave,)
+        flux_down_boa (torch.Tensor): downward spectral flux at BOA [W/m^2/cm^-1], shape (nwave,)
+    """
+    ...
+
 # Radiation functions
 @overload
 def bbflux_wavenumber(wave: torch.Tensor, temp: float, ncol: int = 1) -> torch.Tensor:
@@ -426,6 +480,30 @@ class RadiationBandOptions:
 
         Args:
             value (list[float]): spectral weights
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    def set_wave_lower(self, value: list[float]) -> "RadiationBandOptions":
+        """
+        Set solver lower bin edges for the active band solver.
+
+        Args:
+            value (list[float]): lower bin edges [cm^-1]
+
+        Returns:
+            RadiationBandOptions: class object
+        """
+        ...
+
+    def set_wave_upper(self, value: list[float]) -> "RadiationBandOptions":
+        """
+        Set solver upper bin edges for the active band solver.
+
+        Args:
+            value (list[float]): upper bin edges [cm^-1]
 
         Returns:
             RadiationBandOptions: class object

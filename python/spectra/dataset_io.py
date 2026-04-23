@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+import os
 from pathlib import Path
-import shutil
-import tempfile
 
 import numpy as np
 import xarray as xr
@@ -12,6 +12,8 @@ import xarray as xr
 
 DEFAULT_NETCDF_ENGINE = "scipy"
 WAVENUMBER_ATTRS = {"long_name": "wavenumber", "units": "cm^-1"}
+HDF5_USE_FILE_LOCKING_ENV = "HDF5_USE_FILE_LOCKING"
+HDF5_USE_FILE_LOCKING_DISABLED = "FALSE"
 
 
 def clean_var_token(value: object) -> str:
@@ -86,12 +88,20 @@ def combine_band_datasets(datasets: list[xr.Dataset], *, wn_ranges: list[tuple[f
     return combined
 
 
-def write_dataset_via_tmp(dataset: xr.Dataset, output_path: Path, *, engine: str = DEFAULT_NETCDF_ENGINE) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix="pyharp_", suffix=".nc", dir="/tmp")
-    Path(tmp_name).unlink(missing_ok=True)
+@contextmanager
+def hdf5_file_locking_disabled():
+    previous_value = os.environ.get(HDF5_USE_FILE_LOCKING_ENV)
+    os.environ[HDF5_USE_FILE_LOCKING_ENV] = HDF5_USE_FILE_LOCKING_DISABLED
     try:
-        dataset.to_netcdf(tmp_name, engine=engine)
-        shutil.move(tmp_name, output_path)
+        yield
     finally:
-        Path(tmp_name).unlink(missing_ok=True)
+        if previous_value is None:
+            os.environ.pop(HDF5_USE_FILE_LOCKING_ENV, None)
+        else:
+            os.environ[HDF5_USE_FILE_LOCKING_ENV] = previous_value
+
+
+def write_dataset(dataset: xr.Dataset, output_path: Path, *, engine: str = DEFAULT_NETCDF_ENGINE) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with hdf5_file_locking_disabled():
+        dataset.to_netcdf(output_path, engine=engine)

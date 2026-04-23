@@ -51,6 +51,16 @@ The following functions have been used to process the legacy CIA data files:
    :undoc-members:
    :imported-members:
 
+NetCDF dump-backed molecular opacities
+--------------------------------------
+
+Pyharp also supports NetCDF dump-backed molecular absorption through the
+``molecule-line`` and ``cia`` opacity types. These readers consume
+cross-section fields on ``(del_temperature, pressure, wavenumber)`` or any
+equivalent variable-dimension ordering, convert them into the runtime units
+used by the C++ radiative-transfer core, and interpolate on the requested
+band grid.
+
 References
 ----------
 .. [1] Lupu, R., et al. "Correlated k coefficients for H2-He atmospheres; 196 spectral windows and 1460 pressure-temperature points." Zenodo, doi 0.5281/zenodo.5590988 (2021).

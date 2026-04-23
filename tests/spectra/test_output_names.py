@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pyharp.spectra.output_names import default_output_path
+from pyharp.spectra.utils import default_output_path
 
 
 def test_default_output_path_uses_requested_pattern() -> None:

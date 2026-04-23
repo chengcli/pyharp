@@ -6,6 +6,13 @@ from pyharp.spectra.config import (
     resolve_hitran_cia_pair,
     resolve_hitran_species,
 )
+import numpy as np
+
+
+def test_spectral_band_grid_includes_both_endpoints() -> None:
+    band = SpectralBandConfig("single_state", 20.0, 22.0, 1.0)
+
+    assert np.allclose(band.grid(), np.array([20.0, 21.0, 22.0]))
 
 
 def test_resolve_hitran_species_is_case_insensitive() -> None:

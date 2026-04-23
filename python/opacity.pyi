@@ -17,7 +17,7 @@ class OpacityOptions:
     Examples:
         >>> import torch
         >>> from pyharp.opacity import OpacityOptions
-        >>> op = OpacityOptions().type('rfm-lbl')
+        >>> op = OpacityOptions().type('molecule-line')
     """
 
     def __init__(self) -> None:
@@ -59,7 +59,7 @@ class OpacityOptions:
         """
         Set the type of the opacity source format.
 
-        Valid options are: ``jit``, ``rfm-lbl``, ``rfm-ck``, ``fourcolumn``, ``wavetemp``, ``multiband-ck``, ``helios``.
+        Valid options are: ``jit``, ``molecule-line``, ``molecule-cia``, ``fourcolumn``, ``wavetemp``, ``multiband-ck``, ``helios``.
 
         Args:
             value (str): type of the opacity source
@@ -70,7 +70,7 @@ class OpacityOptions:
         Examples:
             >>> import torch
             >>> from pyharp.opacity import OpacityOptions
-            >>> op = OpacityOptions().type('rfm-lbl')
+            >>> op = OpacityOptions().type('molecule-line')
             >>> print(op)
         """
         ...
@@ -538,14 +538,14 @@ class FourColumn:
         """
         ...
 
-class RFM:
+class MoleculeLine:
     """
-    Line-by-line absorption data computed by RFM.
+    Molecular line absorption read from a NetCDF dump.
 
     Examples:
         >>> import torch
-        >>> from pyharp.opacity import RFM, OpacityOptions
-        >>> op = RFM(OpacityOptions())
+        >>> from pyharp.opacity import MoleculeLine, OpacityOptions
+        >>> op = MoleculeLine(OpacityOptions())
     """
 
     options: OpacityOptions
@@ -558,7 +558,7 @@ class RFM:
     @overload
     def __init__(self, options: OpacityOptions) -> None:
         """
-        Create a RFM instance.
+        Create a MoleculeLine instance.
 
         Args:
             options (OpacityOptions): Opacity options
@@ -593,7 +593,7 @@ class RFM:
 
     def forward(self, conc: torch.Tensor, atm: dict[str, torch.Tensor]) -> torch.Tensor:
         """
-        Calculate opacity using RFM line-by-line absorption data.
+        Calculate attenuation using NetCDF line cross sections.
 
         Args:
             conc (torch.Tensor): concentration of the species in mol/m^3
@@ -609,7 +609,81 @@ class RFM:
                 where nwave is the number of wavelengths,
                 ncol is the number of columns,
                 nlyr is the number of layers.
-                The last dimension is the optical properties arranged
-                in the order of attenuation [1/m], single scattering albedo and scattering phase function.
+                The last dimension is the attenuation coefficient [1/m].
+        """
+        ...
+
+class MoleculeCIA:
+    """
+    Collision-induced absorption read from a NetCDF dump.
+
+    Examples:
+        >>> import torch
+        >>> from pyharp.opacity import MoleculeCIA, OpacityOptions
+        >>> op = MoleculeCIA(OpacityOptions())
+    """
+
+    options: OpacityOptions
+
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+
+    @overload
+    def __init__(self, options: OpacityOptions) -> None:
+        """
+        Create a MoleculeCIA instance.
+
+        Args:
+            options (OpacityOptions): Opacity options
+        """
+        ...
+
+    def __repr__(self) -> str: ...
+
+    def module(self, name: str):
+        """
+        Get a submodule by name.
+
+        Args:
+            name (str): name of the submodule
+
+        Returns:
+            The submodule
+        """
+        ...
+
+    def buffer(self, name: str) -> torch.Tensor:
+        """
+        Get a buffer by name.
+
+        Args:
+            name (str): name of the buffer
+
+        Returns:
+            torch.Tensor: the buffer tensor
+        """
+        ...
+
+    def forward(self, conc: torch.Tensor, atm: dict[str, torch.Tensor]) -> torch.Tensor:
+        """
+        Calculate attenuation using NetCDF CIA binary coefficients.
+
+        Args:
+            conc (torch.Tensor): concentration of the species in mol/m^3
+            atm (dict[str, torch.Tensor]): atmospheric parameters
+
+                Either 'wavelength' or 'wavenumber' must be provided
+                if 'wavelength' is provided, the unit is um.
+                if 'wavenumber' is provided, the unit is cm^{-1}.
+
+        Returns:
+            torch.Tensor:
+                The shape of the output tensor is (nwave, ncol, nlyr, 1),
+                where nwave is the number of wavelengths,
+                ncol is the number of columns,
+                nlyr is the number of layers.
+                The last dimension is the attenuation coefficient [1/m].
         """
         ...

@@ -16,9 +16,9 @@ import numpy as np
 import xarray as xr
 
 from .config import SpectroscopyConfig, SpectralBandConfig
-from .dataset_io import write_dataset_via_tmp
-from .hitran_cia import CiaDataset, download_cia_file, parse_cia_file
-from .hitran_lines import HapiLineProvider, LineDatabase, build_line_provider, download_hitran_lines
+from .dataset_io import write_dataset
+from .hitran_cia_utils import CiaDataset, download_cia_file, parse_cia_file
+from .hitran_molecule_utils import HapiLineProvider, LineDatabase, build_line_provider, download_hitran_lines
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
 
 K_BOLTZMANN = 1.380649e-23
@@ -187,7 +187,7 @@ def write_spectrum_dataset(spectrum: AbsorptionSpectrum, output_path: Path) -> N
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dataset = spectrum_to_dataset(spectrum)
     try:
-        write_dataset_via_tmp(dataset, output_path)
+        write_dataset(dataset, output_path)
     finally:
         dataset.close()
 

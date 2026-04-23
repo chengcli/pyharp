@@ -31,8 +31,9 @@ using OpacityDict = std::map<std::string, OpacityOptions>;
  *
  * The `RadiationBand` object recognizes the following opacity source types:
  *  - "jit": user-defined opacity module
- *  - "rfm-lbl": line-by-line opacity defined on wavenumber grid
- *  - "rfm-ck": correlated-k opacity table computed from rfm line-by-line table
+ *  - "molecule-line": line opacity from NetCDF cross-section dumps
+ *  - "molecule-cia": CIA opacity from NetCDF binary absorption coefficient
+ * dumps
  *  - "multiband-ck": multi-band correlated-k opacity table
  *  - "wavetemp": opacity table defined on wavenumber and temperature grid (CIA)
  *  - "fourcolumn": Four-column opacity table (aerosol)
@@ -66,6 +67,36 @@ struct RadiationBandOptionsImpl {
    */
   static std::shared_ptr<RadiationBandOptionsImpl> from_yaml(
       std::string const& filename, std::string const& bd_name);
+
+  RadiationBandOptionsImpl& set_wave_lower(std::vector<double> const& values) {
+    if (nwave() > 0) {
+      TORCH_CHECK(static_cast<int>(values.size()) == nwave(),
+                  "wave_lower size(", values.size(),
+                  ") inconsistent with nwave(", nwave(), ")");
+    }
+
+    if (disort() != nullptr) disort()->wave_lower(values);
+    if (toon() != nullptr) toon()->wave_lower(values);
+
+    TORCH_CHECK(disort() != nullptr || toon() != nullptr,
+                "Cannot set wave_lower before creating a solver");
+    return *this;
+  }
+
+  RadiationBandOptionsImpl& set_wave_upper(std::vector<double> const& values) {
+    if (nwave() > 0) {
+      TORCH_CHECK(static_cast<int>(values.size()) == nwave(),
+                  "wave_upper size(", values.size(),
+                  ") inconsistent with nwave(", nwave(), ")");
+    }
+
+    if (disort() != nullptr) disort()->wave_upper(values);
+    if (toon() != nullptr) toon()->wave_upper(values);
+
+    TORCH_CHECK(disort() != nullptr || toon() != nullptr,
+                "Cannot set wave_upper before creating a solver");
+    return *this;
+  }
 
   std::shared_ptr<RadiationBandOptionsImpl> clone() const {
     auto op = std::make_shared<RadiationBandOptionsImpl>(*this);

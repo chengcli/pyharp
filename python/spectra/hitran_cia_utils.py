@@ -1,4 +1,4 @@
-"""Download and parse HITRAN collision-induced absorption files."""
+"""Utility helpers for HITRAN collision-induced absorption data."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from urllib.request import Request, urlopen
 
 import numpy as np
 
-from .blackbody import compute_normalized_blackbody_curve
 from .config import SpectroscopyConfig
 
 K_BOLTZMANN = 1.380649e-23
@@ -233,36 +232,6 @@ def load_cia_dataset(
     return parse_cia_file(path, pair)
 
 
-def plot_cia_cross_section(
-    dataset: CiaDataset,
-    *,
-    temperature_k: float,
-    wavenumber_grid_cm1: np.ndarray,
-    figure_path: Path,
-) -> np.ndarray:
-    """Plot a CIA binary absorption coefficient spectrum in cm^5 molecule^-2."""
-    import matplotlib.pyplot as plt
-
-    wavenumber_grid_cm1 = np.asarray(wavenumber_grid_cm1, dtype=np.float64)
-    binary_xsec = dataset.interpolate_to_grid(temperature_k, wavenumber_grid_cm1)
-    positive = binary_xsec[binary_xsec > 0.0]
-    if positive.size == 0:
-        raise ValueError("No positive CIA coefficients were found on the requested grid.")
-
-    figure_path.parent.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(11, 6))
-    ax.plot(wavenumber_grid_cm1, binary_xsec, color="tab:blue", linewidth=1.25)
-    ax.set_yscale("log")
-    ax.set_xlabel("Wavenumber [cm$^{-1}$]")
-    ax.set_ylabel("Binary absorption coefficient [cm$^5$ / molecule$^2$]")
-    ax.set_title(f"{dataset.pair} CIA at {temperature_k:.1f} K")
-    ax.grid(True, which="both", alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(figure_path, dpi=150)
-    plt.close(fig)
-    return binary_xsec
-
-
 def compute_cia_attenuation_m1(
     dataset: CiaDataset,
     *,
@@ -275,42 +244,6 @@ def compute_cia_attenuation_m1(
     binary_xsec = dataset.interpolate_to_grid(temperature_k, wavenumber_grid_cm1)
     number_density_cm3 = float(pressure_pa / (K_BOLTZMANN * temperature_k) / 1.0e6)
     return np.asarray(binary_xsec * number_density_cm3**2 * 100.0, dtype=np.float64)
-
-
-def plot_cia_attenuation_coefficient(
-    dataset: CiaDataset,
-    *,
-    temperature_k: float,
-    pressure_pa: float,
-    wavenumber_grid_cm1: np.ndarray,
-    figure_path: Path,
-) -> np.ndarray:
-    """Plot a CIA attenuation coefficient spectrum in 1/m."""
-    import matplotlib.pyplot as plt
-
-    wavenumber_grid_cm1 = np.asarray(wavenumber_grid_cm1, dtype=np.float64)
-    attenuation_m1 = compute_cia_attenuation_m1(
-        dataset,
-        temperature_k=temperature_k,
-        pressure_pa=pressure_pa,
-        wavenumber_grid_cm1=wavenumber_grid_cm1,
-    )
-    positive = attenuation_m1[attenuation_m1 > 0.0]
-    if positive.size == 0:
-        raise ValueError("No positive CIA attenuation coefficients were found on the requested grid.")
-
-    figure_path.parent.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(11, 6))
-    ax.plot(wavenumber_grid_cm1, attenuation_m1, color="tab:orange", linewidth=1.25)
-    ax.set_yscale("log")
-    ax.set_xlabel("Wavenumber [cm$^{-1}$]")
-    ax.set_ylabel("Attenuation coefficient [1/m]")
-    ax.set_title(f"{dataset.pair} CIA attenuation at {temperature_k:.1f} K and {pressure_pa / 1.0e5:.3f} bar")
-    ax.grid(True, which="both", alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(figure_path, dpi=150)
-    plt.close(fig)
-    return attenuation_m1
 
 
 def compute_cia_transmission(
@@ -331,53 +264,3 @@ def compute_cia_transmission(
         wavenumber_grid_cm1=wavenumber_grid_cm1,
     )
     return np.exp(-attenuation_m1 * float(path_length_m))
-
-
-def plot_cia_transmission(
-    dataset: CiaDataset,
-    *,
-    temperature_k: float,
-    pressure_pa: float,
-    path_length_m: float,
-    wavenumber_grid_cm1: np.ndarray,
-    figure_path: Path,
-) -> np.ndarray:
-    """Plot CIA transmission over a fixed path length."""
-    import matplotlib.pyplot as plt
-
-    wavenumber_grid_cm1 = np.asarray(wavenumber_grid_cm1, dtype=np.float64)
-    transmission = compute_cia_transmission(
-        dataset,
-        temperature_k=temperature_k,
-        pressure_pa=pressure_pa,
-        path_length_m=path_length_m,
-        wavenumber_grid_cm1=wavenumber_grid_cm1,
-    )
-
-    figure_path.parent.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(11, 6))
-    ax.plot(wavenumber_grid_cm1, transmission, color="tab:green", linewidth=1.25)
-    ax.plot(
-        wavenumber_grid_cm1,
-        compute_normalized_blackbody_curve(
-            wavenumber_cm1=wavenumber_grid_cm1,
-            temperature_k=temperature_k,
-        ),
-        color="black",
-        linestyle="--",
-        linewidth=1.1,
-        label="Blackbody",
-    )
-    ax.set_xlabel("Wavenumber [cm$^{-1}$]")
-    ax.set_ylabel("Transmission")
-    ax.set_ylim(0.0, 1.01)
-    ax.set_title(
-        f"{dataset.pair} CIA transmission at {temperature_k:.1f} K, "
-        f"{pressure_pa / 1.0e5:.3f} bar, L={path_length_m / 1000.0:.3f} km"
-    )
-    ax.grid(True, which="both", alpha=0.3)
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(figure_path, dpi=150)
-    plt.close(fig)
-    return transmission

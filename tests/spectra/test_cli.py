@@ -5,9 +5,9 @@ from pathlib import Path
 
 import xarray as xr
 
-from pyharp.spectra.dataset_io import combine_band_datasets, write_dataset_via_tmp
-from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _output_path_for_wn_range, _pair_xsection_dataset, _resolve_pair_filename, _species_transmission_dataset, _stack_state_grid_datasets, _xsection_dataset, build_parser, main
-from pyharp.spectra.shared_cli import default_hitran_dir, default_orton_xiz_cia_dir, default_output_path, project_root
+from pyharp.spectra.dataset_io import combine_band_datasets, write_dataset
+from pyharp.spectra.dump_cli import _args_for_wn_range, _composition_transmission_dataset, _composition_xsection_dataset, _compute_xsection_band, _output_path_for_wn_range, _pair_xsection_dataset, _parallel_band_results, _resolve_pair_filename, _species_transmission_dataset, _stack_state_grid_datasets, _xsection_dataset, build_parser, main
+from pyharp.spectra.utils import default_hitran_dir, default_orton_xiz_cia_dir, default_output_path, project_root
 from pyharp.spectra.spectrum import AbsorptionSpectrum
 
 
@@ -189,7 +189,7 @@ def test_pair_xsection_dataset_uses_orton_xiz_backend(monkeypatch, tmp_path) -> 
     dataset = _pair_xsection_dataset(_args_for_wn_range(args, args.wn_ranges[0]))
     try:
         assert dataset.attrs["pair_name"] == "H2-H2"
-        assert np.allclose(dataset["binary_absorption_coefficient"].values, np.array([4.0e-46, 4.0e-46]))
+        assert np.allclose(dataset["binary_absorption_coefficient"].values, np.array([4.0e-46, 4.0e-46, 4.0e-46]))
     finally:
         dataset.close()
 
@@ -432,7 +432,7 @@ def test_cli_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
             "requested=h2:0.900,he:0.100 -> effective=air:1.000 (fallback: h2->air, he->air)",
         ),
     )
-    monkeypatch.setattr("pyharp.spectra.dump_cli.write_dataset_via_tmp", lambda dataset, output_path, *, engine: None)
+    monkeypatch.setattr("pyharp.spectra.dump_cli.write_dataset", lambda dataset, output_path, *, engine: None)
 
     main()
 
@@ -472,7 +472,7 @@ def test_cli_xsection_writes_one_file_per_range(monkeypatch, tmp_path, capsys) -
         lambda tasks, *, worker: [worker(task) for task in tasks],
     )
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
+        "pyharp.spectra.dump_cli.write_dataset",
         lambda dataset, output_path, *, engine: written.append((tuple(dataset["wavenumber"].values), output_path, engine)),
     )
 
@@ -523,7 +523,7 @@ def test_cli_xsection_composition_writes_one_file_with_component_fields(monkeypa
         lambda tasks, *, worker: [worker(task) for task in tasks],
     )
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
+        "pyharp.spectra.dump_cli.write_dataset",
         lambda dataset, output_path, *, engine: written.append((sorted(dataset.data_vars), dataset["sigma_total"].dims, tuple(dataset["del_temperature"].values), tuple(dataset["pressure"].values), tuple(dataset["temperature"].values), output_path, engine)),
     )
 
@@ -571,7 +571,7 @@ def test_cli_xsection_uses_output_dir_for_generated_path(monkeypatch, tmp_path, 
         ),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
+        "pyharp.spectra.dump_cli.write_dataset",
         lambda dataset, output_path, *, engine: written.append(output_path),
     )
 
@@ -665,7 +665,7 @@ def test_cli_xsection_temperature_list_writes_temperature_stacked_dataset(monkey
     )
     written = []
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
+        "pyharp.spectra.dump_cli.write_dataset",
         lambda dataset, output_path, *, engine: written.append((dataset["sigma_total"].dims, tuple(dataset["del_temperature"].values), tuple(dataset["pressure"].values), tuple(dataset["temperature"].values), output_path, engine)),
     )
 
@@ -717,7 +717,7 @@ def test_cli_xsection_temperature_list_and_ranges_flattens_all_tasks(monkeypatch
         ]
 
     monkeypatch.setattr("pyharp.spectra.dump_cli._parallel_band_results", fake_parallel)
-    monkeypatch.setattr("pyharp.spectra.dump_cli.write_dataset_via_tmp", lambda dataset, output_path, *, engine: None)
+    monkeypatch.setattr("pyharp.spectra.dump_cli.write_dataset", lambda dataset, output_path, *, engine: None)
 
     main()
 
@@ -767,15 +767,53 @@ def test_combine_band_datasets_preserves_band_metadata() -> None:
         combined.close()
 
 
-def test_write_dataset_via_tmp_creates_missing_output_parent(tmp_path) -> None:
+def test_write_dataset_creates_missing_output_parent(tmp_path) -> None:
     dataset = xr.Dataset(coords={"wavenumber": ("wavenumber", np.array([1.0, 2.0]))}, data_vars={"sigma_total": ("wavenumber", np.array([3.0, 4.0]))})
     output_path = tmp_path / "nested" / "pair.nc"
 
     try:
-        write_dataset_via_tmp(dataset, output_path, engine="scipy")
+        write_dataset(dataset, output_path, engine="scipy")
         assert output_path.exists()
     finally:
         dataset.close()
+
+
+def test_write_dataset_disables_hdf5_file_locking(monkeypatch, tmp_path) -> None:
+    dataset = xr.Dataset(coords={"wavenumber": ("wavenumber", np.array([1.0, 2.0]))}, data_vars={"sigma_total": ("wavenumber", np.array([3.0, 4.0]))})
+    output_path = tmp_path / "nested" / "pair.nc"
+    captured = {}
+
+    def fake_to_netcdf(self, path, *, engine):
+        captured["path"] = path
+        captured["engine"] = engine
+        captured["locking"] = __import__("os").environ.get("HDF5_USE_FILE_LOCKING")
+
+    monkeypatch.setattr(xr.Dataset, "to_netcdf", fake_to_netcdf)
+
+    try:
+        write_dataset(dataset, output_path, engine="scipy")
+        assert captured == {"path": output_path, "engine": "scipy", "locking": "FALSE"}
+    finally:
+        dataset.close()
+
+
+def test_parallel_band_results_falls_back_to_subprocess_workers_when_process_pool_locks_are_unavailable(monkeypatch) -> None:
+    tasks = [("species", "first"), ("pair", "second")]
+
+    class FailingExecutor:
+        def __init__(self, *args, **kwargs):
+            raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("pyharp.spectra.dump_cli.process_pool_context", lambda: "ctx-token")
+    monkeypatch.setattr("pyharp.spectra.dump_cli.ProcessPoolExecutor", FailingExecutor)
+    monkeypatch.setattr(
+        "pyharp.spectra.dump_cli._parallel_band_results_via_subprocess",
+        lambda task_items, *, worker, max_workers: [("subprocess-result", None)],
+    )
+
+    results = _parallel_band_results(tasks, worker=_compute_xsection_band)
+
+    assert results == [("subprocess-result", None)]
 
 
 def test_xsection_dataset_keeps_only_sigma_fields() -> None:
@@ -988,7 +1026,7 @@ def test_cli_xsection_composition_multi_range_uses_composition_worker(monkeypatc
         lambda tasks, *, worker: [worker(task) for task in tasks],
     )
     monkeypatch.setattr(
-        "pyharp.spectra.dump_cli.write_dataset_via_tmp",
+        "pyharp.spectra.dump_cli.write_dataset",
         lambda dataset, output_path, *, engine: written.append((tuple(dataset["wavenumber"].values), output_path, engine)),
     )
 

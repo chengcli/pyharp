@@ -19,7 +19,7 @@ class SpectralBandConfig:
     resolution_cm1: float = 1.0
 
     def grid(self) -> np.ndarray:
-        """Return the lower-inclusive, upper-exclusive wavenumber grid."""
+        """Return the wavenumber grid with both endpoints included."""
         if self.resolution_cm1 <= 0:
             raise ValueError("resolution_cm1 must be positive")
         span_cm1 = self.wavenumber_max_cm1 - self.wavenumber_min_cm1
@@ -34,9 +34,9 @@ class SpectralBandConfig:
         ):
             raise ValueError(
                 "wavenumber range must be an integer multiple of resolution_cm1 "
-                "to produce a lower-inclusive, upper-exclusive grid"
+                "to produce an endpoint-inclusive grid"
             )
-        return self.wavenumber_min_cm1 + np.arange(count, dtype=np.float64) * self.resolution_cm1
+        return self.wavenumber_min_cm1 + np.arange(count + 1, dtype=np.float64) * self.resolution_cm1
 
 
 @dataclass(frozen=True)
