@@ -45,6 +45,7 @@ bands:
     range: [20.0, 2500.0]
     opacities: [h2o_line, nh3_line, ch4_line, h2_h2_cia, h2_he_cia]
     solver: toon
+    flags: planck
     nwave: 2481
     nstr: 4
 

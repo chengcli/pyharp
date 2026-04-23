@@ -24,6 +24,9 @@ TEST(ToonConfig, from_yaml_reads_toon_options) {
 
   ASSERT_EQ(op->solver_name(), "toon");
   ASSERT_NE(op->toon(), nullptr);
+  EXPECT_EQ(op->toon()->flags(),
+            "planck,zenith_correction,hard_surface,delta_eddington_lw");
+  EXPECT_TRUE(op->toon()->planck());
   EXPECT_TRUE(op->toon()->zenith_correction());
   EXPECT_EQ(op->toon()->top_emission_flag(), -1);
   EXPECT_TRUE(op->toon()->hard_surface());
@@ -39,6 +42,7 @@ TEST(ToonConfig, radiation_band_registers_solver_module) {
   op->name("B_toon");
   op->solver_name("toon");
   op->toon(harp::ToonMcKay89OptionsImpl::create());
+  op->toon()->flags("planck");
   op->nwave(2);
   op->ncol(1);
   op->nlyr(3);
@@ -50,6 +54,34 @@ TEST(ToonConfig, radiation_band_registers_solver_module) {
   harp::RadiationBand band(op);
 
   EXPECT_NO_THROW({ (void)band->named_modules()["solver"]; });
+}
+
+TEST(ToonConfig, planck_flag_controls_thermal_emission) {
+  auto wave_lower = std::vector<double>{200.0, 500.0};
+  auto wave_upper = std::vector<double>{500.0, 1000.0};
+
+  auto sw_op = harp::ToonMcKay89OptionsImpl::create();
+  sw_op->wave_lower(wave_lower);
+  sw_op->wave_upper(wave_upper);
+  harp::ToonMcKay89 sw_toon(sw_op);
+
+  auto lw_op = harp::ToonMcKay89OptionsImpl::create();
+  lw_op->wave_lower(wave_lower);
+  lw_op->wave_upper(wave_upper);
+  lw_op->flags("planck");
+  harp::ToonMcKay89 lw_toon(lw_op);
+
+  auto prop = torch::zeros({2, 1, 3, 3}, torch::kFloat64);
+  prop.select(-1, 0).fill_(0.2);
+  auto temf = torch::ones({1, 4}, torch::kFloat64) * 300.0;
+  std::map<std::string, torch::Tensor> sw_bc;
+  std::map<std::string, torch::Tensor> lw_bc;
+
+  auto sw_result = sw_toon(prop, &sw_bc, /*band=*/"", temf);
+  auto lw_result = lw_toon(prop, &lw_bc, /*band=*/"", temf);
+
+  EXPECT_TRUE(torch::allclose(sw_result, torch::zeros_like(sw_result)));
+  EXPECT_GT(torch::max(torch::abs(lw_result)).item<double>(), 0.0);
 }
 
 TEST_P(DeviceTest, simple_toon_mckay89) {
@@ -93,6 +125,7 @@ TEST_P(DeviceTest, simple_toon_mckay89) {
   }
 
   auto temf = torch::ones({ncol, nlyr + 1}, prop.options()) * tem_K;
+  op->flags("planck");
 
   for (auto [w0, g] : {std::make_pair(0.1, 0.5), std::make_pair(0.5, 0.5),
                        std::make_pair(0.9, 0.5)}) {

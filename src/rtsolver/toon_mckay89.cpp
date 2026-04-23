@@ -84,7 +84,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
   // would have strides that don't match the pointer arithmetic in the impl.
   prop = prop.contiguous();
 
-  if (!temf.has_value()) {  // shortwave
+  if (!options->planck()) {  // shortwave
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)
@@ -106,6 +106,8 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
         options->delta_eddington_lw());
     return flx;
   } else {  // longwave
+    TORCH_CHECK(temf.has_value(),
+                "ToonMcKay89::forward: 'planck' flag requires temf");
     /*Eigen::VectorXd temp(nlay + 1);
     Eigen::VectorXd be(nlay + 1);
     for (int i = 0; i < nlay + 1; ++i) {
