@@ -628,6 +628,33 @@ def test_stack_state_grid_datasets_adds_del_temperature_and_pressure_dimensions(
         fourth.close()
 
 
+def test_xsection_dataset_renames_wavenumber_dimension_without_leaving_legacy_dim() -> None:
+    spectrum = AbsorptionSpectrum(
+        species_name="H2O",
+        wavenumber_cm1=np.array([20.0, 21.0]),
+        sigma_line_cm2_molecule=np.array([1.0, 2.0]),
+        sigma_cia_cm2_molecule=np.array([0.1, 0.2]),
+        sigma_total_cm2_molecule=np.array([1.1, 2.2]),
+        kappa_line_cm1=np.array([3.0, 4.0]),
+        kappa_cia_cm1=np.array([0.3, 0.4]),
+        kappa_total_cm1=np.array([3.3, 4.4]),
+        attenuation_line_m1=np.array([5.0, 6.0]),
+        attenuation_cia_m1=np.array([0.5, 0.6]),
+        attenuation_total_m1=np.array([5.5, 6.6]),
+        temperature_k=300.0,
+        pressure_pa=1.0e5,
+        number_density_cm3=2.4e19,
+    )
+
+    dataset = _xsection_dataset(spectrum, species_name="H2O", wn_range=(20.0, 22.0))
+    try:
+        assert tuple(dataset.dims) == ("wavenumber",)
+        assert "wavenumber_cm1" not in dataset.dims
+        assert "wavenumber_cm1" not in dataset.coords
+    finally:
+        dataset.close()
+
+
 def test_cli_xsection_temperature_list_writes_temperature_stacked_dataset(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setattr(
         sys,

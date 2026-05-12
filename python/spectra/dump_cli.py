@@ -292,8 +292,7 @@ def _xsection_dataset(
             keep_cia_generic = False
     if keep_cia_generic:
         rename_map["sigma_cia_cm2_molecule"] = "sigma_cia"
-    dataset = dataset.rename_vars(rename_map)
-    dataset = dataset.swap_dims({"wavenumber_cm1": "wavenumber"})
+    dataset = dataset.rename(rename_map)
     add_wavenumber_attrs(dataset)
     dataset[f"sigma_line_{species_token}"].attrs = {"long_name": f"{species_name or spectrum.species_name} line absorption cross section", "units": "cm^2 molecule^-1"}
     dataset["sigma_total"].attrs = {"long_name": "total absorption cross section", "units": "cm^2 molecule^-1"}
