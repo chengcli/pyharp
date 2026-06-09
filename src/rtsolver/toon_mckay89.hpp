@@ -113,6 +113,11 @@ class ToonMcKay89Impl : public torch::nn::Cloneable<ToonMcKay89Impl> {
                         std::map<std::string, torch::Tensor>* bc,
                         std::string bname = "",
                         torch::optional<torch::Tensor> temf = torch::nullopt);
+
+ protected:
+  FORWARD_HAS_DEFAULT_ARGS(
+      {2, torch::nn::AnyValue(std::string(""))},
+      {3, torch::nn::AnyValue(torch::optional<torch::Tensor>(torch::nullopt))})
 };
 TORCH_MODULE(ToonMcKay89);
 
