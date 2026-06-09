@@ -333,7 +333,7 @@ torch::Tensor RadiationBandImpl::forward(
   bool use_planck =
       options->solver_name() != "toon" || options->toon()->planck();
   if (use_planck && kwargs->find("tempf") != kwargs->end()) {
-    int nlyr = prop.size(-1);
+    int nlyr = prop.size(-2);
     int nlev = kwargs->at("tempf").size(-1);
     TORCH_CHECK(nlev == nlyr + 1, "'tempf' size must be nlyr + 1 = ", nlyr + 1,
                 ", got ", nlev);
