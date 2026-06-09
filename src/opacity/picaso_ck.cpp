@@ -18,10 +18,10 @@ void PicasoCKImpl::reset() {
 #ifdef NETCDFOUTPUT
   int fileid = open_file(options->opacity_files()[0]);
 
-  auto qwave = read_tensor_permuted(fileid, "quadrature_wavenumber",
-                                    {"band", "gpoint"});
-  auto qweight = read_tensor_permuted(fileid, "quadrature_weight",
-                                      {"band", "gpoint"});
+  auto qwave =
+      read_tensor_permuted(fileid, "quadrature_wavenumber", {"band", "gpoint"});
+  auto qweight =
+      read_tensor_permuted(fileid, "quadrature_weight", {"band", "gpoint"});
   auto lower = read_1d_variable(fileid, "wavenumber_lower");
   auto upper = read_1d_variable(fileid, "wavenumber_upper");
   auto ng = qwave.size(1);
@@ -70,8 +70,8 @@ torch::Tensor PicasoCKImpl::forward(
       interpn({lnp}, {ln_pressure}, ln_temperature_base).squeeze(-1).exp();
   auto tempa = temp - temperature_base;
   int const nwave = wave_query.size(0);
-  auto wave =
-      wave_query.unsqueeze(-1).unsqueeze(-1).expand({nwave, conc.size(0), conc.size(1)});
+  auto wave = wave_query.unsqueeze(-1).unsqueeze(-1).expand(
+      {nwave, conc.size(0), conc.size(1)});
   lnp = lnp.unsqueeze(0).expand_as(wave);
   tempa = tempa.unsqueeze(0).expand_as(wave);
   auto sigma =

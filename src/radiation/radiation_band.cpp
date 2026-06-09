@@ -330,7 +330,8 @@ torch::Tensor RadiationBandImpl::forward(
   }
 
   // run rt solver
-  bool use_planck = options->solver_name() != "toon" || options->toon()->planck();
+  bool use_planck =
+      options->solver_name() != "toon" || options->toon()->planck();
   if (use_planck && kwargs->find("tempf") != kwargs->end()) {
     int nlyr = prop.size(-1);
     int nlev = kwargs->at("tempf").size(-1);
