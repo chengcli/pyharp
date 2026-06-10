@@ -58,13 +58,23 @@ void PicasoCKImpl::reset() {
 
 torch::Tensor PicasoCKImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
+  int ncol = conc.size(0);
+  int nlyr = conc.size(1);
+
   TORCH_CHECK(kwargs.count("pres") > 0, "pres is required in kwargs");
   TORCH_CHECK(kwargs.count("temp") > 0, "temp is required in kwargs");
   auto const& pres = kwargs.at("pres");
   auto const& temp = kwargs.at("temp");
+
+  TORCH_CHECK(pres.size(0) == ncol && pres.size(1) == nlyr,
+              "Invalid pres shape: ", pres.sizes(), "; needs to be (ncol, nlyr)");
+  TORCH_CHECK(temp.size(0) == ncol && temp.size(1) == nlyr,
+              "Invalid temp shape: ", temp.sizes(), "; needs to be (ncol, nlyr)");
+
   auto wave_query =
       kwargs.count("wavenumber") > 0 ? kwargs.at("wavenumber") : wavenumber;
-
+  TORCH_CHECK(wave_query.dim() == 1,
+              "PicasoCK expects a 1D wavenumber grid");
   auto lnp = pres.log();
   auto temperature_base =
       interpn({lnp}, {ln_pressure}, ln_temperature_base).squeeze(-1).exp();
