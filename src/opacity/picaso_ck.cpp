@@ -67,14 +67,15 @@ torch::Tensor PicasoCKImpl::forward(
   auto const& temp = kwargs.at("temp");
 
   TORCH_CHECK(pres.size(0) == ncol && pres.size(1) == nlyr,
-              "Invalid pres shape: ", pres.sizes(), "; needs to be (ncol, nlyr)");
+              "Invalid pres shape: ", pres.sizes(),
+              "; needs to be (ncol, nlyr)");
   TORCH_CHECK(temp.size(0) == ncol && temp.size(1) == nlyr,
-              "Invalid temp shape: ", temp.sizes(), "; needs to be (ncol, nlyr)");
+              "Invalid temp shape: ", temp.sizes(),
+              "; needs to be (ncol, nlyr)");
 
   auto wave_query =
       kwargs.count("wavenumber") > 0 ? kwargs.at("wavenumber") : wavenumber;
-  TORCH_CHECK(wave_query.dim() == 1,
-              "PicasoCK expects a 1D wavenumber grid");
+  TORCH_CHECK(wave_query.dim() == 1, "PicasoCK expects a 1D wavenumber grid");
   auto lnp = pres.log();
   auto temperature_base =
       interpn({lnp}, {ln_pressure}, ln_temperature_base).squeeze(-1).exp();
