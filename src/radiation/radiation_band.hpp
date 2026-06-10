@@ -35,6 +35,7 @@ using OpacityDict = std::map<std::string, OpacityOptions>;
  *  - "molecule-cia": CIA opacity from NetCDF binary absorption coefficient
  * dumps
  *  - "multiband-ck": multi-band correlated-k opacity table
+ *  - "picaso-ck": PICASO correlated-k NetCDF table
  *  - "wavetemp": opacity table defined on wavenumber and temperature grid (CIA)
  *  - "fourcolumn": Four-column opacity table (aerosol)
  *  - "helios": Helios opacity table

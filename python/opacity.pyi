@@ -59,7 +59,9 @@ class OpacityOptions:
         """
         Set the type of the opacity source format.
 
-        Valid options are: ``jit``, ``molecule-line``, ``molecule-cia``, ``fourcolumn``, ``wavetemp``, ``multiband-ck``, ``helios``.
+        Valid options are: ``jit``, ``molecule-line``, ``molecule-cia``,
+        ``fourcolumn``, ``wavetemp``, ``multiband-ck``, ``picaso-ck``,
+        ``helios``.
 
         Args:
             value (str): type of the opacity source

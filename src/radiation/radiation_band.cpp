@@ -12,6 +12,7 @@
 #include <harp/opacity/molecule_line.hpp>
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
+#include <harp/opacity/picaso_ck.hpp>
 #include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/parse_yaml_input.hpp>
@@ -183,6 +184,10 @@ void RadiationBandImpl::reset() {
       auto a = MultiBand(op);
       nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
+    } else if (op->type() == "picaso-ck") {
+      auto a = PicasoCK(op);
+      nmax_prop = std::max(nmax_prop, 1);
+      opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "wavetemp") {
       auto a = WaveTemp(op);
       nmax_prop = std::max(nmax_prop, 1);
@@ -200,6 +205,7 @@ void RadiationBandImpl::reset() {
     }
     register_module(name, opacities[name].ptr());
   }
+  if (options->solver_name() == "toon") nmax_prop = std::max(nmax_prop, 3);
 
   // create rtsolver
   auto [uphi, umu] = get_direction_grids<double>(ray_out);
@@ -324,8 +330,10 @@ torch::Tensor RadiationBandImpl::forward(
   }
 
   // run rt solver
-  if (kwargs->find("tempf") != kwargs->end()) {
-    int nlyr = prop.size(-1);
+  bool use_planck =
+      options->solver_name() != "toon" || options->toon()->planck();
+  if (use_planck && kwargs->find("tempf") != kwargs->end()) {
+    int nlyr = prop.size(-2);
     int nlev = kwargs->at("tempf").size(-1);
     TORCH_CHECK(nlev == nlyr + 1, "'tempf' size must be nlyr + 1 = ", nlyr + 1,
                 ", got ", nlev);
@@ -340,7 +348,7 @@ torch::Tensor RadiationBandImpl::forward(
       std::cout << "  Done running rt solver with level temperatures."
                 << std::endl;
     }
-  } else if (kwargs->find("temp") != kwargs->end()) {
+  } else if (use_planck && kwargs->find("temp") != kwargs->end()) {
     Layer2LevelOptions l2l;
     l2l.order(options->l2l_order());
     l2l.lower(kExtrapolate).upper(kExtrapolate).check_positivity(true);
