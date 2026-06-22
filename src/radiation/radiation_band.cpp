@@ -258,7 +258,7 @@ torch::Tensor RadiationBandImpl::forward(
 
   // add wavelength or wavenumber to kwargs, overwrite existing values
   int nwave = 0;
-  if (options->weight().size() > 0) {
+  if (options->wavenumber().size() > 0) {
     (*kwargs)["wavenumber"] =
         torch::tensor(options->wavenumber(), conc.options());
     (*kwargs)["wavelength"] = 1.e4 / (*kwargs)["wavenumber"];
