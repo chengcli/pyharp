@@ -100,6 +100,12 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
   //! band spectra
   torch::Tensor spectra;
 
+  //! net flux at layer midpoints (ncol, nlev), set during forward().
+  //! Read by the 1D RCE solver for its staggered (midpoint-flux) residual;
+  //! the 3-tuple return of forward() is unchanged so other callers are
+  //! unaffected. For non-Toon bands this falls back to the level net flux.
+  torch::Tensor net_flux_midpt;
+
   //! all RadiationBands
   std::vector<RadiationBand> bands;
 

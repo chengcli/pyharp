@@ -14,8 +14,13 @@
 #define DTAU_IN(i) prop[(nlay - (i) - 1) * len1]
 #define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
 #define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
-#define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
-#define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
+// 4 channels per level: [0]=level up, [1]=level down,
+// [2]=layer-midpoint up, [3]=layer-midpoint down. Shortwave is smooth and (in
+// the RCE solve) frozen, so it is not the source of the period-2 null mode;
+// the midpoint channels are set equal to the level channels (good to O(dtau))
+// at the end of this routine. Level channels [0,1] are unchanged.
+#define FLX_UP(i) flx[4 * (nlev - (i) - 1)]
+#define FLX_DN(i) flx[4 * (nlev - (i) - 1) + 1]
 #define MU_IN(i) mu_in[nlev - (i) - 1]
 
 namespace harp {
@@ -224,6 +229,15 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
     for (int k = 0; k < nlev; k++) {
       printf("Level %d: FLX_UP = %e, FLX_DN = %e\n", k, FLX_UP(k), FLX_DN(k));
     }*/
+  }
+
+  // Midpoint channels: shortwave is smooth (direct beam + slowly-varying
+  // diffuse), so set the layer-midpoint flux equal to the level flux at each
+  // slot (O(dtau) accurate). This keeps the combined LW+SW midpoint residual
+  // well defined without porting the shortwave source-function midpoint.
+  for (int j = 0; j < nlev; j++) {
+    flx[4 * j + 2] = flx[4 * j];
+    flx[4 * j + 3] = flx[4 * j + 1];
   }
 }
 

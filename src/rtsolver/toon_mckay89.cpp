@@ -77,7 +77,12 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
     (*bc)["albedo"] = torch::zeros({nwave, ncol}, prop.options());
   }
 
-  auto flx = torch::zeros({nwave, ncol, nlyr + 1, 2}, prop.options());
+  // 4 channels: [0]=level up, [1]=level down, [2]=layer-midpoint up,
+  // [3]=layer-midpoint down. The midpoint channels carry the flux at the
+  // half-layer optical depth (PICASO flux_*_mdpt), used by the 1D RCE solver
+  // for a STAGGERED residual that avoids the period-2 (collocated
+  // interface-flux) null mode. Level channels [0,1] are unchanged.
+  auto flx = torch::zeros({nwave, ncol, nlyr + 1, 4}, prop.options());
 
   // Ensure prop is contiguous so raw pointer access in impl is correct.
   // Non-contiguous slices (e.g. prop[:,:,:,:3] from a larger tensor)
@@ -88,7 +93,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)
-                    .declare_static_shape({nwave, ncol, nlyr + 1, 2},
+                    .declare_static_shape({nwave, ncol, nlyr + 1, 4},
                                           /*squash_dims=*/{2, 3})
                     .add_output(flx)
                     .add_input(prop)
@@ -126,7 +131,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)
-                    .declare_static_shape({nwave, ncol, nlyr + 1, 2},
+                    .declare_static_shape({nwave, ncol, nlyr + 1, 4},
                                           /*squash_dims=*/{2, 3})
                     .add_output(flx)
                     .add_input(prop)

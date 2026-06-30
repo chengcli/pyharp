@@ -17,8 +17,15 @@
 #define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
 #define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
 #define BE_IN(i) be[nlev - (i) - 1]
-#define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
-#define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
+// 4 channels per level: [0]=level up, [1]=level down,
+// [2]=layer-midpoint up, [3]=layer-midpoint down.
+#define FLX_UP(i) flx[4 * (nlev - (i) - 1)]
+#define FLX_DN(i) flx[4 * (nlev - (i) - 1) + 1]
+// Midpoint flux of internal LAYER k (between internal levels k and k+1) is
+// stored in channels [2,3] of the layer's upper-level slot (internal level k).
+// The deepest external slot (internal level nlay) holds no layer midpoint -> 0.
+#define FLX_UP_MID(k) flx[4 * (nlev - (k) - 1) + 2]
+#define FLX_DN_MID(k) flx[4 * (nlev - (k) - 1) + 3]
 
 namespace harp {
 
@@ -236,6 +243,10 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     FLX_UP(k) = 0.0;
     FLX_DN(k) = 0.0;
   }
+  for (int k = 0; k < nlay; k++) {
+    FLX_UP_MID(k) = 0.0;
+    FLX_DN_MID(k) = 0.0;
+  }
 
   // --- Gaussian Quadrature Mu Loop ---
   for (int m = 0; m < nmu; m++) {
@@ -260,6 +271,20 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
                          (xk[k] / l_u_m1) * (em2 - em1[k]) +
                          sigma1[k] * (1.0 - em2) +
                          sigma2[k] * (u * em2 + dtau[k] - u);
+
+      // downward flux at the MIDPOINT of layer k (half-layer optical depth),
+      // same source-function form as the level update but to tau_k + dtau/2.
+      // (PICASO get_thermal_1d flux_minus_mdpt; vars: xj=J, xk=K.)
+      T em2_mid = exp(-0.5 * dtau[k] / u);
+      T exptrm_h = fmin(0.5 * lam[k] * dtau[k], 35.0);
+      T Ep_mid = exp(exptrm_h);    // exptrm_positive_mdpt
+      T em1_mid = 1.0 / Ep_mid;    // exptrm_minus_mdpt
+      T mid_dn = lw_down_g[k] * em2_mid +
+                 (xj[k] / l_u_p1) * (Ep_mid - em2_mid) +
+                 (xk[k] / l_u_m1) * (em2_mid - em1_mid) +
+                 sigma1[k] * (1.0 - em2_mid) +
+                 sigma2[k] * (u * em2_mid + 0.5 * dtau[k] - u);
+      FLX_DN_MID(k) += mid_dn * wuarr[m];
     }
 
     // Upward loop
@@ -281,6 +306,20 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
                    (g[k] / l_u_m1) * (Ep[k] * em2 - 1.0) +
                    (h[k] / l_u_p1) * (1.0 - em3) + alpha1[k] * (1.0 - em2) +
                    alpha2[k] * (u - (dtau[k] + u) * em2);
+
+      // upward flux at the MIDPOINT of layer k (half-layer optical depth),
+      // propagated up from the lower-interface level flux lw_up_g[k+1].
+      // (PICASO get_thermal_1d flux_plus_mdpt; vars: g=G, h=H.)
+      T em2_mid = exp(-0.5 * dtau[k] / u);
+      T exptrm_h = fmin(0.5 * lam[k] * dtau[k], 35.0);
+      T Ep_mid = exp(exptrm_h);    // exptrm_positive_mdpt
+      T em1_mid = 1.0 / Ep_mid;    // exptrm_minus_mdpt
+      T mid_up = lw_up_g[k + 1] * em2_mid +
+                 (g[k] / l_u_m1) * (Ep[k] * em2_mid - Ep_mid) +
+                 (h[k] / l_u_p1) * (em1_mid - em1[k] * em2_mid) +
+                 alpha1[k] * (1.0 - em2_mid) +
+                 alpha2[k] * (u + 0.5 * dtau[k] - (dtau[k] + u) * em2_mid);
+      FLX_UP_MID(k) += mid_up * wuarr[m];
     }
 
     for (int k = 0; k < nlev; k++) {
@@ -298,3 +337,5 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
 #undef BE_IN
 #undef FLX_UP
 #undef FLX_DN
+#undef FLX_UP_MID
+#undef FLX_DN_MID

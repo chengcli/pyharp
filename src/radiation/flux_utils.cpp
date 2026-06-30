@@ -25,21 +25,30 @@ torch::Tensor sum_spectrum(torch::Tensor flux, torch::Tensor wave_or_weight,
 }
 
 torch::Tensor cal_net_flux(torch::Tensor flux) {
-  // Check last dimension
-  TORCH_CHECK(flux.size(-1) == 2, "flux must have last dimension of size 2");
+  // Last dimension is >=2: [0]=up, [1]=down (+ optional [2,3]=midpoint up/down).
+  TORCH_CHECK(flux.size(-1) >= 2, "flux must have last dimension of size >= 2");
   return flux.select(-1, disort::IUP) - flux.select(-1, disort::IDN);
 }
 
 torch::Tensor cal_surface_flux(torch::Tensor flux) {
   // Check last dimension
-  TORCH_CHECK(flux.size(-1) == 2, "flux must have last dimension of size 2");
+  TORCH_CHECK(flux.size(-1) >= 2, "flux must have last dimension of size >= 2");
   return flux.select(-1, disort::IDN).select(-1, 0);
 }
 
 torch::Tensor cal_toa_flux(torch::Tensor flux) {
   // Check last dimension
-  TORCH_CHECK(flux.size(-1) == 2, "flux must have last dimension of size 2");
+  TORCH_CHECK(flux.size(-1) >= 2, "flux must have last dimension of size >= 2");
   return flux.select(-1, disort::IUP).select(-1, -1);
+}
+
+torch::Tensor cal_net_flux_midpt(torch::Tensor flux) {
+  // Net flux at layer MIDPOINTS, from channels [2]=mid up, [3]=mid down.
+  // Used by the 1D RCE solver for a staggered (collocation-shift) residual
+  // that avoids the period-2 interface-flux null mode.
+  TORCH_CHECK(flux.size(-1) >= 4,
+              "midpoint net flux needs last dimension of size >= 4");
+  return flux.select(-1, 2) - flux.select(-1, 3);
 }
 
 torch::Tensor spherical_flux_scaling(torch::Tensor flx, torch::Tensor dz,

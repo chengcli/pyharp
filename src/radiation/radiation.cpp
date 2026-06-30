@@ -64,6 +64,10 @@ void RadiationImpl::reset() {
 
   // spectra holder
   spectra = register_buffer("spectra", torch::tensor({0}, torch::kFloat64));
+
+  // midpoint net flux holder (set during forward, read by the 1D RCE solver)
+  net_flux_midpt =
+      register_buffer("net_flux_midpt", torch::tensor({0}, torch::kFloat64));
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> RadiationImpl::forward(
@@ -87,6 +91,10 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> RadiationImpl::forward(
   spectra.set_(torch::stack(spectrum, 0));
 
   auto net_flux = cal_net_flux(total_flux);
+
+  // stash the layer-midpoint net flux (channels [2,3] of total_flux) for the
+  // 1D RCE solver's staggered residual. The returned 3-tuple is unchanged.
+  net_flux_midpt.set_(cal_net_flux_midpt(total_flux));
 
   // doing spherical scaling
   if (kwargs->find("area") != kwargs->end()) {
