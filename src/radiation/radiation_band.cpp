@@ -118,6 +118,8 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
       auto const toon = band["toon"];
       op->toon()->top_emission_flag(
           toon["top_emission_flag"].as<int>(op->toon()->top_emission_flag()));
+      op->toon()->btop_factor(
+          toon["btop_factor"].as<double>(op->toon()->btop_factor()));
       if (toon["flags"]) {
         op->toon()->flags(trim_copy(toon["flags"].as<std::string>()));
       }

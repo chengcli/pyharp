@@ -32,7 +32,7 @@ namespace harp {
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
                                           T a_surf_in, int top_emission_flag,
-                                          bool hard_surface,
+                                          T btop_factor, bool hard_surface,
                                           bool delta_eddington_lw, T* flx,
                                           int len1, char* work) {
   int nlev = nlay + 1;
@@ -158,7 +158,7 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   //   tau_top = dtau[0] * exp(-1), Btop = (1-exp(-tau_top/ubari)) * BE(0)
   T Btop;
   if (top_emission_flag < 0) {
-    T tautop = dtau[0] * exp(-1.0);
+    T tautop = dtau[0] * btop_factor;
     Btop = (1.0 - exp(-tautop / ubari)) * BE_IN(0);
   } else {
     Btop = top_emission_flag * BE_IN(0);
@@ -256,7 +256,7 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     // Top BC: for auto-compute mode, use angle-dependent tau_top
     T Btop_g;
     if (top_emission_flag < 0) {
-      T tautop = dtau[0] * exp(-1.0);
+      T tautop = dtau[0] * btop_factor;
       Btop_g = (1.0 - exp(-tautop / u)) * BE_IN(0);
     } else {
       Btop_g = top_emission_flag * BE_IN(0);

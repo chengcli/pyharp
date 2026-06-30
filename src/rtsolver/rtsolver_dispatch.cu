@@ -16,6 +16,7 @@ namespace harp {
 void call_toon89_sw_cuda(at::TensorIterator& iter,
                          bool zenith_correction,
                          int /*top_emission_flag*/,
+                         double /*btop_factor*/,
                          bool /*hard_surface*/,
                          bool /*delta_eddington_lw*/) {
   at::cuda::CUDAGuard device_guard(iter.device());
@@ -41,6 +42,7 @@ void call_toon89_sw_cuda(at::TensorIterator& iter,
 void call_toon89_lw_cuda(at::TensorIterator& iter,
                          bool /*zenith_correction*/,
                          int top_emission_flag,
+                         double btop_factor,
                          bool hard_surface,
                          bool delta_eddington_lw) {
   at::cuda::CUDAGuard device_guard(iter.device());
@@ -58,6 +60,7 @@ void call_toon89_lw_cuda(at::TensorIterator& iter,
           auto be = reinterpret_cast<scalar_t*>(data[2] + strides[2]);
           auto albedo = reinterpret_cast<scalar_t*>(data[3] + strides[3]);
           toon_mckay89_longwave(nlay, be, prop, *albedo, top_emission_flag,
+                                static_cast<scalar_t>(btop_factor),
                                 hard_surface, delta_eddington_lw, out, len1, work);
         });
   });

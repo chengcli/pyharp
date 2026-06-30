@@ -107,8 +107,8 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
     at::native::call_toon89_sw(
         flx.device().type(), iter, options->zenith_correction(),
-        options->top_emission_flag(), options->hard_surface(),
-        options->delta_eddington_lw());
+        options->top_emission_flag(), options->btop_factor(),
+        options->hard_surface(), options->delta_eddington_lw());
     return flx;
   } else {  // longwave
     TORCH_CHECK(temf.has_value(),
@@ -141,8 +141,8 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
     at::native::call_toon89_lw(
         flx.device().type(), iter, options->zenith_correction(),
-        options->top_emission_flag(), options->hard_surface(),
-        options->delta_eddington_lw());
+        options->top_emission_flag(), options->btop_factor(),
+        options->hard_surface(), options->delta_eddington_lw());
     return flx;
   }
 }
