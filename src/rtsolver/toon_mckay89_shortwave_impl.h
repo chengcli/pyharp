@@ -231,13 +231,34 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
     }*/
   }
 
-  // Midpoint channels: shortwave is smooth (direct beam + slowly-varying
-  // diffuse), so set the layer-midpoint flux equal to the level flux at each
-  // slot (O(dtau) accurate). This keeps the combined LW+SW midpoint residual
-  // well defined without porting the shortwave source-function midpoint.
+  // Midpoint channels [2]=mid up, [3]=mid down. Start from the level value: the
+  // diffuse up/down are smooth (O(dtau) accurate at the midpoint).
   for (int j = 0; j < nlev; j++) {
     flx[4 * j + 2] = flx[4 * j];
     flx[4 * j + 3] = flx[4 * j + 1];
+  }
+  // Direct-beam midpoint correction. The direct beam is the dominant SW term
+  // (~60 Fint in an irradiated skin) and attenuates EXPONENTIALLY across a layer,
+  // so its value at the layer-k midpoint is sqrt(dir[k]*dir[k+1]) (geometric mean
+  // = exact for an exponential; holds for constant or slant-path mu). Replacing
+  // the level beam with the midpoint beam in FLX_DN_MID(k) makes the SW
+  // layer-midpoint net flux match PICASO's flux_net_v_layer to leading order.
+  // Without it the combined LW+SW midpoint residual is INCONSISTENT (true LW
+  // midpoint + level-approx SW) and the RCE Newton drifts off irradiated
+  // (inversion) fixed points. UP is unaffected (the beam is downward only).
+  // all_zero_w case: FLX_DN itself IS the beam. FLX_DN_MID(k)=flx[4*(nlev-k-1)+3].
+  for (int k = 0; k < nlay; k++) {
+    T dir_k, dir_kp1;
+    if (all_zero_w) {
+      dir_k = flx[4 * (nlev - k - 1) + 1];   // FLX_DN(k)   = pure beam
+      dir_kp1 = flx[4 * (nlev - k - 2) + 1]; // FLX_DN(k+1)
+    } else {
+      dir_k = dir[k];
+      dir_kp1 = dir[k + 1];
+    }
+    T dir_mid = sqrt(fmax(dir_k * dir_kp1, (T)0.0));
+    flx[4 * (nlev - k - 1) + 3] =
+        flx[4 * (nlev - k - 1) + 1] - dir_k + dir_mid;
   }
 }
 
