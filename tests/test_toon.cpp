@@ -140,6 +140,58 @@ TEST_P(DeviceTest, simple_toon_mckay89) {
   }
 }
 
+// Regression: for a Lambertian surface the reflected upward flux must equal
+// albedo * (total downward flux at the surface), where the total includes both
+// the diffuse and the direct beam.  Output level index 0 is the surface.  This
+// guards the shortwave bottom boundary condition, including the zero-single-
+// scattering-albedo case, which must NOT take the direct-beam-only shortcut
+// when the surface albedo is nonzero.
+TEST_P(DeviceTest, shortwave_surface_albedo_reflection) {
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({200., 500., 1000.});
+  op->wave_upper({500., 1000., 2000.});
+
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  int nwave = op->wave_lower().size();
+  int nlyr = 20;
+  int ncol = 2;
+  int nprop = 3;
+
+  double total_tau = 1.0;
+  double fbeam = 100.0;
+  double umu0 = 0.5;
+  double albedo = 0.1;
+
+  auto prop = torch::zeros({nwave, ncol, nlyr, nprop},
+                           torch::device(device).dtype(dtype));
+  prop.select(-1, 0) = total_tau / nlyr;  // uniform dtau per layer
+
+  std::map<std::string, torch::Tensor> bc;
+  bc["fbeam"] = torch::ones({nwave, ncol}, prop.options()) * fbeam;
+  bc["umu0"] = torch::ones({ncol}, prop.options()) * umu0;
+  bc["albedo"] = torch::ones({nwave, ncol}, prop.options()) * albedo;
+
+  double tol = (dtype == torch::kFloat64) ? 1e-11 : 1e-3;
+
+  // ssa = 0 (pure absorption, exercises the shortcut guard), a tiny nonzero
+  // ssa, and a genuinely scattering case handled by the general solver.
+  for (auto [w0, g] : {std::make_pair(0.0, 0.0), std::make_pair(1.0e-10, 0.0),
+                       std::make_pair(0.5, 0.5)}) {
+    prop.select(-1, 1) = w0;  // single scattering albedo
+    prop.select(-1, 2) = g;   // asymmetry parameter
+
+    auto flx = toon(prop, &bc);
+    auto up_surf = flx.select(-1, 0).select(-1, 0);  // up flux at the surface
+    auto dn_surf = flx.select(-1, 1).select(-1, 0);  // down flux at the surface
+
+    auto resid = (up_surf - albedo * dn_surf).abs().max().item<double>();
+    EXPECT_LT(resid, tol) << "surface reflection failed for w0=" << w0
+                          << " g=" << g << " resid=" << resid;
+  }
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
