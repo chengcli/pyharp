@@ -277,13 +277,12 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       // (PICASO get_thermal_1d flux_minus_mdpt; vars: xj=J, xk=K.)
       T em2_mid = exp(-0.5 * dtau[k] / u);
       T exptrm_h = fmin(0.5 * lam[k] * dtau[k], 35.0);
-      T Ep_mid = exp(exptrm_h);    // exptrm_positive_mdpt
-      T em1_mid = 1.0 / Ep_mid;    // exptrm_minus_mdpt
-      T mid_dn = lw_down_g[k] * em2_mid +
-                 (xj[k] / l_u_p1) * (Ep_mid - em2_mid) +
-                 (xk[k] / l_u_m1) * (em2_mid - em1_mid) +
-                 sigma1[k] * (1.0 - em2_mid) +
-                 sigma2[k] * (u * em2_mid + 0.5 * dtau[k] - u);
+      T Ep_mid = exp(exptrm_h);  // exptrm_positive_mdpt
+      T em1_mid = 1.0 / Ep_mid;  // exptrm_minus_mdpt
+      T mid_dn =
+          lw_down_g[k] * em2_mid + (xj[k] / l_u_p1) * (Ep_mid - em2_mid) +
+          (xk[k] / l_u_m1) * (em2_mid - em1_mid) + sigma1[k] * (1.0 - em2_mid) +
+          sigma2[k] * (u * em2_mid + 0.5 * dtau[k] - u);
       FLX_DN_MID(k) += mid_dn * wuarr[m];
     }
 
@@ -312,8 +311,8 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       // (PICASO get_thermal_1d flux_plus_mdpt; vars: g=G, h=H.)
       T em2_mid = exp(-0.5 * dtau[k] / u);
       T exptrm_h = fmin(0.5 * lam[k] * dtau[k], 35.0);
-      T Ep_mid = exp(exptrm_h);    // exptrm_positive_mdpt
-      T em1_mid = 1.0 / Ep_mid;    // exptrm_minus_mdpt
+      T Ep_mid = exp(exptrm_h);  // exptrm_positive_mdpt
+      T em1_mid = 1.0 / Ep_mid;  // exptrm_minus_mdpt
       T mid_up = lw_up_g[k + 1] * em2_mid +
                  (g[k] / l_u_m1) * (Ep[k] * em2_mid - Ep_mid) +
                  (h[k] / l_u_p1) * (em1_mid - em1[k] * em2_mid) +

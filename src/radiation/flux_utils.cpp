@@ -25,7 +25,8 @@ torch::Tensor sum_spectrum(torch::Tensor flux, torch::Tensor wave_or_weight,
 }
 
 torch::Tensor cal_net_flux(torch::Tensor flux) {
-  // Last dimension is >=2: [0]=up, [1]=down (+ optional [2,3]=midpoint up/down).
+  // Last dimension is >=2: [0]=up, [1]=down (+ optional [2,3]=midpoint
+  // up/down).
   TORCH_CHECK(flux.size(-1) >= 2, "flux must have last dimension of size >= 2");
   return flux.select(-1, disort::IUP) - flux.select(-1, disort::IDN);
 }
