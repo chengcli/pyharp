@@ -58,6 +58,7 @@ struct ToonMcKay89OptionsImpl {
     os << "* planck = " << planck() << "\n";
     os << "* zenith_correction = " << zenith_correction() << "\n";
     os << "* top_emission_flag = " << top_emission_flag() << "\n";
+    os << "* btop_factor = " << btop_factor() << "\n";
     os << "* hard_surface = " << hard_surface() << "\n";
     os << "* delta_eddington_lw = " << delta_eddington_lw() << "\n";
 
@@ -82,9 +83,17 @@ struct ToonMcKay89OptionsImpl {
   //! top emission flag
   //!   0 = no incoming radiation at TOA (Toon 1989 default, GCM mode)
   //!   1 = full Planck at TOA (infinite isothermal slab above)
-  //!  -1 = auto-compute from first layer: tau_top = dtau[0]*exp(-1),
-  //!       Btop = (1-exp(-tau_top/mu)) * B(T_top)  (FMS-style)
+  //!  -1 = auto-compute from first layer: tau_top = dtau[0]*btop_factor,
+  //!       Btop = (1-exp(-tau_top/mu)) * B(T_top)
   ADD_ARG(int, top_emission_flag) = 0;
+
+  //! factor for the auto top-emission tau_top (top_emission_flag < 0):
+  //! tau_top = dtau[0] * btop_factor. Default exp(-1) (FMS-style). Set to
+  //! plevel[0]/(plevel[1]-plevel[0]) = 1/(r-1) for a log-P grid to reproduce
+  //! PICASO's get_thermal_1d "imaginary isothermal slab above" top BC, which
+  //! warms the optically-thin skin onto PICASO (the difference is purely this
+  //! TOA boundary convention, not the RT scheme).
+  ADD_ARG(double, btop_factor) = 0.36787944117144233;
 };
 
 using ToonMcKay89Options = std::shared_ptr<ToonMcKay89OptionsImpl>;

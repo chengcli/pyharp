@@ -14,8 +14,13 @@
 #define DTAU_IN(i) prop[(nlay - (i) - 1) * len1]
 #define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
 #define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
-#define FLX_UP(i) flx[2 * (nlev - (i) - 1)]
-#define FLX_DN(i) flx[2 * (nlev - (i) - 1) + 1]
+// 4 channels per level: [0]=level up, [1]=level down,
+// [2]=layer-midpoint up, [3]=layer-midpoint down. Shortwave is smooth and (in
+// the RCE solve) frozen, so it is not the source of the period-2 null mode;
+// the midpoint channels are set equal to the level channels (good to O(dtau))
+// at the end of this routine. Level channels [0,1] are unchanged.
+#define FLX_UP(i) flx[4 * (nlev - (i) - 1)]
+#define FLX_DN(i) flx[4 * (nlev - (i) - 1) + 1]
 #define MU_IN(i) mu_in[nlev - (i) - 1]
 
 namespace harp {
@@ -224,6 +229,36 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
     for (int k = 0; k < nlev; k++) {
       printf("Level %d: FLX_UP = %e, FLX_DN = %e\n", k, FLX_UP(k), FLX_DN(k));
     }*/
+  }
+
+  // Midpoint channels [2]=mid up, [3]=mid down. Start from the level value: the
+  // diffuse up/down are smooth (O(dtau) accurate at the midpoint).
+  for (int j = 0; j < nlev; j++) {
+    flx[4 * j + 2] = flx[4 * j];
+    flx[4 * j + 3] = flx[4 * j + 1];
+  }
+  // Direct-beam midpoint correction. The direct beam is the dominant SW term
+  // (~60 Fint in an irradiated skin) and attenuates EXPONENTIALLY across a
+  // layer, so its value at the layer-k midpoint is sqrt(dir[k]*dir[k+1])
+  // (geometric mean = exact for an exponential; holds for constant or
+  // slant-path mu). Replacing the level beam with the midpoint beam in
+  // FLX_DN_MID(k) makes the SW layer-midpoint net flux match PICASO's
+  // flux_net_v_layer to leading order. Without it the combined LW+SW midpoint
+  // residual is INCONSISTENT (true LW midpoint + level-approx SW) and the RCE
+  // Newton drifts off irradiated (inversion) fixed points. UP is unaffected
+  // (the beam is downward only). all_zero_w case: FLX_DN itself IS the beam.
+  // FLX_DN_MID(k)=flx[4*(nlev-k-1)+3].
+  for (int k = 0; k < nlay; k++) {
+    T dir_k, dir_kp1;
+    if (all_zero_w) {
+      dir_k = flx[4 * (nlev - k - 1) + 1];    // FLX_DN(k)   = pure beam
+      dir_kp1 = flx[4 * (nlev - k - 2) + 1];  // FLX_DN(k+1)
+    } else {
+      dir_k = dir[k];
+      dir_kp1 = dir[k + 1];
+    }
+    T dir_mid = sqrt(fmax(dir_k * dir_kp1, (T)0.0));
+    flx[4 * (nlev - k - 1) + 3] = flx[4 * (nlev - k - 1) + 1] - dir_k + dir_mid;
   }
 }
 

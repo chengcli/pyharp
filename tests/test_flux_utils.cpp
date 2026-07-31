@@ -59,7 +59,7 @@ TEST(FluxUtilsTest, CalNetFlux) {
 
 TEST(FluxUtilsTest, CalNetFluxInvalidInput) {
   // Create a 2D tensor with random values
-  torch::Tensor flux = torch::rand({5, 3});
+  torch::Tensor flux = torch::rand({5, 1});
 
   // Check for invalid input
   EXPECT_THROW(harp::cal_net_flux(flux), c10::Error);
@@ -80,7 +80,7 @@ TEST(FluxUtilsTest, CalSurfaceFlux) {
 
 TEST(FluxUtilsTest, CalSurfaceFluxInvalidInput) {
   // Create a 2D tensor with random values
-  torch::Tensor flux = torch::rand({5, 3});
+  torch::Tensor flux = torch::rand({5, 1});
 
   // Check for invalid input
   EXPECT_THROW(harp::cal_surface_flux(flux), c10::Error);
@@ -101,7 +101,7 @@ TEST(FluxUtilsTest, CalTOAFlux) {
 
 TEST(FluxUtilsTest, CalTOAFluxInvalidInput) {
   // Create a 2D tensor with random values
-  torch::Tensor flux = torch::rand({5, 3});
+  torch::Tensor flux = torch::rand({5, 1});
 
   // Check for invalid input
   EXPECT_THROW(harp::cal_toa_flux(flux), c10::Error);

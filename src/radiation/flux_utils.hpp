@@ -92,6 +92,19 @@ torch::Tensor cal_surface_flux(torch::Tensor flux);
  */
 torch::Tensor cal_toa_flux(torch::Tensor flux);
 
+//! \brief Calculate net flux at layer midpoints
+/*!
+ * Uses channels [2]=midpoint up and [3]=midpoint down of the flux tensor
+ * (last dimension must be >= 4). The Toon longwave solver fills these with the
+ * flux evaluated at half-layer optical depth (PICASO flux_*_mdpt). The 1D RCE
+ * solver drives this STAGGERED quantity (instead of the collocated interface
+ * net flux) to avoid the period-2 odd-even decoupling null mode.
+ *
+ * \param flux The flux tensor (..., nlev, >=4)
+ * \return The layer-midpoint net flux (..., nlev)
+ */
+torch::Tensor cal_net_flux_midpt(torch::Tensor flux);
+
 //! \brief Spherical correction by XIZ
 /*!
  * Formula 1:

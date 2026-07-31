@@ -7,8 +7,8 @@
 namespace at::native {
 
 using toon89_fn = void (*)(at::TensorIterator& iter, bool zenith_correction,
-                           int top_emission_flag, bool hard_surface,
-                           bool delta_eddington_lw);
+                           int top_emission_flag, double btop_factor,
+                           bool hard_surface, bool delta_eddington_lw);
 
 //! \brief Toon 1989 longwave solver
 /*!

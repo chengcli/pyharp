@@ -118,6 +118,8 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
       auto const toon = band["toon"];
       op->toon()->top_emission_flag(
           toon["top_emission_flag"].as<int>(op->toon()->top_emission_flag()));
+      op->toon()->btop_factor(
+          toon["btop_factor"].as<double>(op->toon()->btop_factor()));
       if (toon["flags"]) {
         op->toon()->flags(trim_copy(toon["flags"].as<std::string>()));
       }
@@ -384,6 +386,15 @@ torch::Tensor RadiationBandImpl::forward(
     result = sum_spectrum(
         spectrum, torch::tensor(options->wavenumber(), spectrum.options()),
         "wavenumber");
+  }
+  // Ensure a uniform 4-channel layout [up, down, mid_up, mid_down] across all
+  // bands so band fluxes can be summed regardless of solver. The Toon solver
+  // already emits 4 channels (level + layer-midpoint). Other solvers (disort,
+  // beer-lambert) emit 2 (level only); duplicate the level channels into the
+  // midpoint slots so their midpoint net flux falls back to the level net flux
+  // (harmless: only the 1D RCE reads the midpoint, and it uses Toon bands).
+  if (result.size(-1) < 4) {
+    result = torch::cat({result, result}, -1);
   }
   return result;
 }
