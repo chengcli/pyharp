@@ -96,6 +96,13 @@ _HITRAN_SPECIES_BY_NAME: dict[str, HitranSpecies] = {
         isotopologue_ids=(1, 2, 3, 4, 5, 6, 7),
         cia_filename=None,
     ),
+    # Add by JLiu, 2024-08-04
+    "CO": HitranSpecies(
+        name="CO",
+        molecule_id=5,
+        isotopologue_ids=(1, 2, 3, 4, 5, 6),
+        cia_filename=None,
+    ),
     "H2": HitranSpecies(
         name="H2",
         molecule_id=45,
