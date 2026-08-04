@@ -92,6 +92,55 @@ class HapiLineProvider:
         if cache_dir is not None:
             _call_hapi_quietly(self._hapi.db_begin, str(cache_dir))
 
+    @property
+    def _is_h2o(self) -> bool:
+        return self.table_name.lower().startswith("h2o_")
+
+    def _h2o_voigt_minus_pedestal(
+        self,
+        Nu,
+        GammaD,
+        Gamma0,
+        Delta0,
+        WnGrid,
+        YRosen=0.0,
+        Sw=1.0,
+    ):
+        """Return the local H2O Voigt line with its 25 cm-1 pedestal removed."""
+        profile = self._hapi.PROFILE_VOIGT(
+            Nu, GammaD, Gamma0, Delta0, WnGrid, YRosen=YRosen, Sw=Sw
+        )
+        shifted_center = Nu - Delta0
+        pedestal = self._hapi.PROFILE_VOIGT(
+            Nu,
+            GammaD,
+            Gamma0,
+            Delta0,
+            np.asarray([shifted_center + 25.0]),
+            YRosen=YRosen,
+            Sw=Sw,
+        )[0]
+        return np.maximum(profile - pedestal, 0.0)
+
+    def _voigt_kwargs(self) -> dict[str, object]:
+        if not self._is_h2o:
+            return {
+                "WavenumberWing": 25.0,
+                "WavenumberWingHW": 0.0,
+            }
+        return {
+            "WavenumberWing": 25.0,
+            "WavenumberWingHW": 0.0,
+            "profile": self._h2o_voigt_minus_pedestal,
+            "calcpars": self._hapi.calculateProfileParametersVoigt,
+        }
+
+    @property
+    def _voigt_function(self):
+        if self._is_h2o:
+            return self._hapi.absorptionCoefficient_Generic
+        return self._hapi.absorptionCoefficient_Voigt
+
     def broadening_summary(self) -> str:
         """Return a compact description of requested and effective broadening."""
         requested = _format_diluent(self.requested_diluent)
@@ -110,13 +159,14 @@ class HapiLineProvider:
         """Return line absorption coefficient on the requested grid."""
         pressure_atm = float(pressure_pa) / 101_325.0
         _, coef = _call_hapi_quietly(
-            self._hapi.absorptionCoefficient_Voigt,
+            self._voigt_function,
             SourceTables=self.table_name,
             OmegaGrid=np.asarray(wavenumber_grid_cm1, dtype=np.float64),
             Environment={"T": float(temperature_k), "p": pressure_atm},
             Diluent=self.diluent,
             IntensityThreshold=self.min_line_strength,
             HITRAN_units=False,
+            **self._voigt_kwargs(),
         )
         return np.asarray(coef, dtype=np.float64)
 
@@ -129,13 +179,14 @@ class HapiLineProvider:
         """Return line absorption cross section in cm^2/molecule."""
         pressure_atm = float(pressure_pa) / 101_325.0
         _, coef = _call_hapi_quietly(
-            self._hapi.absorptionCoefficient_Voigt,
+            self._voigt_function,
             SourceTables=self.table_name,
             OmegaGrid=np.asarray(wavenumber_grid_cm1, dtype=np.float64),
             Environment={"T": float(temperature_k), "p": pressure_atm},
             Diluent=self.diluent,
             IntensityThreshold=self.min_line_strength,
             HITRAN_units=True,
+            **self._voigt_kwargs(),
         )
         return np.asarray(coef, dtype=np.float64)
 
