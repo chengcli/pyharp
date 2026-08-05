@@ -126,7 +126,7 @@ class HapiLineProvider:
         if not self._is_h2o:
             return {
                 "WavenumberWing": 25.0,
-                "WavenumberWingHW": 0.0,
+                "WavenumberWingHW": 50.0,
             }
         return {
             "WavenumberWing": 25.0,
