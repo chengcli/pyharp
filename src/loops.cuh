@@ -3,6 +3,7 @@
 // torch
 #include <ATen/TensorIterator.h>
 #include <ATen/native/cuda/Loops.cuh>
+#include <c10/cuda/CUDAException.h>
 
 namespace harp {
 namespace native {
@@ -36,7 +37,7 @@ void gpu_kernel(at::TensorIterator& iter, const func_t& f) {
 }
 
 template <int Chunks, int Arity, typename func_t>
-void gpu_chunk_kernel(at::TensorIterator& iter, int work_size, const func_t& f) {
+void gpu_chunk_kernel(at::TensorIterator& iter, size_t work_size, const func_t& f) {
   TORCH_CHECK(iter.ninputs() + iter.noutputs() == Arity);
 
   std::array<char*, Arity> data;
@@ -52,16 +53,17 @@ void gpu_chunk_kernel(at::TensorIterator& iter, int work_size, const func_t& f) 
   char* d_workspace = nullptr;
 
   // workspace size per chunk
-  int chunks = Chunks > numel ? numel : Chunks;
-  int base = numel / chunks;
-  int rem  = numel % chunks;
+  int64_t chunks = Chunks > numel ? numel : Chunks;
+  int64_t base = numel / chunks;
+  int64_t rem  = numel % chunks;
 
-  size_t workspace_bytes = work_size * (base + (rem > 0 ? 1 : 0));
-  cudaMalloc(&d_workspace, workspace_bytes);
+  size_t workspace_bytes =
+      work_size * static_cast<size_t>(base + (rem > 0 ? 1 : 0));
+  C10_CUDA_CHECK(cudaMalloc(&d_workspace, workspace_bytes));
 
-  int chunk_start = 0;
+  int64_t chunk_start = 0;
 
-  for (int n = 0; n < chunks; n++) {
+  for (int64_t n = 0; n < chunks; n++) {
     int64_t chunk_numel = base + (n < rem ? 1 : 0);
     int64_t chunk_end = chunk_start + chunk_numel;  // exclusive
 
