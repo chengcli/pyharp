@@ -1,7 +1,10 @@
 name: Auto Tag on PR Merge
 
 on:
-  pull_request:
+  # Use pull_request_target so the bump-bot App credentials (secrets/vars) are
+  # available even when the PR comes from a fork. This job only reads PR
+  # metadata and tags the base branch; it never checks out or runs PR code.
+  pull_request_target:
     types: [closed]
     branches: [main]
 
