@@ -34,7 +34,7 @@ jobs:
   build-macos:
     name: Build macOS Wheels
     if: ${{ github.event.inputs.build_os == 'Both' || github.event.inputs.build_os == 'MacOS' }}
-    runs-on: macos-latest
+    runs-on: macos-15
     strategy:
       fail-fast: true
       matrix:
