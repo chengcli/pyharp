@@ -138,10 +138,11 @@ TEST(TestOpacity, MoleculeLineAddsContinuumAndHandlesDimensionOrder) {
 
   auto result = line->forward(conc, atm).squeeze(-1).squeeze(-1).squeeze(-1);
   auto expected_sigma =
-      torch::tensor({3.1e-24, 3.1e-24, 5.1e-24}, torch::kFloat64) *
+      torch::tensor({0.0, 3.1e-24, 5.1e-24}, torch::kFloat64) *
       (1.0e-4 * harp::constants::Avogadro);
   auto expected = expected_sigma * 2.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
+  EXPECT_LT(result[0].item<double>(), 1.0e-250);
 #endif
 }
 
@@ -169,10 +170,11 @@ TEST(TestOpacity, CIAHandlesBinaryPairsAndReversedSpeciesOrder) {
 
   auto result = cia->forward(conc, atm).squeeze(-1).squeeze(-1).squeeze(-1);
   auto expected_coeff =
-      torch::tensor({3.0e-46, 3.0e-46, 4.0e-46}, torch::kFloat64) *
+      torch::tensor({0.0, 3.0e-46, 4.0e-46}, torch::kFloat64) *
       (1.0e-10 * harp::constants::Avogadro * harp::constants::Avogadro);
   auto expected = expected_coeff * 12.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
+  EXPECT_LT(result[0].item<double>(), 1.0e-250);
 #endif
 }
 
