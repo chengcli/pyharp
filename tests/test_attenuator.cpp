@@ -138,10 +138,11 @@ TEST(TestOpacity, MoleculeLineAddsContinuumAndHandlesDimensionOrder) {
 
   auto result = line->forward(conc, atm).squeeze(-1).squeeze(-1).squeeze(-1);
   auto expected_sigma =
-      torch::tensor({3.1e-24, 3.1e-24, 5.1e-24}, torch::kFloat64) *
+      torch::tensor({0.0, 3.1e-24, 5.1e-24}, torch::kFloat64) *
       (1.0e-4 * harp::constants::Avogadro);
   auto expected = expected_sigma * 2.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
+  EXPECT_LT(result[0].item<double>(), 1.0e-250);
 #endif
 }
 
@@ -169,10 +170,57 @@ TEST(TestOpacity, CIAHandlesBinaryPairsAndReversedSpeciesOrder) {
 
   auto result = cia->forward(conc, atm).squeeze(-1).squeeze(-1).squeeze(-1);
   auto expected_coeff =
-      torch::tensor({3.0e-46, 3.0e-46, 4.0e-46}, torch::kFloat64) *
+      torch::tensor({0.0, 3.0e-46, 4.0e-46}, torch::kFloat64) *
       (1.0e-10 * harp::constants::Avogadro * harp::constants::Avogadro);
   auto expected = expected_coeff * 12.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
+  EXPECT_LT(result[0].item<double>(), 1.0e-250);
+#endif
+}
+
+TEST(TestOpacity, MoleculeOpacitiesClampTemperatureAnomalyToTableBounds) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  auto dataset = write_test_dataset();
+  harp::species_names = {"H2O", "H2", "He"};
+  harp::species_weights = {18.0e-3, 2.0e-3, 4.0e-3};
+
+  auto line_options = harp::OpacityOptionsImpl::create();
+  line_options->type("molecule-line")
+      .species_ids({0})
+      .opacity_files({dataset.string()});
+  harp::MoleculeLine line(line_options);
+
+  auto cia_options = harp::OpacityOptionsImpl::create();
+  cia_options->type("molecule-cia")
+      .species_ids({1, 2})
+      .opacity_files({dataset.string()});
+  harp::MoleculeCIA cia(cia_options);
+
+  auto conc = torch::ones({1, 1, 3}, torch::kFloat64);
+  std::map<std::string, torch::Tensor> atm;
+  atm["pres"] = torch::tensor({{1.0e5}}, torch::kFloat64);
+  atm["wavenumber"] = torch::tensor({20.0, 21.0, 22.0}, torch::kFloat64);
+
+  auto evaluate = [&](auto& opacity, double temperature) {
+    atm["temp"] = torch::tensor({{temperature}}, torch::kFloat64);
+    return opacity->forward(conc, atm);
+  };
+
+  auto line_lower_bound = evaluate(line, 290.0);
+  auto line_below_bound = evaluate(line, 270.0);
+  auto line_upper_bound = evaluate(line, 310.0);
+  auto line_above_bound = evaluate(line, 330.0);
+  EXPECT_TRUE(torch::allclose(line_below_bound, line_lower_bound));
+  EXPECT_TRUE(torch::allclose(line_above_bound, line_upper_bound));
+
+  auto cia_lower_bound = evaluate(cia, 290.0);
+  auto cia_below_bound = evaluate(cia, 270.0);
+  auto cia_upper_bound = evaluate(cia, 310.0);
+  auto cia_above_bound = evaluate(cia, 330.0);
+  EXPECT_TRUE(torch::allclose(cia_below_bound, cia_lower_bound));
+  EXPECT_TRUE(torch::allclose(cia_above_bound, cia_upper_bound));
 #endif
 }
 

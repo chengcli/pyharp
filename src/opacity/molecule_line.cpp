@@ -150,9 +150,11 @@ torch::Tensor MoleculeLineImpl::forward(
   lnp = lnp.unsqueeze(0).expand({nwave, ncol, nlyr});
   tempa = tempa.unsqueeze(0).expand({nwave, ncol, nlyr});
 
+  // Clamp queries to the tabulated bounds. Extrapolating logarithmic line
+  // cross sections can produce nonphysical opacity outside the table coverage.
   auto out = interpn({wave, lnp, tempa},
                      {wavenumber, ln_pressure, temperature_anomaly},
-                     ln_sigma_cross, true)
+                     ln_sigma_cross, false)
                  .exp();
 
   // Check species id in range

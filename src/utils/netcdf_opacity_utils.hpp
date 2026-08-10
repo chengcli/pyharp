@@ -225,10 +225,10 @@ inline torch::Tensor convert_temperature_to_k(torch::Tensor values,
 inline torch::Tensor apply_positive_fill(torch::Tensor values,
                                          std::string const& quantity_name) {
   auto const positive_mask = values > 0;
-  double fill_value = 1.0e-300;
-  if (positive_mask.any().item<bool>()) {
-    fill_value = values.masked_select(positive_mask).min().item<double>();
-  }
+  // Use a fixed negligible floor only to keep log-space interpolation finite.
+  // Filling zeros with the table's smallest positive value would create an
+  // artificial opacity floor outside the source's spectral coverage.
+  double const fill_value = 1.0e-300;
 
   TORCH_CHECK(std::isfinite(fill_value) && fill_value > 0.0,
               "Invalid positive fill value for ", quantity_name, ": ",

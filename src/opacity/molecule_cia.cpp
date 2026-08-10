@@ -139,9 +139,11 @@ torch::Tensor MoleculeCIAImpl::forward(
   auto lnp_grid = lnp.unsqueeze(0).expand({nwave, ncol, nlyr});
   auto temp_grid = del_temp.unsqueeze(0).expand({nwave, ncol, nlyr});
 
+  // Clamp queries to the tabulated bounds. Extrapolating logarithmic CIA
+  // coefficients can produce nonphysical opacity outside the table coverage.
   auto coeff = interpn({wave, lnp_grid, temp_grid},
                        {wavenumber, ln_pressure, temperature_anomaly},
-                       ln_sigma_binary, true)
+                       ln_sigma_binary, false)
                    .exp();
 
   auto species0 = conc.select(-1, options->species_ids().at(0));
