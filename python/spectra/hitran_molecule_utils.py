@@ -19,6 +19,9 @@ from .hitran_cia_utils import load_cia_dataset
 from .utils import build_band_from_range
 
 
+LINE_WING_CM1 = 25.0
+
+
 def _import_hapi():
     try:
         return importlib.import_module("hapi")
@@ -116,7 +119,7 @@ class HapiLineProvider:
             GammaD,
             Gamma0,
             Delta0,
-            np.asarray([shifted_center + 25.0]),
+            np.asarray([shifted_center + LINE_WING_CM1]),
             YRosen=YRosen,
             Sw=Sw,
         )[0]
@@ -125,11 +128,11 @@ class HapiLineProvider:
     def _voigt_kwargs(self) -> dict[str, object]:
         if not self._is_h2o:
             return {
-                "WavenumberWing": 25.0,
-                "WavenumberWingHW": 50.0,
+                "WavenumberWing": LINE_WING_CM1,
+                "WavenumberWingHW": 0.0,
             }
         return {
-            "WavenumberWing": 25.0,
+            "WavenumberWing": LINE_WING_CM1,
             "WavenumberWingHW": 0.0,
             "profile": self._h2o_voigt_minus_pedestal,
             "calcpars": self._hapi.calculateProfileParametersVoigt,
@@ -275,13 +278,24 @@ def _format_diluent(diluent: dict[str, float]) -> str:
     return ",".join(f"{name}:{value:.3f}" for name, value in sorted(diluent.items()))
 
 
+def _line_source_band(band: SpectralBandConfig) -> SpectralBandConfig:
+    """Return the line-center range needed to cover the output-band wings."""
+    return SpectralBandConfig(
+        name=f"{band.name}_line_source",
+        wavenumber_min_cm1=max(0.0, band.wavenumber_min_cm1 - LINE_WING_CM1),
+        wavenumber_max_cm1=band.wavenumber_max_cm1 + LINE_WING_CM1,
+        resolution_cm1=band.resolution_cm1,
+    )
+
+
 def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> LineDatabase:
-    """Fetch the configured species line table for one spectral band."""
+    """Fetch line centers over the output band plus the fixed line wings."""
     config.ensure_directories()
     hapi = _import_hapi()
-    bounds_min = band.wavenumber_min_cm1
-    bounds_max = band.wavenumber_max_cm1
-    table_name = config.resolved_line_table_name(band)
+    line_band = _line_source_band(band)
+    bounds_min = line_band.wavenumber_min_cm1
+    bounds_max = line_band.wavenumber_max_cm1
+    table_name = config.resolved_line_table_name(line_band)
     global_iso_ids = _resolve_global_isotopologue_ids(hapi, config)
     _call_hapi_quietly(hapi.db_begin, str(config.hitran_cache_dir))
     data_path = config.hitran_cache_dir / f"{table_name}.data"
