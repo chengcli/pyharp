@@ -43,22 +43,33 @@ class FakeHapi:
         return grid, np.ones_like(grid)
 
 
-def test_download_hitran_lines_uses_band_bounds(monkeypatch, tmp_path) -> None:
+def _line_source_band(band: SpectralBandConfig) -> SpectralBandConfig:
+    return SpectralBandConfig(
+        band.name,
+        max(0.0, band.wavenumber_min_cm1 - 25.0),
+        band.wavenumber_max_cm1 + 25.0,
+        band.resolution_cm1,
+    )
+
+
+def test_download_hitran_lines_pads_band_by_line_wing(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
     band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
+    line_band = _line_source_band(band)
+    table_name = config.resolved_line_table_name(line_band)
 
     db = download_hitran_lines(config, band)
 
-    assert db.table_name == config.resolved_line_table_name(band)
+    assert db.table_name == table_name
     assert fake.db_dir == str(config.hitran_cache_dir)
     assert fake.calls == [
         (
-            config.resolved_line_table_name(band),
+            table_name,
             (7, 8, 9, 10, 11, 12, 13),
-            band.wavenumber_min_cm1,
-            band.wavenumber_max_cm1,
+            line_band.wavenumber_min_cm1,
+            line_band.wavenumber_max_cm1,
         )
     ]
 
@@ -69,7 +80,7 @@ def test_download_hitran_lines_skips_fetch_when_cache_exists(monkeypatch, tmp_pa
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
     band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
     config.hitran_cache_dir.mkdir(parents=True, exist_ok=True)
-    table_name = config.resolved_line_table_name(band)
+    table_name = config.resolved_line_table_name(_line_source_band(band))
     (config.hitran_cache_dir / f"{table_name}.data").write_text("x", encoding="utf-8")
     (config.hitran_cache_dir / f"{table_name}.header").write_text("x", encoding="utf-8")
     fake.LOCAL_TABLE_CACHE[table_name] = {"data": {"molec_id": [2, 2, 2]}}
@@ -85,8 +96,9 @@ def test_download_hitran_lines_refetches_contaminated_cache(monkeypatch, tmp_pat
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
     band = SpectralBandConfig("single_state", 25.0, 2500.0, 1.0)
+    line_band = _line_source_band(band)
     config.hitran_cache_dir.mkdir(parents=True, exist_ok=True)
-    table_name = config.resolved_line_table_name(band)
+    table_name = config.resolved_line_table_name(line_band)
     (config.hitran_cache_dir / f"{table_name}.data").write_text("x", encoding="utf-8")
     (config.hitran_cache_dir / f"{table_name}.header").write_text("x", encoding="utf-8")
     fake.LOCAL_TABLE_CACHE[table_name] = {"data": {"molec_id": [1, 2]}}
@@ -98,8 +110,8 @@ def test_download_hitran_lines_refetches_contaminated_cache(monkeypatch, tmp_pat
         (
             table_name,
             (7, 8, 9, 10, 11, 12, 13),
-            band.wavenumber_min_cm1,
-            band.wavenumber_max_cm1,
+            line_band.wavenumber_min_cm1,
+            line_band.wavenumber_max_cm1,
         )
     ]
 
@@ -114,12 +126,14 @@ def test_download_hitran_lines_wraps_fetch_failures(monkeypatch, tmp_path) -> No
     fake.fetch_by_ids = fail_fetch
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache", species_name="CO2")
     band = SpectralBandConfig("single_state", 2500.0, 10000.0, 1.0)
+    line_band = _line_source_band(band)
 
     try:
         download_hitran_lines(config, band)
     except RuntimeError as exc:
         assert "Failed to download HITRAN lines for CO2" in str(exc)
-        assert "2500-10000 cm^-1" in str(exc)
+        expected_range = f"{line_band.wavenumber_min_cm1:g}-{line_band.wavenumber_max_cm1:g} cm^-1"
+        assert expected_range in str(exc)
     else:
         raise AssertionError("expected RuntimeError")
 
@@ -158,6 +172,7 @@ def test_hapi_line_provider_passes_min_line_strength_to_hapi(monkeypatch, tmp_pa
 
     assert fake.absorption_calls[-1]["IntensityThreshold"] == 1.0e-27
     assert fake.absorption_calls[-1]["HITRAN_units"] is True
+    assert fake.absorption_calls[-1]["WavenumberWingHW"] == 0.0
 
 
 def test_hapi_line_provider_falls_back_missing_broadener_to_air(monkeypatch, tmp_path) -> None:
