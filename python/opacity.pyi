@@ -219,6 +219,29 @@ class OpacityOptions:
         ...
 
     @overload
+    def nmom(self) -> int:
+        """
+        Get number of scattering moments.
+
+        Returns:
+            int: number of scattering moments
+        """
+        ...
+
+    @overload
+    def nmom(self, value: int) -> "OpacityOptions":
+        """
+        Set number of scattering moments.
+
+        Args:
+            value (int): number of scattering moments
+
+        Returns:
+            OpacityOptions: class object
+        """
+        ...
+
+    @overload
     def verbose(self) -> bool:
         """
         Get verbose flag.
