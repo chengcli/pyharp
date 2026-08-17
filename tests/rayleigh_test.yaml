@@ -1,0 +1,22 @@
+species:
+  - name: H2
+    composition: {H: 2}
+
+geometry:
+  cells:
+    nx1: 2
+
+opacities:
+  rayleigh:
+    type: rayleigh
+    species: [H2]
+    nmom: 4
+
+bands:
+  - name: shortwave
+    range: [19999.5, 20000.5]
+    opacities: [rayleigh]
+    solver: disort
+    nwave: 1
+    nstr: 4
+    flags: lamber,quiet,onlyfl

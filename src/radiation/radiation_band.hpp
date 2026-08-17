@@ -38,6 +38,7 @@ using OpacityDict = std::map<std::string, OpacityOptions>;
  *  - "picaso-ck": PICASO correlated-k NetCDF table
  *  - "wavetemp": opacity table defined on wavenumber and temperature grid (CIA)
  *  - "fourcolumn": Four-column opacity table (aerosol)
+ *  - "rayleigh": gas Rayleigh scattering computed on the active spectral grid
  *  - "helios": Helios opacity table
  */
 struct RadiationBandOptionsImpl {

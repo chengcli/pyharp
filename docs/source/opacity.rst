@@ -29,6 +29,9 @@ A complete list of built-in opacity types is given in the table below.
   * - 'molecule-cia'
     - NetCDF
     - Collision-induced absorption binary coefficients on ``(wavenumber, pressure, del_temperature)``
+  * - 'rayleigh'
+    - Analytic
+    - Gas Rayleigh scattering for H2, He, H2O, CH4, N2, and CO2 on the active spectral grid
   * - 'multiband-ck'
     - '.pt' (saved by :func:`torch.jit.save`)
     - Three-dimensional correlated-k opacity lookup table. The axis are
@@ -58,6 +61,27 @@ Line opacity variables follow the naming convention ``sigma_line_<species>``.
 Optional same-species continuum terms use ``sigma_continuum_<species>_*`` and
 are summed into the line attenuation automatically. CIA variables use
 ``binary_absorption_coefficient_<species_a>_<species_b>``.
+
+Rayleigh scattering is configured as a separate opacity source on the same
+line-by-line grid. It does not need to be stored in the absorption NetCDF file:
+
+.. code-block:: yaml
+
+   opacities:
+     rayleigh:
+       type: rayleigh
+       species: [H2O, CH4, CO2, H2, He]
+       nmom: 4
+
+   bands:
+     - name: shortwave
+       opacities: [h2o_line, ch4_line, co2_line, h2_line, rayleigh]
+       solver: disort
+       nstr: 4
+
+``nmom`` should be at least 2 and normally matches ``nstr``. The opacity
+returns conservative scattering and the Rayleigh Legendre moments; the
+radiation band combines it with molecular absorption before calling DISORT.
 
 .. _example_sonora:
 

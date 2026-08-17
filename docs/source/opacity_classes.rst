@@ -21,5 +21,8 @@ Opacity Classes
 .. autoclass:: pyharp.opacity.MoleculeCIA
    :members: __init__, forward
 
+.. autoclass:: pyharp.opacity.Rayleigh
+   :members: __init__, forward
+
 .. autoclass:: pyharp.opacity.JITOpacity
    :members: __init__, forward

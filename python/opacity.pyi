@@ -61,7 +61,7 @@ class OpacityOptions:
 
         Valid options are: ``jit``, ``molecule-line``, ``molecule-cia``,
         ``fourcolumn``, ``wavetemp``, ``multiband-ck``, ``picaso-ck``,
-        ``helios``.
+        ``rayleigh``, ``helios``.
 
         Args:
             value (str): type of the opacity source
@@ -221,20 +221,20 @@ class OpacityOptions:
     @overload
     def nmom(self) -> int:
         """
-        Get number of scattering moments.
+        Get the number of scattering phase-function moments.
 
         Returns:
-            int: number of scattering moments
+            int: number of moments, excluding the implicit zeroth moment
         """
         ...
 
     @overload
     def nmom(self, value: int) -> "OpacityOptions":
         """
-        Set number of scattering moments.
+        Set the number of scattering phase-function moments.
 
         Args:
-            value (int): number of scattering moments
+            value (int): number of moments, excluding the implicit zeroth moment
 
         Returns:
             OpacityOptions: class object
@@ -560,6 +560,57 @@ class FourColumn:
                 nlyr is the number of layers.
                 The last dimension is the optical properties arranged
                 in the order of attenuation [1/m], single scattering albedo and scattering phase function, where nmom is the number of scattering moments.
+        """
+        ...
+
+class Rayleigh:
+    """
+    Gas Rayleigh-scattering opacity evaluated on the active spectral grid.
+
+    Supported species are H2, He, H2O, CH4, N2, and CO2. The returned
+    attenuation is calculated from the molar concentrations in ``conc``.
+
+    Examples:
+        >>> import torch
+        >>> from pyharp.opacity import OpacityOptions, Rayleigh
+        >>> op = OpacityOptions().type("rayleigh").species_ids([0]).nmom(4)
+        >>> rayleigh = Rayleigh(op)
+    """
+
+    options: OpacityOptions
+
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+
+    @overload
+    def __init__(self, options: OpacityOptions) -> None:
+        """Create a Rayleigh instance from opacity options."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+    def module(self, name: str): ...
+
+    def buffer(self, name: str) -> torch.Tensor: ...
+
+    def forward(
+        self, conc: torch.Tensor, atm: dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        """
+        Calculate gas Rayleigh optical properties.
+
+        Args:
+            conc: Molar concentration with shape ``(ncol, nlyr, nspecies)``
+                and units mol/m^3.
+            atm: Must contain either one-dimensional ``wavenumber`` in cm^-1
+                or ``wavelength`` in um.
+
+        Returns:
+            Tensor with shape ``(nwave, ncol, nlyr, 2 + nmom)`` containing
+            attenuation [1/m], single-scattering albedo, and Legendre moments
+            excluding the zeroth moment.
         """
         ...
 
