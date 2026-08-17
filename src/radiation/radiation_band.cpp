@@ -13,6 +13,7 @@
 #include <harp/opacity/multiband.hpp>
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/picaso_ck.hpp>
+#include <harp/opacity/rayleigh.hpp>
 #include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/parse_yaml_input.hpp>
@@ -29,6 +30,22 @@
 #include "radiation_formatter.hpp"
 
 namespace harp {
+
+namespace {
+
+torch::Tensor divide_where_positive(torch::Tensor numerator,
+                                    torch::Tensor denominator) {
+  while (denominator.dim() < numerator.dim()) {
+    denominator = denominator.unsqueeze(-1);
+  }
+  auto const positive = denominator > 0.0;
+  auto const safe_denominator =
+      torch::where(positive, denominator, torch::ones_like(denominator));
+  return torch::where(positive, numerator / safe_denominator,
+                      torch::zeros_like(numerator));
+}
+
+}  // namespace
 
 RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     std::string const& filename, std::string const& bd_name) {
@@ -198,6 +215,10 @@ void RadiationBandImpl::reset() {
       auto a = FourColumn(op);
       nmax_prop = std::max(nmax_prop, 2 + a->options->nmom());
       opacities[name] = torch::nn::AnyModule(a);
+    } else if (op->type() == "rayleigh") {
+      auto a = Rayleigh(op);
+      nmax_prop = std::max(nmax_prop, 2 + a->options->nmom());
+      opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "helios") {
       auto a = Helios(op);
       nmax_prop = std::max(nmax_prop, 1);
@@ -309,8 +330,9 @@ torch::Tensor RadiationBandImpl::forward(
   // average phase moments
   int nprop = prop.size(-1);
   if (nprop > 2) {
-    prop.narrow(-1, disort::IPM, nprop - 2) /=
-        (prop.select(-1, disort::ISS).unsqueeze(-1) + 1e-10);
+    auto scattering = prop.select(-1, disort::ISS);
+    auto moments = prop.narrow(-1, disort::IPM, nprop - 2);
+    moments.copy_(divide_where_positive(moments, scattering));
     if (options->verbose()) {
       std::cout << "  Averaging phase moments." << std::endl;
     }
@@ -318,7 +340,9 @@ torch::Tensor RadiationBandImpl::forward(
 
   // average single scattering albedo
   if (nprop > 1) {
-    prop.select(-1, disort::ISS) /= (prop.select(-1, disort::IEX) + 1e-10);
+    auto extinction = prop.select(-1, disort::IEX);
+    auto scattering = prop.select(-1, disort::ISS);
+    scattering.copy_(divide_where_positive(scattering, extinction));
     if (options->verbose()) {
       std::cout << "  Averaging single scattering albedo." << std::endl;
     }
@@ -329,6 +353,16 @@ torch::Tensor RadiationBandImpl::forward(
   if (options->verbose()) {
     std::cout << "  Converting attenuation coefficients to optical thickness."
               << std::endl;
+  }
+
+  // cDISORT's eigenproblem becomes numerically degenerate for conservative
+  // and nearly conservative scattering. Keep the physical opacity source
+  // conservative, but regularize the solver input by a dtype-appropriate
+  // distance from unity.
+  if (options->solver_name() == "disort" && nprop > 1) {
+    auto const ssa_margin =
+        prop.scalar_type() == torch::kFloat64 ? 1.0e-12 : 1.0e-6;
+    prop.select(-1, disort::ISS).clamp_max_(1.0 - ssa_margin);
   }
 
   // run rt solver
