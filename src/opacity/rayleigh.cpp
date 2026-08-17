@@ -3,6 +3,7 @@
 
 // harp
 #include <harp/constants.h>
+
 #include <harp/utils/strings.hpp>
 
 #include "rayleigh.hpp"
@@ -16,15 +17,14 @@ namespace {
 double species_scale(std::string const& species_name) {
   auto const name = to_lower_copy(species_name);
   if (name == "h2") return 1.0;
-  if (name == "he") return 0.0641; // Pierrehumbert (2010)
+  if (name == "he") return 0.0641;  // Pierrehumbert (2010)
   if (name == "h2o") return 3.3690;
   if (name == "ch4") return 10.1509;
   if (name == "n2") return 4.6035;
   if (name == "co2") return 10.5611;
 
   TORCH_CHECK(false, "Rayleigh opacity does not support species '",
-              species_name,
-              "'. Supported species: H2, He, H2O, CH4, N2, CO2");
+              species_name, "'. Supported species: H2, He, H2O, CH4, N2, CO2");
   return 0.0;
 }
 
@@ -55,8 +55,7 @@ void RayleighImpl::reset() {
 }
 
 torch::Tensor RayleighImpl::forward(
-    torch::Tensor conc,
-    std::map<std::string, torch::Tensor> const& kwargs) {
+    torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   TORCH_CHECK(conc.dim() == 3,
               "Rayleigh expects conc shape (ncol, nlyr, nspecies); got ",
               conc.sizes());
@@ -76,8 +75,7 @@ torch::Tensor RayleighImpl::forward(
   }
 
   TORCH_CHECK(wavenumber.dim() == 1,
-              "Rayleigh expects a 1D spectral grid; got ",
-              wavenumber.sizes());
+              "Rayleigh expects a 1D spectral grid; got ", wavenumber.sizes());
   TORCH_CHECK(torch::all(torch::isfinite(wavenumber)).item<bool>() &&
                   torch::all(wavenumber > 0.0).item<bool>(),
               "Rayleigh wavenumber must be finite and positive");
@@ -90,8 +88,8 @@ torch::Tensor RayleighImpl::forward(
 
   // Dalgarno & Williams (1962) H2 cross section [cm^2/molecule].
   auto sigma_m2_per_mol =
-      (8.14e-13 * inv_lambda2.pow(2) +
-       1.28e-6 * inv_lambda2.pow(3) + 1.61 * inv_lambda2.pow(4)) *
+      (8.14e-13 * inv_lambda2.pow(2) + 1.28e-6 * inv_lambda2.pow(3) +
+       1.61 * inv_lambda2.pow(4)) *
       (constants::Avogadro * 1.0e-4);
 
   auto const ncol = conc.size(0);
@@ -102,24 +100,24 @@ torch::Tensor RayleighImpl::forward(
 
   for (int i = 0; i < options->species_ids().size(); ++i) {
     auto const species_id = options->species_ids().at(i);
-    TORCH_CHECK(species_id < conc.size(2), "Invalid Rayleigh species_id: ",
-                species_id, " for conc with ", conc.size(2), " species");
-    attenuation +=
-        sigma_m2_per_mol.view({nwave, 1, 1}) * scales[i] *
-        conc.select(-1, species_id).unsqueeze(0);
+    TORCH_CHECK(species_id < conc.size(2),
+                "Invalid Rayleigh species_id: ", species_id, " for conc with ",
+                conc.size(2), " species");
+    attenuation += sigma_m2_per_mol.view({nwave, 1, 1}) * scales[i] *
+                   conc.select(-1, species_id).unsqueeze(0);
   }
 
-  auto result = torch::zeros(
-      {nwave, ncol, nlyr, 2 + options->nmom()}, conc.options());
-  result.select(-1, disort::IEX).copy_(attenuation); // extinction [1/m]
+  auto result =
+      torch::zeros({nwave, ncol, nlyr, 2 + options->nmom()}, conc.options());
+  result.select(-1, disort::IEX).copy_(attenuation);  // extinction [1/m]
 
   // Rayleigh scattering is conservative: extinction equals scattering.
-  result.select(-1, disort::ISS).fill_(1.0); // single-scattering albedo
+  result.select(-1, disort::ISS).fill_(1.0);  // single-scattering albedo
 
   // DISORT stores moments beta_l in
   // P(cos(theta)) = sum_l (2l+1) beta_l P_l(cos(theta)).
   // For P = 3/4 (1 + cos^2(theta)), beta_1=0 and beta_2=0.1.
-  result.select(-1, disort::IPM + 1).fill_(0.1); // second Legendre moment
+  result.select(-1, disort::IPM + 1).fill_(0.1);  // second Legendre moment
 
   return result;
 }

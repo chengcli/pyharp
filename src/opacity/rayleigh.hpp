@@ -43,9 +43,8 @@ class RayleighImpl : public torch::nn::Cloneable<RayleighImpl> {
    *        "wavelength" [um], both with shape (nwave)
    * \return optical properties, (nwave, ncol, nlyr, 2 + nmom)
    */
-  torch::Tensor forward(
-      torch::Tensor conc,
-      std::map<std::string, torch::Tensor> const& kwargs);
+  torch::Tensor forward(torch::Tensor conc,
+                        std::map<std::string, torch::Tensor> const& kwargs);
 };
 TORCH_MODULE(Rayleigh);
 
