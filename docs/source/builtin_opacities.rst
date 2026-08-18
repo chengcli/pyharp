@@ -65,8 +65,8 @@ Gas Rayleigh scattering
 -----------------------
 
 The ``rayleigh`` opacity type computes gas Rayleigh scattering analytically on
-the active wavelength or wavenumber grid. It supports H2, He, H2O, CH4, N2,
-and CO2, returns conservative scattering with the Rayleigh Legendre moments,
+the active wavelength or wavenumber grid. It supports H2, He, H2O, CH4, N2, CO2,
+and NH3, and returns conservative scattering with the Rayleigh Legendre moments,
 and is mixed with line and CIA absorption by the radiation band before the
 DISORT calculation.
 
@@ -75,5 +75,5 @@ References
 .. [1] Lupu, R., et al. "Correlated k coefficients for H2-He atmospheres; 196 spectral windows and 1460 pressure-temperature points." Zenodo, doi 0.5281/zenodo.5590988 (2021).
 .. [2] Marley, Mark S., et al. "The Sonora brown dwarf atmosphere and evolution models. I. Model description and application to cloudless atmospheres in rainout chemical equilibrium." The Astrophysical Journal 920.2 (2021): 85.
 .. [3] Li, C., Le, T., Zhang, X., & Yung, Y. L. (2018). A high-performance atmospheric radiation package: With applications to the radiative energy budgets of giant planets. Journal of Quantitative Spectroscopy and Radiative Transfer, 217, 353-362.
-.. [4] Dalgarno, A., & Williams, D. A. (1962). The scattering of light by molecules. Proceedings of the Royal Society of London. Series A. Mathematical and Physical Sciences, 269(1338), 97-110.
+.. [4] Dalgarno, A., & Williams, D. A. (1962). The scattering of light by molecular hydrogen. Astrophysical Journal, 136, 690.
 .. [5] Pierrehumbert, R. T. (2010). Principles of planetary climate. Cambridge University Press.
