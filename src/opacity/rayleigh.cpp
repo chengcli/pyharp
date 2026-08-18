@@ -22,11 +22,11 @@ double species_scale(std::string const& species_name) {
   if (name == "ch4") return 10.1509;
   if (name == "n2") return 4.6035;
   if (name == "co2") return 10.5611;
-  if (name == "nh3") return 7.3427;  
-
+  if (name == "nh3") return 7.3427;
 
   TORCH_CHECK(false, "Rayleigh opacity does not support species '",
-              species_name, "'. Supported species: H2, He, H2O, CH4, N2, CO2, NH3");
+              species_name,
+              "'. Supported species: H2, He, H2O, CH4, N2, CO2, NH3");
   return 0.0;
 }
 
@@ -88,10 +88,10 @@ torch::Tensor RayleighImpl::forward(
   auto const wavelength_angstrom = 1.0e8 / wavenumber;
 
   // Dalgarno & Williams (1962) H2 cross section [cm^2/molecule].
-  auto sigma_m2_per_mol =
-      (8.14e-13 * wavelength_angstrom.pow(-4) + 1.28e-6 * wavelength_angstrom.pow(-6) +
-       1.61 * wavelength_angstrom.pow(-8)) *
-      (constants::Avogadro * 1.0e-4);
+  auto sigma_m2_per_mol = (8.14e-13 * wavelength_angstrom.pow(-4) +
+                           1.28e-6 * wavelength_angstrom.pow(-6) +
+                           1.61 * wavelength_angstrom.pow(-8)) *
+                          (constants::Avogadro * 1.0e-4);
 
   auto const ncol = conc.size(0);
   auto const nlyr = conc.size(1);

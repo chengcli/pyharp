@@ -65,7 +65,7 @@ Gas Rayleigh scattering
 -----------------------
 
 The ``rayleigh`` opacity type computes gas Rayleigh scattering analytically on
-the active wavelength or wavenumber grid. It supports H2, He, H2O, CH4, N2, CO2, 
+the active wavelength or wavenumber grid. It supports H2, He, H2O, CH4, N2, CO2,
 and NH3, and returns conservative scattering with the Rayleigh Legendre moments,
 and is mixed with line and CIA absorption by the radiation band before the
 DISORT calculation.
