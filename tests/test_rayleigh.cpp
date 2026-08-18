@@ -36,19 +36,19 @@ harp::OpacityOptions rayleigh_options(std::vector<int> species_ids,
 }  // namespace
 
 TEST(TestRayleigh, ComputesMixtureAttenuationAndPhaseMoments) {
-  harp::species_names = {"H2", "He", "H2O", "CH4", "N2", "CO2"};
+  harp::species_names = {"H2", "He", "H2O", "CH4", "N2", "CO2", "NH3"};
   harp::species_weights = {2.01588e-3,  4.002602e-3, 18.01528e-3,
-                           16.04246e-3, 28.0134e-3,  44.0095e-3};
+                           16.04246e-3, 28.0134e-3,  44.0095e-3,  17.03052e-3};
 
-  harp::Rayleigh rayleigh(rayleigh_options({0, 1, 2, 3, 4, 5}));
-  auto conc = torch::ones({1, 1, 6}, torch::kFloat64);
+  harp::Rayleigh rayleigh(rayleigh_options({0, 1, 2, 3, 4, 5, 6}));
+  auto conc = torch::ones({1, 1, 7}, torch::kFloat64);
   std::map<std::string, torch::Tensor> atm;
   atm["wavenumber"] = torch::tensor({20000.0}, torch::kFloat64);
 
   auto result = rayleigh->forward(conc, atm);
   ASSERT_EQ(result.sizes(), torch::IntArrayRef({1, 1, 1, 6}));
 
-  double const scale_sum = 1.0 + 0.0641 + 3.3690 + 10.1509 + 4.6035 + 10.5611;
+  double const scale_sum = 1.0 + 0.0641 + 3.3690 + 10.1509 + 4.6035 + 10.5611 + 7.3427;
   double const expected = h2_cross_section_m2_per_mol(20000.0) * scale_sum;
   EXPECT_NEAR(result[0][0][0][0].item<double>(), expected, expected * 1.0e-12);
   EXPECT_DOUBLE_EQ(result[0][0][0][1].item<double>(), 1.0);
@@ -75,8 +75,8 @@ TEST(TestRayleigh, WavelengthAndWavenumberInputsAgree) {
 }
 
 TEST(TestRayleigh, RejectsUnsupportedSpeciesAndTooFewMoments) {
-  harp::species_names = {"NH3"};
-  harp::species_weights = {17.03052e-3};
+  harp::species_names = {"H2S"};
+  harp::species_weights = {34.08088e-3};
 
   EXPECT_THROW({ harp::Rayleigh rayleigh(rayleigh_options({0})); }, c10::Error);
 
