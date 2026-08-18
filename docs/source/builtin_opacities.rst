@@ -75,5 +75,5 @@ References
 .. [1] Lupu, R., et al. "Correlated k coefficients for H2-He atmospheres; 196 spectral windows and 1460 pressure-temperature points." Zenodo, doi 0.5281/zenodo.5590988 (2021).
 .. [2] Marley, Mark S., et al. "The Sonora brown dwarf atmosphere and evolution models. I. Model description and application to cloudless atmospheres in rainout chemical equilibrium." The Astrophysical Journal 920.2 (2021): 85.
 .. [3] Li, C., Le, T., Zhang, X., & Yung, Y. L. (2018). A high-performance atmospheric radiation package: With applications to the radiative energy budgets of giant planets. Journal of Quantitative Spectroscopy and Radiative Transfer, 217, 353-362.
-.. [4] Dalgarno, A., & Williams, D. A. (1962). The scattering of light by molecules. Proceedings of the Royal Society of London. Series A. Mathematical and Physical Sciences, 269(1338), 97-110.
+.. [4] Dalgarno, A., & Williams, D. A. (1962). The scattering of light by molecular hydrogen. Astrophysical Journal, 136, 690.
 .. [5] Pierrehumbert, R. T. (2010). Principles of planetary climate. Cambridge University Press.
