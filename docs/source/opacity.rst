@@ -32,6 +32,9 @@ A complete list of built-in opacity types is given in the table below.
   * - 'rayleigh'
     - Analytic
     - Gas Rayleigh scattering for H2, He, H2O, CH4, N2, and CO2 on the active spectral grid
+  * - 'respq-table'
+    - NetCDF
+    - Frozen ReSPQ quadrature and component optical-property tables
   * - 'multiband-ck'
     - '.pt' (saved by :func:`torch.jit.save`)
     - Three-dimensional correlated-k opacity lookup table. The axis are
@@ -82,6 +85,11 @@ line-by-line grid. It does not need to be stored in the absorption NetCDF file:
 ``nmom`` should be at least 2 and normally matches ``nstr``. The opacity
 returns conservative scattering and the Rayleigh Legendre moments; the
 radiation band combines it with molecular absorption before calling DISORT.
+
+A ``respq-table`` must be the only opacity source in its band. The NetCDF file
+provides the spectral points, bounds, weights, pressure-temperature grid,
+reference composition, and optional scattering properties. Lookup is clamped
+to the table bounds and recorded in the module's ``bounds_mask`` buffer.
 
 .. _example_sonora:
 

@@ -36,6 +36,7 @@ using OpacityDict = std::map<std::string, OpacityOptions>;
  * dumps
  *  - "multiband-ck": multi-band correlated-k opacity table
  *  - "picaso-ck": PICASO correlated-k NetCDF table
+ *  - "respq-table": ReSPQ quadrature and optical-property table
  *  - "wavetemp": opacity table defined on wavenumber and temperature grid (CIA)
  *  - "fourcolumn": Four-column opacity table (aerosol)
  *  - "rayleigh": gas Rayleigh scattering computed on the active spectral grid

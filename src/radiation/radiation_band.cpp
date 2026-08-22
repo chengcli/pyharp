@@ -14,6 +14,7 @@
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/picaso_ck.hpp>
 #include <harp/opacity/rayleigh.hpp>
+#include <harp/opacity/respq_table.hpp>
 #include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/parse_yaml_input.hpp>
@@ -43,6 +44,12 @@ torch::Tensor divide_where_positive(torch::Tensor numerator,
       torch::where(positive, denominator, torch::ones_like(denominator));
   return torch::where(positive, numerator / safe_denominator,
                       torch::zeros_like(numerator));
+}
+
+std::vector<double> to_vector(torch::Tensor const& tensor) {
+  auto data = tensor.to(torch::kCPU, torch::kFloat64).contiguous();
+  return std::vector<double>(data.data_ptr<double>(),
+                             data.data_ptr<double>() + data.numel());
 }
 
 }  // namespace
@@ -186,6 +193,7 @@ void RadiationBandImpl::reset() {
 
   // create opacities
   int nmax_prop = 1;
+  int nrespq = 0;
 
   for (auto const& [name, op] : options->opacities()) {
     if (op->type() == "jit") {
@@ -207,6 +215,13 @@ void RadiationBandImpl::reset() {
       auto a = PicasoCK(op);
       nmax_prop = std::max(nmax_prop, 1);
       opacities[name] = torch::nn::AnyModule(a);
+    } else if (op->type() == "respq-table") {
+      auto a = RespqTable(op);
+      nmax_prop = std::max(nmax_prop, a->scattering_moments() == 0
+                                          ? 1
+                                          : 2 + a->scattering_moments());
+      opacities[name] = torch::nn::AnyModule(a);
+      ++nrespq;
     } else if (op->type() == "wavetemp") {
       auto a = WaveTemp(op);
       nmax_prop = std::max(nmax_prop, 1);
@@ -227,6 +242,19 @@ void RadiationBandImpl::reset() {
       TORCH_CHECK(false, "Unknown opacity type: ", op->type());
     }
     register_module(name, opacities[name].ptr());
+  }
+  if (nrespq > 0) {
+    TORCH_CHECK(nrespq == 1 && opacities.size() == 1,
+                "A respq-table must be the band's only opacity source");
+    TORCH_CHECK(options->wavenumber().empty() && options->weight().empty(),
+                "A respq-table supplies the band quadrature");
+    auto const& table = opacities.begin()->second.get<RespqTableImpl>();
+    TORCH_CHECK(options->nwave() == table.wavenumber.numel(),
+                "band nwave must match the respq-table point count");
+    options->wavenumber(to_vector(table.wavenumber))
+        .weight(to_vector(table.weights))
+        .set_wave_lower(to_vector(table.wave_lower))
+        .set_wave_upper(to_vector(table.wave_upper));
   }
   if (options->solver_name() == "toon") nmax_prop = std::max(nmax_prop, 3);
 
