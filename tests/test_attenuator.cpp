@@ -15,6 +15,9 @@
 #include <harp/opacity/molecule_cia.hpp>
 #include <harp/opacity/molecule_line.hpp>
 #include <harp/opacity/opacity_options.hpp>
+#include <harp/opacity/respq_table.hpp>
+#include <harp/radiation/radiation_band.hpp>
+#include <harp/rtsolver/toon_mckay89.hpp>
 
 // netcdf
 #ifdef NETCDFOUTPUT
@@ -113,6 +116,78 @@ fs::path write_test_dataset() {
   check_nc(nc_put_var_double(fileid, var_cia, sigma_cia.data()));
   check_nc(nc_close(fileid));
 
+  return path;
+}
+
+fs::path write_respq_dataset() {
+  auto path = fs::temp_directory_path() / "pyharp_test_respq.nc";
+  int fileid = -1;
+  check_nc(nc_create(path.c_str(), NC_CLOBBER, &fileid));
+
+  int point = -1, pressure = -1, offset = -1, species = -1;
+  int linear = -1, binary = -1, moment = -1;
+  check_nc(nc_def_dim(fileid, "point", 2, &point));
+  check_nc(nc_def_dim(fileid, "pressure", 2, &pressure));
+  check_nc(nc_def_dim(fileid, "temperature_offset", 2, &offset));
+  check_nc(nc_def_dim(fileid, "species", 2, &species));
+  check_nc(nc_def_dim(fileid, "linear_component", 1, &linear));
+  check_nc(nc_def_dim(fileid, "binary_component", 1, &binary));
+  check_nc(nc_def_dim(fileid, "moment", 2, &moment));
+
+  auto define_1d = [&](char const* name, int dim) {
+    int varid = -1;
+    check_nc(nc_def_var(fileid, name, NC_DOUBLE, 1, &dim, &varid));
+    return varid;
+  };
+  int wave = define_1d("wavenumber", point);
+  int lower = define_1d("wavenumber_lower", point);
+  int upper = define_1d("wavenumber_upper", point);
+  int weight = define_1d("quadrature_weight", point);
+  int pres = define_1d("pressure", pressure);
+  int temp_offset = define_1d("temperature_offset", offset);
+  int temp_base = define_1d("nominal_temperature", pressure);
+  int fraction = define_1d("reference_mole_fraction", species);
+  int scatter = define_1d("scattering_coefficient", point);
+  int linear_dims[4] = {linear, point, pressure, offset};
+  int binary_dims[4] = {binary, point, pressure, offset};
+  int moment_dims[2] = {point, moment};
+  int klinear = -1, kbinary = -1, pmom = -1;
+  check_nc(
+      nc_def_var(fileid, "kappa_linear", NC_DOUBLE, 4, linear_dims, &klinear));
+  check_nc(
+      nc_def_var(fileid, "kappa_binary", NC_DOUBLE, 4, binary_dims, &kbinary));
+  check_nc(
+      nc_def_var(fileid, "phase_moment", NC_DOUBLE, 2, moment_dims, &pmom));
+  put_text_attr(fileid, klinear, "units", "m2 mol-1");
+  put_text_attr(fileid, kbinary, "units", "m5 mol-2");
+  put_text_attr(fileid, scatter, "units", "m2 mol-1");
+  check_nc(nc_enddef(fileid));
+
+  double const wave_data[] = {100., 200.};
+  double const lower_data[] = {99.5, 199.5};
+  double const upper_data[] = {100.5, 200.5};
+  double const weight_data[] = {1., 2.};
+  double const pressure_data[] = {1.e5, 1.e6};
+  double const offset_data[] = {-10., 10.};
+  double const base_data[] = {300., 500.};
+  double const fraction_data[] = {.75, .25};
+  double const scattering_data[] = {1., 2.};
+  double const linear_data[] = {2., 2., 2., 2., 3., 3., 3., 3.};
+  double const binary_data[] = {.5, .5, .5, .5, .25, .25, .25, .25};
+  double const moment_data[] = {1., .1, 1., .2};
+  check_nc(nc_put_var_double(fileid, wave, wave_data));
+  check_nc(nc_put_var_double(fileid, lower, lower_data));
+  check_nc(nc_put_var_double(fileid, upper, upper_data));
+  check_nc(nc_put_var_double(fileid, weight, weight_data));
+  check_nc(nc_put_var_double(fileid, pres, pressure_data));
+  check_nc(nc_put_var_double(fileid, temp_offset, offset_data));
+  check_nc(nc_put_var_double(fileid, temp_base, base_data));
+  check_nc(nc_put_var_double(fileid, fraction, fraction_data));
+  check_nc(nc_put_var_double(fileid, scatter, scattering_data));
+  check_nc(nc_put_var_double(fileid, klinear, linear_data));
+  check_nc(nc_put_var_double(fileid, kbinary, binary_data));
+  check_nc(nc_put_var_double(fileid, pmom, moment_data));
+  check_nc(nc_close(fileid));
   return path;
 }
 #endif
@@ -221,6 +296,52 @@ TEST(TestOpacity, MoleculeOpacitiesClampTemperatureAnomalyToTableBounds) {
   auto cia_above_bound = evaluate(cia, 330.0);
   EXPECT_TRUE(torch::allclose(cia_below_bound, cia_lower_bound));
   EXPECT_TRUE(torch::allclose(cia_above_bound, cia_upper_bound));
+#endif
+}
+
+TEST(TestOpacity, RespqTableCombinesComponentsAndClampsBounds) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  auto dataset = write_respq_dataset();
+  auto options = harp::OpacityOptionsImpl::create();
+  options->type("respq-table")
+      .species_ids({0, 1})
+      .opacity_files({dataset.string()});
+  harp::RespqTable table(options);
+
+  auto conc = torch::tensor({{{3., 1.}}}, torch::kFloat64);
+  std::map<std::string, torch::Tensor> atm;
+  atm["pres"] = torch::tensor({{1.e5}}, torch::kFloat64);
+  atm["temp"] = torch::tensor({{300.}}, torch::kFloat64);
+  atm["wavenumber"] = torch::tensor({100., 200.}, torch::kFloat64);
+  auto result = table->forward(conc, atm);
+  EXPECT_TRUE(torch::allclose(result.select(-1, 0).flatten(),
+                              torch::tensor({20., 24.}, torch::kFloat64)));
+  EXPECT_TRUE(torch::allclose(result.select(-1, 1).flatten(),
+                              torch::tensor({.2, 1. / 3.}, torch::kFloat64)));
+  EXPECT_FALSE(torch::any(table->bounds_mask).item<bool>());
+
+  atm["pres"] = torch::tensor({{1.e4}}, torch::kFloat64);
+  atm["temp"] = torch::tensor({{1000.}}, torch::kFloat64);
+  EXPECT_TRUE(torch::allclose(table->forward(conc, atm), result));
+  EXPECT_TRUE(torch::all(table->bounds_mask).item<bool>());
+
+  auto wrong = torch::tensor({{{2., 2.}}}, torch::kFloat64);
+  EXPECT_THROW(table->forward(wrong, atm), c10::Error);
+
+  auto band_options = harp::RadiationBandOptionsImpl::create();
+  band_options->name("stellar")
+      .solver_name("toon")
+      .toon(harp::ToonMcKay89OptionsImpl::create())
+      .nwave(2)
+      .ncol(1)
+      .nlyr(1);
+  band_options->opacities()["respq"] = options;
+  harp::RadiationBand band(band_options);
+  EXPECT_EQ(band_options->weight(), (std::vector<double>{1., 2.}));
+  EXPECT_EQ(band_options->toon()->wave_lower(),
+            (std::vector<double>{99.5, 199.5}));
 #endif
 }
 

@@ -61,7 +61,7 @@ class OpacityOptions:
 
         Valid options are: ``jit``, ``molecule-line``, ``molecule-cia``,
         ``fourcolumn``, ``wavetemp``, ``multiband-ck``, ``picaso-ck``,
-        ``rayleigh``, ``helios``.
+        ``rayleigh``, ``respq-table``, ``helios``.
 
         Args:
             value (str): type of the opacity source
