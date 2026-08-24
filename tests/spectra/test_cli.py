@@ -864,15 +864,24 @@ def test_xsection_dataset_keeps_only_sigma_fields() -> None:
     dataset = _xsection_dataset(
         spectrum,
         species_name="H2O",
-        secondary_component={"kind": "continuum", "label": "H2O continuum (MT_CKD)"},
+        secondary_component={
+            "kind": "continuum",
+            "label": "H2O continuum (MT_CKD)",
+            "continuum_components": {
+                "self": np.array([0.3, 0.4]),
+                "foreign": np.array([0.5, 0.6]),
+            },
+        },
         wn_range=(20.0, 22.0),
     )
     try:
         assert set(dataset.data_vars) == {
             "sigma_line_h2o",
-            "sigma_continuum_h2o_mt_ckd",
+            "sigma_continuum_h2o_self_mt_ckd",
+            "sigma_continuum_h2o_foreign_mt_ckd",
             "sigma_total",
         }
+        assert dataset["sigma_continuum_h2o_self_mt_ckd"].attrs["composition_weight"] == "runtime"
         assert dataset.attrs["band_wavenumber_min_cm1"] == 20.0
         assert dataset.attrs["band_wavenumber_max_cm1"] == 22.0
     finally:
@@ -1316,14 +1325,21 @@ def test_cli_xsection_reuses_built_provider_for_species_spectrum(monkeypatch, tm
     monkeypatch.setattr("pyharp.spectra.dump_cli.download_hitran_lines", lambda config, band: object())
     monkeypatch.setattr("pyharp.spectra.dump_cli.build_line_provider", lambda config, line_db: fake_provider)
     monkeypatch.setattr("pyharp.spectra.dump_cli._resolve_species_cia", lambda args, config: None)
+    monkeypatch.setattr(
+        "pyharp.spectra.dump_cli.compute_mt_ckd_h2o_continuum_components",
+        lambda **kwargs: (
+            np.array([3.0e-24, 4.0e-24, 5.0e-24]),
+            np.array([6.0e-24, 7.0e-24, 8.0e-24]),
+        ),
+    )
 
     def fake_resolve_continuum_sources(*, config, wavenumber_grid_cm1, temperature_k, pressure_pa):
         calls["resolve"] += 1
         assert config.hitran_species.name == "H2O"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
-        return None, np.array([1.0e-24, 2.0e-24])
+        return None, np.array([1.0e-24, 2.0e-24, 3.0e-24])
 
     def fake_compute_from_sources(
         *,
@@ -1337,12 +1353,12 @@ def test_cli_xsection_reuses_built_provider_for_species_spectrum(monkeypatch, tm
     ):
         calls["compute"] += 1
         assert species_name == "H2O"
-        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0]))
+        assert np.allclose(wavenumber_grid_cm1, np.array([20.0, 21.0, 22.0]))
         assert temperature_k == 300.0
         assert pressure_pa == 1.0e5
         assert line_provider is fake_provider
         assert cia_dataset is None
-        assert np.allclose(cia_cross_section_cm2_molecule, np.array([1.0e-24, 2.0e-24]))
+        assert np.allclose(cia_cross_section_cm2_molecule, np.array([1.0e-24, 2.0e-24, 3.0e-24]))
         return type("Spectrum", (), {})()
 
     monkeypatch.setattr("pyharp.spectra.dump_cli._resolve_continuum_sources", fake_resolve_continuum_sources)

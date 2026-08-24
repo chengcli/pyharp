@@ -64,6 +64,11 @@ Line opacity variables follow the naming convention ``sigma_line_<species>``.
 Optional same-species continuum terms use ``sigma_continuum_<species>_*`` and
 are summed into the line attenuation automatically. CIA variables use
 ``binary_absorption_coefficient_<species_a>_<species_b>``.
+For H2O, paired ``sigma_continuum_h2o_self_mt_ckd`` and
+``sigma_continuum_h2o_foreign_mt_ckd`` fields are unit-VMR components;
+``MoleculeLine`` applies the runtime water and non-water mole fractions before
+multiplying by the H2O molar concentration. A legacy combined MT_CKD field is
+used only when the split pair is absent.
 
 Rayleigh scattering is configured as a separate opacity source on the same
 line-by-line grid. It does not need to be stored in the absorption NetCDF file:
