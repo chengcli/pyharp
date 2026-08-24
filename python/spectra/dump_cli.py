@@ -313,6 +313,8 @@ def _xsection_dataset(
                     "composition_weight": "runtime",
                 },
             )
+        if secondary_component.get("continuum_components"):
+            dataset = dataset.drop_vars(cia_name)
     else:
         dataset[cia_name].attrs = {"long_name": f"{secondary_component['label']} CIA absorption cross section", "units": "cm^2 molecule^-1"}
         binary = np.asarray(secondary_component["binary_absorption_coefficient"], dtype=np.float64)

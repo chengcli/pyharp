@@ -877,7 +877,6 @@ def test_xsection_dataset_keeps_only_sigma_fields() -> None:
     try:
         assert set(dataset.data_vars) == {
             "sigma_line_h2o",
-            "sigma_continuum_h2o_mt_ckd",
             "sigma_continuum_h2o_self_mt_ckd",
             "sigma_continuum_h2o_foreign_mt_ckd",
             "sigma_total",
