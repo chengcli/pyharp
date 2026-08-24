@@ -18,9 +18,14 @@ class MoleculeLineImpl : public torch::nn::Cloneable<MoleculeLineImpl> {
   //! (nwave,) (npres,) (ndeltemp,)
   torch::Tensor wavenumber, ln_pressure, temperature_anomaly;
 
-  //! tabulated ln(line + same-species continuum cross section) [ln(m^2/mol)]
+  //! tabulated ln(line + legacy composition-weighted continuum) [ln(m^2/mol)]
   //! (nwave, npres, ndeltemp, 1)
   torch::Tensor ln_sigma_cross;
+
+  //! tabulated unit-VMR H2O continuum components [ln(m^2/mol)]
+  //! (nwave, npres, ndeltemp, 1)
+  torch::Tensor ln_sigma_continuum_self, ln_sigma_continuum_foreign;
+  bool has_split_h2o_continuum = false;
 
   //! ln(base temperature profile) [ln(K)]
   //! (npres, 1)

@@ -214,9 +214,15 @@ Single-species xsection dumps use names such as:
 
 * ``sigma_line_h2o``
 * ``sigma_continuum_h2o_mt_ckd``
+* ``sigma_continuum_h2o_self_mt_ckd``
+* ``sigma_continuum_h2o_foreign_mt_ckd``
 * ``sigma_cia_h2o_h2o``
 * ``binary_absorption_coefficient_h2o_h2o``
 * ``sigma_total``
+
+The two split MT_CKD fields contain unit-VMR self and foreign components.
+``MoleculeLine`` weights them at runtime by ``xH2O`` and ``1 - xH2O``.  The
+combined ``sigma_continuum_h2o_mt_ckd`` field remains for older readers.
 
 Pair xsection dumps use:
 

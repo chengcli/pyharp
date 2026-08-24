@@ -4,7 +4,11 @@ import numpy as np
 import xarray as xr
 
 from pyharp.spectra.mt_ckd_h2o import default_mt_ckd_h2o_data_path
-from pyharp.spectra.mt_ckd_h2o import _radiation_term, compute_mt_ckd_h2o_continuum_cross_section
+from pyharp.spectra.mt_ckd_h2o import (
+    _radiation_term,
+    compute_mt_ckd_h2o_continuum_components,
+    compute_mt_ckd_h2o_continuum_cross_section,
+)
 
 
 def test_default_mt_ckd_h2o_data_path_uses_local_external_directory(monkeypatch) -> None:
@@ -50,6 +54,12 @@ def test_compute_mt_ckd_h2o_continuum_includes_self_and_foreign_terms(tmp_path) 
         foreign_vmr=0.75,
         data_path=data_path,
     )
+    sigma_self, sigma_foreign = compute_mt_ckd_h2o_continuum_components(
+        wavenumber_grid_cm1=reference_grid,
+        temperature_k=200.0,
+        pressure_pa=1.2e5,
+        data_path=data_path,
+    )
 
     rho_ratio = (1200.0 / 1000.0) * (250.0 / 200.0)
     expected = (
@@ -57,6 +67,7 @@ def test_compute_mt_ckd_h2o_continuum_includes_self_and_foreign_terms(tmp_path) 
         + foreign_absco_ref * 0.75
     ) * rho_ratio * _radiation_term(reference_grid, 200.0)
     assert np.allclose(result, expected)
+    assert np.allclose(result, 0.25 * sigma_self + 0.75 * sigma_foreign)
 
 
 def test_compute_mt_ckd_h2o_continuum_defaults_foreign_to_remaining_fraction(tmp_path) -> None:

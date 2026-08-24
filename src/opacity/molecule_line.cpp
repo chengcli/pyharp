@@ -80,18 +80,48 @@ void MoleculeLineImpl::reset() {
   int nvars = 0;
   check_nc(nc_inq_nvars(fileid, &nvars), "Failed to query variable count");
   auto const continuum_prefix = "sigma_continuum_" + species_token + "_";
+  auto const self_continuum_name = continuum_prefix + "self_mt_ckd";
+  auto const foreign_continuum_name = continuum_prefix + "foreign_mt_ckd";
+  auto const legacy_continuum_name = continuum_prefix + "mt_ckd";
+  torch::Tensor sigma_continuum_self;
+  torch::Tensor sigma_continuum_foreign;
+  torch::Tensor sigma_continuum_legacy;
   for (int i = 0; i < nvars; ++i) {
     char name[NC_MAX_NAME + 1] = {};
     check_nc(nc_inq_varname(fileid, i, name), "Failed to query variable name");
     std::string varname(name);
     if (varname.rfind(continuum_prefix, 0) != 0) continue;
 
-    sigma_cross +=
+    auto continuum =
         convert_line_cross_section_to_m2_per_mol(
             read_tensor_permuted(fileid, varname,
                                  {"wavenumber", "pressure", "del_temperature"}),
             read_var_units(fileid, i), varname)
             .unsqueeze(-1);
+    if (varname == self_continuum_name) {
+      sigma_continuum_self = continuum;
+    } else if (varname == foreign_continuum_name) {
+      sigma_continuum_foreign = continuum;
+    } else if (varname == legacy_continuum_name) {
+      sigma_continuum_legacy = continuum;
+    } else {
+      sigma_cross += continuum;
+    }
+  }
+
+  auto const has_self = sigma_continuum_self.defined();
+  auto const has_foreign = sigma_continuum_foreign.defined();
+  TORCH_CHECK(has_self == has_foreign, "Split H2O continuum requires both ",
+              self_continuum_name, " and ", foreign_continuum_name);
+  has_split_h2o_continuum = has_self && has_foreign;
+  if (has_split_h2o_continuum) {
+    ln_sigma_continuum_self =
+        apply_positive_fill(sigma_continuum_self, self_continuum_name).log();
+    ln_sigma_continuum_foreign =
+        apply_positive_fill(sigma_continuum_foreign, foreign_continuum_name)
+            .log();
+  } else if (sigma_continuum_legacy.defined()) {
+    sigma_cross += sigma_continuum_legacy;
   }
 
   sigma_cross = apply_positive_fill(sigma_cross, line_name);
@@ -108,6 +138,10 @@ void MoleculeLineImpl::reset() {
   register_buffer("temperature_anomaly", temperature_anomaly);
   register_buffer("ln_sigma_cross", ln_sigma_cross);
   register_buffer("ln_temperature_base", ln_temperature_base);
+  if (has_split_h2o_continuum) {
+    register_buffer("ln_sigma_continuum_self", ln_sigma_continuum_self);
+    register_buffer("ln_sigma_continuum_foreign", ln_sigma_continuum_foreign);
+  }
 }
 
 torch::Tensor MoleculeLineImpl::forward(
@@ -152,18 +186,33 @@ torch::Tensor MoleculeLineImpl::forward(
 
   // Clamp queries to the tabulated bounds. Extrapolating logarithmic line
   // cross sections can produce nonphysical opacity outside the table coverage.
-  auto out = interpn({wave, lnp, tempa},
-                     {wavenumber, ln_pressure, temperature_anomaly},
-                     ln_sigma_cross, false)
-                 .exp();
+  auto query = std::vector<torch::Tensor>{wave, lnp, tempa};
+  auto coordinates =
+      std::vector<torch::Tensor>{wavenumber, ln_pressure, temperature_anomaly};
+  auto out = interpn(query, coordinates, ln_sigma_cross, false).exp();
 
   // Check species id in range
   TORCH_CHECK(options->species_ids()[0] >= 0 &&
                   options->species_ids()[0] < conc.size(2),
               "Invalid species_id: ", options->species_ids()[0]);
 
-  return out *
-         conc.select(-1, options->species_ids()[0]).unsqueeze(0).unsqueeze(-1);
+  auto water_conc = conc.select(-1, options->species_ids()[0]);
+  if (has_split_h2o_continuum) {
+    auto total_conc = conc.sum(-1);
+    TORCH_CHECK(torch::all(total_conc > 0.0).item<bool>(),
+                "Total gas concentration must be positive");
+    TORCH_CHECK(torch::all(water_conc >= 0.0).item<bool>(),
+                "H2O concentration must be non-negative");
+    auto h2o_vmr = water_conc / total_conc;
+    auto sigma_self =
+        interpn(query, coordinates, ln_sigma_continuum_self, false).exp();
+    auto sigma_foreign =
+        interpn(query, coordinates, ln_sigma_continuum_foreign, false).exp();
+    out += h2o_vmr.unsqueeze(0).unsqueeze(-1) * sigma_self;
+    out += (1.0 - h2o_vmr).unsqueeze(0).unsqueeze(-1) * sigma_foreign;
+  }
+
+  return out * water_conc.unsqueeze(0).unsqueeze(-1);
 }
 
 }  // namespace harp

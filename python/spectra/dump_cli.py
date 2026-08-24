@@ -27,6 +27,7 @@ from .dataset_io import (
 )
 from .hitran_cia_utils import load_cia_dataset
 from .hitran_molecule_utils import build_line_provider, download_hitran_lines
+from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_components
 from .orton_xiz_cia import load_orton_xiz_cia_dataset, resolve_orton_xiz_cia_filename
 from .utils import (
     HelpFormatter,
@@ -301,6 +302,17 @@ def _xsection_dataset(
         dataset["sigma_cia"].attrs = {"long_name": "CIA or continuum absorption cross section", "units": "cm^2 molecule^-1"}
     elif cia_name.startswith("sigma_continuum_"):
         dataset[cia_name].attrs = {"long_name": f"{secondary_component['label']} absorption cross section", "units": "cm^2 molecule^-1"}
+        for component, values in secondary_component.get("continuum_components", {}).items():
+            name = f"sigma_continuum_h2o_{component}_mt_ckd"
+            dataset[name] = (
+                "wavenumber",
+                np.asarray(values, dtype=np.float64),
+                {
+                    "long_name": f"MT_CKD H2O {component} continuum unit-VMR cross section",
+                    "units": "cm^2 molecule^-1",
+                    "composition_weight": "runtime",
+                },
+            )
     else:
         dataset[cia_name].attrs = {"long_name": f"{secondary_component['label']} CIA absorption cross section", "units": "cm^2 molecule^-1"}
         binary = np.asarray(secondary_component["binary_absorption_coefficient"], dtype=np.float64)
@@ -669,7 +681,16 @@ def _compute_species_xsection(args: argparse.Namespace):
             pressure_pa=pressure_pa,
         )
         if cia_cross_section_cm2_molecule is not None:
-            secondary_component = {"kind": "continuum", "label": "H2O continuum (MT_CKD)"}
+            sigma_self, sigma_foreign = compute_mt_ckd_h2o_continuum_components(
+                wavenumber_grid_cm1=grid,
+                temperature_k=temperature_k,
+                pressure_pa=pressure_pa,
+            )
+            secondary_component = {
+                "kind": "continuum",
+                "label": "H2O continuum (MT_CKD)",
+                "continuum_components": {"self": sigma_self, "foreign": sigma_foreign},
+            }
     elif cia_selection is not None:
         pair, _ = cia_selection
         secondary_component = {

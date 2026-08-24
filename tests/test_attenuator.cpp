@@ -44,8 +44,10 @@ void put_text_attr(int fileid, int varid, char const* name, char const* value) {
   check_nc(nc_put_att_text(fileid, varid, name, std::strlen(value), value));
 }
 
-fs::path write_test_dataset() {
-  auto path = fs::temp_directory_path() / "pyharp_test_molecule_line.nc";
+fs::path write_test_dataset(bool split_continuum = false) {
+  auto path = fs::temp_directory_path() /
+              (split_continuum ? "pyharp_test_molecule_line_split.nc"
+                               : "pyharp_test_molecule_line.nc");
   int fileid = -1;
   check_nc(nc_create(path.c_str(), NC_CLOBBER, &fileid));
 
@@ -56,6 +58,7 @@ fs::path write_test_dataset() {
 
   int var_wavenumber = -1, var_pressure = -1, var_del_temp = -1;
   int var_temperature = -1, var_line = -1, var_cont = -1, var_cia = -1;
+  int var_cont_self = -1, var_cont_foreign = -1;
   check_nc(nc_def_var(fileid, "wavenumber", NC_DOUBLE, 1, &dim_wavenumber,
                       &var_wavenumber));
   check_nc(nc_def_var(fileid, "pressure", NC_DOUBLE, 1, &dim_pressure,
@@ -70,6 +73,12 @@ fs::path write_test_dataset() {
       nc_def_var(fileid, "sigma_line_h2o", NC_DOUBLE, 3, dims3, &var_line));
   check_nc(nc_def_var(fileid, "sigma_continuum_h2o_mt_ckd", NC_DOUBLE, 3, dims3,
                       &var_cont));
+  if (split_continuum) {
+    check_nc(nc_def_var(fileid, "sigma_continuum_h2o_self_mt_ckd", NC_DOUBLE, 3,
+                        dims3, &var_cont_self));
+    check_nc(nc_def_var(fileid, "sigma_continuum_h2o_foreign_mt_ckd", NC_DOUBLE,
+                        3, dims3, &var_cont_foreign));
+  }
   check_nc(nc_def_var(fileid, "binary_absorption_coefficient_h2_he", NC_DOUBLE,
                       3, dims3, &var_cia));
 
@@ -79,6 +88,10 @@ fs::path write_test_dataset() {
   put_text_attr(fileid, var_temperature, "units", "K");
   put_text_attr(fileid, var_line, "units", "cm^2 molecule^-1");
   put_text_attr(fileid, var_cont, "units", "cm^2 molecule^-1");
+  if (split_continuum) {
+    put_text_attr(fileid, var_cont_self, "units", "cm^2 molecule^-1");
+    put_text_attr(fileid, var_cont_foreign, "units", "cm^2 molecule^-1");
+  }
   put_text_attr(fileid, var_cia, "units", "cm^5 molecule^-2");
 
   check_nc(nc_enddef(fileid));
@@ -90,6 +103,8 @@ fs::path write_test_dataset() {
 
   std::vector<double> sigma_line(2 * 2 * 3);
   std::vector<double> sigma_cont(2 * 2 * 3);
+  std::vector<double> sigma_cont_self(2 * 2 * 3, 2.0e-24);
+  std::vector<double> sigma_cont_foreign(2 * 2 * 3, 6.0e-24);
   std::vector<double> sigma_cia(2 * 2 * 3);
 
   for (int idt = 0; idt < 2; ++idt) {
@@ -113,6 +128,11 @@ fs::path write_test_dataset() {
   check_nc(nc_put_var_double(fileid, var_temperature, temperature));
   check_nc(nc_put_var_double(fileid, var_line, sigma_line.data()));
   check_nc(nc_put_var_double(fileid, var_cont, sigma_cont.data()));
+  if (split_continuum) {
+    check_nc(nc_put_var_double(fileid, var_cont_self, sigma_cont_self.data()));
+    check_nc(
+        nc_put_var_double(fileid, var_cont_foreign, sigma_cont_foreign.data()));
+  }
   check_nc(nc_put_var_double(fileid, var_cia, sigma_cia.data()));
   check_nc(nc_close(fileid));
 
@@ -218,6 +238,37 @@ TEST(TestOpacity, MoleculeLineAddsContinuumAndHandlesDimensionOrder) {
   auto expected = expected_sigma * 2.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
   EXPECT_LT(result[0].item<double>(), 1.0e-250);
+#endif
+}
+
+TEST(TestOpacity, MoleculeLineWeightsSplitWaterContinuumAtRuntime) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  auto dataset = write_test_dataset(true);
+  harp::species_names = {"H2O", "H2", "He"};
+  harp::species_weights = {18.0e-3, 2.0e-3, 4.0e-3};
+
+  auto op = harp::OpacityOptionsImpl::create();
+  op->type("molecule-line").species_ids({0}).opacity_files({dataset.string()});
+  harp::MoleculeLine line(op);
+
+  auto conc = torch::zeros({1, 1, 3}, torch::kFloat64);
+  conc[0][0][0] = 1.0;
+  conc[0][0][1] = 3.0;
+  std::map<std::string, torch::Tensor> atm;
+  atm["pres"] = torch::tensor({{1.0e5}}, torch::kFloat64);
+  atm["temp"] = torch::tensor({{290.0}}, torch::kFloat64);
+  atm["wavenumber"] = torch::tensor({20.0, 21.0, 22.0}, torch::kFloat64);
+
+  auto result = line->forward(conc, atm).squeeze();
+  // xH2O=0.25: continuum = 0.25*2e-24 + 0.75*6e-24 = 5e-24.
+  // The legacy combined field is present but must be ignored when both split
+  // fields exist.
+  auto expected_sigma =
+      torch::tensor({5.0e-24, 7.0e-24, 8.0e-24}, torch::kFloat64) *
+      (1.0e-4 * harp::constants::Avogadro);
+  EXPECT_TRUE(torch::allclose(result, expected_sigma, 1.0e-12, 1.0e-12));
 #endif
 }
 

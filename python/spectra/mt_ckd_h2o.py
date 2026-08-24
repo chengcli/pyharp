@@ -61,6 +61,23 @@ def compute_mt_ckd_h2o_continuum_cross_section(
     if not (0.0 <= foreign_vmr <= 1.0):
         raise ValueError("foreign_vmr must be between 0 and 1.")
 
+    sigma_self, sigma_foreign = compute_mt_ckd_h2o_continuum_components(
+        wavenumber_grid_cm1=wavenumber_grid_cm1,
+        temperature_k=temperature_k,
+        pressure_pa=pressure_pa,
+        data_path=data_path,
+    )
+    return float(h2o_vmr) * sigma_self + float(foreign_vmr) * sigma_foreign
+
+
+def compute_mt_ckd_h2o_continuum_components(
+    *,
+    wavenumber_grid_cm1: np.ndarray,
+    temperature_k: float,
+    pressure_pa: float,
+    data_path: Path | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return unit-VMR MT_CKD self and foreign cross sections in cm^2/molecule."""
     resolved_path = default_mt_ckd_h2o_data_path() if data_path is None else Path(data_path)
     if not resolved_path.exists():
         raise FileNotFoundError(
@@ -80,19 +97,21 @@ def compute_mt_ckd_h2o_continuum_cross_section(
         ref_temp_k = float(dataset["ref_temp"].values)
 
     rho_ratio = (pressure_mbar / ref_press_mbar) * (ref_temp_k / float(temperature_k))
-    sigma_self = self_absco_ref * (ref_temp_k / float(temperature_k)) ** self_texp
-    sigma_self = sigma_self * float(h2o_vmr) * rho_ratio
-    sigma_foreign = foreign_absco_ref * float(foreign_vmr) * rho_ratio
-    continuum_ref = (sigma_self + sigma_foreign) * _radiation_term(reference_grid, float(temperature_k))
+    radiation = _radiation_term(reference_grid, float(temperature_k))
+    self_ref = self_absco_ref * (ref_temp_k / float(temperature_k)) ** self_texp * rho_ratio * radiation
+    foreign_ref = foreign_absco_ref * rho_ratio * radiation
 
-    interpolator = interp1d(
-        reference_grid,
-        continuum_ref,
-        kind="cubic",
-        bounds_error=False,
-        fill_value=0.0,
-        assume_sorted=True,
-    )
-    continuum = np.asarray(interpolator(target_grid), dtype=np.float64)
-    continuum[continuum < 0.0] = 0.0
-    return continuum
+    def interpolate(values: np.ndarray) -> np.ndarray:
+        interpolator = interp1d(
+            reference_grid,
+            values,
+            kind="cubic",
+            bounds_error=False,
+            fill_value=0.0,
+            assume_sorted=True,
+        )
+        result = np.asarray(interpolator(target_grid), dtype=np.float64)
+        result[result < 0.0] = 0.0
+        return result
+
+    return interpolate(self_ref), interpolate(foreign_ref)
