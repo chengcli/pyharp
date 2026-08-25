@@ -94,6 +94,27 @@ TEST(TestMieWaterLiquid, UsesBuiltInSegelsteinWaterIndices) {
   EXPECT_TRUE(torch::all(result.select(-1, 1) <= 1.0).item<bool>());
 }
 
+TEST(TestMieWaterLiquid, BuiltInSegelsteinExactGridPointsMatchOverrides) {
+  harp::species_weights = {18.01528e-3};
+  harp::MieWaterLiquid cloud(mie_options(1));
+  auto conc = torch::tensor({{{0.01}}}, torch::kFloat64);
+
+  std::map<std::string, torch::Tensor> builtin_atm;
+  builtin_atm["wavelength"] = torch::tensor({0.1, 1000.0}, torch::kFloat64);
+  builtin_atm["re"] = torch::tensor(10.0, torch::kFloat64);
+  builtin_atm["water_density"] = torch::tensor(1000.0, torch::kFloat64);
+
+  std::map<std::string, torch::Tensor> override_atm = builtin_atm;
+  override_atm["refractive_index_real"] =
+      torch::tensor({1.476628, 2.399111}, torch::kFloat64);
+  override_atm["refractive_index_imag"] =
+      torch::tensor({5.4298789e-1, 1.0418139}, torch::kFloat64);
+
+  auto builtin = cloud->forward(conc, builtin_atm);
+  auto expected = cloud->forward(conc, override_atm);
+  EXPECT_TRUE(torch::allclose(builtin, expected, 1.0e-12, 1.0e-14));
+}
+
 TEST(TestMieWaterLiquid, ScalesLinearlyWithLiquidWaterContent) {
   harp::species_weights = {18.01528e-3};
   harp::MieWaterLiquid cloud(mie_options(1));

@@ -67,7 +67,8 @@ torch::Tensor water_refractive_indices(torch::Tensor const& wavelength,
               "0.1--1000 um. Provide refractive_index_real and "
               "refractive_index_imag to override it.");
 
-  auto upper = torch::searchsorted(grid, wavelength, false, false);
+  auto upper = torch::searchsorted(grid, wavelength,
+                                   /*out_int32=*/false, /*right=*/true);
   upper = torch::clamp(upper, 0, grid.size(0) - 1);
   auto lower = torch::clamp(upper - 1, 0, grid.size(0) - 1);
   auto exact_lower = upper == 0;
