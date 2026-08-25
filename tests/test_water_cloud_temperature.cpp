@@ -14,6 +14,8 @@
 #include <harp/opacity/water_ice_fu96_98.hpp>
 #include <harp/opacity/water_liquid_mie.hpp>
 
+#include "device_testing.hpp"
+
 namespace harp {
 extern std::vector<double> species_weights;
 }  // namespace harp
@@ -63,4 +65,32 @@ TEST(TestTemperatureSwitchWaterCloud, RequiresTemperature) {
   atm["wavelength"] = torch::tensor({0.5}, torch::kFloat64);
   atm["re"] = torch::tensor(re_from_dge(50.0), torch::kFloat64);
   EXPECT_THROW(cloud->forward(conc, atm), c10::Error);
+}
+
+TEST_P(DeviceTest, TemperatureSwitchWaterCloudMatchesCpuReference) {
+  harp::species_weights = {18.01528e-3};
+  harp::TemperatureSwitchWaterCloud cloud(
+      cloud_options("water-cloud-temperature-switch", 2));
+
+  auto tensor_options = torch::TensorOptions().dtype(dtype).device(device);
+  auto conc = torch::full({1, 2, 1}, 0.01, tensor_options);
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] = torch::tensor({0.5}, tensor_options);
+  atm["re"] = torch::full({1, 2}, re_from_dge(50.0), tensor_options);
+  atm["temp"] = torch::tensor({{260.0, 280.0}}, tensor_options);
+
+  auto result = cloud->forward(conc, atm);
+  EXPECT_EQ(result.device().type(), device.type());
+  ASSERT_EQ(result.sizes(), torch::IntArrayRef({1, 1, 2, 4}));
+  EXPECT_TRUE(torch::all(torch::isfinite(result.cpu())).item<bool>());
+
+  harp::TemperatureSwitchWaterCloud cpu_cloud(
+      cloud_options("water-cloud-temperature-switch", 2));
+  auto cpu_conc = conc.cpu();
+  std::map<std::string, torch::Tensor> cpu_atm;
+  for (auto const& item : atm) {
+    cpu_atm[item.first] = item.second.cpu();
+  }
+  auto expected = cpu_cloud->forward(cpu_conc, cpu_atm);
+  EXPECT_TRUE(torch::allclose(result.cpu(), expected, 1.0e-5, 1.0e-7));
 }

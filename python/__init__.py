@@ -1,9 +1,11 @@
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 import torch
 
 try:
     from .pyharp import *
+    add_resource_directory(str(Path(__file__).with_name("data")), prepend=False)
 except ModuleNotFoundError as exc:
     if exc.name != f"{__name__}.pyharp":
         raise

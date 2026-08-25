@@ -11,6 +11,8 @@
 #include <harp/opacity/opacity_options.hpp>
 #include <harp/opacity/water_liquid_mie.hpp>
 
+#include "device_testing.hpp"
+
 namespace harp {
 extern std::vector<double> species_weights;
 }  // namespace harp
@@ -116,4 +118,32 @@ TEST(TestMieWaterLiquid, RequiresRadiusAndCompleteIndexOverride) {
   atm["re"] = torch::tensor(10.0, torch::kFloat64);
   atm["refractive_index_real"] = torch::tensor(1.33, torch::kFloat64);
   EXPECT_THROW(cloud->forward(conc, atm), c10::Error);
+}
+
+TEST_P(DeviceTest, MieWaterLiquidMatchesCpuReference) {
+  harp::species_weights = {18.01528e-3};
+  harp::MieWaterLiquid cloud(mie_options(2));
+
+  auto tensor_options = torch::TensorOptions().dtype(dtype).device(device);
+  auto conc = torch::full({2, 2, 1}, 0.01, tensor_options);
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] = torch::tensor({0.5, 1.0}, tensor_options);
+  atm["re"] = torch::full({2, 2}, 10.0, tensor_options);
+  atm["water_density"] = torch::tensor(1000.0, tensor_options);
+  atm["refractive_index_real"] = torch::tensor({1.33, 1.31}, tensor_options);
+  atm["refractive_index_imag"] = torch::tensor({0.0, 1.0e-6}, tensor_options);
+
+  auto result = cloud->forward(conc, atm);
+  EXPECT_EQ(result.device().type(), device.type());
+  ASSERT_EQ(result.sizes(), torch::IntArrayRef({2, 2, 2, 4}));
+  EXPECT_TRUE(torch::all(torch::isfinite(result.cpu())).item<bool>());
+
+  harp::MieWaterLiquid cpu_cloud(mie_options(2));
+  auto cpu_conc = conc.cpu();
+  std::map<std::string, torch::Tensor> cpu_atm;
+  for (auto const& item : atm) {
+    cpu_atm[item.first] = item.second.cpu();
+  }
+  auto expected = cpu_cloud->forward(cpu_conc, cpu_atm);
+  EXPECT_TRUE(torch::allclose(result.cpu(), expected, 1.0e-5, 1.0e-7));
 }

@@ -12,8 +12,10 @@
 #include <disort/index.h>
 
 // harp
+#include <harp/utils/find_resource.hpp>
+#include <harp/utils/read_data_tensor.hpp>
+
 #include "water_liquid_mie.hpp"
-#include "water_liquid_mie_data.hpp"
 
 namespace harp {
 
@@ -22,6 +24,7 @@ extern std::vector<double> species_weights;
 namespace {
 
 constexpr double kPi = 3.141592653589793238462643383279502884;
+constexpr double kWaterDensity = 997.0;  // kg/m^3 at 25 C
 
 struct MieEfficiency {
   double qext;
@@ -84,39 +87,36 @@ torch::Tensor spectral_field(torch::Tensor value, int64_t nwave,
   return value.contiguous();
 }
 
-std::pair<double, double> water_refractive_index(double wavelength) {
-  using namespace mie_water_liquid_data;
-  TORCH_CHECK(wavelength >= kSegelsteinWater[0][0] &&
-                  wavelength <= kSegelsteinWater[kSegelsteinWaterSize - 1][0],
+std::pair<double, double> water_refractive_index(
+    double wavelength, torch::Tensor const& segelstein_water) {
+  auto table = segelstein_water.accessor<double, 2>();
+  auto const nrow = segelstein_water.size(0);
+  TORCH_CHECK(wavelength >= table[0][0] && wavelength <= table[nrow - 1][0],
               "Built-in liquid-water refractive index supports wavelength "
               "0.1--1000 um; got ",
               wavelength,
               " um. Provide refractive_index_real and "
               "refractive_index_imag to override it.");
 
-  auto const* begin = std::begin(kSegelsteinWater);
-  auto const* end = std::end(kSegelsteinWater);
-  auto const* upper = std::lower_bound(
-      begin, end, wavelength,
-      [](auto const& row, double value) { return row[0] < value; });
-  if (upper == begin) return {upper[0][1], upper[0][2]};
-  if (upper == end) {
-    auto const& row = kSegelsteinWater[kSegelsteinWaterSize - 1];
-    return {row[1], row[2]};
+  int64_t upper = 0;
+  while (upper < nrow && table[upper][0] < wavelength) {
+    ++upper;
   }
-  if ((*upper)[0] == wavelength) return {(*upper)[1], (*upper)[2]};
+  if (upper == 0) return {table[0][1], table[0][2]};
+  if (upper == nrow) return {table[nrow - 1][1], table[nrow - 1][2]};
+  if (table[upper][0] == wavelength) return {table[upper][1], table[upper][2]};
 
-  auto const* lower = upper - 1;
-  double const x0 = std::log((*lower)[0]);
-  double const x1 = std::log((*upper)[0]);
+  auto const lower = upper - 1;
+  double const x0 = std::log(table[lower][0]);
+  double const x1 = std::log(table[upper][0]);
   double const f = (std::log(wavelength) - x0) / (x1 - x0);
-  double const n = (*lower)[1] + f * ((*upper)[1] - (*lower)[1]);
+  double const n = table[lower][1] + f * (table[upper][1] - table[lower][1]);
   double k;
-  if ((*lower)[2] > 0.0 && (*upper)[2] > 0.0) {
-    k = std::exp(std::log((*lower)[2]) +
-                 f * (std::log((*upper)[2]) - std::log((*lower)[2])));
+  if (table[lower][2] > 0.0 && table[upper][2] > 0.0) {
+    k = std::exp(std::log(table[lower][2]) +
+                 f * (std::log(table[upper][2]) - std::log(table[lower][2])));
   } else {
-    k = (*lower)[2] + f * ((*upper)[2] - (*lower)[2]);
+    k = table[lower][2] + f * (table[upper][2] - table[lower][2]);
   }
   return {n, k};
 }
@@ -259,6 +259,16 @@ MieWaterLiquidImpl::MieWaterLiquidImpl(OpacityOptions const& options_)
   reset();
 }
 
+void MieWaterLiquidImpl::reset() {
+  segelstein_water = register_buffer(
+      "segelstein_water",
+      read_data_tensor(find_resource("opacity/cloud/segelstein_water.txt")));
+  TORCH_CHECK(segelstein_water.dim() == 2 && segelstein_water.size(1) == 3,
+              "Liquid-water refractive-index table must have columns "
+              "wavelength, n, k; got ",
+              segelstein_water.sizes());
+}
+
 torch::Tensor MieWaterLiquidImpl::forward(
     torch::Tensor conc, std::map<std::string, torch::Tensor> const& kwargs) {
   TORCH_CHECK(conc.dim() == 3,
@@ -312,8 +322,7 @@ torch::Tensor MieWaterLiquidImpl::forward(
   if (kwargs.count("water_density") > 0) {
     density = layer_field(kwargs.at("water_density"), conc, "water_density");
   } else {
-    density = torch::full({conc.size(0), conc.size(1)},
-                          mie_water_liquid_data::kWaterDensity,
+    density = torch::full({conc.size(0), conc.size(1)}, kWaterDensity,
                           torch::TensorOptions().dtype(torch::kFloat64));
   }
   TORCH_CHECK(torch::all(torch::isfinite(density)).item<bool>() &&
@@ -343,8 +352,10 @@ torch::Tensor MieWaterLiquidImpl::forward(
     auto* wave_ptr = wavelength.data_ptr<double>();
     auto* real_ptr = ref_real.data_ptr<double>();
     auto* imag_ptr = ref_imag.data_ptr<double>();
+    auto water_table =
+        segelstein_water.to(torch::kCPU, torch::kFloat64).contiguous();
     for (int64_t iw = 0; iw < wavelength.size(0); ++iw) {
-      auto const [n, k] = water_refractive_index(wave_ptr[iw]);
+      auto const [n, k] = water_refractive_index(wave_ptr[iw], water_table);
       real_ptr[iw] = n;
       imag_ptr[iw] = k;
     }

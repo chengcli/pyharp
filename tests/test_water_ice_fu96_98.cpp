@@ -11,6 +11,8 @@
 #include <harp/opacity/opacity_options.hpp>
 #include <harp/opacity/water_ice_fu96_98.hpp>
 
+#include "device_testing.hpp"
+
 namespace harp {
 extern std::vector<double> species_weights;
 }  // namespace harp
@@ -150,4 +152,28 @@ TEST(TestFuWaterIce, KeepsFu98EndpointFitsPhysical) {
   auto result = ice->forward(conc, atm);
   EXPECT_TRUE(torch::all(result.select(-1, 1) >= 0.0).item<bool>());
   EXPECT_TRUE(torch::all(result.select(-1, 1) <= 1.0).item<bool>());
+}
+
+TEST_P(DeviceTest, FuWaterIceMatchesCpuReference) {
+  harp::species_weights = {18.01528e-3};
+  harp::FuWaterIce ice(fu_options(2));
+
+  auto tensor_options = torch::TensorOptions().dtype(dtype).device(device);
+  auto conc = torch::full({2, 2, 1}, 0.01, tensor_options);
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] = torch::tensor({0.5, 10.0}, tensor_options);
+  atm["re"] = torch::full({2, 2}, re_from_dge(50.0), tensor_options);
+
+  auto result = ice->forward(conc, atm);
+  EXPECT_EQ(result.device().type(), device.type());
+  ASSERT_EQ(result.sizes(), torch::IntArrayRef({2, 2, 2, 4}));
+  EXPECT_TRUE(torch::all(torch::isfinite(result.cpu())).item<bool>());
+
+  harp::FuWaterIce cpu_ice(fu_options(2));
+  auto cpu_conc = conc.cpu();
+  std::map<std::string, torch::Tensor> cpu_atm;
+  cpu_atm["wavelength"] = atm["wavelength"].cpu();
+  cpu_atm["re"] = atm["re"].cpu();
+  auto expected = cpu_ice->forward(cpu_conc, cpu_atm);
+  EXPECT_TRUE(torch::allclose(result.cpu(), expected, 1.0e-5, 1.0e-7));
 }

@@ -17,12 +17,15 @@ namespace harp {
 //! Lorenz-Mie optical properties for spherical liquid-water droplets.
 class MieWaterLiquidImpl : public torch::nn::Cloneable<MieWaterLiquidImpl> {
  public:
+  //! Segelstein liquid-water refractive-index table: wavelength [um], n, k.
+  torch::Tensor segelstein_water;
+
   //! Options with which this module was constructed.
   OpacityOptions options;
 
   MieWaterLiquidImpl() : options(OpacityOptionsImpl::create()) {}
   explicit MieWaterLiquidImpl(OpacityOptions const& options_);
-  void reset() override {}
+  void reset() override;
 
   //! Calculate liquid-water cloud optical properties.
   /*!
