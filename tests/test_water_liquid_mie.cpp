@@ -83,8 +83,7 @@ TEST(TestMieWaterLiquid, UsesBuiltInSegelsteinWaterIndices) {
   harp::MieWaterLiquid cloud(mie_options(2));
   auto conc = torch::tensor({{{0.01}}}, torch::kFloat64);
   std::map<std::string, torch::Tensor> atm;
-  atm["wavelength"] =
-      torch::tensor({0.5, 1.0, 10.0, 100.0}, torch::kFloat64);
+  atm["wavelength"] = torch::tensor({0.5, 1.0, 10.0, 100.0}, torch::kFloat64);
   atm["re"] = torch::tensor(10.0, torch::kFloat64);
   auto result = cloud->forward(conc, atm);
   EXPECT_TRUE(torch::all(torch::isfinite(result)).item<bool>());

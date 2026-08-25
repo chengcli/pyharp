@@ -112,39 +112,38 @@ torch::Tensor fu98_asymmetry(torch::Tensor const& coeff,
 
 FuWaterIceImpl::FuWaterIceImpl(OpacityOptions const& options_)
     : options(options_) {
-  TORCH_CHECK(options->type().empty() ||
-                  options->type() == "water-ice-fu96-98",
+  TORCH_CHECK(options->type().empty() || options->type() == "water-ice-fu96-98",
               "Mismatch opacity type: ", options->type(),
               " expecting 'water-ice-fu96-98'");
   TORCH_CHECK(options->species_ids().size() == 1,
               "Fu water ice requires exactly one H2O(s) species");
   TORCH_CHECK(options->species_ids()[0] >= 0,
               "Invalid Fu water-ice species_id: ", options->species_ids()[0]);
-  TORCH_CHECK(options->nmom() >= 1,
-              "Fu water ice requires nmom >= 1; got ", options->nmom());
+  TORCH_CHECK(options->nmom() >= 1, "Fu water ice requires nmom >= 1; got ",
+              options->nmom());
   reset();
 }
 
 void FuWaterIceImpl::reset() {
   using namespace fu_water_ice_data;
-  fu96_wavelength_edges = register_buffer(
-      "fu96_wavelength_edges", copy_table(kFu96WavelengthEdges));
-  fu96_extinction_coeff = register_buffer(
-      "fu96_extinction_coeff", copy_table(kFu96Extinction));
-  fu96_coalbedo_coeff = register_buffer(
-      "fu96_coalbedo_coeff", copy_table(kFu96Coalbedo));
-  fu96_asymmetry_coeff = register_buffer(
-      "fu96_asymmetry_coeff", copy_table(kFu96Asymmetry));
+  fu96_wavelength_edges = register_buffer("fu96_wavelength_edges",
+                                          copy_table(kFu96WavelengthEdges));
+  fu96_extinction_coeff =
+      register_buffer("fu96_extinction_coeff", copy_table(kFu96Extinction));
+  fu96_coalbedo_coeff =
+      register_buffer("fu96_coalbedo_coeff", copy_table(kFu96Coalbedo));
+  fu96_asymmetry_coeff =
+      register_buffer("fu96_asymmetry_coeff", copy_table(kFu96Asymmetry));
   fu96_delta_coeff =
       register_buffer("fu96_delta_coeff", copy_table(kFu96Delta));
   fu98_wavelength =
       register_buffer("fu98_wavelength", copy_table(kFu98Wavelength));
-  fu98_extinction_coeff = register_buffer(
-      "fu98_extinction_coeff", copy_table(kFu98Extinction));
-  fu98_absorption_coeff = register_buffer(
-      "fu98_absorption_coeff", copy_table(kFu98Absorption));
-  fu98_asymmetry_coeff = register_buffer(
-      "fu98_asymmetry_coeff", copy_table(kFu98Asymmetry));
+  fu98_extinction_coeff =
+      register_buffer("fu98_extinction_coeff", copy_table(kFu98Extinction));
+  fu98_absorption_coeff =
+      register_buffer("fu98_absorption_coeff", copy_table(kFu98Absorption));
+  fu98_asymmetry_coeff =
+      register_buffer("fu98_asymmetry_coeff", copy_table(kFu98Asymmetry));
 }
 
 torch::Tensor FuWaterIceImpl::forward(
@@ -153,8 +152,9 @@ torch::Tensor FuWaterIceImpl::forward(
               "Fu water ice expects conc shape (ncol, nlyr, nspecies); got ",
               conc.sizes());
   auto const species_id = options->species_ids()[0];
-  TORCH_CHECK(species_id < conc.size(2), "Invalid Fu water-ice species_id: ",
-              species_id, " for conc with ", conc.size(2), " species");
+  TORCH_CHECK(species_id < conc.size(2),
+              "Invalid Fu water-ice species_id: ", species_id,
+              " for conc with ", conc.size(2), " species");
   TORCH_CHECK(species_id < species_weights.size(),
               "Fu water-ice species_id has no molecular weight: ", species_id);
   auto const ice_conc = conc.select(-1, species_id);
@@ -207,8 +207,8 @@ torch::Tensor FuWaterIceImpl::forward(
     auto const invalid96 =
         active & fu96 & ((d < kFu96MinDge) | (d > kFu96MaxDge));
     auto const fu98 = use_fu98.view({-1, 1, 1});
-    auto const invalid98 = active & fu98 &
-                           ((d < kFu98MinDge) | (d > kFu98MaxDge));
+    auto const invalid98 =
+        active & fu98 & ((d < kFu98MinDge) | (d > kFu98MaxDge));
     TORCH_CHECK(!torch::any(invalid96).item<bool>(),
                 "Fu96 re must be in [12.1005, 84.5934] um where IWC > 0");
     TORCH_CHECK(!torch::any(invalid98).item<bool>(),
@@ -263,10 +263,9 @@ torch::Tensor FuWaterIceImpl::forward(
   auto upper98 = torch::ones_like(rows96);
   auto const nodes98 = fu98_wavelength.to(conc.options());
   for (int node = 0; node < 35; ++node) {
-    auto const mask =
-        (lookup_wavelength >= nodes98[node]) &
-        (node == 34 ? lookup_wavelength <= nodes98[node + 1]
-                    : lookup_wavelength < nodes98[node + 1]);
+    auto const mask = (lookup_wavelength >= nodes98[node]) &
+                      (node == 34 ? lookup_wavelength <= nodes98[node + 1]
+                                  : lookup_wavelength < nodes98[node + 1]);
     lower98.masked_fill_(mask, node);
     upper98.masked_fill_(mask, node + 1);
   }
@@ -298,8 +297,7 @@ torch::Tensor FuWaterIceImpl::forward(
   // extinction at Dge=11 um near 65--75 um. Keep solver inputs physical while
   // retaining the original coefficients and interpolation above.
   auto const ssa = torch::where(
-      support_mask,
-      torch::where(fu96_mask, ssa96, ssa98).clamp(0.0, 1.0), 0.0);
+      support_mask, torch::where(fu96_mask, ssa96, ssa98).clamp(0.0, 1.0), 0.0);
   auto const g = torch::where(
       support_mask,
       torch::where(fu96_mask, g96, g98).clamp(-0.999999, 0.999999), 0.0);

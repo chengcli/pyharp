@@ -29,8 +29,7 @@ struct MieEfficiency {
   double g;
 };
 
-std::complex<double> lentz_log_derivative(
-    std::complex<double> z, int n) {
+std::complex<double> lentz_log_derivative(std::complex<double> z, int n) {
   // Continued-fraction coefficients:
   // a_j = (-1)^(j+1) * (2*n + 2*j - 1) / z
   auto const a1 = (2.0 * n + 1.0) / z;
@@ -79,18 +78,16 @@ torch::Tensor spectral_field(torch::Tensor value, int64_t nwave,
   if (value.dim() == 0) {
     return value.expand({nwave}).contiguous();
   }
-  TORCH_CHECK(value.dim() == 1 && value.size(0) == nwave,
-              "Mie water liquid expects ", name,
-              " to be scalar or match the 1D spectral grid; got ",
-              value.sizes());
+  TORCH_CHECK(
+      value.dim() == 1 && value.size(0) == nwave, "Mie water liquid expects ",
+      name, " to be scalar or match the 1D spectral grid; got ", value.sizes());
   return value.contiguous();
 }
 
 std::pair<double, double> water_refractive_index(double wavelength) {
   using namespace mie_water_liquid_data;
   TORCH_CHECK(wavelength >= kSegelsteinWater[0][0] &&
-                  wavelength <=
-                      kSegelsteinWater[kSegelsteinWaterSize - 1][0],
+                  wavelength <= kSegelsteinWater[kSegelsteinWaterSize - 1][0],
               "Built-in liquid-water refractive index supports wavelength "
               "0.1--1000 um; got ",
               wavelength,
@@ -150,8 +147,7 @@ MieEfficiency mie_efficiency(std::complex<double> m, double x) {
   auto const z = m * x;
   int const derivative_order = nstop + 1;
   TORCH_CHECK(derivative_order < 2000000,
-              "Mie size parameter is too large for an online calculation: ",
-              x);
+              "Mie size parameter is too large for an online calculation: ", x);
 
   // D_n(z) = psi'_n(z)/psi_n(z). Wiscombe's criterion chooses the stable
   // recurrence direction; the downward start uses Lentz's continued
@@ -172,10 +168,9 @@ MieEfficiency mie_efficiency(std::complex<double> m, double x) {
     }
   } else {
     auto const exponential = std::exp(std::complex<double>(0.0, -2.0) * z);
-    d[1] = -1.0 / z +
-           (1.0 - exponential) /
-               ((1.0 - exponential) / z -
-                std::complex<double>(0.0, 1.0) * (1.0 + exponential));
+    d[1] = -1.0 / z + (1.0 - exponential) / ((1.0 - exponential) / z -
+                                             std::complex<double>(0.0, 1.0) *
+                                                 (1.0 + exponential));
     for (int n = 2; n <= derivative_order; ++n) {
       auto const nz = (1.0 * n) / z;
       d[static_cast<std::size_t>(n)] =
@@ -185,9 +180,9 @@ MieEfficiency mie_efficiency(std::complex<double> m, double x) {
 
   std::vector<std::complex<double>> a(static_cast<std::size_t>(nstop));
   std::vector<std::complex<double>> b(static_cast<std::size_t>(nstop));
-  double psi_nm1 = std::sin(x); // n-1 (n minus 1) Riccati-Bessel function
+  double psi_nm1 = std::sin(x);  // n-1 (n minus 1) Riccati-Bessel function
   double psi_n = psi_nm1 / x - std::cos(x);
-  std::complex<double> xi_nm1(psi_nm1, std::cos(x)); //psi_nm1 + i*chi_nm1
+  std::complex<double> xi_nm1(psi_nm1, std::cos(x));  // psi_nm1 + i*chi_nm1
   std::complex<double> xi_n(psi_n, std::cos(x) / x + std::sin(x));
 
   for (int n = 1; n <= nstop; ++n) {
@@ -196,9 +191,11 @@ MieEfficiency mie_efficiency(std::complex<double> m, double x) {
     auto const da = dn / m + nx;
     auto const db = m * dn + nx;
     a[static_cast<std::size_t>(n - 1)] =
-        (da * psi_n - psi_nm1) / (da * xi_n - xi_nm1); // Mie-scattering coefficient a_n
+        (da * psi_n - psi_nm1) /
+        (da * xi_n - xi_nm1);  // Mie-scattering coefficient a_n
     b[static_cast<std::size_t>(n - 1)] =
-        (db * psi_n - psi_nm1) / (db * xi_n - xi_nm1); // Mie-scattering coefficient b_n
+        (db * psi_n - psi_nm1) /
+        (db * xi_n - xi_nm1);  // Mie-scattering coefficient b_n
 
     double const psi_np1 = (2.0 * n + 1.0) * psi_n / x - psi_nm1;
     auto const xi_np1 = (2.0 * n + 1.0) * xi_n / x - xi_nm1;
@@ -210,36 +207,38 @@ MieEfficiency mie_efficiency(std::complex<double> m, double x) {
 
   double ext_sum = 0.0;
   double sca_sum = 0.0;
-  double g_sum = 0.0; 
+  double g_sum = 0.0;
   for (int n = 1; n <= nstop; ++n) {
     auto const an = a[static_cast<std::size_t>(n - 1)];
     auto const bn = b[static_cast<std::size_t>(n - 1)];
     double const weight = 2.0 * n + 1.0;
-    ext_sum += weight * (an.real() + bn.real()); // Wiscombe 1980, eq.1a
-    sca_sum += weight * (std::norm(an) + std::norm(bn)); // Wiscombe 1980, eq.1b
+    ext_sum += weight * (an.real() + bn.real());  // Wiscombe 1980, eq.1a
+    sca_sum +=
+        weight * (std::norm(an) + std::norm(bn));  // Wiscombe 1980, eq.1b
     g_sum += weight / (n * (n + 1.0)) *
-             std::real(an * std::conj(bn)); //complex conjugate
+             std::real(an * std::conj(bn));  // complex conjugate
     if (n < nstop) {
       auto const an1 = a[static_cast<std::size_t>(n)];
       auto const bn1 = b[static_cast<std::size_t>(n)];
       g_sum += n * (n + 2.0) / (n + 1.0) *
-               std::real(an * std::conj(an1) + bn * std::conj(bn1)); // Wiscombe 1980, eq.1c
+               std::real(an * std::conj(an1) +
+                         bn * std::conj(bn1));  // Wiscombe 1980, eq.1c
     }
   }
 
   double const factor = 2.0 / (x * x);
   double qext = factor * ext_sum;
   double const qsca = factor * sca_sum;
-  TORCH_CHECK(std::isfinite(qext) && std::isfinite(qsca) && qext >= 0.0 &&
-                  qsca >= 0.0,
-              "Non-finite or negative Mie efficiency for x=", x);
+  TORCH_CHECK(
+      std::isfinite(qext) && std::isfinite(qsca) && qext >= 0.0 && qsca >= 0.0,
+      "Non-finite or negative Mie efficiency for x=", x);
   // Roundoff can make a nonabsorbing calculation very slightly violate
   // qext >= qsca. Enforce nonnegative absorption before forming the albedo.
   qext = std::max(qext, qsca);
-  double const g = qsca > std::numeric_limits<double>::min()
-                       ? std::clamp(4.0 * g_sum / (x * x * qsca), -0.999999,
-                                    0.999999)
-                       : 0.0;
+  double const g =
+      qsca > std::numeric_limits<double>::min()
+          ? std::clamp(4.0 * g_sum / (x * x * qsca), -0.999999, 0.999999)
+          : 0.0;
   return {qext, qsca, g};
 }
 
@@ -247,17 +246,16 @@ MieEfficiency mie_efficiency(std::complex<double> m, double x) {
 
 MieWaterLiquidImpl::MieWaterLiquidImpl(OpacityOptions const& options_)
     : options(options_) {
-  TORCH_CHECK(options->type().empty() ||
-                  options->type() == "water-liquid-mie",
+  TORCH_CHECK(options->type().empty() || options->type() == "water-liquid-mie",
               "Mismatch opacity type: ", options->type(),
               " expecting 'water-liquid-mie'");
   TORCH_CHECK(options->species_ids().size() == 1,
               "Mie water liquid requires exactly one H2O(l) species");
-  TORCH_CHECK(options->species_ids()[0] >= 0,
-              "Invalid Mie water-liquid species_id: ",
-              options->species_ids()[0]);
-  TORCH_CHECK(options->nmom() >= 1,
-              "Mie water liquid requires nmom >= 1; got ", options->nmom());
+  TORCH_CHECK(
+      options->species_ids()[0] >= 0,
+      "Invalid Mie water-liquid species_id: ", options->species_ids()[0]);
+  TORCH_CHECK(options->nmom() >= 1, "Mie water liquid requires nmom >= 1; got ",
+              options->nmom());
   reset();
 }
 
@@ -271,13 +269,12 @@ torch::Tensor MieWaterLiquidImpl::forward(
   TORCH_CHECK(species_id < conc.size(2),
               "Invalid Mie water-liquid species_id: ", species_id,
               " for conc with ", conc.size(2), " species");
-  TORCH_CHECK(species_id < species_weights.size(),
-              "Mie water-liquid species_id has no molecular weight: ",
-              species_id);
+  TORCH_CHECK(
+      species_id < species_weights.size(),
+      "Mie water-liquid species_id has no molecular weight: ", species_id);
 
-  auto liquid_conc = conc.select(-1, species_id)
-                         .to(torch::kCPU, torch::kFloat64)
-                         .contiguous();
+  auto liquid_conc =
+      conc.select(-1, species_id).to(torch::kCPU, torch::kFloat64).contiguous();
   TORCH_CHECK(torch::all(torch::isfinite(liquid_conc)).item<bool>() &&
                   torch::all(liquid_conc >= 0.0).item<bool>(),
               "Mie water-liquid concentration must be finite and nonnegative");
@@ -315,10 +312,9 @@ torch::Tensor MieWaterLiquidImpl::forward(
   if (kwargs.count("water_density") > 0) {
     density = layer_field(kwargs.at("water_density"), conc, "water_density");
   } else {
-    density = torch::full(
-        {conc.size(0), conc.size(1)},
-        mie_water_liquid_data::kWaterDensity,
-        torch::TensorOptions().dtype(torch::kFloat64));
+    density = torch::full({conc.size(0), conc.size(1)},
+                          mie_water_liquid_data::kWaterDensity,
+                          torch::TensorOptions().dtype(torch::kFloat64));
   }
   TORCH_CHECK(torch::all(torch::isfinite(density)).item<bool>() &&
                   torch::all(density > 0.0).item<bool>(),
@@ -385,8 +381,10 @@ torch::Tensor MieWaterLiquidImpl::forward(
         }
         auto const& mie = cached->second;
         double const mass_extinction =
-            3.0 * mie.qext / (4.0 * density_ptr[layer] * radius_m); // kext = Qext*pi*r^2 / (4/3*rho_w*r^3) m^2/kg
-        result[iw][icol][ilyr][disort::IEX] = // m^-1
+            3.0 * mie.qext /
+            (4.0 * density_ptr[layer] *
+             radius_m);  // kext = Qext*pi*r^2 / (4/3*rho_w*r^3) m^2/kg
+        result[iw][icol][ilyr][disort::IEX] =  // m^-1
             molar_conc * molecular_weight * mass_extinction;
         result[iw][icol][ilyr][disort::ISS] =
             mie.qext > 0.0 ? std::clamp(mie.qsca / mie.qext, 0.0, 1.0) : 0.0;
@@ -399,10 +397,10 @@ torch::Tensor MieWaterLiquidImpl::forward(
     }
   }
 
-  TORCH_CHECK(torch::all(torch::isfinite(result_cpu)).item<bool>() &&
-                  torch::all(result_cpu.select(-1, disort::IEX) >= 0.0)
-                      .item<bool>(),
-              "Mie water-liquid returned invalid optical properties");
+  TORCH_CHECK(
+      torch::all(torch::isfinite(result_cpu)).item<bool>() &&
+          torch::all(result_cpu.select(-1, disort::IEX) >= 0.0).item<bool>(),
+      "Mie water-liquid returned invalid optical properties");
   return result_cpu.to(conc.options());
 }
 

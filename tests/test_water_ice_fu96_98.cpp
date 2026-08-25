@@ -42,10 +42,9 @@ TEST(TestFuWaterIce, UsesFu96AndFu98Bands) {
   // 0.5 um: Fu96 interval [0.48, 0.52).
   double const ext96 = -0.945458e-04 + 0.252061e+01 / 50.0;
   double const coalbedo96 = 0.508447e-06 + 0.273206e-07 * 50.0 +
-                            0.496553e-10 * 2500.0 -
-                            0.186001e-12 * 125000.0;
-  double const g96 = 0.749856 + 0.889161e-3 * 50.0 -
-                     0.349578e-6 * 2500.0 - 0.109913e-7 * 125000.0;
+                            0.496553e-10 * 2500.0 - 0.186001e-12 * 125000.0;
+  double const g96 = 0.749856 + 0.889161e-3 * 50.0 - 0.349578e-6 * 2500.0 -
+                     0.109913e-7 * 125000.0;
   EXPECT_NEAR(result[0][0][0][0].item<double>(), ext96 * iwc_g_m3, 1.0e-12);
   EXPECT_NEAR(result[0][0][0][1].item<double>(), 1.0 - coalbedo96, 1.0e-12);
   EXPECT_NEAR(result[0][0][0][2].item<double>(), g96, 1.0e-12);
@@ -53,8 +52,7 @@ TEST(TestFuWaterIce, UsesFu96AndFu98Bands) {
   EXPECT_NEAR(result[0][0][0][4].item<double>(), g96 * g96 * g96, 1.0e-12);
 
   // 1000 cm^-1 is exactly the 10 um Fu98 wavelength node.
-  double const ext98 =
-      -7.627102e-03 + 3.406420 / 50.0 - 17.32583 / 2500.0;
+  double const ext98 = -7.627102e-03 + 3.406420 / 50.0 - 17.32583 / 2500.0;
   EXPECT_NEAR(result[1][0][0][0].item<double>(), ext98 * iwc_g_m3, 1.0e-12);
 }
 

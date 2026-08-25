@@ -30,8 +30,7 @@ class TemperatureSwitchWaterCloudImpl
   FuWaterIce ice{nullptr};
   MieWaterLiquid liquid{nullptr};
 
-  TemperatureSwitchWaterCloudImpl()
-      : options(OpacityOptionsImpl::create()) {}
+  TemperatureSwitchWaterCloudImpl() : options(OpacityOptionsImpl::create()) {}
   explicit TemperatureSwitchWaterCloudImpl(OpacityOptions const& options_);
   void reset() override;
 

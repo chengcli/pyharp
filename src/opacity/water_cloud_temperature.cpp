@@ -58,8 +58,8 @@ torch::Tensor TemperatureSwitchWaterCloudImpl::forward(
               conc.sizes());
   auto const species_id = options->species_ids()[0];
   TORCH_CHECK(species_id < conc.size(2),
-              "Invalid temperature-switch water-cloud species_id: ",
-              species_id, " for conc with ", conc.size(2), " species");
+              "Invalid temperature-switch water-cloud species_id: ", species_id,
+              " for conc with ", conc.size(2), " species");
   TORCH_CHECK(kwargs.count("temp") > 0,
               "Temperature-switch water cloud requires temp [K]");
 
