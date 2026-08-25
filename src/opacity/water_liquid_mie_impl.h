@@ -27,7 +27,7 @@ DISPATCH_MACRO T clamp_value(T value, T lo, T hi) {
 
 template <typename T>
 DISPATCH_MACRO Complex<T> lentz_log_derivative_device(Complex<T> z, int n,
-                                                         int* status) {
+                                                      int* status) {
   auto const a1 = static_cast<T>(2 * n + 1) / z;
   auto const a2 = -static_cast<T>(2 * n + 3) / z;
   auto u = a2 + static_cast<T>(1) / a1;
@@ -54,14 +54,16 @@ DISPATCH_MACRO Complex<T> lentz_log_derivative_device(Complex<T> z, int n,
 
 template <typename T>
 DISPATCH_MACRO int mie_nstop(T x) {
-  return static_cast<int>(x + static_cast<T>(4.05) *
-                                  pow(x, static_cast<T>(1.0 / 3.0)) +
-                          static_cast<T>(2.0));
+  return static_cast<int>(
+      x + static_cast<T>(4.05) * pow(x, static_cast<T>(1.0 / 3.0)) +
+      static_cast<T>(2.0));
 }
 
 template <typename T>
-DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(
-    T nreal, T kimag, T x, Complex<T>* work, int max_order) {
+DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
+                                                            T x,
+                                                            Complex<T>* work,
+                                                            int max_order) {
   MieEfficiencyDevice<T> out{0, 0, 0, 0};
   if (!(x > static_cast<T>(0)) || !(nreal > static_cast<T>(0)) ||
       kimag < static_cast<T>(0)) {
@@ -167,21 +169,22 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(
   if (out.qext < out.qsca) out.qext = out.qsca;
   out.g = out.qsca > static_cast<T>(0)
               ? clamp_value(static_cast<T>(4) * g_sum / (x * x * out.qsca),
-                            static_cast<T>(-0.999999),
-                            static_cast<T>(0.999999))
+                            static_cast<T>(-0.999999), static_cast<T>(0.999999))
               : static_cast<T>(0);
   return out;
 }
 
 template <typename T>
-DISPATCH_MACRO T water_liquid_mie_property(
-    int64_t prop, T molar_conc, T wavelength, T radius_um, T density,
-    T ref_real, T ref_imag, T molecular_weight, int nmom,
-    Complex<T>* work, int max_order) {
+DISPATCH_MACRO T water_liquid_mie_property(int64_t prop, T molar_conc,
+                                           T wavelength, T radius_um, T density,
+                                           T ref_real, T ref_imag,
+                                           T molecular_weight, int nmom,
+                                           Complex<T>* work, int max_order) {
   if (molar_conc == static_cast<T>(0)) return static_cast<T>(0);
   T const pi = static_cast<T>(3.141592653589793238462643383279502884);
   T const x = static_cast<T>(2) * pi * radius_um / wavelength;
-  auto const mie = mie_efficiency_device(ref_real, ref_imag, x, work, max_order);
+  auto const mie =
+      mie_efficiency_device(ref_real, ref_imag, x, work, max_order);
   if (mie.status != 0) return static_cast<T>(NAN);
   if (prop == 0) {
     T const radius_m = radius_um * static_cast<T>(1.0e-6);

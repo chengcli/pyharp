@@ -5,10 +5,11 @@
 #include <disort/index.h>
 
 // harp
-#include "scattering_functions.hpp"
-#include "water_ice_fu96_98.hpp"
 #include <harp/utils/find_resource.hpp>
 #include <harp/utils/read_data_tensor.hpp>
+
+#include "scattering_functions.hpp"
+#include "water_ice_fu96_98.hpp"
 
 namespace harp {
 
@@ -122,34 +123,28 @@ FuWaterIceImpl::FuWaterIceImpl(OpacityOptions const& options_)
 }
 
 void FuWaterIceImpl::reset() {
-  fu96_wavelength_edges = register_buffer("fu96_wavelength_edges",
-                                          load_cloud_table(
-                                              "kFu96WavelengthEdges.txt",
-                                              {26}));
+  fu96_wavelength_edges =
+      register_buffer("fu96_wavelength_edges",
+                      load_cloud_table("kFu96WavelengthEdges.txt", {26}));
   fu96_extinction_coeff =
       register_buffer("fu96_extinction_coeff",
                       load_cloud_table("kFu96Extinction.txt", {25, 2}));
-  fu96_coalbedo_coeff =
-      register_buffer("fu96_coalbedo_coeff",
-                      load_cloud_table("kFu96Coalbedo.txt", {25, 4}));
-  fu96_asymmetry_coeff =
-      register_buffer("fu96_asymmetry_coeff",
-                      load_cloud_table("kFu96Asymmetry.txt", {25, 4}));
-  fu96_delta_coeff =
-      register_buffer("fu96_delta_coeff",
-                      load_cloud_table("kFu96Delta.txt", {25, 4}));
-  fu98_wavelength =
-      register_buffer("fu98_wavelength",
-                      load_cloud_table("kFu98Wavelength.txt", {36}));
+  fu96_coalbedo_coeff = register_buffer(
+      "fu96_coalbedo_coeff", load_cloud_table("kFu96Coalbedo.txt", {25, 4}));
+  fu96_asymmetry_coeff = register_buffer(
+      "fu96_asymmetry_coeff", load_cloud_table("kFu96Asymmetry.txt", {25, 4}));
+  fu96_delta_coeff = register_buffer(
+      "fu96_delta_coeff", load_cloud_table("kFu96Delta.txt", {25, 4}));
+  fu98_wavelength = register_buffer(
+      "fu98_wavelength", load_cloud_table("kFu98Wavelength.txt", {36}));
   fu98_extinction_coeff =
       register_buffer("fu98_extinction_coeff",
                       load_cloud_table("kFu98Extinction.txt", {36, 3}));
   fu98_absorption_coeff =
       register_buffer("fu98_absorption_coeff",
                       load_cloud_table("kFu98Absorption.txt", {36, 4}));
-  fu98_asymmetry_coeff =
-      register_buffer("fu98_asymmetry_coeff",
-                      load_cloud_table("kFu98Asymmetry.txt", {36, 4}));
+  fu98_asymmetry_coeff = register_buffer(
+      "fu98_asymmetry_coeff", load_cloud_table("kFu98Asymmetry.txt", {36, 4}));
 }
 
 torch::Tensor FuWaterIceImpl::forward(

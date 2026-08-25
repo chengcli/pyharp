@@ -79,14 +79,15 @@ torch::Tensor water_refractive_indices(torch::Tensor const& wavelength,
   auto n1 = table.select(1, 1).index_select(0, upper);
   auto k0 = table.select(1, 2).index_select(0, lower);
   auto k1 = table.select(1, 2).index_select(0, upper);
-  auto denom = torch::where(w1 == w0, torch::ones_like(w1), torch::log(w1) - torch::log(w0));
+  auto denom = torch::where(w1 == w0, torch::ones_like(w1),
+                            torch::log(w1) - torch::log(w0));
   auto frac = torch::where(w1 == w0, torch::zeros_like(w1),
                            (torch::log(wavelength) - torch::log(w0)) / denom);
   auto n = n0 + frac * (n1 - n0);
-  auto k = torch::where((k0 > 0.0) & (k1 > 0.0),
-                        torch::exp(torch::log(k0) +
-                                   frac * (torch::log(k1) - torch::log(k0))),
-                        k0 + frac * (k1 - k0));
+  auto k = torch::where(
+      (k0 > 0.0) & (k1 > 0.0),
+      torch::exp(torch::log(k0) + frac * (torch::log(k1) - torch::log(k0))),
+      k0 + frac * (k1 - k0));
   return torch::stack({n, k}, 1).contiguous();
 }
 
@@ -94,9 +95,9 @@ int mie_max_order(double max_x) {
   int const nstop =
       std::max(1, static_cast<int>(max_x + 4.05 * std::cbrt(max_x) + 2.0));
   int const derivative_order = nstop + 1;
-  TORCH_CHECK(derivative_order < 2000000,
-              "Mie size parameter is too large for an online calculation: ",
-              max_x);
+  TORCH_CHECK(
+      derivative_order < 2000000,
+      "Mie size parameter is too large for an online calculation: ", max_x);
   return derivative_order + 1;
 }
 
@@ -119,8 +120,7 @@ void call_water_liquid_mie_cpu(at::TensorIterator& iter,
             auto conc = reinterpret_cast<double*>(data[2] + i * strides[2]);
             auto wave = reinterpret_cast<double*>(data[3] + i * strides[3]);
             auto re = reinterpret_cast<double*>(data[4] + i * strides[4]);
-            auto density =
-                reinterpret_cast<double*>(data[5] + i * strides[5]);
+            auto density = reinterpret_cast<double*>(data[5] + i * strides[5]);
             auto real = reinterpret_cast<double*>(data[6] + i * strides[6]);
             auto imag = reinterpret_cast<double*>(data[7] + i * strides[7]);
             auto const value = water_liquid_mie_property(
@@ -216,9 +216,8 @@ torch::Tensor MieWaterLiquidImpl::forward(
 
   TORCH_CHECK(kwargs.count("re") > 0,
               "Mie water liquid requires droplet radius re [um]");
-  auto re = layer_field(kwargs.at("re"), conc, "re")
-                .to(compute_options)
-                .contiguous();
+  auto re =
+      layer_field(kwargs.at("re"), conc, "re").to(compute_options).contiguous();
   TORCH_CHECK(torch::all(torch::isfinite(re)).item<bool>() &&
                   torch::all(re > 0.0).item<bool>(),
               "Mie water-liquid re must be finite and positive");
@@ -270,23 +269,23 @@ torch::Tensor MieWaterLiquidImpl::forward(
   int const max_order = mie_max_order(max_x);
 
   auto result = torch::empty({nwave, ncol, nlyr, nprop}, conc.options());
-  auto prop = torch::arange(nprop, torch::TensorOptions()
-                                       .dtype(torch::kLong)
-                                       .device(conc.device()))
-                  .view({1, 1, 1, nprop})
-                  .expand({nwave, ncol, nlyr, nprop});
-  auto conc_view = liquid_conc.view({1, ncol, nlyr, 1})
-                       .expand({nwave, ncol, nlyr, nprop});
-  auto wave_view = wavelength.view({nwave, 1, 1, 1})
-                       .expand({nwave, ncol, nlyr, nprop});
-  auto re_view =
-      re.view({1, ncol, nlyr, 1}).expand({nwave, ncol, nlyr, nprop});
+  auto prop =
+      torch::arange(
+          nprop,
+          torch::TensorOptions().dtype(torch::kLong).device(conc.device()))
+          .view({1, 1, 1, nprop})
+          .expand({nwave, ncol, nlyr, nprop});
+  auto conc_view =
+      liquid_conc.view({1, ncol, nlyr, 1}).expand({nwave, ncol, nlyr, nprop});
+  auto wave_view =
+      wavelength.view({nwave, 1, 1, 1}).expand({nwave, ncol, nlyr, nprop});
+  auto re_view = re.view({1, ncol, nlyr, 1}).expand({nwave, ncol, nlyr, nprop});
   auto density_view =
       density.view({1, ncol, nlyr, 1}).expand({nwave, ncol, nlyr, nprop});
-  auto real_view = ref_real.view({nwave, 1, 1, 1})
-                       .expand({nwave, ncol, nlyr, nprop});
-  auto imag_view = ref_imag.view({nwave, 1, 1, 1})
-                       .expand({nwave, ncol, nlyr, nprop});
+  auto real_view =
+      ref_real.view({nwave, 1, 1, 1}).expand({nwave, ncol, nlyr, nprop});
+  auto imag_view =
+      ref_imag.view({nwave, 1, 1, 1}).expand({nwave, ncol, nlyr, nprop});
 
   auto iter = at::TensorIteratorConfig()
                   .add_output(result)
@@ -299,9 +298,8 @@ torch::Tensor MieWaterLiquidImpl::forward(
                   .add_input(imag_view)
                   .check_all_same_dtype(false)
                   .build();
-  at::native::call_water_liquid_mie(iter.device_type(), iter,
-                                    molecular_weight, options->nmom(),
-                                    max_order);
+  at::native::call_water_liquid_mie(iter.device_type(), iter, molecular_weight,
+                                    options->nmom(), max_order);
 
   TORCH_CHECK(
       torch::all(torch::isfinite(result)).item<bool>() &&
