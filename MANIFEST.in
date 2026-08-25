@@ -1,0 +1,2 @@
+recursive-include data/opacity/cloud *.txt
+recursive-include python/data/opacity/cloud *.txt

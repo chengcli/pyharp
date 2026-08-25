@@ -3,7 +3,7 @@ macro(add_package_noinclude name url tag patch option)
   set(ColorReset "${Esc}[m")
   set(Yellow "${Esc}[33m")
 
-  set(CACHE_DIR "${CMAKE_SOURCE_DIR}/.cache")
+  set(CACHE_DIR "${HARP_ROOT_DIR}/.cache")
   set(CACHE_FILE "${CACHE_DIR}/${name}-${tag}.tar.gz")
 
   string(TOUPPER ${name} nameu)
