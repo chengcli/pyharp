@@ -109,25 +109,27 @@ void call_water_liquid_mie_cpu(at::TensorIterator& iter,
                                int max_order) {
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_water_liquid_mie_cpu", [&] {
     int const grain_size = iter.numel() / at::get_num_threads();
-    using ComplexDouble = Complex<double>;
+    using ComplexScalar = Complex<scalar_t>;
     iter.for_each(
         [&](char** data, const int64_t* strides, int64_t n) {
-          std::vector<ComplexDouble> work(
+          std::vector<ComplexScalar> work(
               static_cast<std::size_t>(3 * max_order));
           auto* work_ptr = work.data();
           for (int64_t i = 0; i < n; ++i) {
             auto out = reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
             auto prop = reinterpret_cast<int64_t*>(data[1] + i * strides[1]);
-            auto conc = reinterpret_cast<double*>(data[2] + i * strides[2]);
-            auto wave = reinterpret_cast<double*>(data[3] + i * strides[3]);
-            auto re = reinterpret_cast<double*>(data[4] + i * strides[4]);
-            auto density = reinterpret_cast<double*>(data[5] + i * strides[5]);
-            auto real = reinterpret_cast<double*>(data[6] + i * strides[6]);
-            auto imag = reinterpret_cast<double*>(data[7] + i * strides[7]);
+            auto conc = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
+            auto wave = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
+            auto re = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
+            auto density =
+                reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
+            auto real = reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
+            auto imag = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
             auto const value = water_liquid_mie_property(
                 *prop, *conc, *wave, *re, *density, *real, *imag,
-                molecular_weight, nmom, work_ptr, max_order);
-            *out = static_cast<scalar_t>(value);
+                static_cast<scalar_t>(molecular_weight), nmom, work_ptr,
+                max_order);
+            *out = value;
           }
         },
         grain_size);
@@ -185,19 +187,16 @@ torch::Tensor MieWaterLiquidImpl::forward(
       species_id < species_weights.size(),
       "Mie water-liquid species_id has no molecular weight: ", species_id);
 
-  auto const compute_options =
-      torch::TensorOptions().dtype(torch::kFloat64).device(conc.device());
-  auto liquid_conc =
-      conc.select(-1, species_id).to(compute_options).contiguous();
+  auto liquid_conc = conc.select(-1, species_id).contiguous();
   TORCH_CHECK(torch::all(torch::isfinite(liquid_conc)).item<bool>() &&
                   torch::all(liquid_conc >= 0.0).item<bool>(),
               "Mie water-liquid concentration must be finite and nonnegative");
 
   torch::Tensor wavelength;
   if (kwargs.count("wavelength") > 0) {
-    wavelength = kwargs.at("wavelength");
+    wavelength = kwargs.at("wavelength").to(conc.options()).contiguous();
   } else if (kwargs.count("wavenumber") > 0) {
-    auto wavenumber = kwargs.at("wavenumber");
+    auto wavenumber = kwargs.at("wavenumber").to(conc.options()).contiguous();
     TORCH_CHECK(torch::all(torch::isfinite(wavenumber)).item<bool>() &&
                     torch::all(wavenumber > 0.0).item<bool>(),
                 "Mie water-liquid wavenumber must be finite and positive");
@@ -210,15 +209,13 @@ torch::Tensor MieWaterLiquidImpl::forward(
   TORCH_CHECK(wavelength.dim() == 1,
               "Mie water liquid expects a 1D spectral grid; got ",
               wavelength.sizes());
-  wavelength = wavelength.to(compute_options).contiguous();
   TORCH_CHECK(torch::all(torch::isfinite(wavelength)).item<bool>() &&
                   torch::all(wavelength > 0.0).item<bool>(),
               "Mie water-liquid wavelength must be finite and positive");
 
   TORCH_CHECK(kwargs.count("re") > 0,
               "Mie water liquid requires droplet radius re [um]");
-  auto re =
-      layer_field(kwargs.at("re"), conc, "re").to(compute_options).contiguous();
+  auto re = layer_field(kwargs.at("re"), conc, "re").contiguous();
   TORCH_CHECK(torch::all(torch::isfinite(re)).item<bool>() &&
                   torch::all(re > 0.0).item<bool>(),
               "Mie water-liquid re must be finite and positive");
@@ -226,11 +223,10 @@ torch::Tensor MieWaterLiquidImpl::forward(
   torch::Tensor density;
   if (kwargs.count("water_density") > 0) {
     density = layer_field(kwargs.at("water_density"), conc, "water_density")
-                  .to(compute_options)
                   .contiguous();
   } else {
     density = torch::full({conc.size(0), conc.size(1)}, kWaterDensity,
-                          compute_options);
+                          conc.options());
   }
   TORCH_CHECK(torch::all(torch::isfinite(density)).item<bool>() &&
                   torch::all(density > 0.0).item<bool>(),

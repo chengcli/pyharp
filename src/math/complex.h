@@ -102,7 +102,7 @@ DISPATCH_MACRO T complex_abs(Complex<T> a) {
 template <typename T>
 DISPATCH_MACRO Complex<T> complex_exp(Complex<T> a) {
   T const e = exp(a.r);
-  return {e * cos(a.i), e * sin(a.i)};
+  return {static_cast<T>(e * cos(a.i)), static_cast<T>(e * sin(a.i))};
 }
 
 }  // namespace harp
