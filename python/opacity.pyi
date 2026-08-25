@@ -728,6 +728,55 @@ class MieWaterLiquid:
         """
         ...
 
+class TemperatureSwitchWaterCloud:
+    """
+    Temperature-selected water-condensate cloud opacity.
+
+    The configured species supplies total condensed water. Fu (1996, 1998)
+    ice optics are used where ``temp < 273.15 K``; Lorenz-Mie liquid-water
+    optics are used where ``temp >= 273.15 K``. The freezing temperature is
+    fixed while SNAPy does not output liquid and solid condensate separately.
+
+    Examples:
+        >>> from pyharp.opacity import TemperatureSwitchWaterCloud, OpacityOptions
+        >>> op = (OpacityOptions().type("water-cloud-temperature-switch")
+        ...       .species_ids([0]).nmom(4))
+        >>> cloud = TemperatureSwitchWaterCloud(op)
+    """
+
+    options: OpacityOptions
+
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, options: OpacityOptions) -> None: ...
+
+    def __repr__(self) -> str: ...
+
+    def module(self, name: str): ...
+
+    def buffer(self, name: str) -> torch.Tensor: ...
+
+    def forward(
+        self, conc: torch.Tensor, atm: dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        """
+        Calculate temperature-selected cloud optical properties.
+
+        Args:
+            conc: Total water-condensate molar concentration with shape
+                ``(ncol, nlyr, nspecies)`` and units mol/m^3.
+            atm: Must contain layer ``temp`` [K], layer ``re`` [um], and
+                either ``wavenumber`` [cm^-1] or ``wavelength`` [um].
+
+        Returns:
+            Tensor with shape ``(nwave, ncol, nlyr, 2 + nmom)`` containing
+            attenuation [1/m], single-scattering albedo, and HG Legendre
+            moments excluding the zeroth moment.
+        """
+        ...
+
 class MoleculeLine:
     """
     Molecular line absorption read from a NetCDF dump.

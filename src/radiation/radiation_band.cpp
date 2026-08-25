@@ -15,6 +15,7 @@
 #include <harp/opacity/picaso_ck.hpp>
 #include <harp/opacity/rayleigh.hpp>
 #include <harp/opacity/respq_table.hpp>
+#include <harp/opacity/water_cloud_temperature.hpp>
 #include <harp/opacity/water_ice_fu96_98.hpp>
 #include <harp/opacity/water_liquid_mie.hpp>
 #include <harp/opacity/wavetemp.hpp>
@@ -242,6 +243,10 @@ void RadiationBandImpl::reset() {
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "water-liquid-mie") {
       auto a = MieWaterLiquid(op);
+      nmax_prop = std::max(nmax_prop, 2 + a->options->nmom());
+      opacities[name] = torch::nn::AnyModule(a);
+    } else if (op->type() == "water-cloud-temperature-switch") {
+      auto a = TemperatureSwitchWaterCloud(op);
       nmax_prop = std::max(nmax_prop, 2 + a->options->nmom());
       opacities[name] = torch::nn::AnyModule(a);
     } else if (op->type() == "helios") {
