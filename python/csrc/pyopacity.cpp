@@ -10,6 +10,8 @@
 #include <harp/opacity/opacity_formatter.hpp>
 #include <harp/opacity/opacity_options.hpp>
 #include <harp/opacity/rayleigh.hpp>
+#include <harp/opacity/water_ice_fu96_98.hpp>
+#include <harp/opacity/water_liquid_mie.hpp>
 #include <harp/opacity/wavetemp.hpp>
 
 // python
@@ -50,4 +52,7 @@ void bind_opacity(py::module& parent) {
                   py::arg("atm"));
   ADD_HARP_MODULE(MoleculeCIA, OpacityOptions, py::arg("conc"), py::arg("atm"));
   ADD_HARP_MODULE(Rayleigh, OpacityOptions, py::arg("conc"), py::arg("atm"));
+  ADD_HARP_MODULE(FuWaterIce, OpacityOptions, py::arg("conc"), py::arg("atm"));
+  ADD_HARP_MODULE(MieWaterLiquid, OpacityOptions, py::arg("conc"),
+                  py::arg("atm"));
 }

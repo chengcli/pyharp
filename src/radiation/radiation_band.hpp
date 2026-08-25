@@ -40,6 +40,7 @@ using OpacityDict = std::map<std::string, OpacityOptions>;
  *  - "wavetemp": opacity table defined on wavenumber and temperature grid (CIA)
  *  - "fourcolumn": Four-column opacity table (aerosol)
  *  - "rayleigh": gas Rayleigh scattering computed on the active spectral grid
+ *  - "water-liquid-mie": Lorenz-Mie scattering by liquid-water droplets
  *  - "helios": Helios opacity table
  */
 struct RadiationBandOptionsImpl {

@@ -614,6 +614,120 @@ class Rayleigh:
         """
         ...
 
+class FuWaterIce:
+    """
+    Fu (1996) solar and Fu et al. (1998) infrared water-ice opacity.
+
+    The configured species supplies ice-water content. The required ``re`` is
+    effective radius in um and is converted internally to Fu generalized
+    effective size using ``Dge = 8 re / (3 sqrt(3))``. The full Fu96 interval
+    tables and Fu98 wavelength-node tables cover
+    0.25--100 um; all optical properties are zero outside that range. A scalar
+    ``fu_delta_scale=True`` applies the Fu96 scaling; it defaults to false
+    because Toon shortwave already uses delta-Eddington.
+
+    Examples:
+        >>> from pyharp.opacity import FuWaterIce, OpacityOptions
+        >>> op = (OpacityOptions().type("water-ice-fu96-98")
+        ...       .species_ids([0]).nmom(4))
+        >>> ice = FuWaterIce(op)
+    """
+
+    options: OpacityOptions
+
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+
+    @overload
+    def __init__(self, options: OpacityOptions) -> None:
+        """Create a FuWaterIce instance from opacity options."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+    def module(self, name: str): ...
+
+    def buffer(self, name: str) -> torch.Tensor: ...
+
+    def forward(
+        self, conc: torch.Tensor, atm: dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        """
+        Calculate water-ice cloud optical properties.
+
+        Args:
+            conc: Molar concentration with shape ``(ncol, nlyr, nspecies)``
+                and units mol/m^3.
+            atm: Must contain ``wavenumber`` [cm^-1] or ``wavelength`` [um],
+                plus layer ``re`` [um]. Optional
+                scalar ``fu_delta_scale`` enables the Fu96 delta scaling.
+
+        Returns:
+            Tensor with shape ``(nwave, ncol, nlyr, 2 + nmom)`` containing
+            attenuation [1/m], single-scattering albedo, and HG Legendre
+            moments excluding the zeroth moment.
+        """
+        ...
+
+class MieWaterLiquid:
+    """
+    Lorenz-Mie opacity for spherical liquid-water droplets.
+
+    The configured species supplies liquid-water content. ``re`` is the
+    equivalent monodisperse droplet radius in um. By default the complex
+    refractive index is interpolated from Segelstein (1981) over
+    0.1--1000 um. The returned Legendre moments use a
+    Henyey-Greenstein representation of the exact Mie asymmetry factor.
+
+    Examples:
+        >>> from pyharp.opacity import MieWaterLiquid, OpacityOptions
+        >>> op = (OpacityOptions().type("water-liquid-mie")
+        ...       .species_ids([0]).nmom(4))
+        >>> cloud = MieWaterLiquid(op)
+    """
+
+    options: OpacityOptions
+
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+
+    @overload
+    def __init__(self, options: OpacityOptions) -> None:
+        """Create a MieWaterLiquid instance from opacity options."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+    def module(self, name: str): ...
+
+    def buffer(self, name: str) -> torch.Tensor: ...
+
+    def forward(
+        self, conc: torch.Tensor, atm: dict[str, torch.Tensor]
+    ) -> torch.Tensor:
+        """
+        Calculate liquid-water cloud optical properties.
+
+        Args:
+            conc: Molar concentration with shape
+                ``(ncol, nlyr, nspecies)`` and units mol/m^3.
+            atm: Must contain ``wavenumber`` [cm^-1] or ``wavelength`` [um],
+                plus layer ``re`` [um]. Optional ``water_density`` is in
+                kg/m^3. ``refractive_index_real`` and
+                ``refractive_index_imag`` may jointly override the built-in
+                liquid-water optical constants.
+
+        Returns:
+            Tensor with shape ``(nwave, ncol, nlyr, 2 + nmom)`` containing
+            attenuation [1/m], single-scattering albedo, and HG Legendre
+            moments excluding the zeroth moment.
+        """
+        ...
+
 class MoleculeLine:
     """
     Molecular line absorption read from a NetCDF dump.

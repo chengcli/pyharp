@@ -1,0 +1,21 @@
+species:
+  - name: H2O(s)
+    composition: {H: 2, O: 1}
+
+geometry:
+  cells:
+    nx1: 1
+
+opacities:
+  water-ice:
+    type: water-ice-fu96-98
+    species: [H2O(s)]
+    nmom: 3
+
+bands:
+  - name: shortwave
+    range: [19999.5, 20000.5]
+    opacities: [water-ice]
+    solver: toon
+    nwave: 1
+    nstr: 2
