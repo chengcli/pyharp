@@ -11,6 +11,9 @@ setup_test(test_trapez)
 setup_test(test_bbflux)
 setup_test(test_flux_utils)
 setup_test(test_rayleigh)
+setup_test(test_water_ice_fu96_98)
+setup_test(test_water_liquid_mie)
+setup_test(test_water_cloud_temperature)
 #setup_test(test_yaml_input)
 setup_test(test_tridiag)
 setup_test(test_toon)
@@ -18,6 +21,9 @@ setup_test(test_toon)
 # Python tests
 
 configure_file(rayleigh_test.yaml rayleigh_test.yaml COPYONLY)
+configure_file(water_ice_fu_test.yaml water_ice_fu_test.yaml COPYONLY)
+configure_file(water_liquid_mie_test.yaml water_liquid_mie_test.yaml COPYONLY)
+configure_file(water_cloud_temperature_test.yaml water_cloud_temperature_test.yaml COPYONLY)
 
 file(GLOB pyfiles *.py)
 

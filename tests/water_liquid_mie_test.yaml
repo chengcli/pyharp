@@ -1,0 +1,21 @@
+species:
+  - name: H2O(l)
+    composition: {H: 2, O: 1}
+
+geometry:
+  cells:
+    nx1: 1
+
+opacities:
+  water-liquid:
+    type: water-liquid-mie
+    species: [H2O(l)]
+    nmom: 3
+
+bands:
+  - name: shortwave
+    range: [19999.5, 20000.5]
+    opacities: [water-liquid]
+    solver: toon
+    nwave: 1
+    nstr: 2

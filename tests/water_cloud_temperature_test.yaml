@@ -1,0 +1,21 @@
+species:
+  - name: H2O(s)
+    composition: {H: 2, O: 1}
+
+geometry:
+  cells:
+    nx1: 2
+
+opacities:
+  water-cloud:
+    type: water-cloud-temperature-switch
+    species: [H2O(s)]
+    nmom: 2
+
+bands:
+  - name: shortwave
+    range: [19999.5, 20000.5]
+    opacities: [water-cloud]
+    solver: toon
+    nwave: 1
+    nstr: 2
