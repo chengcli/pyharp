@@ -357,7 +357,25 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
             {"long_name": f"{term.species_name} line absorption cross section", "units": "cm^2 molecule^-1"},
         )
     for source in products.secondary_sources:
-        if source.kind == "continuum":
+        if source.kind == "continuum" and source.source_name == "MT_CKD_H2O":
+            sigma_self, sigma_foreign = compute_mt_ckd_h2o_continuum_components(
+                wavenumber_grid_cm1=np.asarray(spectrum.wavenumber_cm1, dtype=np.float64),
+                temperature_k=float(spectrum.temperature_k),
+                pressure_pa=float(spectrum.pressure_pa),
+            )
+            for component, values in (("self", sigma_self), ("foreign", sigma_foreign)):
+                name = f"sigma_continuum_h2o_{component}_mt_ckd"
+                data_vars[name] = (
+                    "wavenumber",
+                    np.asarray(values, dtype=np.float64),
+                    {
+                        "long_name": f"MT_CKD H2O {component} continuum unit-VMR cross section",
+                        "units": "cm^2 molecule^-1",
+                        "composition_weight": "runtime",
+                    },
+                )
+            continue
+        elif source.kind == "continuum":
             label_token = _continuum_label_token(source.label)
             name = f"sigma_continuum_{label_token}"
             if source.weight > 0.0:

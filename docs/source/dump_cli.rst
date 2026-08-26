@@ -231,7 +231,9 @@ Pair xsection dumps use:
 Composition xsection dumps contain one file with multiple component fields:
 
 * ``sigma_line_<species>`` for unweighted line cross sections
-* ``sigma_continuum_<source>`` for unweighted continuum cross sections
+* ``sigma_continuum_h2o_self_mt_ckd`` and
+  ``sigma_continuum_h2o_foreign_mt_ckd`` for unit-VMR H2O continuum
+  components, weighted by ``MoleculeLine`` at runtime
 * ``binary_absorption_coefficient_<pair>`` for unweighted CIA binary coefficients
 * ``sigma_total`` for the composition-weighted total cross section
 
