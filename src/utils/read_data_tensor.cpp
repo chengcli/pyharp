@@ -16,7 +16,7 @@ torch::Tensor read_data_tensor(const std::string& filename) {
     throw std::runtime_error("Could not open file: " + filename);
   }
 
-  std::vector<std::vector<float>> data;
+  std::vector<std::vector<double>> data;
   std::string line;
 
   while (std::getline(file, line)) {
@@ -26,8 +26,8 @@ torch::Tensor read_data_tensor(const std::string& filename) {
     }
 
     std::stringstream ss(line);
-    std::vector<float> row;
-    float value;
+    std::vector<double> row;
+    double value;
 
     while (ss >> value) {
       row.push_back(value);

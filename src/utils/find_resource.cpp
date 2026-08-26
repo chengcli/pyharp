@@ -63,7 +63,7 @@ std::vector<std::string> deserialize_search_paths(char const* p) {
     }
   }
   if (!found_root) {
-    dirs.push_back(std::string(HARP_ROOT_DIR) + "/data");
+    dirs.push_back(std::string(HARP_ROOT_DIR) + "/python/data");
   }
   return dirs;
 }
@@ -74,8 +74,8 @@ void set_default_directories() {
   // always look in the local directory first
   input_dirs.push_back(".");
 
-  // add cia data directory
-  input_dirs.push_back(std::string(HARP_ROOT_DIR) + "/python/cia_legacy");
+  // add bundled Python package data directory
+  input_dirs.push_back(std::string(HARP_ROOT_DIR) + "/python/data");
 
   serialize_search_paths(input_dirs);
 }

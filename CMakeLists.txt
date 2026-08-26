@@ -40,6 +40,13 @@ add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${_ABI_OUTPUT})
 # Set MacOS deployment target
 set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
 
+set(HARP_INCLUDE_DIR
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  CACHE INTERNAL "harp include directory")
+set(HARP_ROOT_DIR
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  CACHE INTERNAL "harp source/resource root directory")
+
 # make colorful output
 string(ASCII 27 Esc)
 set(ColorReset "${Esc}[m")
@@ -62,7 +69,7 @@ endif()
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/)
 
 # load all macros
-file(GLOB _macro_files "${CMAKE_SOURCE_DIR}/cmake/macros/*.cmake")
+file(GLOB _macro_files "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macros/*.cmake")
 foreach(_file ${_macro_files})
   message(STATUS "Include ${_file}")
   include(${_file})
@@ -73,12 +80,12 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 message(STATUS "${Blue}${PROJECT_NAME}-1. Set up project compiler flags ...${ColorReset}")
-message(STATUS "Include ${CMAKE_SOURCE_DIR}/cmake/compilers.cmake")
-include(${CMAKE_SOURCE_DIR}/cmake/compilers.cmake)
+message(STATUS "Include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers.cmake")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-2. Setting up project parameters ...${ColorReset}")
 message(STATUS "Include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake")
-include(${CMAKE_SOURCE_DIR}/cmake/parameters.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
 find_package(Disort REQUIRED)
@@ -117,7 +124,7 @@ if (CUDAToolkit_FOUND)
 endif()
 
 message(STATUS "${Blue}${PROJECT_NAME}-4. Setting up project libraries ...${ColorReset}")
-configure_file(${CMAKE_SOURCE_DIR}/configure.h.in configure.h @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/configure.h.in configure.h @ONLY)
 add_subdirectory(src)
 
 if (BUILD_TESTS)

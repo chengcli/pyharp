@@ -17,12 +17,15 @@ namespace harp {
 //! Lorenz-Mie optical properties for spherical liquid-water droplets.
 class MieWaterLiquidImpl : public torch::nn::Cloneable<MieWaterLiquidImpl> {
  public:
+  //! Segelstein liquid-water refractive-index table: wavelength [um], n, k.
+  torch::Tensor segelstein_water;
+
   //! Options with which this module was constructed.
   OpacityOptions options;
 
   MieWaterLiquidImpl() : options(OpacityOptionsImpl::create()) {}
   explicit MieWaterLiquidImpl(OpacityOptions const& options_);
-  void reset() override {}
+  void reset() override;
 
   //! Calculate liquid-water cloud optical properties.
   /*!
@@ -42,8 +45,8 @@ class MieWaterLiquidImpl : public torch::nn::Cloneable<MieWaterLiquidImpl> {
    * a one-dimensional tensor matching the spectral grid. `water_density`
    * [kg/m^3] may be scalar or (ncol,nlyr), and defaults to 997 kg/m^3.
    *
-   * This implementation performs the Mie recurrence on CPU and copies the
-   * result back to the input tensor device. It is intended as a physical
+   * The Mie recurrence is evaluated on the input tensor device when a
+   * dispatcher implementation is available. It is intended as a physical
    * opacity calculation, not a differentiable Torch operation.
    *
    * \param conc molar concentration [mol/m^3], (ncol, nlyr, nspecies)
