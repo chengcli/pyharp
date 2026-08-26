@@ -358,11 +358,14 @@ def _composition_xsection_dataset(args: argparse.Namespace) -> xr.Dataset:
         )
     for source in products.secondary_sources:
         if source.kind == "continuum" and source.source_name == "MT_CKD_H2O":
-            sigma_self, sigma_foreign = compute_mt_ckd_h2o_continuum_components(
-                wavenumber_grid_cm1=np.asarray(spectrum.wavenumber_cm1, dtype=np.float64),
-                temperature_k=float(spectrum.temperature_k),
-                pressure_pa=float(spectrum.pressure_pa),
-            )
+            components = source.continuum_components
+            if components is None:
+                components = compute_mt_ckd_h2o_continuum_components(
+                    wavenumber_grid_cm1=np.asarray(spectrum.wavenumber_cm1, dtype=np.float64),
+                    temperature_k=float(spectrum.temperature_k),
+                    pressure_pa=float(spectrum.pressure_pa),
+                )
+            sigma_self, sigma_foreign = components
             for component, values in (("self", sigma_self), ("foreign", sigma_foreign)):
                 name = f"sigma_continuum_h2o_{component}_mt_ckd"
                 data_vars[name] = (

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
@@ -43,7 +43,7 @@ from .hitran_molecule_utils import (
     download_hitran_lines,
     load_hitran_line_list,
 )
-from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
+from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_components
 from .utils import build_band_from_range, default_hitran_dir, parse_wn_range, process_pool_context
 from .spectrum import AbsorptionSpectrum, number_density_cm3_from_pressure_temperature
 from .transmittance import compute_transmittance_spectrum
@@ -66,6 +66,7 @@ class MixtureSecondarySource:
     weight: float
     source_name: str
     sigma_cm2_molecule: np.ndarray
+    continuum_components: tuple[np.ndarray, np.ndarray] | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -217,15 +218,18 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
 
     if "H2O" in composition:
         h2o_fraction = composition["H2O"]
+        foreign_vmr = max(0.0, 1.0 - float(h2o_fraction))
         # MT_CKD returns an H2O absorption coefficient per water molecule, so
         # convert it to the mixture-mean cross section carried by this workflow.
+        # Compute self and foreign components once and store them to avoid re-opening
+        # the MT_CKD coefficient file later (e.g. in xsection dump output).
+        sigma_self, sigma_foreign = compute_mt_ckd_h2o_continuum_components(
+            wavenumber_grid_cm1=grid,
+            temperature_k=temperature_k,
+            pressure_pa=pressure_pa,
+        )
         sigma_continuum = np.asarray(
-            compute_mt_ckd_h2o_continuum_cross_section(
-                wavenumber_grid_cm1=grid,
-                temperature_k=temperature_k,
-                pressure_pa=pressure_pa,
-                h2o_vmr=h2o_fraction,
-            ),
+            float(h2o_fraction) * sigma_self + float(foreign_vmr) * sigma_foreign,
             dtype=np.float64,
         )
         weighted_sigma_continuum = h2o_fraction * sigma_continuum
@@ -237,6 +241,7 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
                 weight=h2o_fraction,
                 source_name="MT_CKD_H2O",
                 sigma_cm2_molecule=weighted_sigma_continuum,
+                continuum_components=(sigma_self, sigma_foreign),
             )
         )
         manifest_sources.append(
