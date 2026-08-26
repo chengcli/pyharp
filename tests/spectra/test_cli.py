@@ -959,7 +959,9 @@ def test_pair_xsection_dataset_uses_binary_absorption_units(monkeypatch, tmp_pat
         dataset.close()
 
 
-def test_composition_xsection_dataset_uses_one_field_per_species_or_cia(monkeypatch, tmp_path) -> None:
+def test_composition_xsection_dataset_splits_h2o_continuum(monkeypatch, tmp_path) -> None:
+    continuum_self = np.array([0.7, 0.8])
+    continuum_foreign = np.array([0.9, 1.0])
     products = type(
         "Products",
         (),
@@ -990,12 +992,22 @@ def test_composition_xsection_dataset_uses_one_field_per_species_or_cia(monkeypa
                 type(
                     "Secondary",
                     (),
-                    {"kind": "continuum", "label": "H2O continuum (MT_CKD)", "weight": 0.2, "sigma_cm2_molecule": np.array([0.5, 0.6])},
+                    {
+                        "kind": "continuum",
+                        "label": "H2O continuum (MT_CKD)",
+                        "weight": 0.2,
+                        "source_name": "MT_CKD_H2O",
+                        "sigma_cm2_molecule": np.array([0.5, 0.6]),
+                    },
                 )(),
             ),
         },
     )()
     monkeypatch.setattr("pyharp.spectra.dump_cli._compute_composition_products", lambda args: products)
+    monkeypatch.setattr(
+        "pyharp.spectra.dump_cli.compute_mt_ckd_h2o_continuum_components",
+        lambda **kwargs: (continuum_self, continuum_foreign),
+    )
     args = build_parser().parse_args(
         [
             "xsection",
@@ -1013,7 +1025,8 @@ def test_composition_xsection_dataset_uses_one_field_per_species_or_cia(monkeypa
         assert set(dataset.data_vars) == {
             "sigma_total",
             "sigma_line_h2o",
-            "sigma_continuum_h2o_mt_ckd",
+            "sigma_continuum_h2o_self_mt_ckd",
+            "sigma_continuum_h2o_foreign_mt_ckd",
             "binary_absorption_coefficient_h2_he",
         }
         assert dataset.attrs["species_name"] == "H2,He,H2O"
@@ -1021,8 +1034,10 @@ def test_composition_xsection_dataset_uses_one_field_per_species_or_cia(monkeypa
         assert dataset.attrs["band_wavenumber_max_cm1"] == 21.0
         assert dataset["sigma_line_h2o"].attrs["units"] == "cm^2 molecule^-1"
         assert np.allclose(dataset["sigma_line_h2o"].values, np.array([3.0, 4.0]))
-        assert dataset["sigma_continuum_h2o_mt_ckd"].attrs["units"] == "cm^2 molecule^-1"
-        assert np.allclose(dataset["sigma_continuum_h2o_mt_ckd"].values, np.array([0.5, 0.6]) / 0.2)
+        assert dataset["sigma_continuum_h2o_self_mt_ckd"].attrs["units"] == "cm^2 molecule^-1"
+        assert dataset["sigma_continuum_h2o_self_mt_ckd"].attrs["composition_weight"] == "runtime"
+        assert np.allclose(dataset["sigma_continuum_h2o_self_mt_ckd"].values, continuum_self)
+        assert np.allclose(dataset["sigma_continuum_h2o_foreign_mt_ckd"].values, continuum_foreign)
         assert dataset["binary_absorption_coefficient_h2_he"].attrs["units"] == "cm^5 molecule^-2"
         assert dataset["binary_absorption_coefficient_h2_he"].attrs["long_name"].startswith("H2-He")
         assert np.allclose(dataset["binary_absorption_coefficient_h2_he"].values, np.array([5.0, 6.0]) / (0.09 * 1.0e5 / (1.380649e-16 * 300.0)))
