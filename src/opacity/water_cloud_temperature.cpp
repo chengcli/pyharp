@@ -1,3 +1,6 @@
+// disort
+#include <disort/index.h>
+
 // harp
 #include "water_cloud_temperature.hpp"
 
@@ -17,6 +20,18 @@ torch::Tensor layer_temperature(torch::Tensor value,
               "(ncol, nlyr) or a scalar; got ",
               value.sizes());
   return value;
+}
+
+torch::Tensor divide_where_positive(torch::Tensor numerator,
+                                    torch::Tensor denominator) {
+  while (denominator.dim() < numerator.dim()) {
+    denominator = denominator.unsqueeze(-1);
+  }
+  auto const positive = denominator > 0.0;
+  auto const safe_denominator =
+      torch::where(positive, denominator, torch::ones_like(denominator));
+  return torch::where(positive, numerator / safe_denominator,
+                      torch::zeros_like(numerator));
 }
 
 }  // namespace
@@ -62,6 +77,10 @@ torch::Tensor TemperatureSwitchWaterCloudImpl::forward(
               " for conc with ", conc.size(2), " species");
   TORCH_CHECK(kwargs.count("temp") > 0,
               "Temperature-switch water cloud requires temp [K]");
+  TORCH_CHECK(kwargs.count("ice_re") > 0,
+              "Temperature-switch water cloud requires ice_re [um]");
+  TORCH_CHECK(kwargs.count("liquid_re") > 0,
+              "Temperature-switch water cloud requires liquid_re [um]");
 
   auto const temp = layer_temperature(kwargs.at("temp"), conc);
   TORCH_CHECK(torch::all(torch::isfinite(temp)).item<bool>() &&
@@ -69,25 +88,56 @@ torch::Tensor TemperatureSwitchWaterCloudImpl::forward(
               "Temperature-switch water-cloud temp must be finite and "
               "positive");
 
-  auto const ice_mask = temp < kFreezingTemperature;
-  auto const liquid_mask = ~ice_mask;
+  // Khairoutdinov and Randall (2003), Eq. A13: omega_n is the liquid fraction
+  // of nonprecipitating condensate. Ice first appears below 273.15 K, the two
+  // phases coexist across a 20 K interval, and all condensate is ice at or
+  // below 253.15 K.
+  auto const liquid_fraction = ((temp - kIceOnlyTemperature) /
+                                (kFreezingTemperature - kIceOnlyTemperature))
+                                   .clamp(0.0, 1.0);
+  auto const ice_fraction = 1.0 - liquid_fraction;
 
-  // Each constituent receives condensate only in its selected phase. This is
-  // important because the Fu model validates its effective-radius range only
-  // where ice water content is nonzero.
+  // Partition only the configured condensate species. This also ensures that
+  // the Fu model validates effective radius only where ice is present.
   auto ice_conc = conc.clone();
-  ice_conc.select(-1, species_id).mul_(ice_mask);
+  ice_conc.select(-1, species_id).mul_(ice_fraction);
   auto liquid_conc = conc.clone();
-  liquid_conc.select(-1, species_id).mul_(liquid_mask);
+  liquid_conc.select(-1, species_id).mul_(liquid_fraction);
 
-  auto const ice_result = ice->forward(ice_conc, kwargs);
-  auto const liquid_result = liquid->forward(liquid_conc, kwargs);
+  // The constituent models both use the generic key `re`; give each model its
+  // own effective radius without moving or copying the underlying tensor.
+  auto ice_kwargs = kwargs;
+  ice_kwargs["re"] = kwargs.at("ice_re");
+  auto liquid_kwargs = kwargs;
+  liquid_kwargs["re"] = kwargs.at("liquid_re");
+  auto const ice_result = ice->forward(ice_conc, ice_kwargs);
+  auto const liquid_result = liquid->forward(liquid_conc, liquid_kwargs);
 
-  // Select the complete property vector rather than adding the two results:
-  // SSA and phase moments are defined even when a constituent's extinction is
-  // zero, so addition would contaminate the active phase.
-  auto const select_ice = ice_mask.unsqueeze(0).unsqueeze(-1);
-  return torch::where(select_ice, ice_result, liquid_result);
+  // Combine the two populations as independent optical constituents.
+  // Extinction adds directly; SSA is extinction weighted; phase moments are
+  // scattering weighted.
+  auto const ice_extinction = ice_result.select(-1, disort::IEX);
+  auto const liquid_extinction = liquid_result.select(-1, disort::IEX);
+  auto const extinction = ice_extinction + liquid_extinction;
+  auto const ice_scattering =
+      ice_extinction * ice_result.select(-1, disort::ISS);
+  auto const liquid_scattering =
+      liquid_extinction * liquid_result.select(-1, disort::ISS);
+  auto const scattering = ice_scattering + liquid_scattering;
+
+  auto result = torch::zeros_like(ice_result);
+  result.select(-1, disort::IEX).copy_(extinction);
+  result.select(-1, disort::ISS)
+      .copy_(divide_where_positive(scattering, extinction));
+
+  auto const nmom = options->nmom();
+  auto const weighted_moments =
+      ice_result.narrow(-1, disort::IPM, nmom) * ice_scattering.unsqueeze(-1) +
+      liquid_result.narrow(-1, disort::IPM, nmom) *
+          liquid_scattering.unsqueeze(-1);
+  result.narrow(-1, disort::IPM, nmom)
+      .copy_(divide_where_positive(weighted_moments, scattering));
+  return result;
 }
 
 }  // namespace harp
