@@ -730,12 +730,13 @@ class MieWaterLiquid:
 
 class TemperatureSwitchWaterCloud:
     """
-    Temperature-selected water-condensate cloud opacity.
+    Temperature-partitioned water-condensate cloud opacity.
 
     The configured species supplies total condensed water. Fu (1996, 1998)
-    ice optics are used where ``temp < 273.15 K``; Lorenz-Mie liquid-water
-    optics are used where ``temp >= 273.15 K``. The freezing temperature is
-    fixed while SNAPy does not output liquid and solid condensate separately.
+    ice optics and Lorenz-Mie liquid-water optics are combined following the
+    Khairoutdinov and Randall (2003) temperature partition: all liquid at and
+    above 273.15 K, all ice at and below 253.15 K, and a linear mixed-phase
+    transition between them.
 
     Examples:
         >>> from pyharp.opacity import TemperatureSwitchWaterCloud, OpacityOptions
@@ -762,13 +763,15 @@ class TemperatureSwitchWaterCloud:
         self, conc: torch.Tensor, atm: dict[str, torch.Tensor]
     ) -> torch.Tensor:
         """
-        Calculate temperature-selected cloud optical properties.
+        Calculate temperature-partitioned cloud optical properties.
 
         Args:
             conc: Total water-condensate molar concentration with shape
                 ``(ncol, nlyr, nspecies)`` and units mol/m^3.
-            atm: Must contain layer ``temp`` [K], layer ``re`` [um], and
-                either ``wavenumber`` [cm^-1] or ``wavelength`` [um].
+            atm: Must contain layer ``temp`` [K], ice effective radius
+                ``ice_re`` [um], liquid-droplet effective radius
+                ``liquid_re`` [um], and either ``wavenumber`` [cm^-1] or
+                ``wavelength`` [um].
 
         Returns:
             Tensor with shape ``(nwave, ncol, nlyr, 2 + nmom)`` containing
