@@ -289,9 +289,10 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     // Upward loop
     // Bottom BC for intensity sweep matches the tridiagonal BC:
     // Gas giant: I_up = 2*pi*(B_surf + B1*u) [Planck + gradient]
-    // Terrestrial: I_up = 2*pi*(1-albedo)*B_surf [emissivity * Planck]
+    // Terrestrial: I_up = 2*pi*(1-albedo)*B_surf + albedo*I_down
     if (hard_surface) {
-      lw_up_g[nlev - 1] = twopi * (1.0 - a_surf_in) * Bsurf;
+      lw_up_g[nlev - 1] =
+          twopi * (1.0 - a_surf_in) * Bsurf + a_surf_in * lw_down_g[nlev - 1];
     } else {
       lw_up_g[nlev - 1] = twopi * (Bsurf + B1[nlay - 1] * u);
     }

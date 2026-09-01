@@ -135,7 +135,9 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                                           /*squash_dims=*/{2, 3})
                     .add_output(flx)
                     .add_input(prop)
-                    .add_input(be)
+                    // the static shape's rank (a 3-D operand is read at
+                    // strides()[3]), contiguous as `prop` is above
+                    .add_owned_input(be.unsqueeze(-1).contiguous())
                     .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
                     .build();
 
