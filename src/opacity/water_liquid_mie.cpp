@@ -294,8 +294,8 @@ torch::Tensor MieWaterLiquidImpl::forward(
   at::native::call_water_liquid_mie(iter.device_type(), iter, molecular_weight,
                                     max_order);
 
-  auto result = torch::empty(
-      {nwave, ncol, nlyr, 2 + options->nmom()}, conc.options());
+  auto result =
+      torch::empty({nwave, ncol, nlyr, 2 + options->nmom()}, conc.options());
   result.select(-1, disort::IEX).copy_(extinction);
   result.select(-1, disort::ISS).copy_(single_scattering_albedo);
   result.narrow(-1, disort::IPM, options->nmom())
