@@ -41,9 +41,11 @@ DISPATCH_MACRO Complex<T> lentz_log_derivative_device(Complex<T> z, int n,
   auto v = a2;
   auto ratio = u / v;
   auto runratio = a1 * ratio;
+  T const tolerance = sizeof(T) == sizeof(float) ? static_cast<T>(1.0e-6)
+                                                 : static_cast<T>(1.0e-12);
   int iterations = 0;
   int j = 3;
-  while (complex_abs(ratio - static_cast<T>(1)) > static_cast<T>(1.0e-12)) {
+  while (complex_abs(ratio - static_cast<T>(1)) > tolerance) {
     if (++iterations >= 100000) {
       *status = 1;
       break;
@@ -93,7 +95,8 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     return out;
   }
 
-  int const nstop = mie_nstop(x) > 1 ? mie_nstop(x) : 1;
+  int const computed_nstop = mie_nstop(x);
+  int const nstop = computed_nstop > 1 ? computed_nstop : 1;
   int const derivative_order = nstop + 1;
   if (derivative_order + 1 > max_order) {
     out.status = 3;
@@ -131,10 +134,12 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
   }
   if (out.status != 0) return out;
 
-  T psi_nm1 = sin(x);
-  T psi_n = psi_nm1 / x - cos(x);
-  Complex<T> xi_nm1(psi_nm1, cos(x));
-  Complex<T> xi_n(psi_n, cos(x) / x + sin(x));
+  T const sin_x = sin(x);
+  T const cos_x = cos(x);
+  T psi_nm1 = sin_x;
+  T psi_n = psi_nm1 / x - cos_x;
+  Complex<T> xi_nm1(psi_nm1, cos_x);
+  Complex<T> xi_n(psi_n, cos_x / x + sin_x);
 
   for (int n = 1; n <= nstop; ++n) {
     auto const dn = d[n];
