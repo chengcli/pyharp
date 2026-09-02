@@ -17,6 +17,7 @@
 #include <harp/utils/find_resource.hpp>
 #include <harp/utils/read_data_tensor.hpp>
 
+#include "scattering_functions.hpp"
 #include "water_liquid_mie.hpp"
 #include "water_liquid_mie_dispatch.hpp"
 #include "water_liquid_mie_impl.h"
@@ -105,8 +106,7 @@ int mie_max_order(double max_x) {
 }  // namespace
 
 void call_water_liquid_mie_cpu(at::TensorIterator& iter,
-                               double molecular_weight, int nmom,
-                               int max_order) {
+                               double molecular_weight, int max_order) {
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_water_liquid_mie_cpu", [&] {
     int const grain_size = iter.numel() / at::get_num_threads();
     using ComplexScalar = Complex<scalar_t>;
@@ -116,20 +116,24 @@ void call_water_liquid_mie_cpu(at::TensorIterator& iter,
               static_cast<std::size_t>(3 * max_order));
           auto* work_ptr = work.data();
           for (int64_t i = 0; i < n; ++i) {
-            auto out = reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
-            auto prop = reinterpret_cast<int64_t*>(data[1] + i * strides[1]);
-            auto conc = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
-            auto wave = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
-            auto re = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
+            auto extinction =
+                reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
+            auto single_scattering_albedo =
+                reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
+            auto g = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
+            auto conc = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
+            auto wave = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
+            auto re = reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
             auto density =
-                reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
-            auto real = reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
-            auto imag = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
-            auto const value = water_liquid_mie_property(
-                *prop, *conc, *wave, *re, *density, *real, *imag,
-                static_cast<scalar_t>(molecular_weight), nmom, work_ptr,
-                max_order);
-            *out = value;
+                reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
+            auto real = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
+            auto imag = reinterpret_cast<scalar_t*>(data[8] + i * strides[8]);
+            auto const properties = water_liquid_mie_properties(
+                *conc, *wave, *re, *density, *real, *imag,
+                static_cast<scalar_t>(molecular_weight), work_ptr, max_order);
+            *extinction = properties.extinction;
+            *single_scattering_albedo = properties.single_scattering_albedo;
+            *g = properties.g;
           }
         },
         grain_size);
@@ -258,35 +262,27 @@ torch::Tensor MieWaterLiquidImpl::forward(
   int64_t const ncol = conc.size(0);
   int64_t const nlyr = conc.size(1);
   int64_t const nwave = wavelength.size(0);
-  int64_t const nprop = 2 + options->nmom();
   double const molecular_weight = species_weights.at(species_id);  // kg/mol
 
   auto max_x =
       (2.0 * kPi * re.max() / wavelength.min()).to(torch::kCPU).item<double>();
   int const max_order = mie_max_order(max_x);
 
-  auto result = torch::empty({nwave, ncol, nlyr, nprop}, conc.options());
-  auto prop =
-      torch::arange(
-          nprop,
-          torch::TensorOptions().dtype(torch::kLong).device(conc.device()))
-          .view({1, 1, 1, nprop})
-          .expand({nwave, ncol, nlyr, nprop});
-  auto conc_view =
-      liquid_conc.view({1, ncol, nlyr, 1}).expand({nwave, ncol, nlyr, nprop});
-  auto wave_view =
-      wavelength.view({nwave, 1, 1, 1}).expand({nwave, ncol, nlyr, nprop});
-  auto re_view = re.view({1, ncol, nlyr, 1}).expand({nwave, ncol, nlyr, nprop});
-  auto density_view =
-      density.view({1, ncol, nlyr, 1}).expand({nwave, ncol, nlyr, nprop});
-  auto real_view =
-      ref_real.view({nwave, 1, 1, 1}).expand({nwave, ncol, nlyr, nprop});
-  auto imag_view =
-      ref_imag.view({nwave, 1, 1, 1}).expand({nwave, ncol, nlyr, nprop});
+  auto const shape = std::vector<int64_t>{nwave, ncol, nlyr};
+  auto extinction = torch::empty(shape, conc.options());
+  auto single_scattering_albedo = torch::empty(shape, conc.options());
+  auto g = torch::empty(shape, conc.options());
+  auto conc_view = liquid_conc.view({1, ncol, nlyr}).expand(shape);
+  auto wave_view = wavelength.view({nwave, 1, 1}).expand(shape);
+  auto re_view = re.view({1, ncol, nlyr}).expand(shape);
+  auto density_view = density.view({1, ncol, nlyr}).expand(shape);
+  auto real_view = ref_real.view({nwave, 1, 1}).expand(shape);
+  auto imag_view = ref_imag.view({nwave, 1, 1}).expand(shape);
 
   auto iter = at::TensorIteratorConfig()
-                  .add_output(result)
-                  .add_input(prop)
+                  .add_output(extinction)
+                  .add_output(single_scattering_albedo)
+                  .add_output(g)
                   .add_input(conc_view)
                   .add_input(wave_view)
                   .add_input(re_view)
@@ -296,7 +292,14 @@ torch::Tensor MieWaterLiquidImpl::forward(
                   .check_all_same_dtype(false)
                   .build();
   at::native::call_water_liquid_mie(iter.device_type(), iter, molecular_weight,
-                                    options->nmom(), max_order);
+                                    max_order);
+
+  auto result =
+      torch::empty({nwave, ncol, nlyr, 2 + options->nmom()}, conc.options());
+  result.select(-1, disort::IEX).copy_(extinction);
+  result.select(-1, disort::ISS).copy_(single_scattering_albedo);
+  result.narrow(-1, disort::IPM, options->nmom())
+      .copy_(henyey_greenstein(options->nmom(), g));
 
   TORCH_CHECK(
       torch::all(torch::isfinite(result)).item<bool>() &&

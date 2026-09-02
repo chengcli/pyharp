@@ -21,6 +21,13 @@ struct MieEfficiencyDevice {
 };
 
 template <typename T>
+struct WaterLiquidMieProperties {
+  T extinction;
+  T single_scattering_albedo;
+  T g;
+};
+
+template <typename T>
 DISPATCH_MACRO T clamp_value(T value, T lo, T hi) {
   return value < lo ? lo : (value > hi ? hi : value);
 }
@@ -34,9 +41,11 @@ DISPATCH_MACRO Complex<T> lentz_log_derivative_device(Complex<T> z, int n,
   auto v = a2;
   auto ratio = u / v;
   auto runratio = a1 * ratio;
+  T const tolerance = sizeof(T) == sizeof(float) ? static_cast<T>(1.0e-6)
+                                                 : static_cast<T>(1.0e-12);
   int iterations = 0;
   int j = 3;
-  while (complex_abs(ratio - static_cast<T>(1)) > static_cast<T>(1.0e-12)) {
+  while (complex_abs(ratio - static_cast<T>(1)) > tolerance) {
     if (++iterations >= 100000) {
       *status = 1;
       break;
@@ -86,7 +95,8 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     return out;
   }
 
-  int const nstop = mie_nstop(x) > 1 ? mie_nstop(x) : 1;
+  int const computed_nstop = mie_nstop(x);
+  int const nstop = computed_nstop > 1 ? computed_nstop : 1;
   int const derivative_order = nstop + 1;
   if (derivative_order + 1 > max_order) {
     out.status = 3;
@@ -124,10 +134,12 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
   }
   if (out.status != 0) return out;
 
-  T psi_nm1 = sin(x);
-  T psi_n = psi_nm1 / x - cos(x);
-  Complex<T> xi_nm1(psi_nm1, cos(x));
-  Complex<T> xi_n(psi_n, cos(x) / x + sin(x));
+  T const sin_x = sin(x);
+  T const cos_x = cos(x);
+  T psi_nm1 = sin_x;
+  T psi_n = psi_nm1 / x - cos_x;
+  Complex<T> xi_nm1(psi_nm1, cos_x);
+  Complex<T> xi_n(psi_n, cos_x / x + sin_x);
 
   for (int n = 1; n <= nstop; ++n) {
     auto const dn = d[n];
@@ -175,34 +187,29 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
 }
 
 template <typename T>
-DISPATCH_MACRO T water_liquid_mie_property(int64_t prop, T molar_conc,
-                                           T wavelength, T radius_um, T density,
-                                           T ref_real, T ref_imag,
-                                           T molecular_weight, int nmom,
-                                           Complex<T>* work, int max_order) {
-  if (molar_conc == static_cast<T>(0)) return static_cast<T>(0);
+DISPATCH_MACRO WaterLiquidMieProperties<T> water_liquid_mie_properties(
+    T molar_conc, T wavelength, T radius_um, T density, T ref_real, T ref_imag,
+    T molecular_weight, Complex<T>* work, int max_order) {
+  if (molar_conc == static_cast<T>(0)) return {0, 0, 0};
   T const pi = static_cast<T>(3.141592653589793238462643383279502884);
   T const x = static_cast<T>(2) * pi * radius_um / wavelength;
   auto const mie =
       mie_efficiency_device(ref_real, ref_imag, x, work, max_order);
-  if (mie.status != 0) return static_cast<T>(NAN);
-  if (prop == 0) {
-    T const radius_m = radius_um * static_cast<T>(1.0e-6);
-    T const mass_extinction =
-        static_cast<T>(3) * mie.qext / (static_cast<T>(4) * density * radius_m);
-    return molar_conc * molecular_weight * mass_extinction;
+  if (mie.status != 0) {
+    T const nan = static_cast<T>(NAN);
+    return {nan, nan, nan};
   }
-  if (prop == 1) {
-    return mie.qext > static_cast<T>(0)
-               ? clamp_value(mie.qsca / mie.qext, static_cast<T>(0),
-                             static_cast<T>(1))
-               : static_cast<T>(0);
-  }
-  T moment = mie.g;
-  for (int imom = 0; imom < prop - 2 && imom < nmom; ++imom) {
-    moment *= mie.g;
-  }
-  return moment;
+
+  T const radius_m = radius_um * static_cast<T>(1.0e-6);
+  T const mass_extinction =
+      static_cast<T>(3) * mie.qext / (static_cast<T>(4) * density * radius_m);
+  T const extinction = molar_conc * molecular_weight * mass_extinction;
+  T const single_scattering_albedo =
+      mie.qext > static_cast<T>(0)
+          ? clamp_value(mie.qsca / mie.qext, static_cast<T>(0),
+                        static_cast<T>(1))
+          : static_cast<T>(0);
+  return {extinction, single_scattering_albedo, mie.g};
 }
 
 }  // namespace harp
