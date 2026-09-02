@@ -1,9 +1,14 @@
 #pragma once
 
 // torch
+#include <ATen/ATen.h>
 #include <ATen/TensorIterator.h>
 #include <ATen/native/cuda/Loops.cuh>
 #include <c10/cuda/CUDAException.h>
+#include <c10/cuda/CUDAStream.h>
+
+// C/C++
+#include <limits>
 
 namespace harp {
 namespace native {
@@ -37,7 +42,9 @@ void gpu_kernel(at::TensorIterator& iter, const func_t& f) {
 }
 
 template <int Chunks, int Arity, typename func_t>
-void gpu_chunk_kernel(at::TensorIterator& iter, size_t work_size, const func_t& f) {
+void gpu_chunk_kernel(at::TensorIterator& iter, size_t work_size,
+                      const func_t& f) {
+  static_assert(Chunks > 0, "gpu_chunk_kernel requires at least one chunk");
   TORCH_CHECK(iter.ninputs() + iter.noutputs() == Arity);
 
   std::array<char*, Arity> data;
@@ -47,19 +54,29 @@ void gpu_chunk_kernel(at::TensorIterator& iter, size_t work_size, const func_t& 
 
   auto offset_calc = ::make_offset_calculator<Arity>(iter);
   int64_t numel = iter.numel();
+  if (numel == 0) return;
 
-  // devide numel into Chunk parts to reduce memory usage
-  // allocate working memory pool
-  char* d_workspace = nullptr;
-
-  // workspace size per chunk
+  // Divide numel into chunks so that one reusable workspace bounds memory use.
   int64_t chunks = Chunks > numel ? numel : Chunks;
   int64_t base = numel / chunks;
-  int64_t rem  = numel % chunks;
+  int64_t rem = numel % chunks;
 
-  size_t workspace_bytes =
-      work_size * static_cast<size_t>(base + (rem > 0 ? 1 : 0));
-  C10_CUDA_CHECK(cudaMalloc(&d_workspace, workspace_bytes));
+  size_t const max_chunk_numel =
+      static_cast<size_t>(base + (rem > 0 ? 1 : 0));
+  TORCH_CHECK(work_size == 0 ||
+                  max_chunk_numel <=
+                      std::numeric_limits<size_t>::max() / work_size,
+              "GPU workspace size overflow");
+  size_t const workspace_bytes = work_size * max_chunk_numel;
+  TORCH_CHECK(
+      workspace_bytes <=
+          static_cast<size_t>(std::numeric_limits<int64_t>::max()),
+      "GPU workspace is too large");
+  auto workspace = at::empty(
+      {static_cast<int64_t>(workspace_bytes)},
+      iter.output(0).options().dtype(at::kByte));
+  char* d_workspace = static_cast<char*>(workspace.data_ptr());
+  auto stream = at::cuda::getCurrentCUDAStream(iter.device().index());
 
   int64_t chunk_start = 0;
 
@@ -71,28 +88,18 @@ void gpu_chunk_kernel(at::TensorIterator& iter, size_t work_size, const func_t& 
     dim3 grid((chunk_numel + block.x - 1) / block.x);
 
     auto device_lambda = [=] __device__(int idx, char* work) {
-        auto offsets = offset_calc.get(idx + chunk_start);
-        f(data.data(), offsets.data(), work + idx * work_size);
-      };
+      auto offsets = offset_calc.get(idx + chunk_start);
+      f(data.data(), offsets.data(), work + idx * work_size);
+    };
 
-    /*std::cout << "chunk = " << n
-              << ", chunk_start = " << chunk_start
-              << ", chunk_end = " << chunk_end
-              << ", chunk_numel = " << chunk_numel
-              << ", block = " << block.x
-              << ", grid = " << grid.x
-              << ", work_size = " << work_size
-              << std::endl;*/
-
-    element_kernel<<<grid, block>>>(chunk_numel, device_lambda, d_workspace);
+    // Stream ordering lets every chunk safely reuse the same workspace without
+    // a device-wide synchronization between launches.
+    element_kernel<<<grid, block, 0, stream>>>(chunk_numel, device_lambda,
+                                               d_workspace);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    cudaDeviceSynchronize();
 
     chunk_start = chunk_end;
   }
-
-  // free working memory pool
-  cudaFree(d_workspace);
 }
 
 }  // namespace native
