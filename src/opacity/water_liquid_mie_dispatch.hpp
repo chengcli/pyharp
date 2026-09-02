@@ -7,8 +7,7 @@
 namespace at::native {
 
 using water_liquid_mie_fn = void (*)(at::TensorIterator& iter,
-                                     double molecular_weight, int nmom,
-                                     int max_order);
+                                     double molecular_weight, int max_order);
 
 DECLARE_DISPATCH(water_liquid_mie_fn, call_water_liquid_mie);
 
