@@ -101,12 +101,26 @@ Water-ice clouds
 The ``water-ice-fu96-98`` opacity type uses the cirrus-cloud parameterizations
 of Fu (1996) [7]_ from 0.25 um up to 4 um and Fu, Yang, and Sun (1998) [8]_
 from 4 to 100 um. Optical properties are set to zero outside 0.25--100 um.
-The required ``re`` is the ice effective radius in um; internally it is
-converted to the generalized effective size used by the Fu tables,
+When ``re`` is supplied, it is interpreted as the ice effective radius in um
+and converted to the generalized effective size used by the Fu tables,
 
 .. math::
 
    D_{ge} = \frac{8 r_e}{3\sqrt{3}}.
+
+An explicitly supplied ``re`` always takes precedence. If it is absent,
+``temp`` is required and :math:`D_{ge}` is diagnosed from the layer ice-water
+content using Sun and Rikus (1999) [9]_ with the Sun (2001) correction [10]_,
+
+.. math::
+
+   D_{ge} &= f\left[a + b(T - 83.15)\right],\\
+   f &= 1.2351 + 0.0105(T - 273.15),\\
+   a &= 45.8966\,\mathrm{IWC}^{0.2214},\\
+   b &= 0.7957\,\mathrm{IWC}^{0.2535}.
+
+Here :math:`T` is in K, IWC is in g m\ :sup:`-3`, and :math:`D_{ge}` is in um.
+The same Fu validity limits are checked for both supplied and diagnosed sizes.
 
 The optional scalar flag ``fu_delta_scale`` applies the Fu (1996) delta
 scaling. It is false by default because the Toon shortwave solver already
@@ -128,10 +142,13 @@ separate liquid and ice concentrations. The liquid fraction is
 
 Condensate is therefore entirely liquid at and above 273.15 K, entirely ice
 at and below 253.15 K, and mixed phase between those temperatures. The model
-requires ``temp``, ``liquid_re``, and ``ice_re`` at run time. It calls the Mie
-liquid model and the Fu ice model separately, then combines their extinction,
-single-scattering albedo, and phase moments using the appropriate extinction
-and scattering weights.
+requires only ``temp`` at run time. Liquid droplets use an effective radius of
+14 um by default; optional ``liquid_re`` overrides it. Optional ``ice_re``
+takes precedence when present; when it is absent, the Fu model applies the
+Sun--Rikus/Sun diagnostic to the ice-water content after phase partitioning.
+The model calls the Mie liquid model and the Fu ice model separately, then
+combines their extinction, single-scattering albedo, and phase moments using
+the appropriate extinction and scattering weights.
 
 The three opacity types are configured as follows. The named liquid, ice, or
 total-condensate species must also be present in the top-level ``species``
@@ -165,3 +182,5 @@ References
 .. [6] Segelstein, D. J. (1981). The complex refractive index of water. M.S. thesis, University of Missouri--Kansas City.
 .. [7] Fu, Q. (1996). An accurate parameterization of the solar radiative properties of cirrus clouds for climate models. Journal of Climate, 9, 2058-2082.
 .. [8] Fu, Q., Yang, P., & Sun, W. B. (1998). An accurate parameterization of the infrared radiative properties of cirrus clouds for climate models. Journal of Climate, 11, 2223-2237.
+.. [9] Sun, Z., & Rikus, L. (1999). Parametrization of effective sizes of cirrus-cloud particles and its verification against observations. Quarterly Journal of the Royal Meteorological Society, 125, 3037-3055. doi:10.1002/qj.49712556012.
+.. [10] Sun, Z. (2001). Reply to comments by Greg M. McFarquhar on "Parametrization of effective sizes of cirrus-cloud particles and its verification against observations". Quarterly Journal of the Royal Meteorological Society, 127, 267-271. doi:10.1002/qj.49712757116.

@@ -122,7 +122,7 @@ TEST(TestTemperatureSwitchWaterCloud, RequiresTemperature) {
   EXPECT_THROW(cloud->forward(conc, atm), c10::Error);
 }
 
-TEST(TestTemperatureSwitchWaterCloud, RequiresBothEffectiveRadii) {
+TEST(TestTemperatureSwitchWaterCloud, UsesDefaultsWhenRadiiAreAbsent) {
   harp::species_weights = {18.01528e-3};
   harp::TemperatureSwitchWaterCloud cloud(
       cloud_options("water-cloud-temperature-switch", 1));
@@ -131,12 +131,12 @@ TEST(TestTemperatureSwitchWaterCloud, RequiresBothEffectiveRadii) {
   atm["wavelength"] = torch::tensor({0.5}, torch::kFloat64);
   atm["temp"] = torch::tensor({{263.15}}, torch::kFloat64);
 
-  EXPECT_THROW(cloud->forward(conc, atm), c10::Error);
-  atm["ice_re"] = torch::tensor(re_from_dge(50.0), torch::kFloat64);
-  EXPECT_THROW(cloud->forward(conc, atm), c10::Error);
-  atm.erase("ice_re");
-  atm["liquid_re"] = torch::tensor(10.0, torch::kFloat64);
-  EXPECT_THROW(cloud->forward(conc, atm), c10::Error);
+  auto const default_result = cloud->forward(conc, atm);
+  EXPECT_TRUE(torch::all(torch::isfinite(default_result)).item<bool>());
+
+  atm["liquid_re"] = torch::tensor(14.0, torch::kFloat64);
+  auto const explicit_result = cloud->forward(conc, atm);
+  EXPECT_TRUE(torch::allclose(default_result, explicit_result));
 }
 
 TEST_P(DeviceTest, TemperatureSwitchWaterCloudMatchesCpuReference) {
