@@ -44,7 +44,8 @@ class FuWaterIceImpl : public torch::nn::Cloneable<FuWaterIceImpl> {
    * weight. If effective radius re [um] is supplied, it is converted
    * internally using Fu (1996), Eq. (3.12), Dge = 8 re / (3 sqrt(3)). If re
    * is absent, Dge is diagnosed from layer temperature and IWC following Sun
-   * and Rikus (1999), with the correction from Sun (2001).
+   * and Rikus (1999), with the correction from Sun (2001), and limited to the
+   * Fu96/Fu98 common valid interval [18.63, 129.6] um.
    * Fu96 is used below 4 um and Fu98 from 4 to 100 um.
    * All returned optical properties are zero outside 0.25--100 um.
    * Set scalar `fu_delta_scale` to true to apply the Fu96 delta scaling. It

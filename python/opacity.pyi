@@ -622,7 +622,8 @@ class FuWaterIce:
     it takes precedence and is converted internally to Fu generalized
     effective size using ``Dge = 8 re / (3 sqrt(3))``. Otherwise ``Dge`` is
     diagnosed from layer ``temp`` and IWC with the Sun--Rikus/Sun (2001)
-    parameterization. The full Fu96 interval tables and Fu98 wavelength-node
+    parameterization and limited to the Fu96/Fu98 common size range of
+    18.63--129.6 um. The full Fu96 interval tables and Fu98 wavelength-node
     tables cover 0.25--100 um; all optical properties are zero outside that
     range. A scalar ``fu_delta_scale=True`` applies the Fu96 scaling; it
     defaults to false because Toon shortwave already uses delta-Eddington.

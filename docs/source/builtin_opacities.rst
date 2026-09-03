@@ -120,7 +120,9 @@ content using Sun and Rikus (1999) [9]_ with the Sun (2001) correction [10]_,
    b &= 0.7957\,\mathrm{IWC}^{0.2535}.
 
 Here :math:`T` is in K, IWC is in g m\ :sup:`-3`, and :math:`D_{ge}` is in um.
-The same Fu validity limits are checked for both supplied and diagnosed sizes.
+Diagnosed values are limited to 18.63--129.6 um, the common valid interval of
+the Fu96 and Fu98 tables. An explicitly supplied ``re`` is not silently
+modified and must satisfy the relevant Fu validity limits.
 
 The optional scalar flag ``fu_delta_scale`` applies the Fu (1996) delta
 scaling. It is false by default because the Toon shortwave solver already

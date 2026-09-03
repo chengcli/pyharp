@@ -23,6 +23,9 @@ constexpr double kFu96MinDge = 18.63;  // um
 constexpr double kFu96MaxDge = 130.24;
 constexpr double kFu98MinDge = 11.0;
 constexpr double kFu98MaxDge = 129.6;
+// Spectral-grid-independent bounds shared by both Fu parameterizations.
+constexpr double kDiagnosedMinDge = kFu96MinDge;
+constexpr double kDiagnosedMaxDge = kFu98MaxDge;
 // Fu (1996), Eq. (3.12): re = 3 sqrt(3) Dge / 8.
 constexpr double kDgeToRe = 0.649519052838329;
 constexpr double kReToDge = 1.0 / kDgeToRe;
@@ -225,7 +228,11 @@ torch::Tensor FuWaterIceImpl::forward(
     // their extinction is zero because IWC is zero.
     auto const active = iwc > 0.0;
     auto const safe_iwc = torch::where(active, iwc, torch::ones_like(iwc));
-    auto const diagnosed_dge = sun_rikus_dge(temp, safe_iwc);
+    // ECMWF likewise bounds the Sun--Rikus/Sun diagnosed size before the
+    // radiation calculation. Use the interval common to the Fu96 and Fu98
+    // tables so the result is valid independently of the requested spectrum.
+    auto const diagnosed_dge =
+        sun_rikus_dge(temp, safe_iwc).clamp(kDiagnosedMinDge, kDiagnosedMaxDge);
     dge = torch::where(active, diagnosed_dge,
                        torch::full_like(diagnosed_dge, kSafeDge));
     TORCH_CHECK(torch::all(torch::isfinite(dge)).item<bool>() &&

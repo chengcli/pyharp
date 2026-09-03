@@ -167,6 +167,26 @@ TEST(TestFuWaterIce, ExplicitReTakesPrecedenceOverTemperature) {
   EXPECT_TRUE(torch::allclose(result, expected));
 }
 
+TEST(TestFuWaterIce, ClampsDiagnosedDgeToCommonFuRange) {
+  harp::species_weights = {18.01528e-3};
+  harp::FuWaterIce ice(fu_options(1));
+  double const molecular_weight_g_mol = 1000.0 * harp::species_weights[0];
+  auto conc = torch::tensor(
+      {{{1.0e-8 / molecular_weight_g_mol}, {10.0 / molecular_weight_g_mol}}},
+      torch::kFloat64);
+
+  std::map<std::string, torch::Tensor> diagnosed;
+  diagnosed["wavelength"] = torch::tensor({0.5, 10.0}, torch::kFloat64);
+  diagnosed["temp"] = torch::tensor(233.15, torch::kFloat64);
+  auto const diagnosed_result = ice->forward(conc, diagnosed);
+
+  auto explicit_radius = diagnosed;
+  explicit_radius["re"] = torch::tensor(
+      {{re_from_dge(18.63), re_from_dge(129.6)}}, torch::kFloat64);
+  auto const expected = ice->forward(conc, explicit_radius);
+  EXPECT_TRUE(torch::allclose(diagnosed_result, expected, 1.0e-12, 1.0e-12));
+}
+
 TEST(TestFuWaterIce, RequiresTemperatureWhenReIsAbsent) {
   harp::species_weights = {18.01528e-3};
   harp::FuWaterIce ice(fu_options(1));
