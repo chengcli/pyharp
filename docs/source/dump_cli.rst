@@ -167,6 +167,50 @@ If a requested foreign broadener is not available in the HITRAN table for the
 active absorber, pyharp falls back to ``air`` for that fraction and prints the
 effective broadening summary.
 
+H2O MT_CKD continuum components
+-------------------------------
+
+For H2O ``xsection`` products, ``pyharp-dump`` stores the MT_CKD self and
+foreign continua as two separate fields:
+
+* ``sigma_continuum_h2o_self_mt_ckd``
+* ``sigma_continuum_h2o_foreign_mt_ckd``
+
+Both fields have units of ``cm^2 molecule^-1`` and contain the corresponding
+unit-VMR MT_CKD component. They are not multiplied by the H2O mole fraction in
+the NetCDF file. No additional CLI option is required: the split fields are
+written automatically for both ``--species H2O`` and any ``--composition``
+that contains H2O.
+
+Keeping the two fields separate allows one opacity table to be reused for
+different atmospheric compositions. At run time, ``MoleculeLine`` calculates
+the local H2O volume mixing ratio from the concentration tensor and forms
+
+.. math::
+
+   \sigma_{\mathrm{cont}} =
+   x_{\mathrm{H_2O}}\,\sigma_{\mathrm{self}} +
+   \left(1-x_{\mathrm{H_2O}}\right)\sigma_{\mathrm{foreign}}.
+
+The continuum attenuation is then the composition-weighted continuum cross
+section multiplied by the H2O number density. In other words, ``self`` and
+``foreign`` describe the collision partner of an absorbing H2O molecule; they
+are not two additional atmospheric species.
+
+The ``--broadening-composition`` option controls HITRAN line broadening only.
+It does not pre-weight these continuum fields. For a single-species
+``--species H2O`` calculation, the diagnostic ``sigma_total`` corresponds to
+pure H2O. For ``--composition``, ``sigma_total`` is evaluated using the
+requested mixture, while the two component fields remain unweighted so they
+can be used later with a different composition.
+
+New ``MoleculeLine`` readers require both split fields when either one is
+present. They also remain compatible with an older table containing only
+``sigma_continuum_h2o_mt_ckd``; that legacy combined field is used directly
+and cannot be reweighted for a different H2O abundance. Conversely, an older
+reader that only recognizes the combined field cannot use a newly generated
+split-continuum table.
+
 Multi-band Output
 -----------------
 
@@ -220,9 +264,8 @@ Single-species xsection dumps use names such as:
 * ``sigma_total``
 
 The two split MT_CKD fields contain unit-VMR self and foreign components.
-``MoleculeLine`` weights them at runtime by ``xH2O`` and ``1 - xH2O``.  The
-new reader also falls back to the combined ``sigma_continuum_h2o_mt_ckd``
-field found in older tables; old readers cannot consume the new split format.
+``MoleculeLine`` weights them at runtime by ``xH2O`` and ``1 - xH2O`` as
+described in `H2O MT_CKD continuum components`_.
 
 Pair xsection dumps use:
 
@@ -256,6 +299,13 @@ Examples:
 * ``attenuation_cia_h2_he``
 * ``transmittance_total``
 * ``attenuation_total``
+
+Unlike ``xsection`` output, a ``transmission`` product has already been
+evaluated for the selected species or composition and path length. Its H2O
+continuum variables therefore contain the combined, composition-weighted
+self-plus-foreign continuum and retain the unsplit
+``*_continuum_h2o_mt_ckd`` names. They are diagnostic transmission products,
+not reusable ``MoleculeLine`` opacity-table inputs.
 
 Global Attributes
 -----------------
