@@ -224,8 +224,7 @@ torch::Tensor FuWaterIceImpl::forward(
     // harmless in-range value so the polynomial evaluation stays finite;
     // their extinction is zero because IWC is zero.
     auto const active = iwc > 0.0;
-    auto const safe_iwc =
-        torch::where(active, iwc, torch::ones_like(iwc));
+    auto const safe_iwc = torch::where(active, iwc, torch::ones_like(iwc));
     auto const diagnosed_dge = sun_rikus_dge(temp, safe_iwc);
     dge = torch::where(active, diagnosed_dge,
                        torch::full_like(diagnosed_dge, kSafeDge));

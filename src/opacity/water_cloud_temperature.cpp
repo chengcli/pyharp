@@ -113,8 +113,8 @@ torch::Tensor TemperatureSwitchWaterCloudImpl::forward(
   if (kwargs.count("liquid_re") > 0) {
     liquid_kwargs["re"] = kwargs.at("liquid_re");
   } else {
-    liquid_kwargs["re"] = torch::full(
-        {}, kDefaultLiquidEffectiveRadius, conc.options());
+    liquid_kwargs["re"] =
+        torch::full({}, kDefaultLiquidEffectiveRadius, conc.options());
   }
   auto const ice_result = ice->forward(ice_conc, ice_kwargs);
   auto const liquid_result = liquid->forward(liquid_conc, liquid_kwargs);

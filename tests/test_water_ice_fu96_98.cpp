@@ -136,8 +136,7 @@ TEST(TestFuWaterIce, DiagnosesDgeWhenReIsAbsent) {
   double const iwc_g_m3 = 0.1;
   double const temp_k = 233.15;
   auto conc = torch::tensor(
-      {{{iwc_g_m3 / (1000.0 * harp::species_weights[0])}}},
-      torch::kFloat64);
+      {{{iwc_g_m3 / (1000.0 * harp::species_weights[0])}}}, torch::kFloat64);
 
   std::map<std::string, torch::Tensor> diagnosed;
   diagnosed["wavelength"] = torch::tensor({0.5, 10.0}, torch::kFloat64);
@@ -148,8 +147,8 @@ TEST(TestFuWaterIce, DiagnosesDgeWhenReIsAbsent) {
   explicit_radius["re"] = torch::tensor(
       re_from_dge(sun_rikus_dge(temp_k, iwc_g_m3)), torch::kFloat64);
   auto const explicit_result = ice->forward(conc, explicit_radius);
-  EXPECT_TRUE(torch::allclose(diagnosed_result, explicit_result, 1.0e-12,
-                              1.0e-12));
+  EXPECT_TRUE(
+      torch::allclose(diagnosed_result, explicit_result, 1.0e-12, 1.0e-12));
 }
 
 TEST(TestFuWaterIce, ExplicitReTakesPrecedenceOverTemperature) {
@@ -162,8 +161,8 @@ TEST(TestFuWaterIce, ExplicitReTakesPrecedenceOverTemperature) {
   auto const expected = ice->forward(conc, reference);
 
   auto with_temperature = reference;
-  with_temperature["temp"] = torch::tensor(
-      std::numeric_limits<double>::quiet_NaN(), torch::kFloat64);
+  with_temperature["temp"] =
+      torch::tensor(std::numeric_limits<double>::quiet_NaN(), torch::kFloat64);
   auto const result = ice->forward(conc, with_temperature);
   EXPECT_TRUE(torch::allclose(result, expected));
 }
