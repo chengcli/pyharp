@@ -67,7 +67,7 @@ def test_interpolate_uses_only_temperatures_with_spectral_coverage(tmp_path: Pat
 def test_find_cia_download_url_prefers_matching_link(monkeypatch) -> None:
     html = '<html><body><a href="/files/CO2-CO2_2024.cia">file</a></body></html>'
     monkeypatch.setattr("pyharp.spectra.hitran_cia_utils._download_text", lambda _: html)
-    url = find_cia_download_url("https://hitran.org/cia/", "CO2-CO2_2024.cia")
+    url = find_cia_download_url("CO2-CO2_2024.cia")
     assert url == "https://hitran.org/files/CO2-CO2_2024.cia"
 
 
