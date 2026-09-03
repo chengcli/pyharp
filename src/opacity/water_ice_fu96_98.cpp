@@ -23,9 +23,13 @@ constexpr double kFu96MinDge = 18.63;  // um
 constexpr double kFu96MaxDge = 130.24;
 constexpr double kFu98MinDge = 11.0;
 constexpr double kFu98MaxDge = 129.6;
+// Spectral-grid-independent bounds shared by both Fu parameterizations.
+constexpr double kDiagnosedMinDge = kFu96MinDge;
+constexpr double kDiagnosedMaxDge = kFu98MaxDge;
 // Fu (1996), Eq. (3.12): re = 3 sqrt(3) Dge / 8.
 constexpr double kDgeToRe = 0.649519052838329;
 constexpr double kReToDge = 1.0 / kDgeToRe;
+constexpr double kSafeDge = 50.0;  // um; used only where IWC is zero
 
 torch::Tensor load_cloud_table(std::string const& name,
                                torch::IntArrayRef expected) {
@@ -49,6 +53,17 @@ torch::Tensor layer_field(torch::Tensor value, torch::Tensor const& conc,
               "Fu water ice expects ", name,
               " shape (ncol, nlyr) or a scalar; got ", value.sizes());
   return value;
+}
+
+// Sun and Rikus (1999), with the multiplicative temperature correction from
+// Sun (2001). T is in K, IWC is in g/m^3, and the result is Fu's generalized
+// effective size Dge in um.
+torch::Tensor sun_rikus_dge(torch::Tensor const& temp,
+                            torch::Tensor const& iwc) {
+  auto const factor = 1.2351 + 0.0105 * (temp - 273.15);
+  auto const a = 45.8966 * iwc.pow(0.2214);
+  auto const b = 0.7957 * iwc.pow(0.2535);
+  return factor * (a + b * (temp - 83.15));
 }
 
 torch::Tensor fu96_extinction(torch::Tensor const& coeff,
@@ -191,16 +206,42 @@ torch::Tensor FuWaterIceImpl::forward(
   auto const lookup_wavelength = wavelength.clamp(0.25, 100.0);
   auto const lookup_fu96 = lookup_wavelength < 4.0;
 
-  TORCH_CHECK(kwargs.count("re") > 0,
-              "Fu water ice requires effective radius re [um]");
-  auto re = layer_field(kwargs.at("re"), conc, "re");
-  TORCH_CHECK(torch::all(torch::isfinite(re)).item<bool>() &&
-                  torch::all(re > 0.0).item<bool>(),
-              "Fu water-ice re must be finite and positive");
-  auto const dge = kReToDge * re;
-
   auto const iwc =
       ice_conc * (1000.0 * species_weights.at(species_id));  // g/m^3
+  torch::Tensor dge;
+  if (kwargs.count("re") > 0) {
+    auto const re = layer_field(kwargs.at("re"), conc, "re");
+    TORCH_CHECK(torch::all(torch::isfinite(re)).item<bool>() &&
+                    torch::all(re > 0.0).item<bool>(),
+                "Fu water-ice re must be finite and positive");
+    dge = kReToDge * re;
+  } else {
+    TORCH_CHECK(kwargs.count("temp") > 0,
+                "Fu water ice requires temp [K] when re is not provided");
+    auto const temp = layer_field(kwargs.at("temp"), conc, "temp");
+    TORCH_CHECK(torch::all(torch::isfinite(temp)).item<bool>() &&
+                    torch::all(temp > 0.0).item<bool>(),
+                "Fu water-ice temp must be finite and positive");
+
+    // Particle size is undefined in ice-free layers. Give those layers a
+    // harmless in-range value so the polynomial evaluation stays finite;
+    // their extinction is zero because IWC is zero.
+    auto const active = iwc > 0.0;
+    auto const safe_iwc = torch::where(active, iwc, torch::ones_like(iwc));
+    // ECMWF likewise bounds the Sun--Rikus/Sun diagnosed size before the
+    // radiation calculation. Use the interval common to the Fu96 and Fu98
+    // tables so the result is valid independently of the requested spectrum.
+    auto const diagnosed_dge =
+        sun_rikus_dge(temp, safe_iwc).clamp(kDiagnosedMinDge, kDiagnosedMaxDge);
+    dge = torch::where(active, diagnosed_dge,
+                       torch::full_like(diagnosed_dge, kSafeDge));
+    TORCH_CHECK(torch::all(torch::isfinite(dge)).item<bool>() &&
+                    torch::all(dge > 0.0).item<bool>(),
+                "Sun-Rikus/Sun (2001) diagnosed a non-finite or nonpositive "
+                "Fu generalized effective size; provide re explicitly or "
+                "check temp and IWC");
+  }
+
   if (torch::any(iwc > 0.0).item<bool>()) {
     auto const active = (iwc > 0.0).unsqueeze(0);
     auto const d = dge.unsqueeze(0);
@@ -211,9 +252,11 @@ torch::Tensor FuWaterIceImpl::forward(
     auto const invalid98 =
         active & fu98 & ((d < kFu98MinDge) | (d > kFu98MaxDge));
     TORCH_CHECK(!torch::any(invalid96).item<bool>(),
-                "Fu96 re must be in [12.1005, 84.5934] um where IWC > 0");
+                "Fu96 Dge must be in [18.63, 130.24] um (equivalent re "
+                "[12.1005, 84.5934] um) where IWC > 0");
     TORCH_CHECK(!torch::any(invalid98).item<bool>(),
-                "Fu98 re must be in [7.14471, 84.1777] um where IWC > 0");
+                "Fu98 Dge must be in [11.0, 129.6] um (equivalent re "
+                "[7.14471, 84.1777] um) where IWC > 0");
   }
 
   auto const d = dge.unsqueeze(0);

@@ -41,8 +41,11 @@ class FuWaterIceImpl : public torch::nn::Cloneable<FuWaterIceImpl> {
   /*!
    * `conc` is molar concentration [mol/m^3]. The configured water-ice
    * species is converted to ice-water content [g/m^3] using its molecular
-   * weight. The required effective radius re [um] is converted internally
-   * using Fu (1996), Eq. (3.12), Dge = 8 re / (3 sqrt(3)).
+   * weight. If effective radius re [um] is supplied, it is converted
+   * internally using Fu (1996), Eq. (3.12), Dge = 8 re / (3 sqrt(3)). If re
+   * is absent, Dge is diagnosed from layer temperature and IWC following Sun
+   * and Rikus (1999), with the correction from Sun (2001), and limited to the
+   * Fu96/Fu98 common valid interval [18.63, 129.6] um.
    * Fu96 is used below 4 um and Fu98 from 4 to 100 um.
    * All returned optical properties are zero outside 0.25--100 um.
    * Set scalar `fu_delta_scale` to true to apply the Fu96 delta scaling. It
@@ -53,9 +56,10 @@ class FuWaterIceImpl : public torch::nn::Cloneable<FuWaterIceImpl> {
    * albedo, and Henyey-Greenstein Legendre moments excluding beta_0.
    *
    * \param conc molar concentration [mol/m^3], (ncol, nlyr, nspecies)
-   * \param kwargs must contain `wavenumber` [cm^-1] or `wavelength` [um]
-   *        and layer `re` [um]. Optional scalar
-   *        `fu_delta_scale` selects Fu96 delta scaling.
+   * \param kwargs must contain `wavenumber` [cm^-1] or `wavelength` [um].
+   *        Layer `re` [um] takes precedence when present; otherwise layer
+   *        `temp` [K] is required for the Sun--Rikus/Sun diagnostic. Optional
+   *        scalar `fu_delta_scale` selects Fu96 delta scaling.
    * \return optical properties, (nwave, ncol, nlyr, 2 + nmom)
    */
   torch::Tensor forward(torch::Tensor conc,

@@ -6,6 +6,7 @@
 
 // C/C++
 #include <cmath>
+#include <limits>
 
 // harp
 #include <harp/opacity/opacity_options.hpp>
@@ -26,6 +27,13 @@ harp::OpacityOptions fu_options(int nmom = 3) {
 }
 
 double re_from_dge(double dge) { return 3.0 * std::sqrt(3.0) * dge / 8.0; }
+
+double sun_rikus_dge(double temp_k, double iwc_g_m3) {
+  double const factor = 1.2351 + 0.0105 * (temp_k - 273.15);
+  double const a = 45.8966 * std::pow(iwc_g_m3, 0.2214);
+  double const b = 0.7957 * std::pow(iwc_g_m3, 0.2535);
+  return factor * (a + b * (temp_k - 83.15));
+}
 
 }  // namespace
 
@@ -122,13 +130,69 @@ TEST(TestFuWaterIce, AppliesOptionalFu96DeltaScaling) {
             result_raw[0][0][0][2].item<double>());
 }
 
-TEST(TestFuWaterIce, RequiresExplicitRe) {
+TEST(TestFuWaterIce, DiagnosesDgeWhenReIsAbsent) {
   harp::species_weights = {18.01528e-3};
   harp::FuWaterIce ice(fu_options(1));
-  auto conc = torch::tensor({{{2.0}}}, torch::kFloat64);
+  double const iwc_g_m3 = 0.1;
+  double const temp_k = 233.15;
+  auto conc = torch::tensor(
+      {{{iwc_g_m3 / (1000.0 * harp::species_weights[0])}}}, torch::kFloat64);
+
+  std::map<std::string, torch::Tensor> diagnosed;
+  diagnosed["wavelength"] = torch::tensor({0.5, 10.0}, torch::kFloat64);
+  diagnosed["temp"] = torch::tensor(temp_k, torch::kFloat64);
+  auto const diagnosed_result = ice->forward(conc, diagnosed);
+
+  auto explicit_radius = diagnosed;
+  explicit_radius["re"] = torch::tensor(
+      re_from_dge(sun_rikus_dge(temp_k, iwc_g_m3)), torch::kFloat64);
+  auto const explicit_result = ice->forward(conc, explicit_radius);
+  EXPECT_TRUE(
+      torch::allclose(diagnosed_result, explicit_result, 1.0e-12, 1.0e-12));
+}
+
+TEST(TestFuWaterIce, ExplicitReTakesPrecedenceOverTemperature) {
+  harp::species_weights = {18.01528e-3};
+  harp::FuWaterIce ice(fu_options(1));
+  auto conc = torch::tensor({{{0.01}}}, torch::kFloat64);
+  std::map<std::string, torch::Tensor> reference;
+  reference["wavelength"] = torch::tensor({0.5}, torch::kFloat64);
+  reference["re"] = torch::tensor(re_from_dge(50.0), torch::kFloat64);
+  auto const expected = ice->forward(conc, reference);
+
+  auto with_temperature = reference;
+  with_temperature["temp"] =
+      torch::tensor(std::numeric_limits<double>::quiet_NaN(), torch::kFloat64);
+  auto const result = ice->forward(conc, with_temperature);
+  EXPECT_TRUE(torch::allclose(result, expected));
+}
+
+TEST(TestFuWaterIce, ClampsDiagnosedDgeToCommonFuRange) {
+  harp::species_weights = {18.01528e-3};
+  harp::FuWaterIce ice(fu_options(1));
+  double const molecular_weight_g_mol = 1000.0 * harp::species_weights[0];
+  auto conc = torch::tensor(
+      {{{1.0e-8 / molecular_weight_g_mol}, {10.0 / molecular_weight_g_mol}}},
+      torch::kFloat64);
+
+  std::map<std::string, torch::Tensor> diagnosed;
+  diagnosed["wavelength"] = torch::tensor({0.5, 10.0}, torch::kFloat64);
+  diagnosed["temp"] = torch::tensor(233.15, torch::kFloat64);
+  auto const diagnosed_result = ice->forward(conc, diagnosed);
+
+  auto explicit_radius = diagnosed;
+  explicit_radius["re"] = torch::tensor(
+      {{re_from_dge(18.63), re_from_dge(129.6)}}, torch::kFloat64);
+  auto const expected = ice->forward(conc, explicit_radius);
+  EXPECT_TRUE(torch::allclose(diagnosed_result, expected, 1.0e-12, 1.0e-12));
+}
+
+TEST(TestFuWaterIce, RequiresTemperatureWhenReIsAbsent) {
+  harp::species_weights = {18.01528e-3};
+  harp::FuWaterIce ice(fu_options(1));
+  auto conc = torch::tensor({{{0.01}}}, torch::kFloat64);
   std::map<std::string, torch::Tensor> atm;
   atm["wavelength"] = torch::tensor({0.5}, torch::kFloat64);
-  atm["temp"] = torch::tensor({{233.15}}, torch::kFloat64);
   EXPECT_THROW(ice->forward(conc, atm), c10::Error);
 }
 

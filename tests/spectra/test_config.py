@@ -44,6 +44,49 @@ def test_resolve_hitran_species_supports_h2o() -> None:
     assert species.cia_filename is None
 
 
+def test_resolve_hitran_species_supports_o3() -> None:
+    species = resolve_hitran_species("o3")
+    assert species.name == "O3"
+    assert species.molecule_id == 3
+    assert species.isotopologue_ids == (1, 2, 3, 4, 5)
+    assert species.cia_filename is None
+
+
+def test_resolve_hitran_species_supports_o2() -> None:
+    species = resolve_hitran_species("o2")
+    assert species.name == "O2"
+    assert species.molecule_id == 7
+    assert species.isotopologue_ids == (1, 2, 3)
+    assert species.cia_filename == "O2-O2_2024.cia"
+
+
+def test_o2_and_o3_configs_derive_hitran_line_metadata(tmp_path) -> None:
+    band = SpectralBandConfig("shortwave", 1000.0, 50000.0, 5.0)
+    expected = {
+        "O2": (7, (1, 2, 3), "o2_lines_1000_50000"),
+        "O3": (3, (1, 2, 3, 4, 5), "o3_lines_1000_50000"),
+    }
+    for name, (molecule_id, isotopologues, table_name) in expected.items():
+        config = SpectroscopyConfig(
+            output_path=tmp_path / f"{name.lower()}.nc",
+            hitran_cache_dir=tmp_path / "hitran",
+            species_name=name,
+        )
+        assert config.molecule_id == molecule_id
+        assert config.resolved_isotopologue_ids() == isotopologues
+        assert config.resolved_line_table_name(band) == table_name
+
+
+def test_o2_config_derives_default_cia_metadata(tmp_path) -> None:
+    config = SpectroscopyConfig(
+        output_path=tmp_path / "o2.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="O2",
+    )
+    assert config.cia_pair == "O2-O2"
+    assert config.cia_filename == "O2-O2_2024.cia"
+
+
 def test_resolve_hitran_species_supports_ch4() -> None:
     species = resolve_hitran_species("CH4")
     assert species.name == "CH4"
@@ -139,6 +182,7 @@ def test_resolve_hitran_cia_pair_supports_new_binary_pairs() -> None:
     assert resolve_hitran_cia_pair("CO2-H2").filename == "CO2-H2_2024.cia"
     assert resolve_hitran_cia_pair("H2-He").filename == "H2-He_2011.cia"
     assert resolve_hitran_cia_pair("N2-CH4").filename == "N2-CH4_2024.cia"
+    assert resolve_hitran_cia_pair("O2-O2").filename == "O2-O2_2024.cia"
 
 
 def test_resolve_hitran_cia_pair_accepts_reversed_order() -> None:

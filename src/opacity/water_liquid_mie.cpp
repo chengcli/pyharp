@@ -94,6 +94,8 @@ torch::Tensor water_refractive_indices(torch::Tensor const& wavelength,
 }
 
 int mie_max_order(double max_x) {
+  // Allocate enough D_n, a_n, and b_n scratch space for the largest size
+  // parameter in this call, using the same Wiscombe truncation as the kernel.
   int const nstop =
       std::max(1, static_cast<int>(max_x + 4.05 * std::cbrt(max_x) + 2.0));
   int const derivative_order = nstop + 1;
@@ -298,6 +300,9 @@ torch::Tensor MieWaterLiquidImpl::forward(
       torch::empty({nwave, ncol, nlyr, 2 + options->nmom()}, conc.options());
   result.select(-1, disort::IEX).copy_(extinction);
   result.select(-1, disort::ISS).copy_(single_scattering_albedo);
+  // The Mie series supplies the asymmetry factor g. Until the full Mie phase
+  // function is projected directly, use HG moments beta_l = g^l; beta_0 = 1
+  // is implicit, so the stored sequence begins with beta_1 = g.
   result.narrow(-1, disort::IPM, options->nmom())
       .copy_(henyey_greenstein(options->nmom(), g));
 

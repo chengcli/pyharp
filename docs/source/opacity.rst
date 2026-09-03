@@ -32,6 +32,15 @@ A complete list of built-in opacity types is given in the table below.
   * - 'rayleigh'
     - Analytic
     - Gas Rayleigh scattering for H2, He, H2O, CH4, N2, and CO2 on the active spectral grid
+  * - 'water-liquid-mie'
+    - Analytic + bundled table
+    - Lorenz--Mie optical properties for spherical liquid-water droplets, using the Segelstein (1981) complex refractive indices by default
+  * - 'water-ice-fu96-98'
+    - Bundled tables
+    - Water-ice cloud optical properties from Fu (1996) in the shortwave and Fu, Yang, and Sun (1998) in the infrared
+  * - 'water-cloud-temperature-switch'
+    - Composite
+    - Temperature-partitioned liquid and ice cloud optical properties, with a linear mixed-phase transition from 253.15 to 273.15 K
   * - 'respq-table'
     - NetCDF
     - Frozen ReSPQ quadrature and component optical-property tables

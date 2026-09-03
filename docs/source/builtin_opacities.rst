@@ -70,6 +70,110 @@ and NH3, and returns conservative scattering with the Rayleigh Legendre moments,
 and is mixed with line and CIA absorption by the radiation band before the
 DISORT calculation.
 
+Water-cloud optical properties
+------------------------------
+
+Pyharp provides separate optical-property models for liquid-water droplets
+and water-ice particles, together with a temperature-partitioned model for a
+single total-condensate field. All three models interpret the configured
+species concentration as molar concentration in mol/m3 and return extinction
+in 1/m, single-scattering albedo, and Legendre moments excluding the zeroth
+moment.
+
+Liquid-water clouds
+~~~~~~~~~~~~~~~~~~~
+
+The ``water-liquid-mie`` opacity type treats liquid-water droplets as
+homogeneous, monodisperse spheres and evaluates the full Lorenz--Mie series.
+The droplet radius ``re`` is supplied in um. By default, the wavelength-
+dependent complex refractive index is interpolated from Segelstein (1981) [6]_
+for liquid water at 25 C over 0.1--1000 um. The liquid-water density and both
+parts of the refractive index can also be overridden at run time.
+
+The Mie calculation supplies extinction, single-scattering albedo, and the
+asymmetry factor ``g``. Until the full Mie phase function is projected
+directly, the higher-order Legendre moments are represented by the
+Henyey--Greenstein approximation, :math:`\beta_l = g^l`.
+
+Water-ice clouds
+~~~~~~~~~~~~~~~~
+
+The ``water-ice-fu96-98`` opacity type uses the cirrus-cloud parameterizations
+of Fu (1996) [7]_ from 0.25 um up to 4 um and Fu, Yang, and Sun (1998) [8]_
+from 4 to 100 um. Optical properties are set to zero outside 0.25--100 um.
+When ``re`` is supplied, it is interpreted as the ice effective radius in um
+and converted to the generalized effective size used by the Fu tables,
+
+.. math::
+
+   D_{ge} = \frac{8 r_e}{3\sqrt{3}}.
+
+An explicitly supplied ``re`` always takes precedence. If it is absent,
+``temp`` is required and :math:`D_{ge}` is diagnosed from the layer ice-water
+content using Sun and Rikus (1999) [9]_ with the Sun (2001) correction [10]_,
+
+.. math::
+
+   D_{ge} &= f\left[a + b(T - 83.15)\right],\\
+   f &= 1.2351 + 0.0105(T - 273.15),\\
+   a &= 45.8966\,\mathrm{IWC}^{0.2214},\\
+   b &= 0.7957\,\mathrm{IWC}^{0.2535}.
+
+Here :math:`T` is in K, IWC is in g m\ :sup:`-3`, and :math:`D_{ge}` is in um.
+Diagnosed values are limited to 18.63--129.6 um, the common valid interval of
+the Fu96 and Fu98 tables. An explicitly supplied ``re`` is not silently
+modified and must satisfy the relevant Fu validity limits.
+
+The optional scalar flag ``fu_delta_scale`` applies the Fu (1996) delta
+scaling. It is false by default because the Toon shortwave solver already
+applies delta-Eddington scaling. The returned higher-order phase moments use
+the Henyey--Greenstein representation of the parameterized asymmetry factor.
+
+Temperature-partitioned water clouds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``water-cloud-temperature-switch`` opacity type is intended for models
+that provide one total nonprecipitating water-condensate field instead of
+separate liquid and ice concentrations. The liquid fraction is
+
+.. math::
+
+   \omega_l = \max\left[0,\min\left(1,
+   \frac{T - 253.15\ \mathrm{K}}{273.15\ \mathrm{K} - 253.15\ \mathrm{K}}
+   \right)\right].
+
+Condensate is therefore entirely liquid at and above 273.15 K, entirely ice
+at and below 253.15 K, and mixed phase between those temperatures. The model
+requires only ``temp`` at run time. Liquid droplets use an effective radius of
+14 um by default; optional ``liquid_re`` overrides it. Optional ``ice_re``
+takes precedence when present; when it is absent, the Fu model applies the
+Sun--Rikus/Sun diagnostic to the ice-water content after phase partitioning.
+The model calls the Mie liquid model and the Fu ice model separately, then
+combines their extinction, single-scattering albedo, and phase moments using
+the appropriate extinction and scattering weights.
+
+The three opacity types are configured as follows. The named liquid, ice, or
+total-condensate species must also be present in the top-level ``species``
+list.
+
+.. code-block:: yaml
+
+   opacities:
+     liquid-cloud:
+       type: water-liquid-mie
+       species: [H2O(l)]
+       nmom: 4
+
+     ice-cloud:
+       type: water-ice-fu96-98
+       species: [H2O(s)]
+       nmom: 4
+
+     mixed-phase-cloud:
+       type: water-cloud-temperature-switch
+       species: [H2O(s)]  # interpreted here as total condensed water
+       nmom: 4
+
 References
 ----------
 .. [1] Lupu, R., et al. "Correlated k coefficients for H2-He atmospheres; 196 spectral windows and 1460 pressure-temperature points." Zenodo, doi 0.5281/zenodo.5590988 (2021).
@@ -77,3 +181,8 @@ References
 .. [3] Li, C., Le, T., Zhang, X., & Yung, Y. L. (2018). A high-performance atmospheric radiation package: With applications to the radiative energy budgets of giant planets. Journal of Quantitative Spectroscopy and Radiative Transfer, 217, 353-362.
 .. [4] Dalgarno, A., & Williams, D. A. (1962). The scattering of light by molecular hydrogen. Astrophysical Journal, 136, 690.
 .. [5] Pierrehumbert, R. T. (2010). Principles of planetary climate. Cambridge University Press.
+.. [6] Segelstein, D. J. (1981). The complex refractive index of water. M.S. thesis, University of Missouri--Kansas City.
+.. [7] Fu, Q. (1996). An accurate parameterization of the solar radiative properties of cirrus clouds for climate models. Journal of Climate, 9, 2058-2082.
+.. [8] Fu, Q., Yang, P., & Sun, W. B. (1998). An accurate parameterization of the infrared radiative properties of cirrus clouds for climate models. Journal of Climate, 11, 2223-2237.
+.. [9] Sun, Z., & Rikus, L. (1999). Parametrization of effective sizes of cirrus-cloud particles and its verification against observations. Quarterly Journal of the Royal Meteorological Society, 125, 3037-3055. doi:10.1002/qj.49712556012.
+.. [10] Sun, Z. (2001). Reply to comments by Greg M. McFarquhar on "Parametrization of effective sizes of cirrus-cloud particles and its verification against observations". Quarterly Journal of the Royal Meteorological Society, 127, 267-271. doi:10.1002/qj.49712757116.

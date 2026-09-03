@@ -1,6 +1,4 @@
 from pathlib import Path
-import math
-
 import torch
 
 import pyharp
@@ -21,10 +19,6 @@ def test_temperature_switch_python_binding_and_yaml_factory():
     concentration = torch.full((1, 2, 1), 0.01, dtype=torch.float64)
     atmosphere = {
         "wavenumber": torch.tensor([20000.0], dtype=torch.float64),
-        "ice_re": torch.tensor(
-            3.0 * math.sqrt(3.0) * 50.0 / 8.0, dtype=torch.float64
-        ),
-        "liquid_re": torch.tensor(10.0, dtype=torch.float64),
         "temp": torch.tensor([[260.0, 280.0]], dtype=torch.float64),
     }
     direct = opacity.forward(concentration, atmosphere)
@@ -43,11 +37,7 @@ def test_temperature_switch_python_binding_and_yaml_factory():
         concentration,
         torch.full((2,), 2.0, dtype=torch.float64),
         boundary,
-        {
-            "ice_re": atmosphere["ice_re"],
-            "liquid_re": atmosphere["liquid_re"],
-            "temp": atmosphere["temp"],
-        },
+        {"temp": atmosphere["temp"]},
     )
     prop = band.buffer("prop")
     assert torch.allclose(prop[..., 0], 2.0 * direct[..., 0])

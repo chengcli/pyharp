@@ -618,13 +618,15 @@ class FuWaterIce:
     """
     Fu (1996) solar and Fu et al. (1998) infrared water-ice opacity.
 
-    The configured species supplies ice-water content. The required ``re`` is
-    effective radius in um and is converted internally to Fu generalized
-    effective size using ``Dge = 8 re / (3 sqrt(3))``. The full Fu96 interval
-    tables and Fu98 wavelength-node tables cover
-    0.25--100 um; all optical properties are zero outside that range. A scalar
-    ``fu_delta_scale=True`` applies the Fu96 scaling; it defaults to false
-    because Toon shortwave already uses delta-Eddington.
+    The configured species supplies ice-water content. When ``re`` is given,
+    it takes precedence and is converted internally to Fu generalized
+    effective size using ``Dge = 8 re / (3 sqrt(3))``. Otherwise ``Dge`` is
+    diagnosed from layer ``temp`` and IWC with the Sun--Rikus/Sun (2001)
+    parameterization and limited to the Fu96/Fu98 common size range of
+    18.63--129.6 um. The full Fu96 interval tables and Fu98 wavelength-node
+    tables cover 0.25--100 um; all optical properties are zero outside that
+    range. A scalar ``fu_delta_scale=True`` applies the Fu96 scaling; it
+    defaults to false because Toon shortwave already uses delta-Eddington.
 
     Examples:
         >>> from pyharp.opacity import FuWaterIce, OpacityOptions
@@ -660,9 +662,10 @@ class FuWaterIce:
         Args:
             conc: Molar concentration with shape ``(ncol, nlyr, nspecies)``
                 and units mol/m^3.
-            atm: Must contain ``wavenumber`` [cm^-1] or ``wavelength`` [um],
-                plus layer ``re`` [um]. Optional
-                scalar ``fu_delta_scale`` enables the Fu96 delta scaling.
+            atm: Must contain ``wavenumber`` [cm^-1] or ``wavelength`` [um].
+                Layer ``re`` [um] takes precedence when present; otherwise
+                layer ``temp`` [K] is required. Optional scalar
+                ``fu_delta_scale`` enables the Fu96 delta scaling.
 
         Returns:
             Tensor with shape ``(nwave, ncol, nlyr, 2 + nmom)`` containing
@@ -768,10 +771,11 @@ class TemperatureSwitchWaterCloud:
         Args:
             conc: Total water-condensate molar concentration with shape
                 ``(ncol, nlyr, nspecies)`` and units mol/m^3.
-            atm: Must contain layer ``temp`` [K], ice effective radius
-                ``ice_re`` [um], liquid-droplet effective radius
-                ``liquid_re`` [um], and either ``wavenumber`` [cm^-1] or
-                ``wavelength`` [um].
+            atm: Must contain layer ``temp`` [K] and either ``wavenumber``
+                [cm^-1] or ``wavelength`` [um]. Liquid droplets use 14 um by
+                default; optional ``liquid_re`` [um] overrides it. Optional
+                ``ice_re`` [um] takes precedence over the Sun--Rikus/Sun
+                diagnostic.
 
         Returns:
             Tensor with shape ``(nwave, ncol, nlyr, 2 + nmom)`` containing

@@ -77,10 +77,6 @@ torch::Tensor TemperatureSwitchWaterCloudImpl::forward(
               " for conc with ", conc.size(2), " species");
   TORCH_CHECK(kwargs.count("temp") > 0,
               "Temperature-switch water cloud requires temp [K]");
-  TORCH_CHECK(kwargs.count("ice_re") > 0,
-              "Temperature-switch water cloud requires ice_re [um]");
-  TORCH_CHECK(kwargs.count("liquid_re") > 0,
-              "Temperature-switch water cloud requires liquid_re [um]");
 
   auto const temp = layer_temperature(kwargs.at("temp"), conc);
   TORCH_CHECK(torch::all(torch::isfinite(temp)).item<bool>() &&
@@ -104,12 +100,22 @@ torch::Tensor TemperatureSwitchWaterCloudImpl::forward(
   auto liquid_conc = conc.clone();
   liquid_conc.select(-1, species_id).mul_(liquid_fraction);
 
-  // The constituent models both use the generic key `re`; give each model its
-  // own effective radius without moving or copying the underlying tensor.
+  // The constituent models both use the generic key `re`. An explicitly
+  // supplied ice_re takes precedence; otherwise the Fu model diagnoses Dge
+  // from temp and the ice water content after phase partitioning.
   auto ice_kwargs = kwargs;
-  ice_kwargs["re"] = kwargs.at("ice_re");
+  if (kwargs.count("ice_re") > 0) {
+    ice_kwargs["re"] = kwargs.at("ice_re");
+  } else {
+    ice_kwargs.erase("re");
+  }
   auto liquid_kwargs = kwargs;
-  liquid_kwargs["re"] = kwargs.at("liquid_re");
+  if (kwargs.count("liquid_re") > 0) {
+    liquid_kwargs["re"] = kwargs.at("liquid_re");
+  } else {
+    liquid_kwargs["re"] =
+        torch::full({}, kDefaultLiquidEffectiveRadius, conc.options());
+  }
   auto const ice_result = ice->forward(ice_conc, ice_kwargs);
   auto const liquid_result = liquid->forward(liquid_conc, liquid_kwargs);
 

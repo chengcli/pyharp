@@ -35,11 +35,21 @@ DISPATCH_MACRO T clamp_value(T value, T lo, T hi) {
 template <typename T>
 DISPATCH_MACRO Complex<T> lentz_log_derivative_device(Complex<T> z, int n,
                                                       int* status) {
+  // Continued-fraction coefficients:
+  // a_j = (-1)^(j+1) * (2*n + 2*j - 1) / z
   auto const a1 = static_cast<T>(2 * n + 1) / z;
   auto const a2 = -static_cast<T>(2 * n + 3) / z;
+  // U_2 = P_2 / P_1
+  // V_2 = Q_2 / Q_1
+  // These are the numerator and denominator ratios in Lentz's
+  // continued-fraction recurrence.
   auto u = a2 + static_cast<T>(1) / a1;
   auto v = a2;
+  // delta_2 = F_2 / F_1
+  // This ratio measures the change between successive convergents.
   auto ratio = u / v;
+  // F_2 = F_1 * delta_2
+  // Later iterations accumulate the same product until it converges.
   auto runratio = a1 * ratio;
   T const tolerance = sizeof(T) == sizeof(float) ? static_cast<T>(1.0e-6)
                                                  : static_cast<T>(1.0e-12);
@@ -63,11 +73,16 @@ DISPATCH_MACRO Complex<T> lentz_log_derivative_device(Complex<T> z, int n,
 
 template <typename T>
 DISPATCH_MACRO int mie_nstop(T x) {
+  // Wiscombe (1980) criterion for 8 < x < 4200.
+  // It specifies where the otherwise infinite Lorenz-Mie series is truncated.
   return static_cast<int>(
       x + static_cast<T>(4.05) * pow(x, static_cast<T>(1.0 / 3.0)) +
       static_cast<T>(2.0));
 }
 
+// Full homogeneous-sphere Lorenz-Mie efficiencies. The recurrence follows
+// Bohren and Huffman (1983) and the numerical layout used by miepython:
+// m uses the absorbing n-i*k convention and x is the external size parameter.
 template <typename T>
 DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
                                                             T x,
@@ -81,6 +96,8 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
   }
 
   Complex<T> const m(nreal, -kimag);
+  // Avoid cancellation in the Riccati-Bessel recurrence in the Rayleigh
+  // limit. This branch is asymptotically exact as x -> 0.
   if (x < static_cast<T>(1.0e-3)) {
     auto const m2 = m * m;
     auto const alpha = (m2 - static_cast<T>(1)) / (m2 + static_cast<T>(2));
@@ -95,6 +112,7 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     return out;
   }
 
+  // The highest retained multipole order grows with the size parameter x.
   int const computed_nstop = mie_nstop(x);
   int const nstop = computed_nstop > 1 ? computed_nstop : 1;
   int const derivative_order = nstop + 1;
@@ -103,11 +121,16 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     return out;
   }
 
+  // Divide the caller-provided scratch space into the logarithmic derivatives
+  // D_n and the two complex Mie-coefficient sequences a_n and b_n.
   auto* d = work;
   auto* a = d + max_order;
   auto* b = a + max_order;
   auto const z = m * x;
   T const kappa = kimag;
+  // D_n(z) = psi'_n(z)/psi_n(z). Wiscombe's criterion chooses the stable
+  // recurrence direction; the downward start uses Lentz's continued
+  // fraction, matching miepython's validated implementation.
   bool const use_downward =
       nreal < static_cast<T>(1) || nreal > static_cast<T>(10) ||
       kappa > static_cast<T>(10) ||
@@ -136,9 +159,11 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
 
   T const sin_x = sin(x);
   T const cos_x = cos(x);
-  T psi_nm1 = sin_x;
+  T psi_nm1 = sin_x;  // n-1 (n minus 1) Riccati-Bessel function
   T psi_n = psi_nm1 / x - cos_x;
-  Complex<T> xi_nm1(psi_nm1, cos_x);
+  // xi_n = psi_n + i*chi_n is the outgoing Riccati-Hankel function in the
+  // sign convention used by this implementation.
+  Complex<T> xi_nm1(psi_nm1, cos_x);  // psi_nm1 + i*chi_nm1
   Complex<T> xi_n(psi_n, cos_x / x + sin_x);
 
   for (int n = 1; n <= nstop; ++n) {
@@ -146,9 +171,15 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     auto const nx = static_cast<T>(n) / x;
     auto const da = dn / m + nx;
     auto const db = m * dn + nx;
-    a[n - 1] = (da * psi_n - psi_nm1) / (da * xi_n - xi_nm1);
-    b[n - 1] = (db * psi_n - psi_nm1) / (db * xi_n - xi_nm1);
+    // a_n is the electric-type coefficient and b_n is the magnetic-type
+    // coefficient in the Lorenz-Mie expansion.
+    a[n - 1] = (da * psi_n - psi_nm1) /
+               (da * xi_n - xi_nm1);  // Mie-scattering coefficient a_n
+    b[n - 1] = (db * psi_n - psi_nm1) /
+               (db * xi_n - xi_nm1);  // Mie-scattering coefficient b_n
 
+    // Three-term Riccati-Bessel recurrence advances both function pairs from
+    // orders n-1,n to n,n+1 without evaluating derivatives explicitly.
     T const psi_np1 = static_cast<T>(2 * n + 1) * psi_n / x - psi_nm1;
     auto const xi_np1 = static_cast<T>(2 * n + 1) * xi_n / x - xi_nm1;
     psi_nm1 = psi_n;
@@ -164,20 +195,27 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     auto const an = a[n - 1];
     auto const bn = b[n - 1];
     T const weight = static_cast<T>(2 * n + 1);
-    ext_sum += weight * (an.r + bn.r);
-    sca_sum += weight * (complex_norm(an) + complex_norm(bn));
-    g_sum += weight / static_cast<T>(n * (n + 1)) * (an * complex_conj(bn)).r;
+    ext_sum += weight * (an.r + bn.r);  // Wiscombe 1980, eq.1a
+    sca_sum +=
+        weight * (complex_norm(an) + complex_norm(bn));  // Wiscombe 1980, eq.1b
+    // The asymmetry-factor sum contains a_n*b_n^* and adjacent-order terms;
+    // complex_conj() supplies the complex conjugate denoted by the star.
+    g_sum += weight / static_cast<T>(n * (n + 1)) *
+             (an * complex_conj(bn)).r;  // complex conjugate
     if (n < nstop) {
       auto const an1 = a[n];
       auto const bn1 = b[n];
       g_sum += static_cast<T>(n * (n + 2)) / static_cast<T>(n + 1) *
-               (an * complex_conj(an1) + bn * complex_conj(bn1)).r;
+               (an * complex_conj(an1) + bn * complex_conj(bn1))
+                   .r;  // Wiscombe 1980, eq.1c
     }
   }
 
   T const factor = static_cast<T>(2) / (x * x);
   out.qext = factor * ext_sum;
   out.qsca = factor * sca_sum;
+  // Roundoff can make a nonabsorbing calculation very slightly violate
+  // qext >= qsca. Enforce nonnegative absorption before forming the albedo.
   if (out.qext < out.qsca) out.qext = out.qsca;
   out.g = out.qsca > static_cast<T>(0)
               ? clamp_value(static_cast<T>(4) * g_sum / (x * x * out.qsca),
@@ -201,9 +239,14 @@ DISPATCH_MACRO WaterLiquidMieProperties<T> water_liquid_mie_properties(
   }
 
   T const radius_m = radius_um * static_cast<T>(1.0e-6);
+  // kext = Qext*pi*r^2 / (4/3*rho_w*r^3) m^2/kg
+  // More explicitly, the particle-mass denominator contains pi:
+  // (4/3)*pi*rho_w*r^3. Cancelling pi and one power of r gives
+  // 3*Qext/(4*rho_w*r).
   T const mass_extinction =
       static_cast<T>(3) * mie.qext / (static_cast<T>(4) * density * radius_m);
-  T const extinction = molar_conc * molecular_weight * mass_extinction;
+  T const extinction =  // m^-1
+      molar_conc * molecular_weight * mass_extinction;
   T const single_scattering_albedo =
       mie.qext > static_cast<T>(0)
           ? clamp_value(mie.qsca / mie.qext, static_cast<T>(0),
