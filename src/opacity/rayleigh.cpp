@@ -21,12 +21,13 @@ double species_scale(std::string const& species_name) {
   if (name == "h2o") return 3.3690;
   if (name == "ch4") return 10.1509;
   if (name == "n2") return 4.6035;
+  if (name == "o2") return 3.8634;
   if (name == "co2") return 10.5611;
   if (name == "nh3") return 7.3427;
 
   TORCH_CHECK(false, "Rayleigh opacity does not support species '",
               species_name,
-              "'. Supported species: H2, He, H2O, CH4, N2, CO2, NH3");
+              "'. Supported species: H2, He, H2O, CH4, N2, O2, CO2, NH3");
   return 0.0;
 }
 
