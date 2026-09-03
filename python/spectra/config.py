@@ -76,6 +76,7 @@ _HITRAN_CIA_PAIRS_BY_NAME: dict[str, HitranCiaPair] = {
     "H2-H2": HitranCiaPair(pair="H2-H2", filename="H2-H2_2011.cia"),
     "CH4-CH4": HitranCiaPair(pair="CH4-CH4", filename="CH4-CH4_2011.cia"),
     "N2-N2": HitranCiaPair(pair="N2-N2", filename="N2-N2_2021.cia"),
+    "O2-O2": HitranCiaPair(pair="O2-O2", filename="O2-O2_2024.cia"),
     "CO2-CH4": HitranCiaPair(pair="CO2-CH4", filename="CO2-CH4_2024.cia"),
     "CO2-H2": HitranCiaPair(pair="CO2-H2", filename="CO2-H2_2024.cia"),
     "H2-HE": HitranCiaPair(pair="H2-He", filename="H2-He_2011.cia"),
@@ -96,6 +97,12 @@ _HITRAN_SPECIES_BY_NAME: dict[str, HitranSpecies] = {
         isotopologue_ids=(1, 2, 3, 4, 5, 6, 7),
         cia_filename=None,
     ),
+    "O3": HitranSpecies(
+        name="O3",
+        molecule_id=3,
+        isotopologue_ids=(1, 2, 3, 4, 5),
+        cia_filename=None,
+    ),
     "CO": HitranSpecies(
         name="CO",
         molecule_id=5,
@@ -113,6 +120,12 @@ _HITRAN_SPECIES_BY_NAME: dict[str, HitranSpecies] = {
         molecule_id=6,
         isotopologue_ids=(1, 2, 3, 4),
         cia_filename="CH4-CH4_2011.cia",
+    ),
+    "O2": HitranSpecies(
+        name="O2",
+        molecule_id=7,
+        isotopologue_ids=(1, 2, 3),
+        cia_filename="O2-O2_2024.cia",
     ),
     "NH3": HitranSpecies(
         name="NH3",
