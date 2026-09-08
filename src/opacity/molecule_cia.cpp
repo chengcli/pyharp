@@ -57,6 +57,16 @@ void MoleculeCIAImpl::reset() {
                             .log()
                             .unsqueeze(-1);
 
+  wavenumber_min = wavenumber.min().item<double>();
+  wavenumber_max = wavenumber.max().item<double>();
+  pressure_min = ln_pressure.min().exp().item<double>();
+  pressure_max = ln_pressure.max().exp().item<double>();
+  temperature_anomaly_min = temperature_anomaly.min().item<double>();
+  temperature_anomaly_max = temperature_anomaly.max().item<double>();
+  warned_wavenumber_bounds = false;
+  warned_pressure_bounds = false;
+  warned_temperature_anomaly_bounds = false;
+
   auto first = normalize_token(species_names.at(options->species_ids().at(0)));
   auto second = first;
   if (options->species_ids().size() == 2) {
@@ -132,6 +142,19 @@ torch::Tensor MoleculeCIAImpl::forward(
   auto temperature_base =
       interpn({lnp}, {ln_pressure}, ln_temperature_base).squeeze(-1).exp();
   auto del_temp = temp - temperature_base;
+
+  if (options->warn_out_of_bounds()) {
+    warn_if_outside_table_bounds(wave_query, wavenumber_min, wavenumber_max,
+                                 "MoleculeCIA", "wavenumber", "cm^-1",
+                                 warned_wavenumber_bounds);
+    warn_if_outside_table_bounds(pres, pressure_min, pressure_max,
+                                 "MoleculeCIA", "pressure", "Pa",
+                                 warned_pressure_bounds);
+    warn_if_outside_table_bounds(del_temp, temperature_anomaly_min,
+                                 temperature_anomaly_max, "MoleculeCIA",
+                                 "temperature anomaly", "K",
+                                 warned_temperature_anomaly_bounds);
+  }
 
   int const nwave = wave_query.size(0);
   auto wave =

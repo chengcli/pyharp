@@ -242,6 +242,32 @@ class OpacityOptions:
         ...
 
     @overload
+    def warn_out_of_bounds(self) -> bool:
+        """
+        Get whether dump-backed opacity lookups warn when queries exceed their
+        tabulated wavenumber, pressure, or temperature-anomaly bounds.
+
+        Returns:
+            bool: whether out-of-bounds warnings are enabled
+        """
+        ...
+
+    @overload
+    def warn_out_of_bounds(self, value: bool) -> "OpacityOptions":
+        """
+        Enable or disable warnings when dump-backed opacity queries are clamped
+        to their nearest table boundary. Each affected coordinate warns once
+        per opacity module.
+
+        Args:
+            value (bool): whether out-of-bounds warnings are enabled
+
+        Returns:
+            OpacityOptions: class object
+        """
+        ...
+
+    @overload
     def verbose(self) -> bool:
         """
         Get verbose flag.

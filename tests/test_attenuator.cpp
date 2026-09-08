@@ -396,6 +396,70 @@ TEST(TestOpacity, RespqTableCombinesComponentsAndClampsBounds) {
 #endif
 }
 
+TEST(TestOpacity, MoleculeOpacitiesWarnOnceWhenQueriesAreClamped) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  auto dataset = write_test_dataset();
+  harp::species_names = {"H2O", "H2", "He"};
+  harp::species_weights = {18.0e-3, 2.0e-3, 4.0e-3};
+
+  auto line_options = harp::OpacityOptionsImpl::create();
+  line_options->type("molecule-line")
+      .species_ids({0})
+      .opacity_files({dataset.string()})
+      .warn_out_of_bounds(true);
+  harp::MoleculeLine line(line_options);
+
+  auto cia_options = harp::OpacityOptionsImpl::create();
+  cia_options->type("molecule-cia")
+      .species_ids({1, 2})
+      .opacity_files({dataset.string()})
+      .warn_out_of_bounds(true);
+  harp::MoleculeCIA cia(cia_options);
+
+  auto conc = torch::ones({1, 1, 3}, torch::kFloat64);
+  std::map<std::string, torch::Tensor> atm;
+  atm["pres"] = torch::tensor({{5.0e4}}, torch::kFloat64);
+  atm["temp"] = torch::tensor({{250.0}}, torch::kFloat64);
+  atm["wavenumber"] = torch::tensor({19.0, 21.0, 23.0}, torch::kFloat64);
+
+  testing::internal::CaptureStderr();
+  line->forward(conc, atm);
+  line->forward(conc, atm);
+  auto const line_warning = testing::internal::GetCapturedStderr();
+  EXPECT_NE(line_warning.find("MoleculeLine wavenumber query range"),
+            std::string::npos);
+  EXPECT_EQ(line_warning.find("MoleculeLine wavenumber query range"),
+            line_warning.rfind("MoleculeLine wavenumber query range"));
+  EXPECT_NE(line_warning.find("MoleculeLine pressure query range"),
+            std::string::npos);
+  EXPECT_EQ(line_warning.find("MoleculeLine pressure query range"),
+            line_warning.rfind("MoleculeLine pressure query range"));
+  EXPECT_NE(line_warning.find("MoleculeLine temperature anomaly query range"),
+            std::string::npos);
+  EXPECT_EQ(line_warning.find("MoleculeLine temperature anomaly query range"),
+            line_warning.rfind("MoleculeLine temperature anomaly query range"));
+
+  testing::internal::CaptureStderr();
+  cia->forward(conc, atm);
+  cia->forward(conc, atm);
+  auto const cia_warning = testing::internal::GetCapturedStderr();
+  EXPECT_NE(cia_warning.find("MoleculeCIA wavenumber query range"),
+            std::string::npos);
+  EXPECT_EQ(cia_warning.find("MoleculeCIA wavenumber query range"),
+            cia_warning.rfind("MoleculeCIA wavenumber query range"));
+  EXPECT_NE(cia_warning.find("MoleculeCIA pressure query range"),
+            std::string::npos);
+  EXPECT_EQ(cia_warning.find("MoleculeCIA pressure query range"),
+            cia_warning.rfind("MoleculeCIA pressure query range"));
+  EXPECT_NE(cia_warning.find("MoleculeCIA temperature anomaly query range"),
+            std::string::npos);
+  EXPECT_EQ(cia_warning.find("MoleculeCIA temperature anomaly query range"),
+            cia_warning.rfind("MoleculeCIA temperature anomaly query range"));
+#endif
+}
+
 TEST(TestOpacity, NewOpacityTypesParseFromYaml) {
   harp::species_names = {"H2O", "H2", "He"};
   harp::species_weights = {18.0e-3, 2.0e-3, 4.0e-3};
@@ -407,6 +471,7 @@ TEST(TestOpacity, NewOpacityTypesParseFromYaml) {
       << "    type: molecule-line\n"
       << "    data: [/tmp/mock.nc]\n"
       << "    species: [H2O]\n"
+      << "    warn_out_of_bounds: true\n"
       << "  cia_pair:\n"
       << "    type: molecule-cia\n"
       << "    data: [/tmp/mock.nc]\n"
@@ -417,6 +482,7 @@ TEST(TestOpacity, NewOpacityTypesParseFromYaml) {
   EXPECT_EQ(line->type(), "molecule-line");
   ASSERT_EQ(line->species_ids().size(), 1);
   EXPECT_EQ(line->species_ids()[0], 0);
+  EXPECT_TRUE(line->warn_out_of_bounds());
 
   auto cia =
       harp::OpacityOptionsImpl::from_yaml(yaml_path.string(), "cia_pair");
@@ -424,6 +490,7 @@ TEST(TestOpacity, NewOpacityTypesParseFromYaml) {
   ASSERT_EQ(cia->species_ids().size(), 2);
   EXPECT_EQ(cia->species_ids()[0], 1);
   EXPECT_EQ(cia->species_ids()[1], 2);
+  EXPECT_FALSE(cia->warn_out_of_bounds());
 }
 
 }  // namespace

@@ -238,6 +238,31 @@ inline torch::Tensor apply_positive_fill(torch::Tensor values,
                       torch::full_like(values, fill_value));
 }
 
+inline void warn_if_outside_table_bounds(torch::Tensor const& query,
+                                         double table_min, double table_max,
+                                         std::string const& module_name,
+                                         std::string const& coordinate_name,
+                                         std::string const& units,
+                                         bool& already_warned) {
+  if (already_warned || query.numel() == 0) return;
+
+  auto const query_min = query.min().item<double>();
+  auto const query_max = query.max().item<double>();
+  auto const scale = std::max({std::abs(table_min), std::abs(table_max), 1.0});
+  auto const tolerance = 1.0e-12 * scale;
+  if (query_min >= table_min - tolerance &&
+      query_max <= table_max + tolerance) {
+    return;
+  }
+
+  TORCH_WARN(module_name, " ", coordinate_name, " query range [", query_min,
+             ", ", query_max, "] ", units, " exceeds opacity table range [",
+             table_min, ", ", table_max, "] ", units,
+             "; out-of-range values will be clamped to the nearest table "
+             "boundary.");
+  already_warned = true;
+}
+
 inline torch::Tensor convert_line_cross_section_to_m2_per_mol(
     torch::Tensor values, std::string const& units,
     std::string const& varname) {

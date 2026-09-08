@@ -32,6 +32,8 @@ struct OpacityOptionsImpl {
     os << "* fractions = ";
     for (auto const& f : fractions()) os << f << ", ";
     os << "* nmom = " << nmom() << "\n";
+    os << "* warn_out_of_bounds = " << (warn_out_of_bounds() ? "true" : "false")
+       << "\n";
     os << "* verbose = " << (verbose() ? "true" : "false") << "\n";
   }
 
@@ -55,6 +57,9 @@ struct OpacityOptionsImpl {
 
   //! number of scattering moments
   ADD_ARG(int, nmom) = 0;
+
+  //! warn when a dump-backed opacity query is clamped to table bounds
+  ADD_ARG(bool, warn_out_of_bounds) = false;
 
   //! verbose flag
   ADD_ARG(bool, verbose) = false;

@@ -31,6 +31,7 @@ OpacityOptions OpacityOptionsImpl::from_yaml(std::string const& filename,
   TORCH_CHECK(my["type"], "'type' missing in opacity", op_name);
   op->type(my["type"].as<std::string>());
 
+  op->warn_out_of_bounds(my["warn_out_of_bounds"].as<bool>(false));
   op->verbose(my["verbose"].as<bool>(false));
 
   if (my["data"]) {
