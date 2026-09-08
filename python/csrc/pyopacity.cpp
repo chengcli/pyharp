@@ -43,6 +43,7 @@ void bind_opacity(py::module& parent) {
                   jit_kwargs)
       .ADD_OPTION(std::vector<double>, harp::OpacityOptionsImpl, fractions)
       .ADD_OPTION(int, harp::OpacityOptionsImpl, nmom)
+      .ADD_OPTION(bool, harp::OpacityOptionsImpl, warn_out_of_bounds)
       .ADD_OPTION(bool, harp::OpacityOptionsImpl, verbose);
 
   ADD_HARP_MODULE(JITOpacity, OpacityOptions, py::arg("conc"), py::arg("atm"));

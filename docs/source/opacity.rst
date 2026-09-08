@@ -105,6 +105,23 @@ provides the spectral points, bounds, weights, pressure-temperature grid,
 reference composition, and optional scattering properties. Lookup is clamped
 to the table bounds and recorded in the module's ``bounds_mask`` buffer.
 
+``molecule-line`` and ``molecule-cia`` lookups also clamp wavenumber, pressure,
+and temperature anomaly to their table bounds.  Set
+``warn_out_of_bounds: true`` on either opacity to report the queried and
+tabulated ranges when clamping occurs.  Each affected coordinate warns only
+once per opacity module, so a time-dependent calculation does not flood its
+logs.  The option is false by default to preserve existing behavior and avoid
+device synchronization in performance-sensitive calculations.
+
+.. code-block:: yaml
+
+   opacities:
+     h2o-line:
+       type: molecule-line
+       data: [h2o_xsection.nc]
+       species: [H2O]
+       warn_out_of_bounds: true
+
 .. _example_sonora:
 
 Example 1. Compute Sonora2020 molecular opacities

@@ -63,6 +63,16 @@ void MoleculeLineImpl::reset() {
                             .log()
                             .unsqueeze(-1);
 
+  wavenumber_min = wavenumber.min().item<double>();
+  wavenumber_max = wavenumber.max().item<double>();
+  pressure_min = ln_pressure.min().exp().item<double>();
+  pressure_max = ln_pressure.max().exp().item<double>();
+  temperature_anomaly_min = temperature_anomaly.min().item<double>();
+  temperature_anomaly_max = temperature_anomaly.max().item<double>();
+  warned_wavenumber_bounds = false;
+  warned_pressure_bounds = false;
+  warned_temperature_anomaly_bounds = false;
+
   auto const species_token =
       normalize_token(species_names.at(options->species_ids().at(0)));
   auto const line_name = "sigma_line_" + species_token;
@@ -177,6 +187,18 @@ torch::Tensor MoleculeLineImpl::forward(
   auto temperature_base =
       interpn({lnp}, {ln_pressure}, ln_temperature_base).squeeze(-1).exp();
   auto tempa = temp - temperature_base;
+
+  if (options->warn_out_of_bounds()) {
+    warn_if_outside_table_bounds(wave_query, wavenumber_min, wavenumber_max,
+                                 "MoleculeLine", "wavenumber", "cm^-1",
+                                 warned_wavenumber_bounds);
+    warn_if_outside_table_bounds(pres, pressure_min, pressure_max,
+                                 "MoleculeLine", "pressure", "Pa",
+                                 warned_pressure_bounds);
+    warn_if_outside_table_bounds(
+        tempa, temperature_anomaly_min, temperature_anomaly_max, "MoleculeLine",
+        "temperature anomaly", "K", warned_temperature_anomaly_bounds);
+  }
 
   int const nwave = wave_query.size(0);
   auto wave =

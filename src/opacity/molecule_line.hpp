@@ -31,6 +31,14 @@ class MoleculeLineImpl : public torch::nn::Cloneable<MoleculeLineImpl> {
   //! (npres, 1)
   torch::Tensor ln_temperature_base;
 
+  //! physical table-coordinate bounds used by optional runtime warnings
+  double wavenumber_min = 0.0, wavenumber_max = 0.0;
+  double pressure_min = 0.0, pressure_max = 0.0;
+  double temperature_anomaly_min = 0.0, temperature_anomaly_max = 0.0;
+  bool warned_wavenumber_bounds = false;
+  bool warned_pressure_bounds = false;
+  bool warned_temperature_anomaly_bounds = false;
+
   //! options with which this `MoleculeLineImpl` was constructed
   OpacityOptions options;
 
