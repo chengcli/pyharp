@@ -7,11 +7,16 @@ namespace harp {
 
 //! Multidimensional linear interpolation
 /*!
- * \param query_coords Query coordinates (nbatch, ndim)
+ * The query tensors only have to broadcast against one another, they do not
+ * have to be the same shape. A dimension whose query is constant along some
+ * axis can be passed with that axis of size one, and the search for that
+ * dimension then runs on the small tensor rather than on the broadcast result.
+ *
+ * \param query_coords Query coordinates, len = ndim, mutually broadcastable
  * \param coords Coordinate arrays, len = ndim, each tensor has shape (nx1,),
  * (nx2,) ...
  * \param lookup Lookup tensor (nx1, nx2, ..., nval)
- * \return Interpolated values (nbatch, nval)
+ * \return Interpolated values, shape broadcast(query_coords) + (nval,)
  */
 torch::Tensor interpn(std::vector<torch::Tensor> const& query_coords,
                       std::vector<torch::Tensor> const& coords,

@@ -200,11 +200,14 @@ torch::Tensor MoleculeLineImpl::forward(
         "temperature anomaly", "K", warned_temperature_anomaly_bounds);
   }
 
+  // Leave each query at the shape its values actually vary over and let
+  // interpn broadcast them. Expanding all three to (nwave, ncol, nlyr) first
+  // made the pressure and temperature searches repeat once per wavenumber,
+  // and the wavenumber search repeat once per (column, layer).
   int const nwave = wave_query.size(0);
-  auto wave =
-      wave_query.unsqueeze(-1).unsqueeze(-1).expand({nwave, ncol, nlyr});
-  lnp = lnp.unsqueeze(0).expand({nwave, ncol, nlyr});
-  tempa = tempa.unsqueeze(0).expand({nwave, ncol, nlyr});
+  auto wave = wave_query.view({nwave, 1, 1});
+  lnp = lnp.unsqueeze(0);
+  tempa = tempa.unsqueeze(0);
 
   // Clamp queries to the tabulated bounds. Extrapolating logarithmic line
   // cross sections can produce nonphysical opacity outside the table coverage.

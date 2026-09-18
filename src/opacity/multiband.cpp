@@ -77,9 +77,11 @@ torch::Tensor MultiBandImpl::forward(
               "Invalid temp shape: ", temp.sizes(),
               "; needs to be (ncol, nlyr)");
 
-  auto wave = kwave.unsqueeze(-1).unsqueeze(-1).expand({nwave, ncol, nlyr});
-  auto lnp = pres.log().unsqueeze(0).expand({nwave, ncol, nlyr});
-  auto tempa = temp.unsqueeze(0).expand({nwave, ncol, nlyr});
+  // interpn broadcasts the queries, so leave each at the shape its values
+  // vary over instead of expanding all of them to (nwave, ncol, nlyr).
+  auto wave = kwave.view({nwave, 1, 1});
+  auto lnp = pres.log().unsqueeze(0);
+  auto tempa = temp.unsqueeze(0);
   auto out = interpn({wave, lnp, tempa}, {kwave, klnp, ktemp}, kdata);
 
   // ln(cm^2 / molecule) -> 1/m
