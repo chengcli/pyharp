@@ -80,11 +80,12 @@ torch::Tensor PicasoCKImpl::forward(
   auto temperature_base =
       interpn({lnp}, {ln_pressure}, ln_temperature_base).squeeze(-1).exp();
   auto tempa = temp - temperature_base;
+  // interpn broadcasts the queries, so leave each at the shape its values
+  // vary over instead of expanding all of them to (nwave, ncol, nlyr).
   int const nwave = wave_query.size(0);
-  auto wave = wave_query.unsqueeze(-1).unsqueeze(-1).expand(
-      {nwave, conc.size(0), conc.size(1)});
-  lnp = lnp.unsqueeze(0).expand_as(wave);
-  tempa = tempa.unsqueeze(0).expand_as(wave);
+  auto wave = wave_query.view({nwave, 1, 1});
+  lnp = lnp.unsqueeze(0);
+  tempa = tempa.unsqueeze(0);
   auto sigma =
       interpn({wave, lnp, tempa},
               {wavenumber, ln_pressure, temperature_anomaly}, ln_sigma_cross)

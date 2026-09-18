@@ -57,7 +57,8 @@ AxisWeights locate_on_axis(torch::Tensor const& coord,
 
   // The recursion below broadcasts the weights against the trailing value
   // dimension of the lookup table, so give them that shape once here rather
-  // than on every visit.
+  // than on every visit. Everything keeps the query's own shape, so a query
+  // that is constant along some axis costs nothing along that axis.
   out.weight_low = out.weight_low.unsqueeze(-1);
   out.weight_high = out.weight_high.unsqueeze(-1);
 
@@ -101,23 +102,27 @@ torch::Tensor interpn(std::vector<torch::Tensor> const& query_coords,
   TORCH_CHECK(query_coords.size() == coords.size(),
               "Query coordinates must match interpolation dimensions");
 
-  auto nval = lookup.size(-1);
-  auto vec = query_coords[0].sizes().vec();
-  vec.push_back(nval);
-
   // Bracket every dimension once. The weights depend only on that dimension's
   // query, not on the path taken through the earlier dimensions, so computing
   // them inside the recursion repeated the search and the weight arithmetic
   // 2^dim times for dimension dim.
+  //
+  // Each dimension is bracketed at the shape it was handed in. The queries
+  // only have to broadcast against each other, so a caller that varies
+  // pressure over (ncol, nlyr) and wavenumber over (nwave,) can pass
+  // (1, ncol, nlyr) and (nwave, 1, 1) instead of expanding both to the full
+  // (nwave, ncol, nlyr); the gather below broadcasts them and the search runs
+  // on the small tensors. Passing fully expanded queries still works, it just
+  // repeats the search along the expanded axes.
   std::vector<AxisWeights> axes;
   axes.reserve(coords.size());
   for (size_t dim = 0; dim < coords.size(); ++dim) {
     axes.push_back(
-        locate_on_axis(coords[dim], query_coords[dim].flatten(), extrapolate));
+        locate_on_axis(coords[dim], query_coords[dim], extrapolate));
   }
 
   // Perform recursive interpolation
-  return interpn_recur(axes, lookup, {}).view(vec);
+  return interpn_recur(axes, lookup, {});
 }
 
 }  // namespace harp

@@ -117,7 +117,7 @@ torch::Tensor HeliosImpl::forward(
   TORCH_CHECK(kwargs.count("temp") > 0, "temp is required in kwargs");
 
   auto const& pres = kwargs.at("pres");
-  auto const& temp = kwargs.at("temp").unsqueeze(0).expand({nwave, ncol, nlyr});
+  auto const& temp = kwargs.at("temp");
 
   TORCH_CHECK(pres.size(0) == ncol && pres.size(1) == nlyr,
               "Invalid pres shape: ", pres.sizes(),
@@ -126,10 +126,13 @@ torch::Tensor HeliosImpl::forward(
               "Invalid temp shape: ", temp.sizes(),
               "; needs to be (ncol, nlyr)");
 
-  auto wave = kwave.unsqueeze(-1).unsqueeze(-1).expand({nwave, ncol, nlyr});
-  auto lnp = pres.log().unsqueeze(0).expand({nwave, ncol, nlyr});
+  // interpn broadcasts the queries, so leave each at the shape its values
+  // vary over instead of expanding all of them to (nwave, ncol, nlyr).
+  auto wave = kwave.view({nwave, 1, 1});
+  auto lnp = pres.log().unsqueeze(0);
 
-  auto out = interpn({wave, lnp, temp}, {kwave, klnp, ktemp}, kdata);
+  auto out =
+      interpn({wave, lnp, temp.unsqueeze(0)}, {kwave, klnp, ktemp}, kdata);
 
   //!!! CHECK UNITS !!!!
   // ln(cm^2 / molecule) -> 1/m

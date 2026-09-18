@@ -115,6 +115,38 @@ TEST(TestInterpolation, testTrilinearIsReproducedExactly) {
   EXPECT_TRUE(torch::allclose(result.squeeze(-1), f(qx, qy, qz), 1e-12, 1e-12));
 }
 
+TEST(TestInterpolation, testBroadcastQueryMatchesExpandedQuery) {
+  // Opacity tables are queried with a wavenumber that varies only over the
+  // spectral axis and a pressure and temperature that vary only over
+  // (column, layer). Passing those at their own shape must give exactly the
+  // same answer as expanding all three first.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  const int nwave = 7, ncol = 4, nlyr = 5;
+
+  auto kwave = torch::linspace(100.0, 800.0, 9, opt);
+  auto klnp = torch::linspace(0.0, 6.0, 6, opt);
+  auto ktemp = torch::linspace(-40.0, 40.0, 4, opt);
+  auto lookup = torch::randn({9, 6, 4, 2}, opt);
+
+  auto wave_1d = torch::linspace(150.0, 770.0, nwave, opt);
+  auto lnp_2d = torch::linspace(0.3, 5.7, ncol * nlyr, opt).view({ncol, nlyr});
+  auto tmp_2d = torch::linspace(-35.0, 35.0, ncol * nlyr, opt).view({ncol, nlyr});
+
+  auto narrow = harp::interpn(
+      {wave_1d.view({nwave, 1, 1}), lnp_2d.unsqueeze(0), tmp_2d.unsqueeze(0)},
+      {kwave, klnp, ktemp}, lookup);
+
+  auto wide = harp::interpn(
+      {wave_1d.view({nwave, 1, 1}).expand({nwave, ncol, nlyr}),
+       lnp_2d.unsqueeze(0).expand({nwave, ncol, nlyr}),
+       tmp_2d.unsqueeze(0).expand({nwave, ncol, nlyr})},
+      {kwave, klnp, ktemp}, lookup);
+
+  ASSERT_EQ(narrow.sizes(), torch::IntArrayRef({nwave, ncol, nlyr, 2}));
+  ASSERT_EQ(wide.sizes(), narrow.sizes());
+  EXPECT_TRUE(torch::equal(narrow, wide));
+}
+
 TEST(TestInterpolation, testClampsOutsideTheTable) {
   auto opt = torch::TensorOptions().dtype(torch::kFloat64);
   auto x = torch::tensor({0.0, 1.0, 2.0}, opt);
