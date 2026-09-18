@@ -70,6 +70,66 @@ TEST(TestInterpolation, testND) {
   std::cout << "Interpolated Values:\n" << result << std::endl;
 }
 
+TEST(TestInterpolation, testGridPointsAreExact) {
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto x = torch::tensor({1.0, 2.0, 4.0, 8.0}, opt);
+  auto y = torch::tensor({-1.0, 0.5, 3.0}, opt);
+  auto lookup = torch::arange(4 * 3 * 2, opt).view({4, 3, 2});
+
+  // Query every grid point. Landing on a node must return the tabulated value.
+  auto qx = x.unsqueeze(-1).expand({4, 3});
+  auto qy = y.unsqueeze(0).expand({4, 3});
+
+  auto result = harp::interpn({qx, qy}, {x, y}, lookup);
+  ASSERT_EQ(result.sizes(), torch::IntArrayRef({4, 3, 2}));
+  EXPECT_TRUE(torch::allclose(result, lookup));
+}
+
+TEST(TestInterpolation, testTrilinearIsReproducedExactly) {
+  // Linear interpolation is exact for a function that is itself multilinear,
+  // so the result can be checked against the closed form rather than against
+  // a previous run.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto x = torch::tensor({0.0, 1.0, 3.0, 7.0}, opt);
+  auto y = torch::tensor({10.0, 20.0, 50.0}, opt);
+  auto z = torch::tensor({-4.0, -1.0}, opt);
+
+  auto f = [](torch::Tensor const& a, torch::Tensor const& b,
+              torch::Tensor const& c) {
+    return 2.0 + 3.0 * a - 0.5 * b + 1.5 * c + 0.25 * a * b - 0.75 * a * c +
+           0.1 * b * c + 0.05 * a * b * c;
+  };
+
+  auto lookup = f(x.view({4, 1, 1}), y.view({1, 3, 1}), z.view({1, 1, 2}))
+                    .unsqueeze(-1);
+
+  // Interior query points, deliberately not aligned with any grid node, and
+  // shaped so that each dimension is broadcast differently -- the way the
+  // opacity tables are queried.
+  auto qx = torch::tensor({0.4, 2.2, 6.1}, opt).view({3, 1}).expand({3, 2});
+  auto qy = torch::tensor({12.0, 41.0}, opt).view({1, 2}).expand({3, 2});
+  auto qz = torch::full({3, 2}, -2.5, opt);
+
+  auto result = harp::interpn({qx, qy, qz}, {x, y, z}, lookup);
+  ASSERT_EQ(result.sizes(), torch::IntArrayRef({3, 2, 1}));
+  EXPECT_TRUE(torch::allclose(result.squeeze(-1), f(qx, qy, qz), 1e-12, 1e-12));
+}
+
+TEST(TestInterpolation, testClampsOutsideTheTable) {
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto x = torch::tensor({0.0, 1.0, 2.0}, opt);
+  auto lookup = torch::tensor({{5.0}, {6.0}, {7.0}}, opt);
+
+  auto query = torch::tensor({-3.0, 0.5, 9.0}, opt);
+  auto result = harp::interpn({query}, {x}, lookup);
+
+  // Default is extrapolate=false: the weights are clamped, so queries beyond
+  // either end return the edge value.
+  EXPECT_NEAR(result[0][0].item<double>(), 5.0, 1e-12);
+  EXPECT_NEAR(result[1][0].item<double>(), 5.5, 1e-12);
+  EXPECT_NEAR(result[2][0].item<double>(), 7.0, 1e-12);
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
