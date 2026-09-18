@@ -100,8 +100,8 @@ TEST(TestInterpolation, testTrilinearIsReproducedExactly) {
            0.1 * b * c + 0.05 * a * b * c;
   };
 
-  auto lookup = f(x.view({4, 1, 1}), y.view({1, 3, 1}), z.view({1, 1, 2}))
-                    .unsqueeze(-1);
+  auto lookup =
+      f(x.view({4, 1, 1}), y.view({1, 3, 1}), z.view({1, 1, 2})).unsqueeze(-1);
 
   // Interior query points, deliberately not aligned with any grid node, and
   // shaped so that each dimension is broadcast differently -- the way the
@@ -130,17 +130,18 @@ TEST(TestInterpolation, testBroadcastQueryMatchesExpandedQuery) {
 
   auto wave_1d = torch::linspace(150.0, 770.0, nwave, opt);
   auto lnp_2d = torch::linspace(0.3, 5.7, ncol * nlyr, opt).view({ncol, nlyr});
-  auto tmp_2d = torch::linspace(-35.0, 35.0, ncol * nlyr, opt).view({ncol, nlyr});
+  auto tmp_2d =
+      torch::linspace(-35.0, 35.0, ncol * nlyr, opt).view({ncol, nlyr});
 
   auto narrow = harp::interpn(
       {wave_1d.view({nwave, 1, 1}), lnp_2d.unsqueeze(0), tmp_2d.unsqueeze(0)},
       {kwave, klnp, ktemp}, lookup);
 
-  auto wide = harp::interpn(
-      {wave_1d.view({nwave, 1, 1}).expand({nwave, ncol, nlyr}),
-       lnp_2d.unsqueeze(0).expand({nwave, ncol, nlyr}),
-       tmp_2d.unsqueeze(0).expand({nwave, ncol, nlyr})},
-      {kwave, klnp, ktemp}, lookup);
+  auto wide =
+      harp::interpn({wave_1d.view({nwave, 1, 1}).expand({nwave, ncol, nlyr}),
+                     lnp_2d.unsqueeze(0).expand({nwave, ncol, nlyr}),
+                     tmp_2d.unsqueeze(0).expand({nwave, ncol, nlyr})},
+                    {kwave, klnp, ktemp}, lookup);
 
   ASSERT_EQ(narrow.sizes(), torch::IntArrayRef({nwave, ncol, nlyr, 2}));
   ASSERT_EQ(wide.sizes(), narrow.sizes());

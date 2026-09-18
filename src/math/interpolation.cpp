@@ -117,8 +117,7 @@ torch::Tensor interpn(std::vector<torch::Tensor> const& query_coords,
   std::vector<AxisWeights> axes;
   axes.reserve(coords.size());
   for (size_t dim = 0; dim < coords.size(); ++dim) {
-    axes.push_back(
-        locate_on_axis(coords[dim], query_coords[dim], extrapolate));
+    axes.push_back(locate_on_axis(coords[dim], query_coords[dim], extrapolate));
   }
 
   // Perform recursive interpolation
