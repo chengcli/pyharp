@@ -15,7 +15,25 @@ struct AxisWeights {
   torch::Tensor index_high;
   torch::Tensor weight_low;
   torch::Tensor weight_high;
+  //! Query sits exactly on the nodes, so the high branch has zero weight.
+  bool on_nodes = false;
 };
+
+//! Is every query value exactly one of the tabulated coordinates, in order?
+/*!
+ * Opacity bands are built from the wavenumber axis of the table they read, so
+ * that dimension is usually queried at its own nodes. Interpolating there is a
+ * gather with weight one, and the other branch of the recursion is multiplied
+ * by zero and thrown away, which for a 3D table is half of the corner reads.
+ */
+bool query_lies_on_nodes(torch::Tensor const& coord,
+                         torch::Tensor const& query_d) {
+  auto q = query_d.squeeze();
+  if (q.sizes() != coord.sizes() || q.scalar_type() != coord.scalar_type()) {
+    return false;
+  }
+  return torch::equal(q, coord);
+}
 
 AxisWeights locate_on_axis(torch::Tensor const& coord,
                            torch::Tensor const& query_d, bool extrapolate) {
@@ -61,6 +79,7 @@ AxisWeights locate_on_axis(torch::Tensor const& coord,
   // that is constant along some axis costs nothing along that axis.
   out.weight_low = out.weight_low.unsqueeze(-1);
   out.weight_high = out.weight_high.unsqueeze(-1);
+  out.on_nodes = query_lies_on_nodes(coord, query_d);
 
   return out;
 }
@@ -82,6 +101,11 @@ torch::Tensor interpn_recur(
   indices_low.push_back(axis.index_low);
 
   auto interp_low = interpn_recur(axes, lookup, indices_low);
+
+  // The high branch carries weight zero, so skip it and the multiply.
+  if (axis.on_nodes) {
+    return interp_low;
+  }
 
   auto indices_high = indices;
   indices_high.push_back(axis.index_high);

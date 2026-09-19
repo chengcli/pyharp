@@ -148,6 +148,35 @@ TEST(TestInterpolation, testBroadcastQueryMatchesExpandedQuery) {
   EXPECT_TRUE(torch::equal(narrow, wide));
 }
 
+TEST(TestInterpolation, testOnNodeQueryMatchesGeneralPath) {
+  // A query given at its own coordinate array takes the fast path that skips
+  // the zero-weight branch. Handing the same values in a shape that does not
+  // match the axis takes the general path. They must agree bit for bit.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  const int nwave = 6, ncol = 3, nlyr = 4;
+
+  auto kwave = torch::linspace(100.0, 600.0, nwave, opt);
+  auto klnp = torch::linspace(0.0, 6.0, 5, opt);
+  auto lookup = torch::randn({nwave, 5, 2}, opt);
+  auto lnp_2d = torch::linspace(0.4, 5.6, ncol * nlyr, opt).view({ncol, nlyr});
+
+  auto fast = harp::interpn({kwave.view({nwave, 1, 1}), lnp_2d.unsqueeze(0)},
+                            {kwave, klnp}, lookup);
+  auto general =
+      harp::interpn({kwave.view({nwave, 1, 1}).expand({nwave, ncol, nlyr}),
+                     lnp_2d.unsqueeze(0).expand({nwave, ncol, nlyr})},
+                    {kwave, klnp}, lookup);
+
+  ASSERT_EQ(fast.sizes(), torch::IntArrayRef({nwave, ncol, nlyr, 2}));
+  EXPECT_TRUE(torch::equal(fast, general));
+
+  // Shifting off the nodes must leave the fast path and change the answer.
+  auto shifted =
+      harp::interpn({(kwave + 20.0).view({nwave, 1, 1}), lnp_2d.unsqueeze(0)},
+                    {kwave, klnp}, lookup);
+  EXPECT_FALSE(torch::equal(fast, shifted));
+}
+
 TEST(TestInterpolation, testClampsOutsideTheTable) {
   auto opt = torch::TensorOptions().dtype(torch::kFloat64);
   auto x = torch::tensor({0.0, 1.0, 2.0}, opt);
