@@ -14,6 +14,14 @@ extern std::vector<std::string> species_names;
 
 namespace {
 
+//! True if 'grid' is the same tensor already validated as 'cached'.
+bool grid_already_validated(torch::Tensor const& grid,
+                            torch::Tensor const& cached) {
+  return cached.defined() && grid.data_ptr() == cached.data_ptr() &&
+         grid.sizes() == cached.sizes() &&
+         grid.scalar_type() == cached.scalar_type();
+}
+
 double species_scale(std::string const& species_name) {
   auto const name = to_lower_copy(species_name);
   if (name == "h2") return 1.0;
@@ -66,22 +74,32 @@ torch::Tensor RayleighImpl::forward(
   torch::Tensor wavenumber;
   if (kwargs.count("wavenumber") > 0) {
     wavenumber = kwargs.at("wavenumber");
+    if (!grid_already_validated(wavenumber, validated_wavenumber_)) {
+      TORCH_CHECK(wavenumber.dim() == 1,
+                  "Rayleigh expects a 1D spectral grid; got ",
+                  wavenumber.sizes());
+      TORCH_CHECK(torch::all(torch::isfinite(wavenumber)).item<bool>() &&
+                      torch::all(wavenumber > 0.0).item<bool>(),
+                  "Rayleigh wavenumber must be finite and positive");
+      validated_wavenumber_ = wavenumber;
+    }
   } else if (kwargs.count("wavelength") > 0) {
     auto wavelength = kwargs.at("wavelength");
-    TORCH_CHECK(torch::all(torch::isfinite(wavelength)).item<bool>() &&
-                    torch::all(wavelength > 0.0).item<bool>(),
-                "Rayleigh wavelength must be finite and positive");
+    if (!grid_already_validated(wavelength, validated_wavelength_)) {
+      TORCH_CHECK(torch::all(torch::isfinite(wavelength)).item<bool>() &&
+                      torch::all(wavelength > 0.0).item<bool>(),
+                  "Rayleigh wavelength must be finite and positive");
+      validated_wavelength_ = wavelength;
+    }
+    // Finite and positive wavelength implies finite and positive wavenumber.
     wavenumber = 1.0e4 / wavelength;
+    TORCH_CHECK(wavenumber.dim() == 1,
+                "Rayleigh expects a 1D spectral grid; got ",
+                wavenumber.sizes());
   } else {
     TORCH_CHECK(false,
                 "Rayleigh requires wavenumber [cm^-1] or wavelength [um]");
   }
-
-  TORCH_CHECK(wavenumber.dim() == 1,
-              "Rayleigh expects a 1D spectral grid; got ", wavenumber.sizes());
-  TORCH_CHECK(torch::all(torch::isfinite(wavenumber)).item<bool>() &&
-                  torch::all(wavenumber > 0.0).item<bool>(),
-              "Rayleigh wavenumber must be finite and positive");
 
   wavenumber = wavenumber.to(conc.options());
 

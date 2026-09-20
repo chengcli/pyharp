@@ -75,6 +75,23 @@ TEST(TestRayleigh, WavelengthAndWavenumberInputsAgree) {
   EXPECT_TRUE(torch::allclose(first, second, 1.0e-12, 1.0e-14));
 }
 
+TEST(TestRayleigh, RevalidatesWhenGridChangesAcrossCalls) {
+  harp::species_names = {"H2"};
+  harp::species_weights = {2.01588e-3};
+  harp::Rayleigh rayleigh(rayleigh_options({0}, 2));
+  auto conc = torch::tensor({{{2.0}}}, torch::kFloat64);
+
+  std::map<std::string, torch::Tensor> valid;
+  valid["wavenumber"] = torch::tensor({20000.0}, torch::kFloat64);
+  auto first = rayleigh->forward(conc, valid);
+  auto second = rayleigh->forward(conc, valid);
+  EXPECT_TRUE(torch::allclose(first, second, 1.0e-12, 1.0e-14));
+
+  std::map<std::string, torch::Tensor> invalid;
+  invalid["wavenumber"] = torch::tensor({-20000.0}, torch::kFloat64);
+  EXPECT_THROW({ rayleigh->forward(conc, invalid); }, c10::Error);
+}
+
 TEST(TestRayleigh, RejectsUnsupportedSpeciesAndTooFewMoments) {
   harp::species_names = {"H2S"};
   harp::species_weights = {34.08088e-3};

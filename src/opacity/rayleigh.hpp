@@ -45,6 +45,13 @@ class RayleighImpl : public torch::nn::Cloneable<RayleighImpl> {
    */
   torch::Tensor forward(torch::Tensor conc,
                         std::map<std::string, torch::Tensor> const& kwargs);
+
+ private:
+  //! Spectral grid validated by the most recent forward() call, cached by
+  //! tensor identity so a band's static grid is not re-validated (a host
+  //! sync) on every step. Assumes the grid tensor is not mutated in place.
+  torch::Tensor validated_wavenumber_;
+  torch::Tensor validated_wavelength_;
 };
 TORCH_MODULE(Rayleigh);
 
