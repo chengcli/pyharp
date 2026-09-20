@@ -1,5 +1,7 @@
 // C/C++
 #include <iostream>
+#include <mutex>
+#include <unordered_map>
 #include <vector>
 
 // harp
@@ -19,26 +21,115 @@ struct AxisWeights {
   bool on_nodes = false;
 };
 
+//! Whether a coordinate axis increases along its only dimension, cached by
+//! tensor identity. Opacity tables register their coordinate axes as
+//! construction-time buffers that never change afterward, but interpn() is a
+//! free function with no per-instance state to remember that in, so this
+//! keeps a small process-wide table instead. A held reference to the tensor
+//! keeps its storage alive so a later, unrelated tensor cannot reuse the same
+//! address and be mistaken for it; sizes/dtype/device are re-checked on every
+//! lookup as a cheap (no device sync) guard against exactly that.
+class AxisDirectionCache {
+ public:
+  bool is_increasing(torch::Tensor const& coord) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = table_.find(coord.data_ptr());
+    if (it != table_.end()) {
+      auto const& [cached_tensor, cached_value] = it->second;
+      if (cached_tensor.sizes() == coord.sizes() &&
+          cached_tensor.scalar_type() == coord.scalar_type() &&
+          cached_tensor.device() == coord.device()) {
+        return cached_value;
+      }
+    }
+
+    bool const increasing = coord[1].item<float>() > coord[0].item<float>();
+    table_[coord.data_ptr()] = {coord, increasing};
+    return increasing;
+  }
+
+ private:
+  std::mutex mutex_;
+  std::unordered_map<void const*, std::pair<torch::Tensor, bool>> table_;
+};
+
+AxisDirectionCache& axis_direction_cache() {
+  static AxisDirectionCache cache;
+  return cache;
+}
+
+//! Combines two pointer hashes; std::unordered_map has no built-in hash for
+//! std::pair.
+struct PointerPairHash {
+  size_t operator()(std::pair<void const*, void const*> const& p) const {
+    size_t const h1 = std::hash<void const*>{}(p.first);
+    size_t const h2 = std::hash<void const*>{}(p.second);
+    return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+  }
+};
+
 //! Is every query value exactly one of the tabulated coordinates, in order?
 /*!
  * Opacity bands are built from the wavenumber axis of the table they read, so
  * that dimension is usually queried at its own nodes. Interpolating there is a
  * gather with weight one, and the other branch of the recursion is multiplied
  * by zero and thrown away, which for a 3D table is half of the corner reads.
+ *
+ * The shape/dtype check above is metadata only and never reaches the table
+ * data, so it is free. It also means a query whose shape does not match the
+ * axis (pressure and temperature queried over (ncol, nlyr) against a much
+ * shorter table axis, say) returns before the `torch::equal` below, which is
+ * the only line here that syncs the device. In practice that line only runs
+ * for a band's own wavenumber grid queried against the matching table axis,
+ * and both are construction-time buffers that never change, so the result is
+ * cached by tensor identity just like the axis direction above.
  */
-bool query_lies_on_nodes(torch::Tensor const& coord,
-                         torch::Tensor const& query_d) {
-  auto q = query_d.squeeze();
-  if (q.sizes() != coord.sizes() || q.scalar_type() != coord.scalar_type()) {
-    return false;
+class OnNodesCache {
+ public:
+  bool query_lies_on_nodes(torch::Tensor const& coord,
+                           torch::Tensor const& query_d) {
+    auto q = query_d.squeeze();
+    if (q.sizes() != coord.sizes() || q.scalar_type() != coord.scalar_type()) {
+      return false;
+    }
+
+    auto const key = std::make_pair(coord.data_ptr(), q.data_ptr());
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = table_.find(key);
+    if (it != table_.end()) {
+      auto const& [cached_coord, cached_q, cached_value] = it->second;
+      if (cached_coord.sizes() == coord.sizes() &&
+          cached_coord.scalar_type() == coord.scalar_type() &&
+          cached_coord.device() == coord.device() &&
+          cached_q.sizes() == q.sizes() &&
+          cached_q.scalar_type() == q.scalar_type() &&
+          cached_q.device() == q.device()) {
+        return cached_value;
+      }
+    }
+
+    bool const on_nodes = torch::equal(q, coord);
+    table_[key] = {coord, q, on_nodes};
+    return on_nodes;
   }
-  return torch::equal(q, coord);
+
+ private:
+  std::mutex mutex_;
+  std::unordered_map<std::pair<void const*, void const*>,
+                     std::tuple<torch::Tensor, torch::Tensor, bool>,
+                     PointerPairHash>
+      table_;
+};
+
+OnNodesCache& on_nodes_cache() {
+  static OnNodesCache cache;
+  return cache;
 }
 
 AxisWeights locate_on_axis(torch::Tensor const& coord,
                            torch::Tensor const& query_d, bool extrapolate) {
   // Determine if coordinates are increasing or decreasing
-  bool is_increasing = coord[1].item<float>() > coord[0].item<float>();
+  bool is_increasing = axis_direction_cache().is_increasing(coord);
 
   // Get searchsorted index
   torch::Tensor search_idx;
@@ -79,7 +170,7 @@ AxisWeights locate_on_axis(torch::Tensor const& coord,
   // that is constant along some axis costs nothing along that axis.
   out.weight_low = out.weight_low.unsqueeze(-1);
   out.weight_high = out.weight_high.unsqueeze(-1);
-  out.on_nodes = query_lies_on_nodes(coord, query_d);
+  out.on_nodes = on_nodes_cache().query_lies_on_nodes(coord, query_d);
 
   return out;
 }

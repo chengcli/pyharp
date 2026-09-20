@@ -192,6 +192,76 @@ TEST(TestInterpolation, testClampsOutsideTheTable) {
   EXPECT_NEAR(result[2][0].item<double>(), 7.0, 1e-12);
 }
 
+TEST(TestInterpolation, testAxisDirectionCacheDistinguishesDifferentAxes) {
+  // locate_on_axis() caches each coordinate axis's monotonic direction by
+  // tensor identity to avoid a host sync on every call, since opacity tables
+  // register their axes once at construction and never change them. Exercise
+  // two differently-ordered axes of the same shape/dtype back to back, and
+  // reuse each one across repeated calls, to make sure the cache never
+  // conflates distinct axes or serves a stale answer.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto increasing = torch::tensor({1.0, 2.0, 3.0, 4.0}, opt);
+  auto decreasing = torch::tensor({4.0, 3.0, 2.0, 1.0}, opt);
+  auto lookup = torch::tensor({{1.0}, {2.0}, {3.0}, {4.0}}, opt);
+  auto query = torch::tensor({1.5, 2.5, 3.5}, opt);
+
+  auto from_increasing = harp::interpn({query}, {increasing}, lookup);
+  auto from_decreasing = harp::interpn({query}, {decreasing}, lookup);
+  EXPECT_TRUE(torch::allclose(from_increasing,
+                              torch::tensor({{1.5}, {2.5}, {3.5}}, opt)));
+  EXPECT_TRUE(torch::allclose(from_decreasing,
+                              torch::tensor({{3.5}, {2.5}, {1.5}}, opt)));
+
+  // Repeat both, in reverse order, to exercise the cache-hit path.
+  auto from_decreasing_again = harp::interpn({query}, {decreasing}, lookup);
+  auto from_increasing_again = harp::interpn({query}, {increasing}, lookup);
+  EXPECT_TRUE(torch::equal(from_decreasing, from_decreasing_again));
+  EXPECT_TRUE(torch::equal(from_increasing, from_increasing_again));
+}
+
+TEST(TestInterpolation, testOnNodesCacheDistinguishesDifferentQueries) {
+  // query_lies_on_nodes() caches its result by (axis, query) identity once
+  // their shapes and dtypes match closely enough to reach torch::equal, since
+  // that pairing is exactly a band's own wavenumber grid queried against the
+  // matching table axis -- both construction-time buffers that never change.
+  // Interleave the on-nodes query with an off-nodes query of the identical
+  // shape, and repeat each, to make sure the cache never conflates the two or
+  // serves a stale answer.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  const int nwave = 5, ncol = 2, nlyr = 2;
+  auto kwave = torch::linspace(100.0, 500.0, nwave, opt);
+  auto klnp = torch::linspace(0.0, 6.0, 4, opt);
+  auto lookup = torch::randn({nwave, 4, 2}, opt);
+  auto lnp_2d = torch::linspace(0.4, 5.6, ncol * nlyr, opt).view({ncol, nlyr});
+
+  auto on_nodes_query = kwave.view({nwave, 1, 1});
+  auto off_nodes_query = (kwave + 10.0).view({nwave, 1, 1});
+
+  auto on_nodes_general =
+      harp::interpn({on_nodes_query.expand({nwave, ncol, nlyr}),
+                     lnp_2d.unsqueeze(0).expand({nwave, ncol, nlyr})},
+                    {kwave, klnp}, lookup);
+
+  auto run_on_nodes = [&] {
+    return harp::interpn({on_nodes_query, lnp_2d.unsqueeze(0)}, {kwave, klnp},
+                         lookup);
+  };
+  auto run_off_nodes = [&] {
+    return harp::interpn({off_nodes_query, lnp_2d.unsqueeze(0)}, {kwave, klnp},
+                         lookup);
+  };
+
+  auto on1 = run_on_nodes();
+  auto off1 = run_off_nodes();
+  auto on2 = run_on_nodes();
+  auto off2 = run_off_nodes();
+
+  EXPECT_TRUE(torch::equal(on1, on_nodes_general));
+  EXPECT_TRUE(torch::equal(on1, on2));
+  EXPECT_TRUE(torch::equal(off1, off2));
+  EXPECT_FALSE(torch::equal(on1, off1));
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
