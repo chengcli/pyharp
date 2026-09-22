@@ -37,16 +37,29 @@ struct AxisWeights {
  * same address is never mistaken for the original. Strides are part of the
  * identity because two views can share a first element, shape, dtype, and
  * device yet read different values.
+ *
+ * The identity also records the tensor's version counter, which libtorch
+ * bumps on every in-place operation and shares between a tensor and all of
+ * its views. A cached tensor that is later mutated in place therefore fails to
+ * match and is recomputed, so interpn() keeps its contract of not requiring
+ * immutable inputs. Inference tensors (created under c10::InferenceMode) do
+ * not track versions; callers must check can_cache() and skip the cache for
+ * them.
  */
 class TensorIdentity {
  public:
+  //! Inference tensors have no version counter, so mutation of one cannot be
+  //! detected and it must not be cached.
+  static bool can_cache(torch::Tensor const& t) { return !t.is_inference(); }
+
   explicit TensorIdentity(torch::Tensor const& t)
       : storage_(t.storage().getWeakStorageImpl()),
         data_ptr_(t.data_ptr()),
         sizes_(t.sizes().vec()),
         strides_(t.strides().vec()),
         dtype_(t.scalar_type()),
-        device_(t.device()) {}
+        device_(t.device()),
+        version_(t._version()) {}
 
   //! Storage has been freed, so this identity can never match again.
   bool expired() const { return storage_.expired(); }
@@ -55,7 +68,8 @@ class TensorIdentity {
   bool matches(torch::Tensor const& t) const {
     return !storage_.expired() && data_ptr_ == t.data_ptr() &&
            t.sizes().equals(sizes_) && t.strides().equals(strides_) &&
-           dtype_ == t.scalar_type() && device_ == t.device();
+           dtype_ == t.scalar_type() && device_ == t.device() && can_cache(t) &&
+           version_ == t._version();
   }
 
  private:
@@ -65,6 +79,7 @@ class TensorIdentity {
   std::vector<int64_t> strides_;
   torch::ScalarType dtype_;
   torch::Device device_;
+  int64_t version_;
 };
 
 //! Upper bound on entries in either identity cache below. Steady state is a
@@ -94,6 +109,10 @@ void make_room(Table& table, IsExpired is_expired) {
 class AxisDirectionCache {
  public:
   bool is_increasing(torch::Tensor const& coord) {
+    if (!TensorIdentity::can_cache(coord)) {
+      return coord[1].item<float>() > coord[0].item<float>();
+    }
+
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = table_.find(coord.data_ptr());
     if (it != table_.end()) {
@@ -155,6 +174,10 @@ class OnNodesCache {
     auto q = query_d.squeeze();
     if (q.sizes() != coord.sizes() || q.scalar_type() != coord.scalar_type()) {
       return false;
+    }
+
+    if (!TensorIdentity::can_cache(coord) || !TensorIdentity::can_cache(q)) {
+      return torch::equal(q, coord);
     }
 
     auto const key = std::make_pair(coord.data_ptr(), q.data_ptr());

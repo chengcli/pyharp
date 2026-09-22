@@ -327,23 +327,57 @@ TEST(TestInterpolation, testCachesDoNotRetainTensors) {
 
 TEST(TestInterpolation, testCachesSurviveAddressReuse) {
   // Since nothing is retained, a freed axis's address may be handed to the
-  // next allocation. Alternate freshly allocated increasing and decreasing
-  // axes, dropping each before the next, so any stale entry left under a
-  // reused address would flip the direction and produce the wrong bracket.
+  // next allocation. Make that deterministic: wrap one caller-owned buffer in
+  // a fresh tensor (fresh storage, same address) on every iteration, with the
+  // axis direction flipped each time, so a stale entry left under the reused
+  // address would produce the wrong bracket.
   auto opt = torch::TensorOptions().dtype(torch::kFloat64);
   auto lookup = torch::tensor({{10.0}, {20.0}, {30.0}}, opt);
-  for (int repeat = 0; repeat < 32; ++repeat) {
-    {
-      auto axis = torch::tensor({1.0, 2.0, 3.0}, opt);
-      auto out = harp::interpn({torch::tensor({1.5}, opt)}, {axis}, lookup);
-      EXPECT_NEAR(out[0][0].item<double>(), 15.0, 1e-12);
-    }
-    {
-      auto axis = torch::tensor({3.0, 2.0, 1.0}, opt);
-      auto out = harp::interpn({torch::tensor({1.5}, opt)}, {axis}, lookup);
-      EXPECT_NEAR(out[0][0].item<double>(), 25.0, 1e-12);
-    }
+  std::vector<double> buffer(3);
+  void const* first_address = nullptr;
+  for (int repeat = 0; repeat < 8; ++repeat) {
+    bool const increasing = repeat % 2 == 0;
+    // Overwrite in place so the buffer keeps its address.
+    for (int i = 0; i < 3; ++i) buffer[i] = increasing ? 1.0 + i : 3.0 - i;
+    auto axis = torch::from_blob(buffer.data(), {3}, opt);
+    if (first_address == nullptr) first_address = axis.data_ptr();
+    ASSERT_EQ(axis.data_ptr(), first_address);
+    auto out = harp::interpn({torch::tensor({1.5}, opt)}, {axis}, lookup);
+    EXPECT_NEAR(out[0][0].item<double>(), increasing ? 15.0 : 25.0, 1e-12);
   }
+}
+
+TEST(TestInterpolation, testCachesFollowInPlaceMutation) {
+  // interpn() does not require immutable inputs, so both caches must notice
+  // when a tensor they have seen is written in place: the axis direction may
+  // flip, and an on-nodes query may move off the nodes.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+
+  auto axis = torch::tensor({1.0, 2.0, 3.0}, opt);
+  auto lookup = torch::tensor({{10.0}, {20.0}, {30.0}}, opt);
+  auto query = torch::tensor({1.5}, opt);
+  EXPECT_NEAR(harp::interpn({query}, {axis}, lookup)[0][0].item<double>(), 15.0,
+              1e-12);
+  axis.copy_(axis.flip(0));  // now {3, 2, 1}, decreasing
+  EXPECT_NEAR(harp::interpn({query}, {axis}, lookup)[0][0].item<double>(), 25.0,
+              1e-12);
+  // Writing through a view bumps the same counter.
+  axis.slice(0, 0, 3).copy_(torch::tensor({1.0, 2.0, 3.0}, opt));
+  EXPECT_NEAR(harp::interpn({query}, {axis}, lookup)[0][0].item<double>(), 15.0,
+              1e-12);
+
+  const int nwave = 4;
+  auto kwave = torch::linspace(100.0, 400.0, nwave, opt);
+  auto table = torch::randn({nwave, 2}, opt);
+  auto wave_query = kwave.clone().unsqueeze(-1);
+  auto run = [&](torch::Tensor const& q) {
+    return harp::interpn({q}, {kwave}, table);
+  };
+  EXPECT_TRUE(torch::equal(run(wave_query), run(wave_query.clone())));
+  wave_query.add_(10.0);  // off the nodes now
+  EXPECT_TRUE(torch::equal(run(wave_query), run(wave_query.clone())));
+  wave_query.sub_(10.0);  // and back on them
+  EXPECT_TRUE(torch::equal(run(wave_query), run(wave_query.clone())));
 }
 
 int main(int argc, char** argv) {

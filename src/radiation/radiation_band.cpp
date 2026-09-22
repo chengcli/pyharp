@@ -329,13 +329,25 @@ torch::Tensor RadiationBandImpl::forward(
     // every step. Opacities cache grid validation and interpolation metadata
     // by tensor identity, so a fresh allocation per step would both defeat
     // those caches and pay a host-to-device copy on every call.
+    //
+    // The kwargs map aliases these private tensors, so a caller could write
+    // to them in place after a step. libtorch bumps a tensor's version
+    // counter on every in-place write, and both tensors are rebuilt when
+    // either counter has moved since they were built.
     auto const& wavenumber = options->wavenumber();
     if (!wavenumber_.defined() || wavenumber_.device() != conc.device() ||
         wavenumber_.scalar_type() != conc.scalar_type() ||
-        wavenumber_source_ != wavenumber) {
+        wavenumber_source_ != wavenumber ||
+        wavenumber_._version() != wavenumber_version_ ||
+        wavelength_._version() != wavelength_version_) {
+      // Ordinary tensors even under c10::InferenceMode: inference tensors do
+      // not track versions, and the caches downstream skip them.
+      c10::InferenceMode inference_guard(false);
       wavenumber_source_ = wavenumber;
       wavenumber_ = torch::tensor(wavenumber, conc.options());
       wavelength_ = 1.e4 / wavenumber_;
+      wavenumber_version_ = wavenumber_._version();
+      wavelength_version_ = wavelength_._version();
     }
     (*kwargs)["wavenumber"] = wavenumber_;
     (*kwargs)["wavelength"] = wavelength_;

@@ -229,11 +229,16 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
  private:
   //! Spectral grid handed to the opacities through kwargs, allocated on the
   //! first forward() call and reused until the concentration tensor's device
-  //! or dtype changes or the option values it was built from change.
-  //! Opacities cache validation and interpolation metadata by tensor
-  //! identity, which only pays off if the grid tensor is stable.
+  //! or dtype changes, the option values it was built from change, or a
+  //! caller writes to either tensor in place. Opacities cache validation and
+  //! interpolation metadata by tensor identity, which only pays off if the
+  //! grid tensor is stable.
   torch::Tensor wavenumber_;
   torch::Tensor wavelength_;
+  //! Version counters observed when the two tensors were built; any in-place
+  //! write through the kwargs alias moves one of them and forces a rebuild.
+  int64_t wavenumber_version_ = 0;
+  int64_t wavelength_version_ = 0;
   //! The option values wavenumber_ was built from; a cheap host-side compare
   //! against options->wavenumber() decides whether to rebuild.
   std::vector<double> wavenumber_source_;

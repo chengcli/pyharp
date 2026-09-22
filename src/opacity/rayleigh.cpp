@@ -14,20 +14,39 @@ extern std::vector<std::string> species_names;
 
 namespace {
 
-//! True if 'grid' reads exactly the memory already validated as 'cached'.
+//! True if 'grid' reads exactly the memory already validated as 'cached',
+//! and that memory has not been written since.
 /*!
  * Metadata only, so it never syncs the device. Strides are part of the check
  * because two views can share a first element, shape, dtype, and device yet
  * read different values. The strong reference held in 'cached' keeps that
  * storage alive, so a later, unrelated tensor cannot reuse the same address
- * and be mistaken for it.
+ * and be mistaken for it. The version counter, which libtorch bumps on every
+ * in-place write to the tensor or any view of it, catches mutation of the
+ * validated grid. Inference tensors do not track versions and are therefore
+ * re-validated on every call.
  */
 bool grid_already_validated(torch::Tensor const& grid,
-                            torch::Tensor const& cached) {
-  return cached.defined() && grid.data_ptr() == cached.data_ptr() &&
+                            torch::Tensor const& cached,
+                            int64_t cached_version) {
+  return cached.defined() && !grid.is_inference() &&
+         grid.data_ptr() == cached.data_ptr() &&
          grid.sizes() == cached.sizes() && grid.strides() == cached.strides() &&
          grid.scalar_type() == cached.scalar_type() &&
-         grid.device() == cached.device();
+         grid.device() == cached.device() && grid._version() == cached_version;
+}
+
+//! Remember 'grid' as validated, or forget any previous grid if this one
+//! cannot be tracked.
+void remember_validated(torch::Tensor const& grid, torch::Tensor& cached,
+                        int64_t& cached_version) {
+  if (grid.is_inference()) {
+    cached = torch::Tensor();
+    cached_version = 0;
+    return;
+  }
+  cached = grid;
+  cached_version = grid._version();
 }
 
 double species_scale(std::string const& species_name) {
@@ -82,22 +101,26 @@ torch::Tensor RayleighImpl::forward(
   torch::Tensor wavenumber;
   if (kwargs.count("wavenumber") > 0) {
     wavenumber = kwargs.at("wavenumber");
-    if (!grid_already_validated(wavenumber, validated_wavenumber_)) {
+    if (!grid_already_validated(wavenumber, validated_wavenumber_,
+                                validated_wavenumber_version_)) {
       TORCH_CHECK(wavenumber.dim() == 1,
                   "Rayleigh expects a 1D spectral grid; got ",
                   wavenumber.sizes());
       TORCH_CHECK(torch::all(torch::isfinite(wavenumber)).item<bool>() &&
                       torch::all(wavenumber > 0.0).item<bool>(),
                   "Rayleigh wavenumber must be finite and positive");
-      validated_wavenumber_ = wavenumber;
+      remember_validated(wavenumber, validated_wavenumber_,
+                         validated_wavenumber_version_);
     }
   } else if (kwargs.count("wavelength") > 0) {
     auto wavelength = kwargs.at("wavelength");
-    if (!grid_already_validated(wavelength, validated_wavelength_)) {
+    if (!grid_already_validated(wavelength, validated_wavelength_,
+                                validated_wavelength_version_)) {
       TORCH_CHECK(torch::all(torch::isfinite(wavelength)).item<bool>() &&
                       torch::all(wavelength > 0.0).item<bool>(),
                   "Rayleigh wavelength must be finite and positive");
-      validated_wavelength_ = wavelength;
+      remember_validated(wavelength, validated_wavelength_,
+                         validated_wavelength_version_);
     }
     // Finite and positive wavelength implies finite and positive wavenumber.
     wavenumber = 1.0e4 / wavelength;

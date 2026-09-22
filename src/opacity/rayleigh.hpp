@@ -49,9 +49,12 @@ class RayleighImpl : public torch::nn::Cloneable<RayleighImpl> {
  private:
   //! Spectral grid validated by the most recent forward() call, cached by
   //! tensor identity so a band's static grid is not re-validated (a host
-  //! sync) on every step. Assumes the grid tensor is not mutated in place.
+  //! sync) on every step. The version counter observed at validation is kept
+  //! alongside, so an in-place write to the grid forces re-validation.
   torch::Tensor validated_wavenumber_;
+  int64_t validated_wavenumber_version_ = 0;
   torch::Tensor validated_wavelength_;
+  int64_t validated_wavelength_version_ = 0;
 };
 TORCH_MODULE(Rayleigh);
 
