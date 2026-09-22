@@ -1,7 +1,10 @@
 // C/C++
 #include <iostream>
+#include <iterator>
 #include <mutex>
+#include <tuple>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 // harp
@@ -21,36 +24,94 @@ struct AxisWeights {
   bool on_nodes = false;
 };
 
+//! Everything that determines which values a tensor reads, short of the
+//! values themselves: where its storage lives and how the tensor is laid out
+//! over it. Two tensors with the same identity read the same memory in the
+//! same order, so a result computed from one holds for the other as long as
+//! neither is mutated in place.
+/*!
+ * Only a weak reference to the storage is kept. Caching a tensor's identity
+ * therefore never keeps its allocation alive (an important property for a
+ * process-wide cache that sees per-call temporaries), and when the storage is
+ * freed the reference expires, so an unrelated tensor later allocated at the
+ * same address is never mistaken for the original. Strides are part of the
+ * identity because two views can share a first element, shape, dtype, and
+ * device yet read different values.
+ */
+class TensorIdentity {
+ public:
+  explicit TensorIdentity(torch::Tensor const& t)
+      : storage_(t.storage().getWeakStorageImpl()),
+        data_ptr_(t.data_ptr()),
+        sizes_(t.sizes().vec()),
+        strides_(t.strides().vec()),
+        dtype_(t.scalar_type()),
+        device_(t.device()) {}
+
+  //! Storage has been freed, so this identity can never match again.
+  bool expired() const { return storage_.expired(); }
+
+  //! Metadata-only comparison; never touches tensor data or syncs a device.
+  bool matches(torch::Tensor const& t) const {
+    return !storage_.expired() && data_ptr_ == t.data_ptr() &&
+           t.sizes().equals(sizes_) && t.strides().equals(strides_) &&
+           dtype_ == t.scalar_type() && device_ == t.device();
+  }
+
+ private:
+  c10::weak_intrusive_ptr<c10::StorageImpl> storage_;
+  void const* data_ptr_;
+  std::vector<int64_t> sizes_;
+  std::vector<int64_t> strides_;
+  torch::ScalarType dtype_;
+  torch::Device device_;
+};
+
+//! Upper bound on entries in either identity cache below. Steady state is a
+//! few coordinate axes per opacity table, so this is generous; it only exists
+//! so that a caller handing over a fresh temporary on every step cannot grow
+//! the table without bound.
+constexpr size_t kMaxCacheEntries = 256;
+
+//! Drop entries whose tensors have been freed; if that is not enough to make
+//! room, start over. Every entry is a cheap metadata record, so clearing costs
+//! at most one recomputation per live axis.
+template <typename Table, typename IsExpired>
+void make_room(Table& table, IsExpired is_expired) {
+  if (table.size() < kMaxCacheEntries) return;
+  for (auto it = table.begin(); it != table.end();) {
+    it = is_expired(it->second) ? table.erase(it) : std::next(it);
+  }
+  if (table.size() >= kMaxCacheEntries) table.clear();
+}
+
 //! Whether a coordinate axis increases along its only dimension, cached by
 //! tensor identity. Opacity tables register their coordinate axes as
 //! construction-time buffers that never change afterward, but interpn() is a
 //! free function with no per-instance state to remember that in, so this
-//! keeps a small process-wide table instead. A held reference to the tensor
-//! keeps its storage alive so a later, unrelated tensor cannot reuse the same
-//! address and be mistaken for it; sizes/dtype/device are re-checked on every
-//! lookup as a cheap (no device sync) guard against exactly that.
+//! keeps a small process-wide table instead. The lookup itself is metadata
+//! only; the device sync happens once per distinct axis.
 class AxisDirectionCache {
  public:
   bool is_increasing(torch::Tensor const& coord) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = table_.find(coord.data_ptr());
     if (it != table_.end()) {
-      auto const& [cached_tensor, cached_value] = it->second;
-      if (cached_tensor.sizes() == coord.sizes() &&
-          cached_tensor.scalar_type() == coord.scalar_type() &&
-          cached_tensor.device() == coord.device()) {
-        return cached_value;
-      }
+      auto const& [identity, cached_value] = it->second;
+      if (identity.matches(coord)) return cached_value;
+      table_.erase(it);
     }
 
     bool const increasing = coord[1].item<float>() > coord[0].item<float>();
-    table_[coord.data_ptr()] = {coord, increasing};
+    make_room(table_, [](Entry const& e) { return e.first.expired(); });
+    table_.emplace(coord.data_ptr(), Entry{TensorIdentity(coord), increasing});
     return increasing;
   }
 
  private:
+  using Entry = std::pair<TensorIdentity, bool>;
   std::mutex mutex_;
-  std::unordered_map<void const*, std::pair<torch::Tensor, bool>> table_;
+  std::unordered_map<void const*, Entry> table_;
 };
 
 AxisDirectionCache& axis_direction_cache() {
@@ -75,14 +136,17 @@ struct PointerPairHash {
  * gather with weight one, and the other branch of the recursion is multiplied
  * by zero and thrown away, which for a 3D table is half of the corner reads.
  *
- * The shape/dtype check above is metadata only and never reaches the table
+ * The shape/dtype check up front is metadata only and never reaches the table
  * data, so it is free. It also means a query whose shape does not match the
  * axis (pressure and temperature queried over (ncol, nlyr) against a much
  * shorter table axis, say) returns before the `torch::equal` below, which is
  * the only line here that syncs the device. In practice that line only runs
- * for a band's own wavenumber grid queried against the matching table axis,
- * and both are construction-time buffers that never change, so the result is
- * cached by tensor identity just like the axis direction above.
+ * for a band's own wavenumber grid queried against the matching table axis.
+ * Both are meant to be long-lived tensors (RadiationBand allocates its grid
+ * once and hands the same tensor to every step), so the result is cached by
+ * (axis, query) identity just like the axis direction above. A caller that
+ * does pass a fresh query each step simply misses the cache; nothing here
+ * holds a reference that would keep those temporaries alive.
  */
 class OnNodesCache {
  public:
@@ -97,26 +161,26 @@ class OnNodesCache {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = table_.find(key);
     if (it != table_.end()) {
-      auto const& [cached_coord, cached_q, cached_value] = it->second;
-      if (cached_coord.sizes() == coord.sizes() &&
-          cached_coord.scalar_type() == coord.scalar_type() &&
-          cached_coord.device() == coord.device() &&
-          cached_q.sizes() == q.sizes() &&
-          cached_q.scalar_type() == q.scalar_type() &&
-          cached_q.device() == q.device()) {
+      auto const& [coord_identity, q_identity, cached_value] = it->second;
+      if (coord_identity.matches(coord) && q_identity.matches(q)) {
         return cached_value;
       }
+      table_.erase(it);
     }
 
     bool const on_nodes = torch::equal(q, coord);
-    table_[key] = {coord, q, on_nodes};
+    make_room(table_, [](Entry const& e) {
+      return std::get<0>(e).expired() || std::get<1>(e).expired();
+    });
+    table_.emplace(key,
+                   Entry{TensorIdentity(coord), TensorIdentity(q), on_nodes});
     return on_nodes;
   }
 
  private:
+  using Entry = std::tuple<TensorIdentity, TensorIdentity, bool>;
   std::mutex mutex_;
-  std::unordered_map<std::pair<void const*, void const*>,
-                     std::tuple<torch::Tensor, torch::Tensor, bool>,
+  std::unordered_map<std::pair<void const*, void const*>, Entry,
                      PointerPairHash>
       table_;
 };

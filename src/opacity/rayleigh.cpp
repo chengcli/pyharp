@@ -14,12 +14,20 @@ extern std::vector<std::string> species_names;
 
 namespace {
 
-//! True if 'grid' is the same tensor already validated as 'cached'.
+//! True if 'grid' reads exactly the memory already validated as 'cached'.
+/*!
+ * Metadata only, so it never syncs the device. Strides are part of the check
+ * because two views can share a first element, shape, dtype, and device yet
+ * read different values. The strong reference held in 'cached' keeps that
+ * storage alive, so a later, unrelated tensor cannot reuse the same address
+ * and be mistaken for it.
+ */
 bool grid_already_validated(torch::Tensor const& grid,
                             torch::Tensor const& cached) {
   return cached.defined() && grid.data_ptr() == cached.data_ptr() &&
-         grid.sizes() == cached.sizes() &&
-         grid.scalar_type() == cached.scalar_type();
+         grid.sizes() == cached.sizes() && grid.strides() == cached.strides() &&
+         grid.scalar_type() == cached.scalar_type() &&
+         grid.device() == cached.device();
 }
 
 double species_scale(std::string const& species_name) {

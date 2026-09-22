@@ -92,6 +92,32 @@ TEST(TestRayleigh, RevalidatesWhenGridChangesAcrossCalls) {
   EXPECT_THROW({ rayleigh->forward(conc, invalid); }, c10::Error);
 }
 
+TEST(TestRayleigh, RevalidatesStridedViewSharingTheFirstElement) {
+  // The validation cache identifies a grid by its metadata, never its values.
+  // Two views of one buffer can share the first element, shape, dtype, and
+  // device while reading different values, so strides must be part of the
+  // identity or the invalid view below would ride on the valid view's pass.
+  harp::species_names = {"H2"};
+  harp::species_weights = {2.01588e-3};
+  harp::Rayleigh rayleigh(rayleigh_options({0}, 2));
+  auto conc = torch::tensor({{{2.0}}}, torch::kFloat64);
+
+  auto buffer = torch::tensor({20000.0, -1.0, 30000.0, -1.0}, torch::kFloat64);
+  auto valid_view = buffer.slice(0, 0, 4, 2);    // {20000, 30000}
+  auto invalid_view = buffer.slice(0, 0, 2, 1);  // {20000, -1}
+  ASSERT_EQ(valid_view.data_ptr(), invalid_view.data_ptr());
+  ASSERT_EQ(valid_view.sizes(), invalid_view.sizes());
+
+  std::map<std::string, torch::Tensor> valid;
+  valid["wavenumber"] = valid_view;
+  rayleigh->forward(conc, valid);
+  rayleigh->forward(conc, valid);
+
+  std::map<std::string, torch::Tensor> invalid;
+  invalid["wavenumber"] = invalid_view;
+  EXPECT_THROW({ rayleigh->forward(conc, invalid); }, c10::Error);
+}
+
 TEST(TestRayleigh, RejectsUnsupportedSpeciesAndTooFewMoments) {
   harp::species_names = {"H2S"};
   harp::species_weights = {34.08088e-3};

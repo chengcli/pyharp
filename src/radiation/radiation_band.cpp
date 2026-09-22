@@ -325,10 +325,21 @@ torch::Tensor RadiationBandImpl::forward(
   // add wavelength or wavenumber to kwargs, overwrite existing values
   int nwave = 0;
   if (options->wavenumber().size() > 0) {
-    (*kwargs)["wavenumber"] =
-        torch::tensor(options->wavenumber(), conc.options());
-    (*kwargs)["wavelength"] = 1.e4 / (*kwargs)["wavenumber"];
-    nwave = options->wavenumber().size();
+    // Allocate the band's spectral grid once and hand the same tensors to
+    // every step. Opacities cache grid validation and interpolation metadata
+    // by tensor identity, so a fresh allocation per step would both defeat
+    // those caches and pay a host-to-device copy on every call.
+    auto const& wavenumber = options->wavenumber();
+    if (!wavenumber_.defined() || wavenumber_.device() != conc.device() ||
+        wavenumber_.scalar_type() != conc.scalar_type() ||
+        wavenumber_source_ != wavenumber) {
+      wavenumber_source_ = wavenumber;
+      wavenumber_ = torch::tensor(wavenumber, conc.options());
+      wavelength_ = 1.e4 / wavenumber_;
+    }
+    (*kwargs)["wavenumber"] = wavenumber_;
+    (*kwargs)["wavelength"] = wavelength_;
+    nwave = wavenumber.size();
   } else {
     nwave = options->weight().size();
   }

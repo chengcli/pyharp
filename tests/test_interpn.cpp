@@ -262,6 +262,90 @@ TEST(TestInterpolation, testOnNodesCacheDistinguishesDifferentQueries) {
   EXPECT_FALSE(torch::equal(on1, off1));
 }
 
+TEST(TestInterpolation, testCachesDistinguishStridedViewsOfOneBuffer) {
+  // Both identity caches must treat strides as part of a tensor's identity.
+  // Two views of one buffer can share the first element, shape, dtype, and
+  // device while reading different values: here an increasing and a
+  // decreasing axis, and an on-nodes and an off-nodes query.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+
+  // Axis direction: {2, 3} at stride 1 versus {2, 1} at stride 2.
+  auto axis_buffer = torch::tensor({2.0, 3.0, 1.0}, opt);
+  auto increasing = axis_buffer.slice(0, 0, 2, 1);
+  auto decreasing = axis_buffer.slice(0, 0, 3, 2);
+  ASSERT_EQ(increasing.data_ptr(), decreasing.data_ptr());
+  auto lookup = torch::tensor({{10.0}, {20.0}}, opt);
+  for (int repeat = 0; repeat < 2; ++repeat) {
+    auto up = harp::interpn({torch::tensor({2.25}, opt)}, {increasing}, lookup);
+    auto down =
+        harp::interpn({torch::tensor({1.25}, opt)}, {decreasing}, lookup);
+    EXPECT_NEAR(up[0][0].item<double>(), 12.5, 1e-12);
+    EXPECT_NEAR(down[0][0].item<double>(), 17.5, 1e-12);
+  }
+
+  // On-nodes: the axis values at stride 2 versus an interleaved off-nodes
+  // sequence at stride 1, both starting at the same element.
+  const int nwave = 4;
+  auto kwave = torch::linspace(100.0, 400.0, nwave, opt);
+  auto query_buffer = torch::stack({kwave, kwave + 10.0}, 1).flatten();
+  auto on_nodes = query_buffer.slice(0, 0, 2 * nwave, 2);
+  auto off_nodes = query_buffer.slice(0, 0, nwave, 1);
+  ASSERT_EQ(on_nodes.data_ptr(), off_nodes.data_ptr());
+  ASSERT_TRUE(torch::equal(on_nodes, kwave));
+  ASSERT_FALSE(torch::equal(off_nodes, kwave));
+  auto table = torch::randn({nwave, 2}, opt);
+  auto run = [&](torch::Tensor const& q) {
+    return harp::interpn({q.unsqueeze(-1)}, {kwave}, table);
+  };
+  for (int repeat = 0; repeat < 2; ++repeat) {
+    // A fresh contiguous copy has its own identity, so it never shares a
+    // cache entry with the view and serves as an independent reference.
+    EXPECT_TRUE(torch::equal(run(on_nodes), run(on_nodes.clone())));
+    EXPECT_TRUE(torch::equal(run(off_nodes), run(off_nodes.clone())));
+  }
+}
+
+TEST(TestInterpolation, testCachesDoNotRetainTensors) {
+  // The caches are process-wide and see per-call temporaries, so they must
+  // hold only weak references: a query passed to interpn() must be freed as
+  // soon as the caller drops it, or every step of a model would leak one.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto kwave = torch::linspace(100.0, 400.0, 4, opt);
+  auto table = torch::randn({4, 2}, opt);
+  auto const kwave_owners = kwave.storage().use_count();
+
+  auto released_query = [&] {
+    auto query = kwave.clone().unsqueeze(-1);
+    harp::interpn({query}, {kwave}, table);
+    harp::interpn({query}, {kwave}, table);
+    return query.storage().getWeakStorageImpl();
+  }();
+
+  EXPECT_TRUE(released_query.expired());
+  EXPECT_EQ(kwave.storage().use_count(), kwave_owners);
+}
+
+TEST(TestInterpolation, testCachesSurviveAddressReuse) {
+  // Since nothing is retained, a freed axis's address may be handed to the
+  // next allocation. Alternate freshly allocated increasing and decreasing
+  // axes, dropping each before the next, so any stale entry left under a
+  // reused address would flip the direction and produce the wrong bracket.
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto lookup = torch::tensor({{10.0}, {20.0}, {30.0}}, opt);
+  for (int repeat = 0; repeat < 32; ++repeat) {
+    {
+      auto axis = torch::tensor({1.0, 2.0, 3.0}, opt);
+      auto out = harp::interpn({torch::tensor({1.5}, opt)}, {axis}, lookup);
+      EXPECT_NEAR(out[0][0].item<double>(), 15.0, 1e-12);
+    }
+    {
+      auto axis = torch::tensor({3.0, 2.0, 1.0}, opt);
+      auto out = harp::interpn({torch::tensor({1.5}, opt)}, {axis}, lookup);
+      EXPECT_NEAR(out[0][0].item<double>(), 25.0, 1e-12);
+    }
+  }
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
