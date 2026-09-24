@@ -15,6 +15,7 @@ import numpy as np
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "spectra_matplotlib"))
 
 from .config import SpectralBandConfig, SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
+from .hitemp_lines import derive_hitemp_table, prepare_hitemp_table
 from .hitran_cia_utils import load_cia_dataset
 from .utils import build_band_from_range
 
@@ -290,6 +291,8 @@ def _line_source_band(band: SpectralBandConfig) -> SpectralBandConfig:
 
 def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> LineDatabase:
     """Fetch line centers over the output band plus the fixed line wings."""
+    if config.line_source == "hitemp":
+        return load_hitemp_lines(config, band)
     config.ensure_directories()
     hapi = _import_hapi()
     line_band = _line_source_band(band)
@@ -337,6 +340,57 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
         wavenumber_min_cm1=bounds_min,
         wavenumber_max_cm1=bounds_max,
         available_broadener_keys=available_broadener_keys,
+    )
+
+
+def load_hitemp_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> LineDatabase:
+    """Build (or reuse) a HAPI table from local HITEMP files over the band plus line wings.
+
+    The compressed HITEMP files are read once per band into a wide-temperature parent
+    table; each run then screens that parent at its own temperatures.
+    """
+    config.ensure_directories()
+    hapi = _import_hapi()
+    line_band = _line_source_band(band)
+    table_name = config.resolved_line_table_name(line_band)
+    parent_name = config.resolved_hitemp_parent_table_name(line_band)
+    # HAPI's db_begin loads every table in a folder, so each HITEMP table gets its own.
+    parent_dir = config.hitran_cache_dir / "hitemp" / parent_name
+    table_dir = config.hitran_cache_dir / "hitemp" / table_name
+    prepare_hitemp_table(
+        hitemp_dir=config.hitemp_dir,
+        table_dir=parent_dir,
+        table_name=parent_name,
+        molecule_id=config.molecule_id,
+        local_iso_ids=config.resolved_isotopologue_ids(),
+        wavenumber_min_cm1=line_band.wavenumber_min_cm1,
+        wavenumber_max_cm1=line_band.wavenumber_max_cm1,
+        temperature_range_k=config.resolved_hitemp_parent_temperature_range_k(),
+        min_line_strength=config.min_line_strength,
+        default_header=hapi.HITRAN_DEFAULT_HEADER,
+        partition_sum=hapi.partitionSum,
+        refresh=config.refresh_hitran,
+    )
+    n_lines = derive_hitemp_table(
+        parent_dir=parent_dir,
+        parent_name=parent_name,
+        table_dir=table_dir,
+        table_name=table_name,
+        temperatures_k=config.resolved_hitemp_temperatures_k(),
+        partition_sum=hapi.partitionSum,
+        refresh=config.refresh_hitran,
+    )
+    if n_lines == 0:
+        raise RuntimeError(
+            f"No HITEMP lines for {config.hitran_species.name} over "
+            f"{line_band.wavenumber_min_cm1:g}-{line_band.wavenumber_max_cm1:g} cm^-1 in {config.hitemp_dir}."
+        )
+    return LineDatabase(
+        table_name=table_name,
+        cache_dir=table_dir,
+        wavenumber_min_cm1=line_band.wavenumber_min_cm1,
+        wavenumber_max_cm1=line_band.wavenumber_max_cm1,
+        available_broadener_keys=("air", "self"),
     )
 
 

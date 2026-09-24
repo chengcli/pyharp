@@ -8,6 +8,10 @@ from typing import Mapping
 
 import numpy as np
 
+from .hitemp_lines import DEFAULT_HITEMP_TEMPERATURE_RANGE_K
+
+LINE_SOURCES = ("hitran", "hitemp")
+
 
 @dataclass(frozen=True)
 class SpectralBandConfig:
@@ -315,6 +319,15 @@ class SpectroscopyConfig:
     broadening_composition: dict[str, float] | str | None = None
     refresh_hitran: bool = False
     min_line_strength: float = 1.0e-27
+    line_source: str = "hitran"
+    hitemp_dir: Path | None = None
+    hitemp_temperatures_k: tuple[float, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if self.line_source not in LINE_SOURCES:
+            raise ValueError(f"line_source must be one of {LINE_SOURCES}, got {self.line_source!r}")
+        if self.line_source == "hitemp" and self.hitemp_dir is None:
+            raise ValueError("hitemp_dir is required when line_source='hitemp'")
 
     @property
     def hitran_species(self) -> HitranSpecies:
@@ -359,7 +372,30 @@ class SpectroscopyConfig:
         upper = band.wavenumber_max_cm1
         lower_tag = str(int(round(lower)))
         upper_tag = str(int(round(upper)))
-        return f"{self.hitran_species.line_table_prefix}_{lower_tag}_{upper_tag}"
+        name = f"{self.hitran_species.line_table_prefix}_{lower_tag}_{upper_tag}"
+        if self.line_source == "hitemp":
+            tmin, tmax = self.resolved_hitemp_temperature_range_k()
+            name += f"_hitemp_{int(round(tmin))}_{int(round(tmax))}K"
+        return name
+
+    def resolved_hitemp_parent_table_name(self, band: SpectralBandConfig) -> str:
+        """Return the temperature-independent HITEMP table that per-run tables are screened from."""
+        return self.resolved_line_table_name(band).rsplit("_", 2)[0]
+
+    def resolved_hitemp_temperatures_k(self) -> tuple[float, ...]:
+        """Return the temperatures of this run, at which weak HITEMP lines are screened out."""
+        return tuple(sorted(float(item) for item in self.hitemp_temperatures_k or DEFAULT_HITEMP_TEMPERATURE_RANGE_K))
+
+    def resolved_hitemp_temperature_range_k(self) -> tuple[float, float]:
+        """Return the temperature range covered by this run's HITEMP table."""
+        temperatures = self.resolved_hitemp_temperatures_k()
+        return temperatures[0], temperatures[-1]
+
+    def resolved_hitemp_parent_temperature_range_k(self) -> tuple[float, float]:
+        """Return the parent table's screening range, widened to cover this run if needed."""
+        tmin, tmax = self.resolved_hitemp_temperature_range_k()
+        default_min, default_max = DEFAULT_HITEMP_TEMPERATURE_RANGE_K
+        return min(tmin, default_min), max(tmax, default_max)
 
     def ensure_directories(self) -> None:
         self.output_path.parent.mkdir(parents=True, exist_ok=True)

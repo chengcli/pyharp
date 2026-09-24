@@ -15,7 +15,12 @@ from textwrap import dedent
 import numpy as np
 import xarray as xr
 
-from .atm_overview import compute_mixture_overview_products, parse_composition
+from .atm_overview import (
+    compute_mixture_overview_products,
+    line_source_options,
+    parse_composition,
+    prepare_mixture_hitemp_tables,
+)
 from .config import SpectroscopyConfig, cia_database_for_model, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .dataset_io import (
     DEFAULT_NETCDF_ENGINE,
@@ -25,6 +30,7 @@ from .dataset_io import (
     clean_var_token,
     write_dataset,
 )
+from .hitemp_lines import HITEMP_FILE_PATTERN
 from .hitran_cia_utils import load_cia_dataset
 from .hitran_molecule_utils import build_line_provider, download_hitran_lines
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_components
@@ -109,6 +115,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--wn-range", dest="wn_ranges", action="append", type=parse_wn_range, metavar="MIN,MAX", help="Wavenumber range in cm^-1. Repeat to write one NetCDF per band.")
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
     parser.add_argument("--refresh-hitran", action="store_true", help="Re-download HITRAN line tables even if cached.")
+    parser.add_argument("--hitemp-dir", type=Path, default=None, metavar="DIR", help="Directory of downloaded HITEMP files, e.g. 01_*_HITEMP2010.zip or 02_HITEMP2024.par.bz2. Species with files here use HITEMP lines; the rest use HITRAN. Filtered tables are cached under --hitran-dir/hitemp.")
     parser.add_argument("--broadening-composition", default=None, metavar="BROADENER:FRACTION,...", help="Line-broadening gas composition for molecular line calculations, for example air:0.8,self:0.2 or H2:0.85,He:0.15.")
     parser.add_argument("--filename", default=None, metavar="FILE", help="Use a specific CIA filename instead of resolving one from --pair.")
     parser.add_argument("--cia-filename", default=None, metavar="FILE", help="Optional CIA filename to include for molecular targets.")
@@ -125,6 +132,14 @@ def _validate_single_selector(args: argparse.Namespace, parser: argparse.Argumen
     selectors = [bool(args.pair), bool(args.species), bool(args.composition)]
     if sum(selectors) > 1:
         parser.error("choose only one of --pair, --species, or --composition")
+
+
+def _validate_hitemp_dir(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    # Species fall back to HITRAN when they have no HITEMP files, so a wrong path would do so silently.
+    if args.hitemp_dir is not None and not any(
+        HITEMP_FILE_PATTERN.match(path.name) for path in Path(args.hitemp_dir).rglob("*")
+    ):
+        parser.error(f"--hitemp-dir {args.hitemp_dir} contains no HITEMP files")
 
 
 def _validate_state_grid(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
@@ -685,7 +700,7 @@ def _compute_species_xsection(args: argparse.Namespace):
         hitran_cache_dir=args.hitran_dir,
         species_name=species_name,
         broadening_composition=parse_broadening_composition(args.broadening_composition),
-        refresh_hitran=args.refresh_hitran,
+        **line_source_options(args, species_name, temperature_k=_single_base_state(args)[0]),
     )
     line_db = download_hitran_lines(config, band)
     line_provider = build_line_provider(config, line_db)
@@ -799,6 +814,9 @@ def _compute_composition_products(args: argparse.Namespace):
         refresh_cia=args.refresh_cia,
         broadening_composition=args.broadening_composition,
         path_length_km=getattr(args, "path_length_km", 1.0),
+        hitemp_dir=getattr(args, "hitemp_dir", None),
+        line_temperatures_k=getattr(args, "line_temperatures_k", None),
+        hitemp_tables_ready=getattr(args, "hitemp_tables_ready", False),
     )
     return compute_mixture_overview_products(mixture_args, wn_range=args.wn_range)
 
@@ -944,6 +962,28 @@ def _stack_state_grid_datasets(
     return stacked
 
 
+def _prepare_hitemp_tables(args: argparse.Namespace, *, wn_ranges: list[tuple[float, float]], target_kind: str) -> None:
+    """Build the HITEMP tables once, before parallel workers reuse them."""
+    if target_kind == "composition":
+        prepare_mixture_hitemp_tables(args, wn_ranges)
+        return
+    if target_kind != "species":
+        return
+    species_name = args.species or "CO2"
+    options = line_source_options(args, species_name, temperature_k=args.line_temperatures_k[0])
+    if options.get("line_source") != "hitemp":
+        return
+    for wn_range in wn_ranges:
+        config = SpectroscopyConfig(
+            output_path=Path("output") / "unused.nc",
+            hitran_cache_dir=args.hitran_dir,
+            species_name=species_name,
+            **options,
+        )
+        line_db = download_hitran_lines(config, build_band(_args_for_wn_range(args, wn_range)))
+        print(f"{species_name} lines: HITEMP table {line_db.cache_dir}")
+
+
 def _compute_range_temperature_datasets(
     *,
     args: argparse.Namespace,
@@ -955,6 +995,12 @@ def _compute_range_temperature_datasets(
     base_temperatures = [temperature_k for temperature_k, _ in state_pairs]
     pressure_bars = [pressure_bar for _, pressure_bar in state_pairs]
     del_temperatures = _selected_del_temperatures(args)
+    if getattr(args, "hitemp_dir", None) is not None:
+        temperatures = [base + delta for base in base_temperatures for delta in del_temperatures]
+        args = argparse.Namespace(**vars(args))
+        args.line_temperatures_k = tuple(temperatures)
+        _prepare_hitemp_tables(args, wn_ranges=wn_ranges, target_kind=target_kind)
+        args.hitemp_tables_ready = True
     tasks: list[tuple[str, argparse.Namespace]] = []
     for wn_range in wn_ranges:
         range_args = _args_for_wn_range(args, wn_range)
@@ -1054,6 +1100,7 @@ def main() -> None:
     args = parser.parse_args()
     _validate_single_selector(args, parser)
     _validate_state_grid(args, parser)
+    _validate_hitemp_dir(args, parser)
     if args.command == "xsection":
         wn_ranges = _selected_wn_ranges(args)
         target_kind, _ = _selected_target(args)
