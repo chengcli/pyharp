@@ -12,6 +12,7 @@ from pyharp.spectra.hitran_molecule_utils import (
     HapiLineProvider,
     LineDatabase,
     build_line_provider,
+    download_hitran_lines,
     load_hitran_line_list,
 )
 from pyharp.spectra.line_kernel import load_line_table, voigt_cross_section
@@ -132,6 +133,67 @@ def test_load_line_table_caches_and_refreshes(tmp_path):
     write_table(table_dir, "tab", LINES_CO2[:3])
     reloaded = load_line_table(table_dir, "tab")
     assert reloaded.shape == (3,) and list(reloaded["local_iso_id"]) == [1, 1, 2]
+
+
+def test_load_line_table_falls_back_when_records_are_not_161_bytes(tmp_path):
+    table_dir = tmp_path / "tab"
+    write_table(table_dir, "tab", LINES_CO2[:3])
+    data_path = table_dir / "tab.data"
+    data_path.write_bytes(data_path.read_bytes().replace(b"\n", b"\r\n"))
+    lines = load_line_table(table_dir, "tab")
+    np.testing.assert_allclose(lines["nu"], [660.0, 667.4, 668.1])
+
+
+def test_fast_engine_reads_the_hitemp_parent_and_matches_hapi_on_the_child(tmp_path):
+    hitemp_dir = tmp_path / "hitemp"
+    hitemp_dir.mkdir()
+    lines = [
+        par_line(2, "1", 667.4, 1e-18, 100.0),
+        par_line(2, "1", 680.0, 1e-30, 4000.0),  # strong only when hot
+        par_line(2, "1", 690.0, 1e-28, 0.0),  # below the threshold at 1500 K, above it when cold
+    ]
+    (hitemp_dir / "02_HITEMP2024.par").write_text("".join(line + "\n" for line in lines))
+    band = SpectralBandConfig(name="b", wavenumber_min_cm1=650.0, wavenumber_max_cm1=700.0, resolution_cm1=0.1)
+    common = dict(
+        output_path=tmp_path / "o.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="CO2",
+        line_source="hitemp",
+        hitemp_dir=hitemp_dir,
+        hitemp_temperatures_k=(1500.0,),
+    )
+    with contextlib.redirect_stdout(io.StringIO()):
+        hapi_config = SpectroscopyConfig(**common)
+        hapi_db = download_hitran_lines(hapi_config, band)
+        ref = build_line_provider(hapi_config, hapi_db).cross_section_cm2_molecule(band.grid(), 1500.0, 1.0e5)
+    fast_config = SpectroscopyConfig(**common, line_engine="fast")
+    fast_db = download_hitran_lines(fast_config, band)
+    got = build_line_provider(fast_config, fast_db).cross_section_cm2_molecule(band.grid(), 1500.0, 1.0e5)
+
+    assert hapi_db.table_name == "co2_lines_625_725_hitemp_1500_1500K"
+    assert fast_db.table_name == "co2_lines_625_725_hitemp"
+    assert (fast_db.cache_dir / ".co2_lines_625_725_hitemp.lines.npy").exists()
+    assert load_line_table(fast_db.cache_dir, fast_db.table_name).shape[0] == 3
+    assert json.loads((hapi_db.cache_dir / f"{hapi_db.table_name}.header").read_text())["number_of_rows"] == 2
+    np.testing.assert_allclose(got, ref, rtol=1e-10, atol=1e-12 * ref.max())
+
+
+def test_fast_engine_writes_no_child_table(tmp_path):
+    hitemp_dir = tmp_path / "hitemp"
+    hitemp_dir.mkdir()
+    (hitemp_dir / "02_HITEMP2024.par").write_text(par_line(2, "1", 667.4, 1e-18, 100.0) + "\n")
+    band = SpectralBandConfig(name="b", wavenumber_min_cm1=650.0, wavenumber_max_cm1=700.0, resolution_cm1=0.1)
+    config = SpectroscopyConfig(
+        output_path=tmp_path / "o.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="CO2",
+        line_source="hitemp",
+        hitemp_dir=hitemp_dir,
+        hitemp_temperatures_k=(800.0, 1200.0),
+        line_engine="fast",
+    )
+    download_hitran_lines(config, band)
+    assert sorted(path.name for path in (tmp_path / "hitran" / "hitemp").iterdir()) == ["co2_lines_625_725_hitemp"]
 
 
 def test_load_line_table_rejects_nonstandard_layout(tmp_path):

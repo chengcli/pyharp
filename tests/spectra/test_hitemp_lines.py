@@ -285,20 +285,27 @@ def test_line_source_options_use_hitemp_only_for_species_with_files(tmp_path):
 
     args = argparse.Namespace(hitemp_dir=tmp_path, refresh_hitran=True, line_temperatures_k=(25.0, 225.0, 425.0))
     assert line_source_options(args, "H2O", temperature_k=225.0) == {
+        "line_engine": "hapi",
         "line_source": "hitemp",
         "hitemp_dir": tmp_path,
         "hitemp_temperatures_k": (25.0, 225.0, 425.0),
         "refresh_hitran": True,
     }
-    assert line_source_options(args, "NH3", temperature_k=225.0) == {"refresh_hitran": True}
+    assert line_source_options(args, "NH3", temperature_k=225.0) == {"refresh_hitran": True, "line_engine": "hapi"}
 
     args.hitemp_tables_ready = True
     assert line_source_options(args, "CO2", temperature_k=225.0)["refresh_hitran"] is False
-    assert line_source_options(args, "NH3", temperature_k=225.0) == {"refresh_hitran": True}
+    assert line_source_options(args, "NH3", temperature_k=225.0) == {"refresh_hitran": True, "line_engine": "hapi"}
 
     single = argparse.Namespace(hitemp_dir=tmp_path, refresh_hitran=False)
     assert line_source_options(single, "CO2", temperature_k=300.0)["hitemp_temperatures_k"] == (300.0,)
-    assert line_source_options(argparse.Namespace(refresh_hitran=False), "CO2", temperature_k=300.0) == {"refresh_hitran": False}
+    assert line_source_options(argparse.Namespace(refresh_hitran=False), "CO2", temperature_k=300.0) == {
+        "refresh_hitran": False,
+        "line_engine": "hapi",
+    }
+    fast = argparse.Namespace(hitemp_dir=tmp_path, refresh_hitran=False, line_engine="fast")
+    assert line_source_options(fast, "CO2", temperature_k=300.0)["line_engine"] == "fast"
+    assert line_source_options(fast, "NH3", temperature_k=300.0)["line_engine"] == "fast"
 
 
 def test_dump_cli_rejects_a_hitemp_dir_without_hitemp_files(tmp_path):

@@ -23,7 +23,15 @@ from typing import Callable, Mapping
 
 import numpy as np
 
-from .hitemp_lines import C2_CM_K, T_REF_K, _float_field, _int_field, _iter_par_records, _local_iso_ids
+from .hitemp_lines import (
+    C2_CM_K,
+    PAR_RECORD_LENGTH,
+    T_REF_K,
+    _float_field,
+    _int_field,
+    _iter_par_records,
+    _local_iso_ids,
+)
 
 
 LINE_DTYPE = np.dtype(
@@ -57,6 +65,8 @@ _STANDARD_ORDER = [
 _SQRT_LN2 = np.sqrt(np.log(2.0))
 _SQRT_PI = np.sqrt(np.pi)
 DEFAULT_MAX_PAIRS = 1 << 23
+# Lines per block when screening intensities, which bounds memory on tables of 1e7-1e8 lines.
+_INTENSITY_BLOCK = 1 << 22
 
 PartitionSum = Callable[[int, int, float], float]
 MolecularMass = Callable[[int, int], float]
@@ -81,20 +91,39 @@ def load_line_table(table_dir: Path, table_name: str) -> np.ndarray:
     if cache_path.exists() and meta_path.exists() and json.loads(meta_path.read_text()) == source:
         return np.load(cache_path, mmap_mode="r")
 
-    blocks = []
-    for records in _iter_par_records(data_path):
-        block = np.empty(records.shape[0], dtype=LINE_DTYPE)
-        block["molec_id"] = _int_field(records, 0, 2)
-        block["local_iso_id"] = _local_iso_ids(records)
-        for name, (start, stop) in _FLOAT_COLUMNS.items():
-            block[name] = _float_field(records, start, stop)
-        blocks.append(block)
-    lines = np.concatenate(blocks) if blocks else np.empty(0, dtype=LINE_DTYPE)
     tmp_path = cache_path.with_name(f"{cache_path.stem}.{os.getpid()}.tmp.npy")
-    np.save(tmp_path, lines)
+    _write_line_cache(data_path, tmp_path, stat.st_size)
     os.replace(tmp_path, cache_path)
     meta_path.write_text(json.dumps(source))
     return np.load(cache_path, mmap_mode="r")
+
+
+def _write_line_cache(data_path: Path, cache_path: Path, size: int) -> None:
+    n_rows, remainder = divmod(size, PAR_RECORD_LENGTH + 1)
+    if remainder == 0:
+        # Fixed 161-byte records: stream blocks into a preallocated file instead of holding the table in memory.
+        out = np.lib.format.open_memmap(cache_path, mode="w+", dtype=LINE_DTYPE, shape=(n_rows,))
+        filled = 0
+        for records in _iter_par_records(data_path):
+            if filled + records.shape[0] > n_rows:
+                break
+            out[filled : filled + records.shape[0]] = _parse_records(records)
+            filled += records.shape[0]
+        out.flush()
+        del out
+        if filled == n_rows:
+            return
+    blocks = [_parse_records(records) for records in _iter_par_records(data_path)]
+    np.save(cache_path, np.concatenate(blocks) if blocks else np.empty(0, dtype=LINE_DTYPE))
+
+
+def _parse_records(records: np.ndarray) -> np.ndarray:
+    block = np.empty(records.shape[0], dtype=LINE_DTYPE)
+    block["molec_id"] = _int_field(records, 0, 2)
+    block["local_iso_id"] = _local_iso_ids(records)
+    for name, (start, stop) in _FLOAT_COLUMNS.items():
+        block[name] = _float_field(records, start, stop)
+    return block
 
 
 def voigt_cross_section(
@@ -128,12 +157,17 @@ def voigt_cross_section(
     temperature = float(temperature_k)
     pressure = float(pressure_atm)
 
-    nu = np.asarray(lines["nu"], dtype=np.float64)
-    strength = _line_intensity(lines, temperature, partition_sum)
-    keep = strength >= intensity_threshold
-    if not keep.any():
+    keep_blocks, strength_blocks = [], []
+    for first in range(0, lines.shape[0], _INTENSITY_BLOCK):
+        block_strength = _line_intensity(lines[first : first + _INTENSITY_BLOCK], temperature, partition_sum)
+        keep = np.flatnonzero(block_strength >= intensity_threshold)
+        keep_blocks.append(keep + first)
+        strength_blocks.append(block_strength[keep])
+    keep = np.concatenate(keep_blocks)
+    if keep.size == 0:
         return xsect
-    lines, nu, strength = lines[keep], nu[keep], strength[keep]
+    lines, strength = lines[keep], np.concatenate(strength_blocks)
+    nu = np.asarray(lines["nu"], dtype=np.float64)
 
     gamma_doppler = nu * _doppler_factor(lines, temperature, molecular_mass, boltzmann_cgs, speed_of_light_cgs)
     gamma_lorentz, shift = _pressure_parameters(lines, temperature, pressure, diluent)

@@ -701,7 +701,6 @@ def _compute_species_xsection(args: argparse.Namespace):
         hitran_cache_dir=args.hitran_dir,
         species_name=species_name,
         broadening_composition=parse_broadening_composition(args.broadening_composition),
-        line_engine=getattr(args, "line_engine", "hapi"),
         **line_source_options(args, species_name, temperature_k=_single_base_state(args)[0]),
     )
     line_db = download_hitran_lines(config, band)

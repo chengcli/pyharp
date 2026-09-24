@@ -422,7 +422,8 @@ def load_hitemp_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> L
     """Build (or reuse) a HAPI table from local HITEMP files over the band plus line wings.
 
     The compressed HITEMP files are read once per band into a wide-temperature parent
-    table; each run then screens that parent at its own temperatures.
+    table. For HAPI, each run then screens that parent at its own temperatures; the fast
+    engine skips weak lines at each state's temperature itself, so it reads the parent.
     """
     config.ensure_directories()
     hapi = _import_hapi()
@@ -432,7 +433,7 @@ def load_hitemp_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> L
     # HAPI's db_begin loads every table in a folder, so each HITEMP table gets its own.
     parent_dir = config.hitran_cache_dir / "hitemp" / parent_name
     table_dir = config.hitran_cache_dir / "hitemp" / table_name
-    prepare_hitemp_table(
+    n_lines = prepare_hitemp_table(
         hitemp_dir=config.hitemp_dir,
         table_dir=parent_dir,
         table_name=parent_name,
@@ -446,15 +447,20 @@ def load_hitemp_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> L
         partition_sum=hapi.partitionSum,
         refresh=config.refresh_hitran,
     )
-    n_lines = derive_hitemp_table(
-        parent_dir=parent_dir,
-        parent_name=parent_name,
-        table_dir=table_dir,
-        table_name=table_name,
-        temperatures_k=config.resolved_hitemp_temperatures_k(),
-        partition_sum=hapi.partitionSum,
-        refresh=config.refresh_hitran,
-    )
+    if config.line_engine == "fast":
+        # Build the .npy cache here, so parallel workers only memory-map it.
+        load_line_table(parent_dir, parent_name)
+        table_name, table_dir = parent_name, parent_dir
+    else:
+        n_lines = derive_hitemp_table(
+            parent_dir=parent_dir,
+            parent_name=parent_name,
+            table_dir=table_dir,
+            table_name=table_name,
+            temperatures_k=config.resolved_hitemp_temperatures_k(),
+            partition_sum=hapi.partitionSum,
+            refresh=config.refresh_hitran,
+        )
     if n_lines == 0:
         raise RuntimeError(
             f"No HITEMP lines for {config.hitran_species.name} over "
