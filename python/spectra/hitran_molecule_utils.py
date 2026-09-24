@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "spectra
 from .config import SpectralBandConfig, SpectroscopyConfig, parse_broadening_composition, resolve_hitran_cia_pair
 from .hitemp_lines import derive_hitemp_table, prepare_hitemp_table
 from .hitran_cia_utils import load_cia_dataset
+from .line_kernel import load_line_table, volume_concentration_cm3, voigt_cross_section
 from .utils import build_band_from_range
 
 
@@ -193,6 +195,79 @@ class HapiLineProvider:
             **self._voigt_kwargs(),
         )
         return np.asarray(coef, dtype=np.float64)
+
+
+class FastLineProvider:
+    """Compute line absorption with the vectorized kernel in :mod:`line_kernel`.
+
+    Same interface and results as :class:`HapiLineProvider`, but it reads the table
+    with numpy instead of HAPI's per-line parser and evaluates all lines at once.
+    """
+
+    def __init__(
+        self,
+        table_name: str,
+        cache_dir: Path,
+        diluent: dict[str, float] | None = None,
+        min_line_strength: float = 1.0e-27,
+        available_broadener_keys: tuple[str, ...] | None = None,
+    ) -> None:
+        self._hapi = _import_hapi()
+        self.table_name = table_name
+        self.cache_dir = Path(cache_dir)
+        self.requested_diluent = dict(diluent or {"self": 1.0})
+        if available_broadener_keys is None:
+            available_broadener_keys = _available_broadener_keys_from_header(self.cache_dir, table_name)
+        self.diluent, self.diluent_fallbacks = _resolve_effective_diluent(
+            self._hapi,
+            table_name=table_name,
+            cache_dir=self.cache_dir,
+            requested_diluent=self.requested_diluent,
+            available=available_broadener_keys,
+        )
+        self.min_line_strength = float(min_line_strength)
+        self._lines = load_line_table(self.cache_dir, table_name)
+
+    broadening_summary = HapiLineProvider.broadening_summary
+
+    def cross_section_cm2_molecule(
+        self,
+        wavenumber_grid_cm1: np.ndarray,
+        temperature_k: float,
+        pressure_pa: float,
+    ) -> np.ndarray:
+        """Return line absorption cross section in cm^2/molecule."""
+        return voigt_cross_section(
+            self._lines,
+            np.asarray(wavenumber_grid_cm1, dtype=np.float64),
+            temperature_k=float(temperature_k),
+            pressure_atm=float(pressure_pa) / 101_325.0,
+            diluent=self.diluent,
+            intensity_threshold=self.min_line_strength,
+            wing_cm1=LINE_WING_CM1,
+            partition_sum=self._hapi.PYTIPS,
+            molecular_mass=self._hapi.molecularMass,
+            faddeeva=self._hapi.hum1_wei,
+            boltzmann_cgs=self._hapi.cBolts,
+            speed_of_light_cgs=self._hapi.cc,
+            subtract_wing_pedestal=self.table_name.lower().startswith("h2o_"),
+        )
+
+    def absorption_coefficient_cm1(
+        self,
+        wavenumber_grid_cm1: np.ndarray,
+        temperature_k: float,
+        pressure_pa: float,
+    ) -> np.ndarray:
+        """Return line absorption coefficient on the requested grid."""
+        sigma = self.cross_section_cm2_molecule(wavenumber_grid_cm1, temperature_k, pressure_pa)
+        return sigma * volume_concentration_cm3(float(pressure_pa) / 101_325.0, float(temperature_k), self._hapi.cBolts)
+
+
+def _available_broadener_keys_from_header(cache_dir: Path, table_name: str) -> tuple[str, ...]:
+    header = json.loads((Path(cache_dir) / f"{table_name}.header").read_text())
+    names = list(header.get("order", [])) + list(header.get("extra", []))
+    return tuple(sorted(str(name)[len("gamma_") :].lower() for name in names if str(name).startswith("gamma_")))
 
 
 def _resolve_global_isotopologue_ids(hapi, config: SpectroscopyConfig) -> tuple[int, ...]:
@@ -401,10 +476,13 @@ def load_hitran_line_list(
 ) -> HitranLineList:
     """Load discrete HITRAN line positions and tabulated intensities for the configured species."""
     line_db = line_db or download_hitran_lines(config, band)
-    hapi = _import_hapi()
-    _call_hapi_quietly(hapi.db_begin, str(line_db.cache_dir))
-    _call_hapi_quietly(hapi.storage2cache, line_db.table_name)
-    data = hapi.LOCAL_TABLE_CACHE[line_db.table_name]["data"]
+    if config.line_engine == "fast":
+        data = load_line_table(line_db.cache_dir, line_db.table_name)
+    else:
+        hapi = _import_hapi()
+        _call_hapi_quietly(hapi.db_begin, str(line_db.cache_dir))
+        _call_hapi_quietly(hapi.storage2cache, line_db.table_name)
+        data = hapi.LOCAL_TABLE_CACHE[line_db.table_name]["data"]
     wavenumber_cm1 = np.asarray(data["nu"], dtype=np.float64)
     line_intensity = np.asarray(data["sw"], dtype=np.float64)
     valid = (
@@ -425,9 +503,10 @@ def load_hitran_line_list(
 def build_line_provider(
     config: SpectroscopyConfig,
     line_db: LineDatabase,
-) -> HapiLineProvider:
-    """Construct a HAPI line provider using the config's broadening rules."""
-    return HapiLineProvider(
+) -> HapiLineProvider | FastLineProvider:
+    """Construct the configured line provider using the config's broadening rules."""
+    provider = FastLineProvider if config.line_engine == "fast" else HapiLineProvider
+    return provider(
         line_db.table_name,
         cache_dir=line_db.cache_dir,
         diluent=config.resolved_line_diluent(),

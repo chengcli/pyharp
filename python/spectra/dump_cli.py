@@ -21,7 +21,7 @@ from .atm_overview import (
     parse_composition,
     prepare_mixture_hitemp_tables,
 )
-from .config import SpectroscopyConfig, cia_database_for_model, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
+from .config import LINE_ENGINES, SpectroscopyConfig, cia_database_for_model, parse_broadening_composition, resolve_hitran_cia_filename, resolve_hitran_cia_pair
 from .dataset_io import (
     DEFAULT_NETCDF_ENGINE,
     WAVENUMBER_ATTRS,
@@ -116,6 +116,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser, *, include_path_lengt
     parser.add_argument("--resolution", type=float, default=1.0, metavar="CM^-1", help="Wavenumber grid spacing in cm^-1.")
     parser.add_argument("--refresh-hitran", action="store_true", help="Re-download HITRAN line tables even if cached.")
     parser.add_argument("--hitemp-dir", type=Path, default=None, metavar="DIR", help="Directory of downloaded HITEMP files, e.g. 01_*_HITEMP2010.zip or 02_HITEMP2024.par.bz2. Species with files here use HITEMP lines; the rest use HITRAN. Filtered tables are cached under --hitran-dir/hitemp.")
+    parser.add_argument("--line-engine", choices=LINE_ENGINES, default="hapi", help="Line-by-line calculator: hapi (HAPI's per-line loop) or fast (vectorized, same results).")
     parser.add_argument("--broadening-composition", default=None, metavar="BROADENER:FRACTION,...", help="Line-broadening gas composition for molecular line calculations, for example air:0.8,self:0.2 or H2:0.85,He:0.15.")
     parser.add_argument("--filename", default=None, metavar="FILE", help="Use a specific CIA filename instead of resolving one from --pair.")
     parser.add_argument("--cia-filename", default=None, metavar="FILE", help="Optional CIA filename to include for molecular targets.")
@@ -700,6 +701,7 @@ def _compute_species_xsection(args: argparse.Namespace):
         hitran_cache_dir=args.hitran_dir,
         species_name=species_name,
         broadening_composition=parse_broadening_composition(args.broadening_composition),
+        line_engine=getattr(args, "line_engine", "hapi"),
         **line_source_options(args, species_name, temperature_k=_single_base_state(args)[0]),
     )
     line_db = download_hitran_lines(config, band)
@@ -815,6 +817,7 @@ def _compute_composition_products(args: argparse.Namespace):
         broadening_composition=args.broadening_composition,
         path_length_km=getattr(args, "path_length_km", 1.0),
         hitemp_dir=getattr(args, "hitemp_dir", None),
+        line_engine=getattr(args, "line_engine", "hapi"),
         line_temperatures_k=getattr(args, "line_temperatures_k", None),
         hitemp_tables_ready=getattr(args, "hitemp_tables_ready", False),
     )

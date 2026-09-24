@@ -23,6 +23,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 
 from .config import (
+    LINE_ENGINES,
     SpectroscopyConfig,
     SpectralBandConfig,
     parse_broadening_composition,
@@ -133,6 +134,7 @@ def _build_species_config(
     line_source: str = "hitran",
     hitemp_dir: Path | None = None,
     hitemp_temperatures_k: tuple[float, ...] | None = None,
+    line_engine: str = "hapi",
 ) -> SpectroscopyConfig:
     return SpectroscopyConfig(
         output_path=Path("output") / "unused.nc",
@@ -143,6 +145,7 @@ def _build_species_config(
         line_source=line_source,
         hitemp_dir=hitemp_dir,
         hitemp_temperatures_k=hitemp_temperatures_k,
+        line_engine=line_engine,
     )
 
 
@@ -223,6 +226,7 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
             band=band,
             hitran_dir=args.hitran_dir,
             broadening_composition=broadening_composition,
+            line_engine=getattr(args, "line_engine", "hapi"),
             **line_source_options(args, species_name, temperature_k=temperature_k),
         )
         line_db = download_hitran_lines(config, band)
@@ -584,6 +588,7 @@ def build_atm_overview_parser() -> argparse.ArgumentParser:
     parser.add_argument("--refresh-hitran", action="store_true")
     parser.add_argument("--refresh-cia", action="store_true")
     parser.add_argument("--hitemp-dir", type=Path, default=None)
+    parser.add_argument("--line-engine", choices=LINE_ENGINES, default="hapi")
     parser.add_argument("--figure", type=Path, default=Path("output/atm_overview.pdf"))
     parser.add_argument("--manifest", type=Path, default=None)
     return parser

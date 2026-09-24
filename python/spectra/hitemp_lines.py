@@ -17,7 +17,7 @@ import numpy as np
 
 
 PAR_RECORD_LENGTH = 160
-C2_CM_K = 1.4387769
+C2_CM_K = 1.4388028496642257  # same second radiation constant as HAPI
 T_REF_K = 296.0
 # The per-band parent table read from the HITEMP files is screened over (at least)
 # this range, so runs at different temperatures re-screen it instead of the raw files.

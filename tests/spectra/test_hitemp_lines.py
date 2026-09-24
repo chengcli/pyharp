@@ -182,7 +182,7 @@ def test_max_line_strength_matches_hitran_temperature_scaling():
         temperatures_k=[1000.0],
         partition_sum=lambda m, i, t: t / 296.0,
     )
-    c2 = 1.4387769
+    c2 = 1.4388028496642257
     expected = (
         1e-20
         * (296.0 / 1000.0)
