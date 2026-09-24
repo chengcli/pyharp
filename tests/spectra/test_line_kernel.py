@@ -227,3 +227,22 @@ def test_build_line_provider_and_line_list_follow_line_engine(tmp_path):
         assert isinstance(build_line_provider(hapi_config, line_db), HapiLineProvider)
     with pytest.raises(ValueError, match="line_engine"):
         SpectroscopyConfig(output_path=tmp_path / "o.nc", hitran_cache_dir=tmp_path, line_engine="gpu")
+
+
+def test_fast_engine_reuses_cached_hitran_tables_without_hapi_db_begin(tmp_path, monkeypatch):
+    cache = tmp_path / "hitran"
+    write_table(cache, "co2_lines_625_725", LINES_CO2)
+    write_table(cache, "h2o_lines_0_50", [par_line(1, "1", 10.0, 1e-20, 0.0)])  # another table HAPI would parse
+    calls = []
+    monkeypatch.setattr(hapi, "db_begin", lambda *args: calls.append(args))
+    band = SpectralBandConfig(name="b", wavenumber_min_cm1=650.0, wavenumber_max_cm1=700.0, resolution_cm1=1.0)
+    fast = SpectroscopyConfig(output_path=tmp_path / "o.nc", hitran_cache_dir=cache, species_name="CO2", line_engine="fast")
+    line_db = download_hitran_lines(fast, band)
+    assert calls == []
+    assert line_db.table_name == "co2_lines_625_725" and line_db.available_broadener_keys == ("air", "self")
+
+    # A cached table holding another molecule is not reused; that falls back to HAPI's path.
+    write_table(cache, "co2_lines_625_725", [par_line(1, "1", 667.0, 1e-20, 0.0)])
+    monkeypatch.setattr(hapi, "fetch_by_ids", lambda *args, **kwargs: calls.append("fetch"))
+    download_hitran_lines(fast, band)
+    assert calls and "fetch" in calls

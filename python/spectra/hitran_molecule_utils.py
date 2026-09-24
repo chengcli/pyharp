@@ -375,9 +375,24 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
     bounds_max = line_band.wavenumber_max_cm1
     table_name = config.resolved_line_table_name(line_band)
     global_iso_ids = _resolve_global_isotopologue_ids(hapi, config)
-    _call_hapi_quietly(hapi.db_begin, str(config.hitran_cache_dir))
     data_path = config.hitran_cache_dir / f"{table_name}.data"
     header_path = config.hitran_cache_dir / f"{table_name}.header"
+    if config.line_engine == "fast" and not config.refresh_hitran and data_path.exists() and header_path.exists():
+        # HAPI's db_begin parses every table in the cache folder, which dominates a fast run;
+        # validate the cached table with numpy instead.
+        try:
+            lines = load_line_table(config.hitran_cache_dir, table_name)
+        except ValueError:
+            lines = None
+        if lines is not None and set(np.unique(lines["molec_id"]).tolist()) == {int(config.molecule_id)}:
+            return LineDatabase(
+                table_name=table_name,
+                cache_dir=config.hitran_cache_dir,
+                wavenumber_min_cm1=bounds_min,
+                wavenumber_max_cm1=bounds_max,
+                available_broadener_keys=_available_broadener_keys_from_header(config.hitran_cache_dir, table_name),
+            )
+    _call_hapi_quietly(hapi.db_begin, str(config.hitran_cache_dir))
     cached_data = None
     available_broadener_keys: tuple[str, ...] | None = None
     if data_path.exists() and header_path.exists():
