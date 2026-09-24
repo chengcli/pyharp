@@ -30,6 +30,7 @@ from .config import (
     supported_hitran_cia_pairs,
     supported_hitran_species_names,
 )
+from .hitemp_lines import HITEMP_FILE_PATTERN, has_hitemp_files
 from .hitran_cia_utils import load_cia_dataset
 from .hitran_molecule_plot import (
     _add_legend_if_needed,
@@ -129,6 +130,9 @@ def _build_species_config(
     hitran_dir: Path,
     refresh_hitran: bool,
     broadening_composition: dict[str, float] | None = None,
+    line_source: str = "hitran",
+    hitemp_dir: Path | None = None,
+    hitemp_temperatures_k: tuple[float, ...] | None = None,
 ) -> SpectroscopyConfig:
     return SpectroscopyConfig(
         output_path=Path("output") / "unused.nc",
@@ -136,7 +140,46 @@ def _build_species_config(
         species_name=species_name,
         broadening_composition=broadening_composition,
         refresh_hitran=refresh_hitran,
+        line_source=line_source,
+        hitemp_dir=hitemp_dir,
+        hitemp_temperatures_k=hitemp_temperatures_k,
     )
+
+
+def line_source_options(args: argparse.Namespace, species_name: str, *, temperature_k: float) -> dict[str, object]:
+    """Use local HITEMP lines for species with files in ``args.hitemp_dir``, HITRAN otherwise.
+
+    HITEMP lines are screened at ``args.line_temperatures_k``, the temperatures of every
+    state in a multi-state run so they share one table; a lone state uses its own temperature.
+    """
+    refresh = bool(getattr(args, "refresh_hitran", False))
+    hitemp_dir = getattr(args, "hitemp_dir", None)
+    if hitemp_dir is None or not has_hitemp_files(hitemp_dir, resolve_hitran_species(species_name).molecule_id):
+        return {"refresh_hitran": refresh}
+    # Tables prebuilt by the main process must not be rebuilt by every worker.
+    ready = bool(getattr(args, "hitemp_tables_ready", False))
+    return {
+        "line_source": "hitemp",
+        "hitemp_dir": Path(hitemp_dir),
+        "hitemp_temperatures_k": getattr(args, "line_temperatures_k", None) or (temperature_k,),
+        "refresh_hitran": refresh and not ready,
+    }
+
+
+def prepare_mixture_hitemp_tables(args: argparse.Namespace, wn_ranges: list[tuple[float, float]]) -> None:
+    """Build the HITEMP tables for ``args.line_temperatures_k`` once, before parallel workers reuse them."""
+    if getattr(args, "hitemp_dir", None) is None:
+        return
+    composition = parse_composition(args.composition)
+    for wn_range in wn_ranges:
+        band = build_band_from_range(wn_range, float(args.resolution))
+        for species_name, _ in _line_supported_species(composition):
+            options = line_source_options(args, species_name, temperature_k=args.line_temperatures_k[0])
+            if options.get("line_source") != "hitemp":
+                continue
+            config = _build_species_config(species_name=species_name, band=band, hitran_dir=args.hitran_dir, **options)
+            line_db = download_hitran_lines(config, band)
+            print(f"{species_name} lines: HITEMP table {line_db.cache_dir}")
 
 
 def _find_binary_pairs(composition: dict[str, float]) -> tuple[tuple[str, str, str, str], ...]:
@@ -180,10 +223,11 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
             band=band,
             hitran_dir=args.hitran_dir,
             broadening_composition=broadening_composition,
-            refresh_hitran=bool(args.refresh_hitran),
+            **line_source_options(args, species_name, temperature_k=temperature_k),
         )
         line_db = download_hitran_lines(config, band)
         line_provider = build_line_provider(config, line_db)
+        print(f"{species_name} lines: {config.line_source.upper()} ({line_db.table_name})")
         print(f"{species_name} broadening: {line_provider.broadening_summary()}")
         sigma_line = np.asarray(
             line_provider.cross_section_cm2_molecule(
@@ -193,7 +237,7 @@ def compute_mixture_overview_products(args: argparse.Namespace, *, wn_range: tup
             ),
             dtype=np.float64,
         )
-        line_list = load_hitran_line_list(config, band)
+        line_list = load_hitran_line_list(config, band, line_db)
         species_terms.append(
             MixtureSpeciesTerm(
                 species_name=species_name,
@@ -539,13 +583,17 @@ def build_atm_overview_parser() -> argparse.ArgumentParser:
     parser.add_argument("--broadening-composition", default=None)
     parser.add_argument("--refresh-hitran", action="store_true")
     parser.add_argument("--refresh-cia", action="store_true")
+    parser.add_argument("--hitemp-dir", type=Path, default=None)
     parser.add_argument("--figure", type=Path, default=Path("output/atm_overview.pdf"))
     parser.add_argument("--manifest", type=Path, default=None)
     return parser
 
 
 def main_atm_overview() -> None:
-    args = build_atm_overview_parser().parse_args()
+    parser = build_atm_overview_parser()
+    args = parser.parse_args()
+    if args.hitemp_dir is not None and not any(HITEMP_FILE_PATTERN.match(path.name) for path in args.hitemp_dir.rglob("*")):
+        parser.error(f"--hitemp-dir {args.hitemp_dir} contains no HITEMP files")
     run_atm_overview(args)
 
 
@@ -557,6 +605,12 @@ def run_atm_overview(args: argparse.Namespace) -> None:
 
     wn_ranges = list(args.wn_ranges)
     state_pairs = _state_pairs(args)
+    if getattr(args, "hitemp_dir", None) is not None:
+        temperatures = [temperature_k for temperature_k, _ in state_pairs]
+        args = argparse.Namespace(**vars(args))
+        args.line_temperatures_k = tuple(temperatures)
+        prepare_mixture_hitemp_tables(args, wn_ranges)
+        args.hitemp_tables_ready = True
     tasks: list[tuple[argparse.Namespace, tuple[float, float]]] = []
     page_metadata: list[tuple[float, float, tuple[float, float]]] = []
     for temperature_k, pressure_bar in state_pairs:
