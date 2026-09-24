@@ -11,6 +11,7 @@ import numpy as np
 from .hitemp_lines import DEFAULT_HITEMP_TEMPERATURE_RANGE_K
 
 LINE_SOURCES = ("hitran", "hitemp")
+LINE_ENGINES = ("hapi", "fast")
 
 
 @dataclass(frozen=True)
@@ -322,8 +323,11 @@ class SpectroscopyConfig:
     line_source: str = "hitran"
     hitemp_dir: Path | None = None
     hitemp_temperatures_k: tuple[float, ...] | None = None
+    line_engine: str = "hapi"
 
     def __post_init__(self) -> None:
+        if self.line_engine not in LINE_ENGINES:
+            raise ValueError(f"line_engine must be one of {LINE_ENGINES}, got {self.line_engine!r}")
         if self.line_source not in LINE_SOURCES:
             raise ValueError(f"line_source must be one of {LINE_SOURCES}, got {self.line_source!r}")
         if self.line_source == "hitemp" and self.hitemp_dir is None:

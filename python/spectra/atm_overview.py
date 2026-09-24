@@ -23,6 +23,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 
 from .config import (
+    LINE_ENGINES,
     SpectroscopyConfig,
     SpectralBandConfig,
     parse_broadening_composition,
@@ -133,6 +134,7 @@ def _build_species_config(
     line_source: str = "hitran",
     hitemp_dir: Path | None = None,
     hitemp_temperatures_k: tuple[float, ...] | None = None,
+    line_engine: str = "hapi",
 ) -> SpectroscopyConfig:
     return SpectroscopyConfig(
         output_path=Path("output") / "unused.nc",
@@ -143,22 +145,25 @@ def _build_species_config(
         line_source=line_source,
         hitemp_dir=hitemp_dir,
         hitemp_temperatures_k=hitemp_temperatures_k,
+        line_engine=line_engine,
     )
 
 
 def line_source_options(args: argparse.Namespace, species_name: str, *, temperature_k: float) -> dict[str, object]:
-    """Use local HITEMP lines for species with files in ``args.hitemp_dir``, HITRAN otherwise.
+    """Return the line source and engine fields: HITEMP for species with files in ``args.hitemp_dir``, HITRAN otherwise.
 
     HITEMP lines are screened at ``args.line_temperatures_k``, the temperatures of every
     state in a multi-state run so they share one table; a lone state uses its own temperature.
     """
     refresh = bool(getattr(args, "refresh_hitran", False))
+    line_engine = getattr(args, "line_engine", "hapi")
     hitemp_dir = getattr(args, "hitemp_dir", None)
     if hitemp_dir is None or not has_hitemp_files(hitemp_dir, resolve_hitran_species(species_name).molecule_id):
-        return {"refresh_hitran": refresh}
+        return {"refresh_hitran": refresh, "line_engine": line_engine}
     # Tables prebuilt by the main process must not be rebuilt by every worker.
     ready = bool(getattr(args, "hitemp_tables_ready", False))
     return {
+        "line_engine": line_engine,
         "line_source": "hitemp",
         "hitemp_dir": Path(hitemp_dir),
         "hitemp_temperatures_k": getattr(args, "line_temperatures_k", None) or (temperature_k,),
@@ -584,6 +589,7 @@ def build_atm_overview_parser() -> argparse.ArgumentParser:
     parser.add_argument("--refresh-hitran", action="store_true")
     parser.add_argument("--refresh-cia", action="store_true")
     parser.add_argument("--hitemp-dir", type=Path, default=None)
+    parser.add_argument("--line-engine", choices=LINE_ENGINES, default="hapi")
     parser.add_argument("--figure", type=Path, default=Path("output/atm_overview.pdf"))
     parser.add_argument("--manifest", type=Path, default=None)
     return parser
