@@ -128,6 +128,27 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
     auto be = bbflux_wavenumber(wave_lo, wave_hi, temf.value());
 
+    // Optional area_scale = (r/r_ref)^2 per level, shape (nlyr + 1) or
+    // (ncol, nlyr + 1), multiplies the Planck source: the solution is then the
+    // r^2-weighted flux (Zhang et al. 2023, Inhomogeneity III, App. A), and the
+    // caller divides by the same factor. Absent: plane-parallel, bit-identical.
+    // Any other rank or leading size is refused.
+    if (bc->find(bname + "area_scale") != bc->end()) {
+      auto ascale = bc->at(bname + "area_scale");
+      bool rank_ok = ascale.dim() == 1 || ascale.dim() == 2;
+      TORCH_CHECK(rank_ok,
+                  "ToonMcKay89::forward: bc->area_scale rank must be 1 or 2");
+      if (ascale.dim() == 1) {
+        TORCH_CHECK(ascale.size(0) == nlyr + 1,
+                    "ToonMcKay89::forward: bc->area_scale.size(0) != nlyr + 1");
+      } else {
+        TORCH_CHECK(
+            ascale.size(0) == ncol && ascale.size(1) == nlyr + 1,
+            "ToonMcKay89::forward: bc->area_scale shape is not (ncol, nlyr+1)");
+      }
+      be = be * ascale;
+    }
+
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)
@@ -135,7 +156,9 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                                           /*squash_dims=*/{2, 3})
                     .add_output(flx)
                     .add_input(prop)
-                    .add_input(be)
+                    // the static shape's rank (a 3-D operand is read at
+                    // strides()[3]), contiguous as `prop` is above
+                    .add_owned_input(be.unsqueeze(-1).contiguous())
                     .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
                     .build();
 
