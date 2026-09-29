@@ -217,6 +217,40 @@ TEST_P(DeviceTest, longwave_hard_surface_mirror) {
   EXPECT_LT(std::abs(net), tol) << "net flux at the surface = " << net;
 }
 
+// area_scale multiplies the Planck source, and the longwave solve is linear in
+// it: a uniform scale of 4 returns 4 times the flux. A scale that is not one
+// value per level is refused.
+TEST_P(DeviceTest, longwave_area_scale) {
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({200., 500., 1000.});
+  op->wave_upper({500., 1000., 2000.});
+  op->flags("planck,hard_surface");
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  int nwave = 3, ncol = 2, nlyr = 10;
+  auto prop =
+      torch::zeros({nwave, ncol, nlyr, 3}, torch::device(device).dtype(dtype));
+  prop.select(-1, 0).fill_(0.1);
+  prop.select(-1, 1).fill_(0.5);
+  prop.select(-1, 2).fill_(0.5);
+  auto temf = torch::linspace(300., 200., nlyr + 1, prop.options())
+                  .expand({ncol, nlyr + 1});
+  // forward writes into bc, so each call takes a fresh one
+  auto solve = [&](torch::Tensor scale) {
+    std::map<std::string, torch::Tensor> bc;
+    bc["albedo"] = torch::zeros({nwave, ncol}, prop.options());
+    if (scale.defined()) bc["area_scale"] = scale;
+    return toon(prop, &bc, /*band=*/"", temf);
+  };
+  auto base = solve(torch::Tensor());
+  auto scaled = solve(torch::full({ncol, nlyr + 1}, 4.0, prop.options()));
+  double rtol = dtype == torch::kFloat64 ? 1e-12 : 1e-5;
+  EXPECT_TRUE(torch::allclose(scaled, 4.0 * base, rtol, 0.0));
+  EXPECT_THROW(solve(torch::full({ncol, nlyr}, 4.0, prop.options())),
+               c10::Error);
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

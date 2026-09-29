@@ -128,6 +128,17 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
     auto be = bbflux_wavenumber(wave_lo, wave_hi, temf.value());
 
+    // Optional area_scale = (r/r_ref)^2 per level, shape (nlyr + 1) or
+    // (ncol, nlyr + 1), multiplies the Planck source: the solution is then the
+    // r^2-weighted flux (Zhang et al. 2023, Inhomogeneity III, App. A), and the
+    // caller divides by the same factor. Absent: plane-parallel, bit-identical.
+    if (bc->find(bname + "area_scale") != bc->end()) {
+      auto ascale = bc->at(bname + "area_scale");
+      TORCH_CHECK(ascale.size(-1) == nlyr + 1,
+                  "ToonMcKay89::forward: bc->area_scale.size(-1) != nlyr + 1");
+      be = be * ascale;
+    }
+
     auto iter = at::TensorIteratorConfig()
                     .resize_outputs(false)
                     .check_all_same_dtype(true)
