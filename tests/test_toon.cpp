@@ -2,9 +2,11 @@
 #include <gtest/gtest.h>
 
 // C/C++
+#include <cmath>
 #include <filesystem>
 
 // harp
+#include <harp/radiation/bbflux.hpp>
 #include <harp/radiation/radiation.hpp>
 #include <harp/radiation/radiation_band.hpp>
 #include <harp/rtsolver/toon_mckay89.hpp>
@@ -247,8 +249,91 @@ TEST_P(DeviceTest, longwave_area_scale) {
   auto scaled = solve(torch::full({ncol, nlyr + 1}, 4.0, prop.options()));
   double rtol = dtype == torch::kFloat64 ? 1e-12 : 1e-5;
   EXPECT_TRUE(torch::allclose(scaled, 4.0 * base, rtol, 0.0));
+  // rank 1, length nlyr+1, is the other documented shape
+  auto rank1 = solve(torch::full({nlyr + 1}, 4.0, prop.options()));
+  EXPECT_TRUE(torch::allclose(rank1, 4.0 * base, rtol, 0.0));
+  // wrong last size, rank 3, and a rank-2 leading size that is not ncol
   EXPECT_THROW(solve(torch::full({ncol, nlyr}, 4.0, prop.options())),
                c10::Error);
+  EXPECT_THROW(solve(torch::full({1, ncol, nlyr + 1}, 4.0, prop.options())),
+               c10::Error);
+  EXPECT_THROW(solve(torch::full({ncol + 1, nlyr + 1}, 4.0, prop.options())),
+               c10::Error);
+}
+
+// Partial albedo under angle-dependent downwelling. One pure-absorption layer,
+// no incoming radiation at the top, so I_down(mu) at the surface varies with
+// mu. Surface flux balance holds for a specular mirror and for a Lambertian
+// surface. The TOA upward flux does not: this checks it against an independent
+// quadrature of the isotropic boundary, which is what fails on the specular
+// form in de2a152.
+TEST_P(DeviceTest, longwave_lambertian_partial_albedo) {
+  const double dtau = 1.0;
+  const double albedo = 0.3;
+  const double t_surf = 400.0;
+  const double t_top = 200.0;
+  const double uarr[5] = {0.0985350858, 0.3045357266, 0.5620251898,
+                          0.8019865821, 0.9601901429};
+  const double wuarr[5] = {0.0157479145, 0.0739088701, 0.1463869871,
+                           0.1671746381, 0.0967815902};
+  double wsum = 0.0;
+  for (double w : wuarr) wsum += w;
+  const double twopi = 2.0 * M_PI;
+
+  auto b_of = [](double t) {
+    return harp::bbflux_wavenumber(1.0, 1.0e5, torch::tensor(t)).item<double>();
+  };
+  // BE_IN(0) is the top of the atmosphere, stored last in temf.
+  const double b_top = b_of(t_top);
+  const double b_surf = b_of(t_surf);
+  const double b1 = (b_surf - b_top) / dtau;
+  const double alpha1 = twopi * b_top;
+  const double alpha2 = twopi * b1;
+
+  double fdn = 0.0;
+  double idn[5];
+  for (int m = 0; m < 5; ++m) {
+    double u = uarr[m];
+    double em2 = std::exp(-dtau / u);
+    idn[m] = alpha1 * (1.0 - em2) + alpha2 * (u * em2 + dtau - u);
+    fdn += idn[m] * wuarr[m];
+  }
+  const double i_up = twopi * (1.0 - albedo) * b_surf + albedo * fdn / wsum;
+  double fup_surf = 0.0;
+  double fup_toa = 0.0;
+  for (int m = 0; m < 5; ++m) {
+    double u = uarr[m];
+    double em2 = std::exp(-dtau / u);
+    double i_toa =
+        i_up * em2 + alpha1 * (1.0 - em2) + alpha2 * (u - (dtau + u) * em2);
+    fup_surf += i_up * wuarr[m];
+    fup_toa += i_toa * wuarr[m];
+  }
+
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({1.0});
+  op->wave_upper({1.0e5});
+  op->flags("planck,hard_surface");
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  auto prop = torch::zeros({1, 1, 1, 3}, torch::device(device).dtype(dtype));
+  prop.select(-1, 0).fill_(dtau);
+  auto temf = torch::tensor({t_surf, t_top}, prop.options()).view({1, 2});
+  std::map<std::string, torch::Tensor> bc;
+  bc["albedo"] = torch::full({1, 1}, albedo, prop.options());
+  auto flx = toon(prop, &bc, /*band=*/"", temf);
+
+  double up_s = flx[0][0][0][0].item<double>();
+  double dn_s = flx[0][0][0][1].item<double>();
+  double up_toa = flx[0][0][1][0].item<double>();
+  double scale = std::abs(fup_toa) + std::abs(fup_surf) + 1.0;
+  double tol = (dtype == torch::kFloat64 ? 1e-8 : 1e-4) * scale;
+  double balance =
+      up_s - ((1.0 - albedo) * twopi * b_surf * wsum + albedo * dn_s);
+  EXPECT_LT(std::abs(balance), tol) << "surface balance " << balance;
+  EXPECT_LT(std::abs(up_toa - fup_toa), tol)
+      << "TOA up flux " << up_toa << " expected " << fup_toa;
 }
 
 int main(int argc, char** argv) {

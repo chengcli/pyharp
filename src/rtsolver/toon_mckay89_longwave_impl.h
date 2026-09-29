@@ -249,8 +249,14 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   }
 
   // --- Gaussian Quadrature Mu Loop ---
+  // Downward sweep first. A hard surface is Lambertian, same as the
+  // tridiagonal bottom row, so the reflected intensity needs the downwelling
+  // flux and not I_down(mu).
+  T surf_dn[5];
+  T wsum = 0.0;
   for (int m = 0; m < nmu; m++) {
     T u = uarr[m];
+    wsum += wuarr[m];
 
     // Downward loop
     // Top BC: for auto-compute mode, use angle-dependent tau_top
@@ -285,14 +291,26 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
           sigma2[k] * (u * em2_mid + 0.5 * dtau[k] - u);
       FLX_DN_MID(k) += mid_dn * wuarr[m];
     }
+    surf_dn[m] = lw_down_g[nlev - 1];
+    for (int k = 0; k < nlev; k++) {
+      FLX_DN(k) += lw_down_g[k] * wuarr[m];
+    }
+  }
+
+  T fdn_surf = 0.0;
+  for (int m = 0; m < nmu; m++) fdn_surf += surf_dn[m] * wuarr[m];
+  // Isotropic. sum(w) = 0.5, so a * F_down / sum(w) = 2 a F_down.
+  T lw_up_lambert = twopi * (1.0 - a_surf_in) * Bsurf +
+                    (wsum != 0.0 ? a_surf_in * fdn_surf / wsum : 0.0);
+
+  for (int m = 0; m < nmu; m++) {
+    T u = uarr[m];
 
     // Upward loop
-    // Bottom BC for intensity sweep matches the tridiagonal BC:
     // Gas giant: I_up = 2*pi*(B_surf + B1*u) [Planck + gradient]
-    // Terrestrial: I_up = 2*pi*(1-albedo)*B_surf + albedo*I_down
+    // Terrestrial: isotropic emission plus the reflected downwelling flux
     if (hard_surface) {
-      lw_up_g[nlev - 1] =
-          twopi * (1.0 - a_surf_in) * Bsurf + a_surf_in * lw_down_g[nlev - 1];
+      lw_up_g[nlev - 1] = lw_up_lambert;
     } else {
       lw_up_g[nlev - 1] = twopi * (Bsurf + B1[nlay - 1] * u);
     }
@@ -323,7 +341,6 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     }
 
     for (int k = 0; k < nlev; k++) {
-      FLX_DN(k) += lw_down_g[k] * wuarr[m];
       FLX_UP(k) += lw_up_g[k] * wuarr[m];
     }
   }
