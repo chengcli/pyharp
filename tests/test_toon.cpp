@@ -192,6 +192,31 @@ TEST_P(DeviceTest, shortwave_surface_albedo_reflection) {
   }
 }
 
+// A hard surface of longwave albedo 1 is a mirror: over an isothermal,
+// non-scattering column it reflects all the downwelling, so the net flux at the
+// surface (output level 0) is zero. A surface that only emits (1 - albedo) B
+// and reflects nothing loses the whole downwelling there instead.
+TEST_P(DeviceTest, longwave_hard_surface_mirror) {
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({1.0});
+  op->wave_upper({1.0e5});
+  op->flags("planck,hard_surface");
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  auto prop = torch::zeros({1, 1, 2, 3}, torch::device(device).dtype(dtype));
+  prop.select(-1, 0).fill_(1.0);  // optical depth; w0 = g = 0
+  auto temf = torch::full({1, 3}, 1000.0, prop.options());
+  std::map<std::string, torch::Tensor> bc;
+  bc["albedo"] = torch::ones({1, 1}, prop.options());
+
+  auto flx = toon(prop, &bc, /*band=*/"", temf);
+  double sigma_t4 = 5.670374419e-8 * 1.0e12;
+  double net = (flx[0][0][0][0] - flx[0][0][0][1]).item<double>();
+  double tol = (dtype == torch::kFloat64 ? 1e-9 : 1e-5) * sigma_t4;
+  EXPECT_LT(std::abs(net), tol) << "net flux at the surface = " << net;
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
