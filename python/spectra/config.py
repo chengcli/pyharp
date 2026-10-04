@@ -387,11 +387,14 @@ class SpectroscopyConfig:
         return self.resolved_line_table_name(band).rsplit("_", 2)[0]
 
     def resolved_hitemp_temperatures_k(self) -> tuple[float, ...]:
-        """Return the temperatures of this run, at which weak HITEMP lines are screened out."""
+        """Return the configured evaluation points, or the unpruned parent's default bounds.
+
+        Explicit temperatures enumerate supported points; they do not imply support between them.
+        """
         return tuple(sorted(float(item) for item in self.hitemp_temperatures_k or DEFAULT_HITEMP_TEMPERATURE_RANGE_K))
 
     def resolved_hitemp_temperature_range_k(self) -> tuple[float, float]:
-        """Return the temperature range covered by this run's HITEMP table."""
+        """Return the bounds of the configured points or default parent support."""
         temperatures = self.resolved_hitemp_temperatures_k()
         return temperatures[0], temperatures[-1]
 

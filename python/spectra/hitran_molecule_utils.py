@@ -96,6 +96,7 @@ class HapiLineProvider:
             available=available_broadener_keys,
         )
         self.min_line_strength = float(min_line_strength)
+        self._screening_temperatures_k = _screened_hitemp_temperatures(cache_dir, table_name)
         if cache_dir is not None:
             _call_hapi_quietly(self._hapi.db_begin, str(cache_dir))
 
@@ -157,6 +158,15 @@ class HapiLineProvider:
         fallback_text = ", ".join(f"{name}->{target}" for name, target in sorted(self.diluent_fallbacks.items()))
         return f"requested={requested} -> effective={effective} (fallback: {fallback_text})"
 
+    def _validate_temperature(self, temperature_k: float) -> None:
+        temperature = float(temperature_k)
+        if self._screening_temperatures_k is not None and temperature not in self._screening_temperatures_k:
+            supported = ", ".join(f"{value:g}" for value in self._screening_temperatures_k)
+            raise ValueError(
+                f"{self.table_name} is a screened HITEMP table valid only at "
+                f"{supported} K; rebuild it for {temperature:g} K."
+            )
+
     def absorption_coefficient_cm1(
         self,
         wavenumber_grid_cm1: np.ndarray,
@@ -164,6 +174,7 @@ class HapiLineProvider:
         pressure_pa: float,
     ) -> np.ndarray:
         """Return line absorption coefficient on the requested grid."""
+        self._validate_temperature(temperature_k)
         pressure_atm = float(pressure_pa) / 101_325.0
         _, coef = _call_hapi_quietly(
             self._voigt_function,
@@ -184,6 +195,7 @@ class HapiLineProvider:
         pressure_pa: float,
     ) -> np.ndarray:
         """Return line absorption cross section in cm^2/molecule."""
+        self._validate_temperature(temperature_k)
         pressure_atm = float(pressure_pa) / 101_325.0
         _, coef = _call_hapi_quietly(
             self._voigt_function,
@@ -269,6 +281,20 @@ def _available_broadener_keys_from_header(cache_dir: Path, table_name: str) -> t
     header = json.loads((Path(cache_dir) / f"{table_name}.header").read_text())
     names = list(header.get("order", [])) + list(header.get("extra", []))
     return tuple(sorted(str(name)[len("gamma_") :].lower() for name in names if str(name).startswith("gamma_")))
+
+
+def _screened_hitemp_temperatures(cache_dir: Path | None, table_name: str) -> tuple[float, ...] | None:
+    if cache_dir is None:
+        return None
+    try:
+        metadata = json.loads((Path(cache_dir) / f"{table_name}.header").read_text()).get(
+            "pyharp_hitemp"
+        )
+    except (OSError, ValueError, TypeError):
+        return None
+    if not metadata or metadata.get("strength_pruned") is False:
+        return None
+    return tuple(float(value) for value in metadata.get("screening_temperatures_k", ()))
 
 
 def _resolve_global_isotopologue_ids(hapi, config: SpectroscopyConfig) -> tuple[int, ...]:
@@ -495,6 +521,8 @@ def load_hitemp_lines(config: SpectroscopyConfig, band: SpectralBandConfig) -> L
     if config.line_engine == "fast":
         # Build the .npy cache here, so parallel workers only memory-map it.
         load_line_table(parent_dir, parent_name)
+        table_name, table_dir = parent_name, parent_dir
+    elif config.hitemp_temperatures_k is None:
         table_name, table_dir = parent_name, parent_dir
     else:
         n_lines = derive_hitemp_table(
