@@ -19,8 +19,8 @@ import numpy as np
 PAR_RECORD_LENGTH = 160
 C2_CM_K = 1.4388028496642257  # same second radiation constant as HAPI
 T_REF_K = 296.0
-# The per-band parent table read from the HITEMP files is screened over (at least)
-# this range, so runs at different temperatures re-screen it instead of the raw files.
+# The per-band parent table keeps every requested in-band isotopologue line across
+# this support range, so runs can safely screen it without rereading the raw files.
 DEFAULT_HITEMP_TEMPERATURE_RANGE_K = (10.0, 2000.0)
 FILTER_TEMPERATURE_SAMPLES = 16
 _READ_CHUNK_BYTES = 32 * 1024 * 1024
@@ -59,7 +59,20 @@ def find_hitemp_files(hitemp_dir: Path, molecule_id: int) -> tuple[HitempFile, .
     if not candidates:
         raise FileNotFoundError(f"No HITEMP files for molecule {molecule_id:02d} under {hitemp_dir}.")
     newest = max(item.year for item in candidates)
-    return tuple(sorted((item for item in candidates if item.year == newest), key=lambda item: item.wavenumber_min_cm1))
+    selected = sorted(
+        (item for item in candidates if item.year == newest),
+        key=lambda item: item.wavenumber_min_cm1,
+    )
+    by_range: dict[tuple[float, float], Path] = {}
+    for item in selected:
+        key = (item.wavenumber_min_cm1, item.wavenumber_max_cm1)
+        if key in by_range:
+            raise ValueError(
+                f"Duplicate HITEMP sources for molecule {molecule_id:02d}, edition {newest}, "
+                f"range {key[0]:g}-{key[1]:g} cm^-1: {by_range[key]} and {item.path}."
+            )
+        by_range[key] = item.path
+    return tuple(selected)
 
 
 def has_hitemp_files(hitemp_dir: Path, molecule_id: int) -> bool:
@@ -131,10 +144,10 @@ def prepare_hitemp_table(
 ) -> int:
     """Write a filtered HAPI table (``.data`` + ``.header``) from HITEMP files and return its line count.
 
-    Lines are kept when they fall in the wavenumber range, belong to the requested
-    isotopologues, and exceed ``min_line_strength`` at any temperature in the range.
-    An existing table built from the same inputs over a range covering this one is
-    reused, so a table widened once for a hot run is not rebuilt for cooler runs.
+    Lines are kept when they fall in the wavenumber range and belong to the requested
+    isotopologues. Strength screening is deferred to a run-specific child or HAPI at
+    evaluation time. An existing table built from the same inputs over a range
+    covering this one is reused.
     """
     sources = [
         item
@@ -153,6 +166,7 @@ def prepare_hitemp_table(
                 "local_iso_ids": sorted(int(value) for value in local_iso_ids),
                 "wavenumber_range_cm1": [float(wavenumber_min_cm1), float(wavenumber_max_cm1)],
                 "min_line_strength": float(min_line_strength),
+                "strength_pruned": False,
             }.items()
         )
         if same_inputs and etmin <= tmin and etmax >= tmax:
@@ -170,6 +184,7 @@ def prepare_hitemp_table(
         min_line_strength=min_line_strength,
         default_header=default_header,
         partition_sum=partition_sum,
+        strength_pruned=False,
         refresh=refresh,
     )
 
@@ -210,6 +225,7 @@ def derive_hitemp_table(
         min_line_strength=parent["min_line_strength"],
         default_header={key: value for key, value in parent_header.items() if key != _HEADER_METADATA_KEY},
         partition_sum=partition_sum,
+        strength_pruned=True,
         refresh=refresh,
     )
 
@@ -229,6 +245,7 @@ def _write_filtered_table(
     default_header: dict,
     partition_sum: PartitionSum,
     refresh: bool,
+    strength_pruned: bool,
 ) -> int:
     table_dir = Path(table_dir)
     data_path = table_dir / f"{table_name}.data"
@@ -242,6 +259,7 @@ def _write_filtered_table(
         "temperature_range_k": [float(temperatures[0]), float(temperatures[-1])],
         "screening_temperatures_k": [float(value) for value in temperatures],
         "min_line_strength": float(min_line_strength),
+        "strength_pruned": bool(strength_pruned),
     }
     if not refresh and data_path.exists() and header_path.exists():
         existing = json.loads(header_path.read_text())
@@ -266,16 +284,17 @@ def _write_filtered_table(
                 if not keep.any():
                     continue
                 records, nu, iso = records[keep], nu[keep], iso[keep]
-                strongest = max_line_strength(
-                    nu=nu,
-                    sw=_float_field(records, 15, 25),
-                    elower=_float_field(records, 45, 55),
-                    local_iso_id=iso,
-                    molecule_id=molecule_id,
-                    temperatures_k=temperatures,
-                    partition_sum=partition_sum,
-                )
-                records = records[strongest >= min_line_strength]
+                if strength_pruned:
+                    strongest = max_line_strength(
+                        nu=nu,
+                        sw=_float_field(records, 15, 25),
+                        elower=_float_field(records, 45, 55),
+                        local_iso_id=iso,
+                        molecule_id=molecule_id,
+                        temperatures_k=temperatures,
+                        partition_sum=partition_sum,
+                    )
+                    records = records[strongest >= min_line_strength]
                 if records.shape[0] == 0:
                     continue
                 out.write(np.hstack([records, np.repeat(newline, records.shape[0], axis=0)]).tobytes())

@@ -336,6 +336,61 @@ TEST_P(DeviceTest, longwave_lambertian_partial_albedo) {
       << "TOA up flux " << up_toa << " expected " << fup_toa;
 }
 
+TEST_P(DeviceTest, longwave_resonance_is_continuous) {
+  double constexpr u = 0.5620251898;
+  double constexpr w0 = 1.0 - 1.0 / (4.0 * u * u);
+  double const relative_offset = dtype == torch::kFloat64 ? 1.0e-7 : 1.0e-3;
+
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({1.0});
+  op->wave_upper({1.0e5});
+  op->flags("planck,hard_surface");
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  auto solve = [&](double scattering_albedo) {
+    auto prop = torch::zeros({1, 1, 1, 3}, torch::device(device).dtype(dtype));
+    prop.select(-1, 0).fill_(1.0);
+    prop.select(-1, 1).fill_(scattering_albedo);
+    auto temf = torch::tensor({600.0, 300.0}, prop.options()).view({1, 2});
+    std::map<std::string, torch::Tensor> bc;
+    bc["albedo"] = torch::full({1, 1}, 0.2, prop.options());
+    return toon(prop, &bc, /*band=*/"", temf);
+  };
+
+  auto exact = solve(w0);
+  auto below = solve(w0 * (1.0 - relative_offset));
+  auto above = solve(w0 * (1.0 + relative_offset));
+  auto reference = 0.5 * (below + above);
+
+  EXPECT_TRUE(torch::all(torch::isfinite(exact.cpu())).item<bool>());
+  EXPECT_TRUE(torch::all(torch::isfinite(reference.cpu())).item<bool>());
+  double rtol = dtype == torch::kFloat64 ? 2.0e-6 : 5.0e-3;
+  double scale = torch::abs(reference).max().item<double>();
+  EXPECT_LT(torch::abs(exact - reference).max().item<double>(),
+            rtol * (scale + 1.0));
+}
+
+TEST_P(DeviceTest, longwave_uncapped_ratio_avoids_overflow) {
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({1.0});
+  op->wave_upper({1.0e5});
+  op->flags("planck,hard_surface");
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  auto prop = torch::zeros({1, 1, 1, 3}, torch::device(device).dtype(dtype));
+  prop.select(-1, 0).fill_(1000.0);
+  prop.select(-1, 1).fill_(0.999999);
+  auto temf = torch::tensor({600.0, 300.0}, prop.options()).view({1, 2});
+  std::map<std::string, torch::Tensor> bc;
+  bc["albedo"] = torch::full({1, 1}, 0.2, prop.options());
+
+  auto result = toon(prop, &bc, /*band=*/"", temf);
+
+  EXPECT_TRUE(torch::all(torch::isfinite(result.cpu())).item<bool>());
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

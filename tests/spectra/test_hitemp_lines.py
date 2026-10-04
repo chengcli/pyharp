@@ -10,6 +10,8 @@ import argparse
 from pyharp.spectra.atm_overview import line_source_options
 from pyharp.spectra.config import SpectralBandConfig, SpectroscopyConfig
 from pyharp.spectra.hitemp_lines import (
+    C2_CM_K,
+    T_REF_K,
     _parse_par_float,
     derive_hitemp_table,
     filter_temperatures_k,
@@ -85,6 +87,32 @@ def test_find_hitemp_files_uses_newest_edition_sorted_by_range(tmp_path):
         find_hitemp_files(tmp_path, 6)
 
 
+@pytest.mark.parametrize(
+    "duplicate_name",
+    ["02_HITEMP2024.par.bz2", "02_HITEMP2024.zip", "retained/02_HITEMP2024.par"],
+)
+def test_find_hitemp_files_rejects_duplicate_sources_in_newest_edition(tmp_path, duplicate_name):
+    (tmp_path / "02_HITEMP2024.par").write_bytes(b"")
+    duplicate = tmp_path / duplicate_name
+    duplicate.parent.mkdir(parents=True, exist_ok=True)
+    duplicate.write_bytes(b"")
+
+    with pytest.raises(ValueError, match="Duplicate HITEMP sources"):
+        find_hitemp_files(tmp_path, 2)
+
+
+def test_find_hitemp_files_keeps_distinct_chunks_in_newest_edition(tmp_path):
+    for name in ("02_00000-01000_HITEMP2024.zip", "02_01000-02000_HITEMP2024.par.bz2"):
+        (tmp_path / name).write_bytes(b"")
+
+    files = find_hitemp_files(tmp_path, 2)
+
+    assert [(item.wavenumber_min_cm1, item.wavenumber_max_cm1) for item in files] == [
+        (0.0, 1000.0),
+        (1000.0, 2000.0),
+    ]
+
+
 def test_prepare_filters_range_isotopologue_and_molecule(tmp_path):
     hitemp_dir = tmp_path / "hitemp"
     hitemp_dir.mkdir()
@@ -105,14 +133,15 @@ def test_prepare_filters_range_isotopologue_and_molecule(tmp_path):
     assert header["table_name"] == "tab"
 
 
-def test_prepare_keeps_hot_lines_only_when_the_range_is_hot(tmp_path):
+def test_prepare_parent_keeps_lines_without_strength_pruning(tmp_path):
     hitemp_dir = tmp_path / "hitemp"
     hitemp_dir.mkdir()
     cold = par_line(1, "1", 150.0, 1e-20, 0.0)
     hot_band = par_line(1, "1", 160.0, 1e-30, 5000.0)
     write_par(hitemp_dir / "01_HITEMP2010.par", [cold, hot_band])
 
-    assert prepare(tmp_path, hitemp_dir) == 1
+    assert prepare(tmp_path, hitemp_dir) == 2
+    assert table_lines(tmp_path) == [cold, hot_band]
     assert prepare(tmp_path, hitemp_dir, temperature_range_k=(296.0, 1500.0)) == 2
     assert table_lines(tmp_path) == [cold, hot_band]
 
@@ -319,3 +348,153 @@ def test_dump_cli_rejects_a_hitemp_dir_without_hitemp_files(tmp_path):
 
     (tmp_path / "empty" / "01_00000-00050_HITEMP2010.zip").write_bytes(b"")
     _validate_hitemp_dir(args, parser)
+
+
+def test_hitemp_parent_keeps_line_strong_at_unsampled_run_temperature(tmp_path):
+    hapi = pytest.importorskip("hapi")
+    molecule_id, isotope, nu = 6, 1, 1000.0
+    elower, requested_temperature, threshold = 6334.017365924143, 1663.175709102804, 1.0e-27
+    q_ref = hapi.partitionSum(molecule_id, isotope, T_REF_K)
+
+    def scale(temperature):
+        return (
+            q_ref
+            / hapi.partitionSum(molecule_id, isotope, temperature)
+            * np.exp(-C2_CM_K * elower * (1.0 / temperature - 1.0 / T_REF_K))
+            * (-np.expm1(-C2_CM_K * nu / temperature))
+            / (-np.expm1(-C2_CM_K * nu / T_REF_K))
+        )
+
+    line = par_line(
+        molecule_id,
+        "1",
+        nu,
+        1.06 * threshold / scale(requested_temperature),
+        elower,
+    )
+    hitemp_dir = tmp_path / "hitemp"
+    hitemp_dir.mkdir()
+    write_par(hitemp_dir / "06_HITEMP2020.par", [line])
+    overrides = dict(
+        molecule_id=molecule_id,
+        local_iso_ids=(isotope,),
+        wavenumber_min_cm1=975.0,
+        wavenumber_max_cm1=1025.0,
+        temperature_range_k=(10.0, 2000.0),
+        min_line_strength=threshold,
+        partition_sum=hapi.partitionSum,
+    )
+
+    assert prepare(tmp_path, hitemp_dir, **overrides) == 1
+    assert derive_hitemp_table(
+        parent_dir=tmp_path / "cache",
+        parent_name="tab",
+        table_dir=tmp_path / "child",
+        table_name="child",
+        temperatures_k=(requested_temperature,),
+        partition_sum=hapi.partitionSum,
+    ) == 1
+
+    band = SpectralBandConfig("h3", 975.0, 1025.0, 0.1)
+    common = dict(
+        output_path=tmp_path / "unused.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="CH4",
+        isotopologue_ids=(1,),
+        line_source="hitemp",
+        hitemp_dir=hitemp_dir,
+        min_line_strength=threshold,
+    )
+    hapi_config = SpectroscopyConfig(**common)
+    fast_config = SpectroscopyConfig(**common, line_engine="fast")
+    hapi_database = download_hitran_lines(hapi_config, band)
+    fast_database = download_hitran_lines(fast_config, band)
+    grid = np.asarray([nu])
+    hapi_sigma = build_line_provider(hapi_config, hapi_database).cross_section_cm2_molecule(
+        grid, requested_temperature, 101325.0
+    )
+    fast_sigma = build_line_provider(fast_config, fast_database).cross_section_cm2_molecule(
+        grid, requested_temperature, 101325.0
+    )
+    assert hapi_sigma[0] > 0.0
+    np.testing.assert_allclose(fast_sigma, hapi_sigma, rtol=1.0e-10)
+
+    screened_config = SpectroscopyConfig(
+        **common, hitemp_temperatures_k=(requested_temperature,)
+    )
+    screened_database = download_hitran_lines(screened_config, band)
+    screened_provider = build_line_provider(screened_config, screened_database)
+    assert screened_provider.cross_section_cm2_molecule(
+        grid, requested_temperature, 101325.0
+    )[0] > 0.0
+    offscreen_temperature = requested_temperature + 1.0
+    with pytest.raises(ValueError, match="screened HITEMP table"):
+        screened_provider.cross_section_cm2_molecule(
+            grid, offscreen_temperature, 101325.0
+        )
+    with pytest.raises(ValueError, match="screened HITEMP table"):
+        screened_provider.absorption_coefficient_cm1(
+            grid, offscreen_temperature, 101325.0
+        )
+
+
+def test_fast_provider_rejects_screened_hitemp_child_offscreen(tmp_path):
+    hitemp_dir = tmp_path / "hitemp"
+    hitemp_dir.mkdir()
+    lines = [
+        par_line(1, "1", 130.0, 1.0e-20, 0.0),
+        par_line(1, "1", 160.0, 1.0e-30, 5000.0),
+    ]
+    write_par(hitemp_dir / "01_HITEMP2010.par", lines)
+    band = SpectralBandConfig("h3_guard", 150.0, 170.0, 0.05)
+    common = dict(
+        output_path=tmp_path / "unused.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="H2O",
+        isotopologue_ids=(1,),
+        line_source="hitemp",
+        hitemp_dir=hitemp_dir,
+        min_line_strength=1.0e-27,
+    )
+    screened_config = SpectroscopyConfig(
+        **common, hitemp_temperatures_k=(296.0,)
+    )
+    screened_database = download_hitran_lines(screened_config, band)
+    fast_config = SpectroscopyConfig(**common, line_engine="fast")
+    unpruned_database = download_hitran_lines(fast_config, band)
+    grid = np.asarray([160.0])
+    reference = build_line_provider(
+        fast_config, unpruned_database
+    ).cross_section_cm2_molecule(grid, 1500.0, 101325.0)
+    assert reference[0] > 0.0
+
+    screened_fast_provider = build_line_provider(fast_config, screened_database)
+    with pytest.raises(ValueError, match="screened HITEMP table"):
+        screened_fast_provider.cross_section_cm2_molecule(
+            grid, 1500.0, 101325.0
+        )
+
+
+def test_hitemp_parent_rebuilds_legacy_strength_pruned_cache_without_partition_sums(tmp_path):
+    hitemp_dir = tmp_path / "hitemp"
+    hitemp_dir.mkdir()
+    line = par_line(1, "1", 150.0, 1.0e-30, 0.0)
+    write_par(hitemp_dir / "01_HITEMP2010.par", [line])
+    prepare(tmp_path, hitemp_dir)
+
+    data_path = tmp_path / "cache" / "tab.data"
+    header_path = tmp_path / "cache" / "tab.header"
+    header = json.loads(header_path.read_text())
+    header["number_of_rows"] = 0
+    header["size_in_bytes"] = 0
+    header["pyharp_hitemp"].pop("strength_pruned", None)
+    data_path.write_text("")
+    header_path.write_text(json.dumps(header))
+
+    def fail_partition_sum(*args):
+        raise AssertionError("parent construction must not evaluate partition sums")
+
+    assert prepare(tmp_path, hitemp_dir, partition_sum=fail_partition_sum) == 1
+    rebuilt = json.loads(header_path.read_text())["pyharp_hitemp"]
+    assert rebuilt["strength_pruned"] is False
+    assert rebuilt["min_line_strength"] == 1.0e-27

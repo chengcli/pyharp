@@ -3,6 +3,7 @@
 // C/C++
 #include <cmath>
 #include <cstdint>
+#include <type_traits>
 
 // base
 #include <configure.h>
@@ -110,6 +111,31 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     out.qsca = qsca;
     out.g = 0;
     return out;
+  }
+
+  // The float recurrence loses the small Riccati-Bessel residuals. Up to
+  // x=0.5, evaluate the short recurrence in double precision and cast only
+  // the public result back to float.
+  if constexpr (std::is_same<T, float>::value) {
+    if (x <= static_cast<T>(0.5)) {
+      int const computed_nstop = mie_nstop(x);
+      int const nstop = computed_nstop > 1 ? computed_nstop : 1;
+      if (nstop + 2 > max_order) {
+        out.status = 3;
+        return out;
+      }
+      constexpr int precise_max_order = 8;
+      Complex<double> precise_work[3 * precise_max_order];
+      double const precise_x = static_cast<double>(x);
+      auto precise = mie_efficiency_device(
+          static_cast<double>(nreal), static_cast<double>(kimag), precise_x,
+          precise_work, precise_max_order);
+      out.qext = static_cast<T>(precise.qext);
+      out.qsca = static_cast<T>(precise.qsca);
+      out.g = static_cast<T>(precise.g);
+      out.status = precise.status;
+      return out;
+    }
   }
 
   // The highest retained multipole order grows with the size parameter x.

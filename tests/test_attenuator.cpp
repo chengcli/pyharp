@@ -44,10 +44,13 @@ void put_text_attr(int fileid, int varid, char const* name, char const* value) {
   check_nc(nc_put_att_text(fileid, varid, name, std::strlen(value), value));
 }
 
-fs::path write_test_dataset(bool split_continuum = false) {
+fs::path write_test_dataset(bool split_continuum = false,
+                            bool celsius_temperatures = false,
+                            char const* del_temperature_units = nullptr) {
   auto path = fs::temp_directory_path() /
-              (split_continuum ? "pyharp_test_molecule_line_split.nc"
-                               : "pyharp_test_molecule_line.nc");
+              (celsius_temperatures ? "pyharp_test_molecule_celsius.nc"
+               : split_continuum    ? "pyharp_test_molecule_line_split.nc"
+                                    : "pyharp_test_molecule_line.nc");
   int fileid = -1;
   check_nc(nc_create(path.c_str(), NC_CLOBBER, &fileid));
 
@@ -84,8 +87,12 @@ fs::path write_test_dataset(bool split_continuum = false) {
 
   put_text_attr(fileid, var_wavenumber, "units", "cm^-1");
   put_text_attr(fileid, var_pressure, "units", "Pa");
-  put_text_attr(fileid, var_del_temp, "units", "K");
-  put_text_attr(fileid, var_temperature, "units", "K");
+  put_text_attr(fileid, var_del_temp, "units",
+                del_temperature_units  ? del_temperature_units
+                : celsius_temperatures ? "degC"
+                                       : "K");
+  put_text_attr(fileid, var_temperature, "units",
+                celsius_temperatures ? "degC" : "K");
   put_text_attr(fileid, var_line, "units", "cm^2 molecule^-1");
   put_text_attr(fileid, var_cont, "units", "cm^2 molecule^-1");
   if (split_continuum) {
@@ -99,7 +106,8 @@ fs::path write_test_dataset(bool split_continuum = false) {
   double const wavenumber[] = {20.0, 21.0, 22.0};
   double const pressure[] = {1.0e5, 1.0e6};
   double const del_temp[] = {-10.0, 10.0};
-  double const temperature[] = {300.0, 500.0};
+  double const temperature[] = {celsius_temperatures ? 26.85 : 300.0,
+                                celsius_temperatures ? 226.85 : 500.0};
 
   std::vector<double> sigma_line(2 * 2 * 3);
   std::vector<double> sigma_cont(2 * 2 * 3);
@@ -301,6 +309,52 @@ TEST(TestOpacity, CIAHandlesBinaryPairsAndReversedSpeciesOrder) {
   auto expected = expected_coeff * 12.0;
   EXPECT_TRUE(torch::allclose(result, expected, 1.0e-12, 1.0e-12));
   EXPECT_LT(result[0].item<double>(), 1.0e-250);
+#endif
+}
+
+TEST(TestOpacity, MoleculeTablesDistinguishCelsiusValuesFromIntervals) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  auto kelvin_dataset = write_test_dataset();
+  auto celsius_dataset = write_test_dataset(false, true);
+  harp::species_names = {"H2O", "H2", "He"};
+  harp::species_weights = {18.0e-3, 2.0e-3, 4.0e-3};
+
+  auto make_options = [](char const* type, std::vector<int> species_ids,
+                         fs::path const& dataset) {
+    auto options = harp::OpacityOptionsImpl::create();
+    options->type(type)
+        .species_ids(std::move(species_ids))
+        .opacity_files({dataset.string()});
+    return options;
+  };
+
+  harp::MoleculeLine line_k(make_options("molecule-line", {0}, kelvin_dataset));
+  harp::MoleculeLine line_c(
+      make_options("molecule-line", {0}, celsius_dataset));
+  harp::MoleculeCIA cia_k(make_options("molecule-cia", {1, 2}, kelvin_dataset));
+  harp::MoleculeCIA cia_c(
+      make_options("molecule-cia", {1, 2}, celsius_dataset));
+
+  auto expected_anomaly = torch::tensor({-10.0, 10.0}, torch::kFloat64);
+  auto expected_temperature = torch::tensor({300.0, 500.0}, torch::kFloat64);
+  for (auto const& anomaly :
+       {line_k->temperature_anomaly, line_c->temperature_anomaly,
+        cia_k->temperature_anomaly, cia_c->temperature_anomaly}) {
+    EXPECT_TRUE(torch::allclose(anomaly, expected_anomaly));
+  }
+  for (auto const& log_temperature :
+       {line_k->ln_temperature_base, line_c->ln_temperature_base,
+        cia_k->ln_temperature_base, cia_c->ln_temperature_base}) {
+    EXPECT_TRUE(torch::allclose(log_temperature.squeeze(-1).exp(),
+                                expected_temperature));
+  }
+
+  auto unknown_dataset = write_test_dataset(false, false, "degF");
+  EXPECT_THROW(
+      harp::MoleculeLine(make_options("molecule-line", {0}, unknown_dataset)),
+      c10::Error);
 #endif
 }
 

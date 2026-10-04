@@ -141,6 +141,32 @@ TEST(TestMieWaterLiquid, RequiresRadiusAndCompleteIndexOverride) {
   EXPECT_THROW(cloud->forward(conc, atm), c10::Error);
 }
 
+TEST(TestMieWaterLiquid, Float32SmallParticleMatchesIndependentReference) {
+  harp::species_weights = {18.015e-3};
+  harp::MieWaterLiquid cloud(mie_options(1));
+  auto conc = torch::tensor({{{0.01}}}, torch::kFloat32);
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] = torch::tensor({100.0}, torch::kFloat32);
+  atm["re"] = torch::tensor(0.1, torch::kFloat32);
+
+  auto result = cloud->forward(conc, atm)[0][0][0];
+
+  // Independent SciPy spherical-Bessel series at x=2*pi*0.1/100 using the
+  // built-in Segelstein indices. The float64 implementation agrees.
+  double constexpr extinction = 0.005301434466121953;
+  double constexpr single_scattering_albedo = 2.847968832453763e-7;
+  double constexpr asymmetry = 9.279330028961744e-6;
+  EXPECT_NEAR(result[0].item<double>(), extinction, 2.0e-9);
+  EXPECT_NEAR(result[1].item<double>(), single_scattering_albedo, 2.0e-11);
+  EXPECT_NEAR(result[2].item<double>(), asymmetry, 2.0e-7);
+  EXPECT_TRUE(torch::all(torch::isfinite(result)).item<bool>());
+  EXPECT_GT(result[0].item<double>(), 0.0);
+  EXPECT_GE(result[1].item<double>(), 0.0);
+  EXPECT_LE(result[1].item<double>(), 1.0);
+  EXPECT_GE(result[2].item<double>(), -1.0);
+  EXPECT_LE(result[2].item<double>(), 1.0);
+}
+
 TEST_P(DeviceTest, MieWaterLiquidMatchesCpuReference) {
   harp::species_weights = {18.01528e-3};
   harp::MieWaterLiquid cloud(mie_options(2));

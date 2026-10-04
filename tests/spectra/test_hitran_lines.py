@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 from pyharp.spectra.config import SpectralBandConfig, SpectroscopyConfig
 from pyharp.spectra.hitran_molecule_plot import plot_hitran_line_positions
@@ -33,6 +35,10 @@ class FakeHapi:
 
     def fetch_by_ids(self, table_name, iso_ids, numin, numax):
         self.calls.append((table_name, tuple(iso_ids), numin, numax))
+        table_dir = Path(self.db_dir)
+        table_dir.mkdir(parents=True, exist_ok=True)
+        (table_dir / f"{table_name}.data").write_text("")
+        (table_dir / f"{table_name}.header").write_text("{}")
 
     def storage2cache(self, table_name):
         self.storage_calls.append(table_name)
@@ -74,7 +80,7 @@ def test_download_hitran_lines_pads_band_by_line_wing(monkeypatch, tmp_path) -> 
     ]
 
 
-def test_download_hitran_lines_skips_fetch_when_cache_exists(monkeypatch, tmp_path) -> None:
+def test_download_hitran_lines_refetches_cache_without_request_metadata(monkeypatch, tmp_path) -> None:
     fake = FakeHapi()
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils._import_hapi", lambda: fake)
     config = SpectroscopyConfig(output_path=tmp_path / "out.nc", hitran_cache_dir=tmp_path / "cache")
@@ -87,7 +93,14 @@ def test_download_hitran_lines_skips_fetch_when_cache_exists(monkeypatch, tmp_pa
 
     download_hitran_lines(config, band)
 
-    assert fake.calls == []
+    assert fake.calls == [
+        (
+            table_name,
+            (7, 8, 9, 10, 11, 12, 13),
+            0.0,
+            2525.0,
+        )
+    ]
     assert fake.storage_calls == [table_name]
 
 

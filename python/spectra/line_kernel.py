@@ -175,8 +175,7 @@ def voigt_cross_section(
     y = gamma_lorentz * cte
     amplitude = strength * cte / _SQRT_PI
     if subtract_wing_pedestal:
-        # pyharp's H2O pedestal is taken at (nu - Delta0) + wing, i.e. 25 - 2*Delta0 from the shifted center.
-        pedestal = amplitude * faddeeva((wing_cm1 - 2.0 * shift) * cte, y)[0]
+        pedestal = amplitude * faddeeva(wing_cm1 * cte, y)[0]
 
     lower = np.searchsorted(grid, nu - wing_cm1, side="right")
     upper = np.searchsorted(grid, nu + wing_cm1, side="right")

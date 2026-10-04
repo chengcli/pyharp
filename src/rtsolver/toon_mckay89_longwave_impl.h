@@ -30,6 +30,28 @@
 namespace harp {
 
 template <typename T>
+DISPATCH_MACRO T longwave_exprel(T x) {
+  return x == static_cast<T>(0) ? static_cast<T>(1) : expm1(x) / x;
+}
+
+template <typename T>
+DISPATCH_MACRO T longwave_down_resonant_ratio(T delta, T a) {
+  T const b = (static_cast<T>(1) + delta) * a;
+  return a * exp(-fmin(a, b)) * longwave_exprel(-fabs(delta * a));
+}
+
+template <typename T>
+DISPATCH_MACRO T longwave_up_resonant_ratio(T delta, T a) {
+  return a * longwave_exprel(delta * a);
+}
+
+template <typename T>
+DISPATCH_MACRO T longwave_midpoint_up_resonant_ratio(T delta, T half_a) {
+  return exp((static_cast<T>(1) + delta) * half_a) * half_a *
+         longwave_exprel(delta * half_a);
+}
+
+template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
                                           T a_surf_in, int top_emission_flag,
                                           T btop_factor, bool hard_surface,
@@ -272,10 +294,12 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       T em2 = exp(-dtau[k] / u);
       T l_u_p1 = lam[k] * u + 1.0;
       T l_u_m1 = lam[k] * u - 1.0;
+      T down_ratio = lam[k] * dtau[k] < 35.0
+                         ? longwave_down_resonant_ratio(l_u_m1, dtau[k] / u)
+                         : (em2 - em1[k]) / l_u_m1;
 
       lw_down_g[k + 1] = lw_down_g[k] * em2 + (xj[k] / l_u_p1) * (Ep[k] - em2) +
-                         (xk[k] / l_u_m1) * (em2 - em1[k]) +
-                         sigma1[k] * (1.0 - em2) +
+                         xk[k] * down_ratio + sigma1[k] * (1.0 - em2) +
                          sigma2[k] * (u * em2 + dtau[k] - u);
 
       // downward flux at the MIDPOINT of layer k (half-layer optical depth),
@@ -285,10 +309,14 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       T exptrm_h = fmin(0.5 * lam[k] * dtau[k], 35.0);
       T Ep_mid = exp(exptrm_h);  // exptrm_positive_mdpt
       T em1_mid = 1.0 / Ep_mid;  // exptrm_minus_mdpt
-      T mid_dn =
-          lw_down_g[k] * em2_mid + (xj[k] / l_u_p1) * (Ep_mid - em2_mid) +
-          (xk[k] / l_u_m1) * (em2_mid - em1_mid) + sigma1[k] * (1.0 - em2_mid) +
-          sigma2[k] * (u * em2_mid + 0.5 * dtau[k] - u);
+      T down_mid_ratio = 0.5 * lam[k] * dtau[k] < 35.0
+                             ? longwave_down_resonant_ratio(
+                                   l_u_m1, static_cast<T>(0.5) * dtau[k] / u)
+                             : (em2_mid - em1_mid) / l_u_m1;
+      T mid_dn = lw_down_g[k] * em2_mid +
+                 (xj[k] / l_u_p1) * (Ep_mid - em2_mid) +
+                 xk[k] * down_mid_ratio + sigma1[k] * (1.0 - em2_mid) +
+                 sigma2[k] * (u * em2_mid + 0.5 * dtau[k] - u);
       FLX_DN_MID(k) += mid_dn * wuarr[m];
     }
     surf_dn[m] = lw_down_g[nlev - 1];
@@ -320,8 +348,10 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       T l_u_m1 = lam[k] * u - 1.0;
       T l_u_p1 = lam[k] * u + 1.0;
 
-      lw_up_g[k] = lw_up_g[k + 1] * em2 +
-                   (g[k] / l_u_m1) * (Ep[k] * em2 - 1.0) +
+      T up_ratio = lam[k] * dtau[k] < 35.0
+                       ? longwave_up_resonant_ratio(l_u_m1, dtau[k] / u)
+                       : (Ep[k] * em2 - 1.0) / l_u_m1;
+      lw_up_g[k] = lw_up_g[k + 1] * em2 + g[k] * up_ratio +
                    (h[k] / l_u_p1) * (1.0 - em3) + alpha1[k] * (1.0 - em2) +
                    alpha2[k] * (u - (dtau[k] + u) * em2);
 
@@ -332,8 +362,11 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       T exptrm_h = fmin(0.5 * lam[k] * dtau[k], 35.0);
       T Ep_mid = exp(exptrm_h);  // exptrm_positive_mdpt
       T em1_mid = 1.0 / Ep_mid;  // exptrm_minus_mdpt
-      T mid_up = lw_up_g[k + 1] * em2_mid +
-                 (g[k] / l_u_m1) * (Ep[k] * em2_mid - Ep_mid) +
+      T up_mid_ratio = lam[k] * dtau[k] < 35.0
+                           ? longwave_midpoint_up_resonant_ratio(
+                                 l_u_m1, static_cast<T>(0.5) * dtau[k] / u)
+                           : (Ep[k] * em2_mid - Ep_mid) / l_u_m1;
+      T mid_up = lw_up_g[k + 1] * em2_mid + g[k] * up_mid_ratio +
                  (h[k] / l_u_p1) * (em1_mid - em1[k] * em2_mid) +
                  alpha1[k] * (1.0 - em2_mid) +
                  alpha2[k] * (u + 0.5 * dtau[k] - (dtau[k] + u) * em2_mid);
