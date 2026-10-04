@@ -311,7 +311,12 @@ def resolve_hitran_species(name: str) -> HitranSpecies:
 
 @dataclass(frozen=True)
 class SpectroscopyConfig:
-    """Configuration shared by single-state spectroscopy calculations."""
+    """Configuration shared by single-state spectroscopy calculations.
+
+    Set ``refresh_hitran=True`` after replacing local HITEMP source files.
+    With no HITEMP temperatures configured, the unpruned parent is screened at
+    evaluation time; explicit temperatures enumerate supported evaluation points.
+    """
 
     output_path: Path
     hitran_cache_dir: Path
@@ -399,7 +404,7 @@ class SpectroscopyConfig:
         return temperatures[0], temperatures[-1]
 
     def resolved_hitemp_parent_temperature_range_k(self) -> tuple[float, float]:
-        """Return the parent table's screening range, widened to cover this run if needed."""
+        """Return the parent table's support bounds, widened to cover this run if needed."""
         tmin, tmax = self.resolved_hitemp_temperature_range_k()
         default_min, default_max = DEFAULT_HITEMP_TEMPERATURE_RANGE_K
         return min(tmin, default_min), max(tmax, default_max)

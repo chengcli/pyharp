@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install build ninja setuptools-scm wheel numpy
+          pip install build ninja setuptools-scm wheel numpy pytest hitran-api scipy netCDF4 matplotlib xarray
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             pip install 'torch==2.10.0' --index-url https://download.pytorch.org/whl/cpu
           else
@@ -98,3 +98,9 @@ jobs:
           python -c "import pyharp"
           cd ${{ github.workspace }}/build/tests
           ctest --output-on-failure
+
+      - name: Run offline spectra regressions
+        run: |
+          python -m pytest -q tests/spectra/test_hitemp_lines.py \
+            tests/spectra/test_line_kernel.py \
+            tests/spectra/test_hitran_lines.py
