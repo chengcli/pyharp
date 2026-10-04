@@ -349,8 +349,7 @@ TEST_P(DeviceTest, longwave_resonance_is_continuous) {
   toon->to(device, dtype);
 
   auto solve = [&](double scattering_albedo) {
-    auto prop =
-        torch::zeros({1, 1, 1, 3}, torch::device(device).dtype(dtype));
+    auto prop = torch::zeros({1, 1, 1, 3}, torch::device(device).dtype(dtype));
     prop.select(-1, 0).fill_(1.0);
     prop.select(-1, 1).fill_(scattering_albedo);
     auto temf = torch::tensor({600.0, 300.0}, prop.options()).view({1, 2});
@@ -380,8 +379,7 @@ TEST_P(DeviceTest, longwave_uncapped_ratio_avoids_overflow) {
   harp::ToonMcKay89 toon(op);
   toon->to(device, dtype);
 
-  auto prop =
-      torch::zeros({1, 1, 1, 3}, torch::device(device).dtype(dtype));
+  auto prop = torch::zeros({1, 1, 1, 3}, torch::device(device).dtype(dtype));
   prop.select(-1, 0).fill_(1000.0);
   prop.select(-1, 1).fill_(0.999999);
   auto temf = torch::tensor({600.0, 300.0}, prop.options()).view({1, 2});
