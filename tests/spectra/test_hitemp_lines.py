@@ -438,6 +438,43 @@ def test_hitemp_parent_keeps_line_strong_at_unsampled_run_temperature(tmp_path):
         )
 
 
+def test_fast_provider_rejects_screened_hitemp_child_offscreen(tmp_path):
+    hitemp_dir = tmp_path / "hitemp"
+    hitemp_dir.mkdir()
+    lines = [
+        par_line(1, "1", 130.0, 1.0e-20, 0.0),
+        par_line(1, "1", 160.0, 1.0e-30, 5000.0),
+    ]
+    write_par(hitemp_dir / "01_HITEMP2010.par", lines)
+    band = SpectralBandConfig("h3_guard", 150.0, 170.0, 0.05)
+    common = dict(
+        output_path=tmp_path / "unused.nc",
+        hitran_cache_dir=tmp_path / "hitran",
+        species_name="H2O",
+        isotopologue_ids=(1,),
+        line_source="hitemp",
+        hitemp_dir=hitemp_dir,
+        min_line_strength=1.0e-27,
+    )
+    screened_config = SpectroscopyConfig(
+        **common, hitemp_temperatures_k=(296.0,)
+    )
+    screened_database = download_hitran_lines(screened_config, band)
+    fast_config = SpectroscopyConfig(**common, line_engine="fast")
+    unpruned_database = download_hitran_lines(fast_config, band)
+    grid = np.asarray([160.0])
+    reference = build_line_provider(
+        fast_config, unpruned_database
+    ).cross_section_cm2_molecule(grid, 1500.0, 101325.0)
+    assert reference[0] > 0.0
+
+    screened_fast_provider = build_line_provider(fast_config, screened_database)
+    with pytest.raises(ValueError, match="screened HITEMP table"):
+        screened_fast_provider.cross_section_cm2_molecule(
+            grid, 1500.0, 101325.0
+        )
+
+
 def test_hitemp_parent_rebuilds_legacy_strength_pruned_cache_without_partition_sums(tmp_path):
     hitemp_dir = tmp_path / "hitemp"
     hitemp_dir.mkdir()

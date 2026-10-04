@@ -159,13 +159,9 @@ class HapiLineProvider:
         return f"requested={requested} -> effective={effective} (fallback: {fallback_text})"
 
     def _validate_temperature(self, temperature_k: float) -> None:
-        temperature = float(temperature_k)
-        if self._screening_temperatures_k is not None and temperature not in self._screening_temperatures_k:
-            supported = ", ".join(f"{value:g}" for value in self._screening_temperatures_k)
-            raise ValueError(
-                f"{self.table_name} is a screened HITEMP table valid only at "
-                f"{supported} K; rebuild it for {temperature:g} K."
-            )
+        _validate_screened_hitemp_temperature(
+            self.table_name, self._screening_temperatures_k, temperature_k
+        )
 
     def absorption_coefficient_cm1(
         self,
@@ -239,6 +235,9 @@ class FastLineProvider:
             available=available_broadener_keys,
         )
         self.min_line_strength = float(min_line_strength)
+        self._screening_temperatures_k = _screened_hitemp_temperatures(
+            self.cache_dir, table_name
+        )
         self._lines = load_line_table(self.cache_dir, table_name)
 
     broadening_summary = HapiLineProvider.broadening_summary
@@ -250,6 +249,9 @@ class FastLineProvider:
         pressure_pa: float,
     ) -> np.ndarray:
         """Return line absorption cross section in cm^2/molecule."""
+        _validate_screened_hitemp_temperature(
+            self.table_name, self._screening_temperatures_k, temperature_k
+        )
         return voigt_cross_section(
             self._lines,
             np.asarray(wavenumber_grid_cm1, dtype=np.float64),
@@ -295,6 +297,21 @@ def _screened_hitemp_temperatures(cache_dir: Path | None, table_name: str) -> tu
     if not metadata or metadata.get("strength_pruned") is False:
         return None
     return tuple(float(value) for value in metadata.get("screening_temperatures_k", ()))
+
+
+def _validate_screened_hitemp_temperature(
+    table_name: str,
+    screening_temperatures_k: tuple[float, ...] | None,
+    temperature_k: float,
+) -> None:
+    temperature = float(temperature_k)
+    if screening_temperatures_k is None or temperature in screening_temperatures_k:
+        return
+    supported = ", ".join(f"{value:g}" for value in screening_temperatures_k)
+    raise ValueError(
+        f"{table_name} is a screened HITEMP table valid only at "
+        f"{supported} K; rebuild it for {temperature:g} K."
+    )
 
 
 def _resolve_global_isotopologue_ids(hapi, config: SpectroscopyConfig) -> tuple[int, ...]:
