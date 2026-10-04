@@ -59,7 +59,20 @@ def find_hitemp_files(hitemp_dir: Path, molecule_id: int) -> tuple[HitempFile, .
     if not candidates:
         raise FileNotFoundError(f"No HITEMP files for molecule {molecule_id:02d} under {hitemp_dir}.")
     newest = max(item.year for item in candidates)
-    return tuple(sorted((item for item in candidates if item.year == newest), key=lambda item: item.wavenumber_min_cm1))
+    selected = sorted(
+        (item for item in candidates if item.year == newest),
+        key=lambda item: item.wavenumber_min_cm1,
+    )
+    by_range: dict[tuple[float, float], Path] = {}
+    for item in selected:
+        key = (item.wavenumber_min_cm1, item.wavenumber_max_cm1)
+        if key in by_range:
+            raise ValueError(
+                f"Duplicate HITEMP sources for molecule {molecule_id:02d}, edition {newest}, "
+                f"range {key[0]:g}-{key[1]:g} cm^-1: {by_range[key]} and {item.path}."
+            )
+        by_range[key] = item.path
+    return tuple(selected)
 
 
 def has_hitemp_files(hitemp_dir: Path, molecule_id: int) -> bool:

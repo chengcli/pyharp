@@ -85,6 +85,32 @@ def test_find_hitemp_files_uses_newest_edition_sorted_by_range(tmp_path):
         find_hitemp_files(tmp_path, 6)
 
 
+@pytest.mark.parametrize(
+    "duplicate_name",
+    ["02_HITEMP2024.par.bz2", "02_HITEMP2024.zip", "retained/02_HITEMP2024.par"],
+)
+def test_find_hitemp_files_rejects_duplicate_sources_in_newest_edition(tmp_path, duplicate_name):
+    (tmp_path / "02_HITEMP2024.par").write_bytes(b"")
+    duplicate = tmp_path / duplicate_name
+    duplicate.parent.mkdir(parents=True, exist_ok=True)
+    duplicate.write_bytes(b"")
+
+    with pytest.raises(ValueError, match="Duplicate HITEMP sources"):
+        find_hitemp_files(tmp_path, 2)
+
+
+def test_find_hitemp_files_keeps_distinct_chunks_in_newest_edition(tmp_path):
+    for name in ("02_00000-01000_HITEMP2024.zip", "02_01000-02000_HITEMP2024.par.bz2"):
+        (tmp_path / name).write_bytes(b"")
+
+    files = find_hitemp_files(tmp_path, 2)
+
+    assert [(item.wavenumber_min_cm1, item.wavenumber_max_cm1) for item in files] == [
+        (0.0, 1000.0),
+        (1000.0, 2000.0),
+    ]
+
+
 def test_prepare_filters_range_isotopologue_and_molecule(tmp_path):
     hitemp_dir = tmp_path / "hitemp"
     hitemp_dir.mkdir()

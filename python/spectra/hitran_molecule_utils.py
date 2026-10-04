@@ -23,6 +23,7 @@ from .utils import build_band_from_range
 
 
 LINE_WING_CM1 = 25.0
+_HITRAN_REQUEST_METADATA_KEY = "pyharp_hitran_request"
 
 
 def _import_hapi():
@@ -116,7 +117,7 @@ class HapiLineProvider:
         profile = self._hapi.PROFILE_VOIGT(
             Nu, GammaD, Gamma0, Delta0, WnGrid, YRosen=YRosen, Sw=Sw
         )
-        shifted_center = Nu - Delta0
+        shifted_center = Nu + Delta0
         pedestal = self._hapi.PROFILE_VOIGT(
             Nu,
             GammaD,
@@ -289,6 +290,31 @@ def _call_hapi_quietly(func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
+def _hitran_request_metadata(
+    config: SpectroscopyConfig, bounds_min: float, bounds_max: float
+) -> dict[str, object]:
+    return {
+        "molecule_id": int(config.molecule_id),
+        "local_iso_ids": sorted({int(value) for value in config.resolved_isotopologue_ids()}),
+        "wavenumber_range_cm1": [float(bounds_min), float(bounds_max)],
+    }
+
+
+def _cache_matches_hitran_request(header_path: Path, request: dict[str, object]) -> bool:
+    try:
+        return json.loads(header_path.read_text()).get(_HITRAN_REQUEST_METADATA_KEY) == request
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _write_hitran_request_metadata(header_path: Path, request: dict[str, object]) -> None:
+    header = json.loads(header_path.read_text())
+    header[_HITRAN_REQUEST_METADATA_KEY] = request
+    temporary = header_path.with_name(f".{header_path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(header))
+    os.replace(temporary, header_path)
+
+
 def _cache_matches_requested_molecule_from_data(data: dict[str, object], molecule_id: int) -> bool:
     try:
         molec_ids = data["molec_id"]
@@ -377,6 +403,8 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
     global_iso_ids = _resolve_global_isotopologue_ids(hapi, config)
     data_path = config.hitran_cache_dir / f"{table_name}.data"
     header_path = config.hitran_cache_dir / f"{table_name}.header"
+    request_metadata = _hitran_request_metadata(config, bounds_min, bounds_max)
+    request_matches = _cache_matches_hitran_request(header_path, request_metadata)
     if config.line_engine == "fast" and not config.refresh_hitran and data_path.exists() and header_path.exists():
         # HAPI's db_begin parses every table in the cache folder, which dominates a fast run;
         # validate the cached table with numpy instead.
@@ -384,7 +412,7 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
             lines = load_line_table(config.hitran_cache_dir, table_name)
         except ValueError:
             lines = None
-        if lines is not None and set(np.unique(lines["molec_id"]).tolist()) == {int(config.molecule_id)}:
+        if request_matches and lines is not None and set(np.unique(lines["molec_id"]).tolist()) == {int(config.molecule_id)}:
             return LineDatabase(
                 table_name=table_name,
                 cache_dir=config.hitran_cache_dir,
@@ -404,6 +432,7 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
         and header_path.exists()
         and cached_data is not None
         and _cache_matches_requested_molecule_from_data(cached_data, config.molecule_id)
+        and request_matches
     )
     if config.refresh_hitran or not cache_is_valid:
         previous_timeout = socket.getdefaulttimeout()
@@ -416,6 +445,7 @@ def download_hitran_lines(config: SpectroscopyConfig, band: SpectralBandConfig) 
                 bounds_min,
                 bounds_max,
             )
+            _write_hitran_request_metadata(header_path, request_metadata)
         except Exception as exc:
             raise RuntimeError(
                 f"Failed to download HITRAN lines for {config.hitran_species.name} over "

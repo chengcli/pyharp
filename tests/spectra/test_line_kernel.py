@@ -5,9 +5,11 @@ import json
 
 import numpy as np
 import pytest
+from scipy.special import wofz
 
 from pyharp.spectra.config import SpectralBandConfig, SpectroscopyConfig
 from pyharp.spectra.hitran_molecule_utils import (
+    _line_source_band,
     FastLineProvider,
     HapiLineProvider,
     LineDatabase,
@@ -76,6 +78,37 @@ def test_fast_engine_matches_hapi_h2o_pedestal(tmp_path):
     ref, got = cross_sections(tmp_path, "h2o_lines_970_1035", lines, grid, 500.0, 1.0e6, {"air": 0.8, "self": 0.2})
     assert (ref == 0.0).any() and ref.max() > 0.0  # the pedestal clips the far wings to zero
     np.testing.assert_allclose(got, ref, rtol=1e-10, atol=1e-12 * ref.max())
+
+
+@pytest.mark.parametrize("delta_air", [-0.002, 0.0, 0.002])
+@pytest.mark.parametrize("pressure_atm", [1.0, 100.0])
+def test_h2o_pedestal_matches_scipy_at_shifted_wing(tmp_path, delta_air, pressure_atm):
+    nu, strength, temperature, wing = 1000.0, 1.0e-20, 296.0, 25.0
+    lines = [par_line(1, "1", nu, strength, 0.0, delta_air=delta_air)]
+    grid = np.linspace(nu - wing, nu + wing, 2001)
+    table_name = "h2o_lines_pedestal"
+    table_dir = tmp_path / table_name
+    write_table(table_dir, table_name, lines)
+    gamma_d = nu * np.sqrt(
+        2.0 * hapi.cBolts * temperature * np.log(2.0)
+        / (hapi.molecularMass(1, 1) * 1.66053873e-24)
+        / hapi.cc**2
+    )
+    cte = np.sqrt(np.log(2.0)) / gamma_d
+    shift = delta_air * pressure_atm
+    y = 0.07 * pressure_atm * cte
+    amplitude = strength * cte / np.sqrt(np.pi)
+    raw = amplitude * wofz((grid - nu - shift) * cte + 1j * y).real
+    pedestal = amplitude * wofz(wing * cte + 1j * y).real
+    expected = np.where((grid > nu - wing) & (grid <= nu + wing), np.maximum(raw - pedestal, 0.0), 0.0)
+
+    kwargs = dict(cache_dir=table_dir, diluent={"air": 1.0}, available_broadener_keys=("air", "self"))
+    for provider_type in (HapiLineProvider, FastLineProvider):
+        with contextlib.redirect_stdout(io.StringIO()):
+            actual = provider_type(table_name, **kwargs).cross_section_cm2_molecule(
+                grid, temperature, pressure_atm * 101325.0
+            )
+        np.testing.assert_allclose(actual, expected, rtol=2e-5, atol=1e-12 * expected.max())
 
 
 def test_fast_engine_absorption_coefficient_matches_hapi(tmp_path):
@@ -232,6 +265,14 @@ def test_build_line_provider_and_line_list_follow_line_engine(tmp_path):
 def test_fast_engine_reuses_cached_hitran_tables_without_hapi_db_begin(tmp_path, monkeypatch):
     cache = tmp_path / "hitran"
     write_table(cache, "co2_lines_625_725", LINES_CO2)
+    header_path = cache / "co2_lines_625_725.header"
+    header = json.loads(header_path.read_text())
+    header["pyharp_hitran_request"] = {
+        "molecule_id": 2,
+        "local_iso_ids": [1, 2, 3, 4, 5, 6, 7],
+        "wavenumber_range_cm1": [625.0, 725.0],
+    }
+    header_path.write_text(json.dumps(header))
     write_table(cache, "h2o_lines_0_50", [par_line(1, "1", 10.0, 1e-20, 0.0)])  # another table HAPI would parse
     calls = []
     monkeypatch.setattr(hapi, "db_begin", lambda *args: calls.append(args))
@@ -246,3 +287,51 @@ def test_fast_engine_reuses_cached_hitran_tables_without_hapi_db_begin(tmp_path,
     monkeypatch.setattr(hapi, "fetch_by_ids", lambda *args, **kwargs: calls.append("fetch"))
     download_hitran_lines(fast, band)
     assert calls and "fetch" in calls
+
+
+@pytest.mark.parametrize("line_engine", ["hapi", "fast"])
+def test_hitran_cache_reuse_requires_exact_request_metadata(monkeypatch, tmp_path, line_engine):
+    cache_dir = tmp_path / line_engine
+    fetches = []
+
+    def fetch_to_real_cache(table_name, global_iso_ids, lower, upper):
+        fetches.append((tuple(global_iso_ids), lower, upper))
+        write_table(cache_dir, table_name, [par_line(2, "1", 667.0, 1.0e-18, 0.0)])
+
+    monkeypatch.setattr(hapi, "fetch_by_ids", fetch_to_real_cache)
+    band = SpectralBandConfig("band", 650.1, 700.1, 0.1)
+    common = dict(
+        output_path=tmp_path / "unused.nc",
+        hitran_cache_dir=cache_dir,
+        species_name="CO2",
+        line_engine=line_engine,
+        broadening_composition={"air": 1.0},
+    )
+    config = SpectroscopyConfig(**common, isotopologue_ids=(2, 1))
+    table_name = config.resolved_line_table_name(_line_source_band(band))
+    write_table(cache_dir, table_name, [par_line(2, "1", 667.0, 1.0e-18, 0.0)])
+
+    database = download_hitran_lines(config, band)
+
+    metadata = json.loads((cache_dir / f"{table_name}.header").read_text())["pyharp_hitran_request"]
+    assert metadata == {
+        "molecule_id": 2,
+        "local_iso_ids": [1, 2],
+        "wavenumber_range_cm1": [625.1, 725.1],
+    }
+    assert fetches == [((8, 7), 625.1, 725.1)]
+    assert load_line_table(cache_dir, table_name)["local_iso_id"].tolist() == [1]
+    provider = build_line_provider(config, database)
+    assert provider.cross_section_cm2_molecule(np.array([667.0]), 296.0, 101325.0)[0] > 0.0
+
+    download_hitran_lines(config, band)
+    assert len(fetches) == 1
+
+    config = SpectroscopyConfig(**common, isotopologue_ids=(1,))
+    download_hitran_lines(config, band)
+    assert len(fetches) == 2
+
+    changed_bounds = SpectralBandConfig("band", 650.2, 700.2, 0.1)
+    assert config.resolved_line_table_name(_line_source_band(changed_bounds)) == table_name
+    download_hitran_lines(config, changed_bounds)
+    assert len(fetches) == 3
