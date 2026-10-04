@@ -222,6 +222,19 @@ inline torch::Tensor convert_temperature_to_k(torch::Tensor values,
   return values;
 }
 
+inline torch::Tensor convert_temperature_interval_to_k(
+    torch::Tensor values, std::string const& units,
+    std::string const& varname) {
+  auto const u = lower_copy(trim_copy(units));
+  if (u.empty() || u == "k" || u == "kelvin" || u == "c" || u == "degc" ||
+      u == "celsius") {
+    return values;
+  }
+  TORCH_CHECK(false, "Unsupported temperature interval units for ", varname,
+              ": ", units);
+  return values;
+}
+
 inline torch::Tensor apply_positive_fill(torch::Tensor values,
                                          std::string const& quantity_name) {
   auto const positive_mask = values > 0;

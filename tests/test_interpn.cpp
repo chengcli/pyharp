@@ -177,6 +177,31 @@ TEST(TestInterpolation, testOnNodeQueryMatchesGeneralPath) {
   EXPECT_FALSE(torch::equal(fast, shifted));
 }
 
+TEST(TestInterpolation, testOnNodeVectorRetainsQueryGradients) {
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto x = torch::tensor({0.0, 1.0, 2.0}, opt);
+  auto query = x.clone().set_requires_grad(true);
+  auto lookup = x.unsqueeze(-1);
+
+  harp::interpn({query}, {x}, lookup).sum().backward();
+
+  ASSERT_TRUE(query.grad().defined());
+  EXPECT_TRUE(torch::equal(query.grad(), torch::tensor({1.0, 1.0, 0.0}, opt)));
+}
+
+TEST(TestInterpolation, testOnNodeVectorRetainsCoordinateGradients) {
+  auto opt = torch::TensorOptions().dtype(torch::kFloat64);
+  auto coord = torch::tensor({0.0, 1.0, 2.0}, opt).set_requires_grad(true);
+  auto query = coord.detach().clone();
+  auto lookup = query.unsqueeze(-1);
+
+  harp::interpn({query}, {coord}, lookup).sum().backward();
+
+  ASSERT_TRUE(coord.grad().defined());
+  EXPECT_TRUE(
+      torch::equal(coord.grad(), torch::tensor({-1.0, -1.0, 0.0}, opt)));
+}
+
 TEST(TestInterpolation, testClampsOutsideTheTable) {
   auto opt = torch::TensorOptions().dtype(torch::kFloat64);
   auto x = torch::tensor({0.0, 1.0, 2.0}, opt);

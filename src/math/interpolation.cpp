@@ -79,7 +79,11 @@ AxisWeights locate_on_axis(torch::Tensor const& coord,
   // that is constant along some axis costs nothing along that axis.
   out.weight_low = out.weight_low.unsqueeze(-1);
   out.weight_high = out.weight_high.unsqueeze(-1);
-  out.on_nodes = query_lies_on_nodes(coord, query_d);
+  auto const has_active_coordinate_grad =
+      torch::GradMode::is_enabled() &&
+      (coord.requires_grad() || query_d.requires_grad());
+  out.on_nodes =
+      !has_active_coordinate_grad && query_lies_on_nodes(coord, query_d);
 
   return out;
 }

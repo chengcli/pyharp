@@ -44,7 +44,7 @@ void MoleculeCIAImpl::reset() {
   int del_temp_id = -1;
   check_nc(nc_inq_varid(fileid, "del_temperature", &del_temp_id),
            "Missing required variable del_temperature");
-  temperature_anomaly = convert_temperature_to_k(
+  temperature_anomaly = convert_temperature_interval_to_k(
       read_1d_variable(fileid, "del_temperature"),
       read_var_units(fileid, del_temp_id), "del_temperature");
 
