@@ -3,6 +3,7 @@
 // C/C++
 #include <cmath>
 #include <cstdint>
+#include <type_traits>
 
 // base
 #include <configure.h>
@@ -80,6 +81,65 @@ DISPATCH_MACRO int mie_nstop(T x) {
       static_cast<T>(2.0));
 }
 
+template <typename T>
+DISPATCH_MACRO MieEfficiencyDevice<T> mie_small_sphere_device(T nreal, T kimag,
+                                                              T x) {
+  Complex<T> const m(nreal, -kimag);
+  auto const m2 = m * m;
+  T const x2 = x * x;
+  T const x4 = x2 * x2;
+  auto denominator = m2 + static_cast<T>(2) +
+                     (static_cast<T>(1) - static_cast<T>(0.7) * m2) * x2;
+  denominator =
+      denominator -
+      (static_cast<T>(8) * m2 * m2 - static_cast<T>(385) * m2 +
+       static_cast<T>(350)) *
+          x4 / static_cast<T>(1400);
+  denominator =
+      denominator +
+      Complex<T>(0, 2) * (m2 - static_cast<T>(1)) * x * x2 *
+          (static_cast<T>(1) - static_cast<T>(0.1) * x2) /
+          static_cast<T>(3);
+
+  auto const ahat1 =
+      Complex<T>(0, 2) * (m2 - static_cast<T>(1)) / static_cast<T>(3) *
+      (static_cast<T>(1) - static_cast<T>(0.1) * x2 +
+       (static_cast<T>(4) * m2 + static_cast<T>(5)) * x4 /
+           static_cast<T>(1400)) /
+      denominator;
+  auto bhat1 = Complex<T>(0, 1) * x2 * (m2 - static_cast<T>(1)) /
+               static_cast<T>(45) *
+               (static_cast<T>(1) +
+                (static_cast<T>(2) * m2 - static_cast<T>(5)) * x2 /
+                    static_cast<T>(70));
+  bhat1 = bhat1 /
+          (static_cast<T>(1) -
+           (static_cast<T>(2) * m2 - static_cast<T>(5)) * x2 /
+               static_cast<T>(30));
+  auto ahat2 = Complex<T>(0, 1) * x2 * (m2 - static_cast<T>(1)) /
+               static_cast<T>(15) *
+               (static_cast<T>(1) - x2 / static_cast<T>(14));
+  ahat2 = ahat2 /
+          (static_cast<T>(2) * m2 + static_cast<T>(3) -
+           (static_cast<T>(2) * m2 - static_cast<T>(7)) * x2 /
+               static_cast<T>(14));
+
+  T const sum = complex_norm(ahat1) + complex_norm(bhat1) +
+                static_cast<T>(5.0 / 3.0) * complex_norm(ahat2);
+  MieEfficiencyDevice<T> out;
+  out.qsca = static_cast<T>(6) * x4 * sum;
+  out.qext = kimag == static_cast<T>(0)
+                 ? out.qsca
+                 : static_cast<T>(6) * x *
+                       (ahat1 + bhat1 + static_cast<T>(5.0 / 3.0) * ahat2).r;
+  if (out.qext < out.qsca) out.qext = out.qsca;
+  out.g = sum > static_cast<T>(0)
+              ? (ahat1 * complex_conj(ahat2 + bhat1)).r / sum
+              : static_cast<T>(0);
+  out.status = 0;
+  return out;
+}
+
 // Full homogeneous-sphere Lorenz-Mie efficiencies. The recurrence follows
 // Bohren and Huffman (1983) and the numerical layout used by miepython:
 // m uses the absorbing n-i*k convention and x is the external size parameter.
@@ -110,6 +170,39 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
     out.qsca = qsca;
     out.g = 0;
     return out;
+  }
+
+  // The float recurrence loses the small Riccati-Bessel residuals. For
+  // |m|*x < 0.1, use the bounded small-sphere expansion. Up to x=0.3,
+  // evaluate the remaining short recurrence in double precision. Cast only
+  // the public result back to float.
+  if constexpr (std::is_same<T, float>::value) {
+    if (x <= static_cast<T>(0.3)) {
+      int const computed_nstop = mie_nstop(x);
+      int const nstop = computed_nstop > 1 ? computed_nstop : 1;
+      if (nstop + 2 > max_order) {
+        out.status = 3;
+        return out;
+      }
+      MieEfficiencyDevice<double> precise;
+      double const precise_x = static_cast<double>(x);
+      double const precise_nreal = static_cast<double>(nreal);
+      double const precise_kimag = static_cast<double>(kimag);
+      if (complex_abs(m) * x < static_cast<T>(0.1)) {
+        precise = mie_small_sphere_device(precise_nreal, precise_kimag,
+                                          precise_x);
+      } else {
+        constexpr int precise_max_order = 8;
+        Complex<double> precise_work[3 * precise_max_order];
+        precise = mie_efficiency_device(precise_nreal, precise_kimag, precise_x,
+                                        precise_work, precise_max_order);
+      }
+      out.qext = static_cast<T>(precise.qext);
+      out.qsca = static_cast<T>(precise.qsca);
+      out.g = static_cast<T>(precise.g);
+      out.status = precise.status;
+      return out;
+    }
   }
 
   // The highest retained multipole order grows with the size parameter x.
