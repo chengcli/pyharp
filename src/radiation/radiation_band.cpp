@@ -398,11 +398,14 @@ torch::Tensor RadiationBandImpl::forward(
               << std::endl;
   }
 
-  // cDISORT's eigenproblem becomes numerically degenerate for conservative
-  // and nearly conservative scattering. Keep the physical opacity source
+  // Conservative scattering is degenerate for both solvers: it makes
+  // cDISORT's eigenproblem singular, and it makes Toon form g1 == g2, which
+  // returns NaN for every level of the column once the layer is also
+  // forward-peaked. A band of Rayleigh plus cloud reaches it whenever the gas
+  // absorption in a bin underflows. Keep the physical opacity source
   // conservative, but regularize the solver input by a dtype-appropriate
   // distance from unity.
-  if (options->solver_name() == "disort" && nprop > 1) {
+  if (nprop > 1) {
     auto const ssa_margin =
         prop.scalar_type() == torch::kFloat64 ? 1.0e-12 : 1.0e-6;
     prop.select(-1, disort::ISS).clamp_max_(1.0 - ssa_margin);
