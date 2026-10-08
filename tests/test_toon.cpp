@@ -371,6 +371,41 @@ TEST_P(DeviceTest, longwave_resonance_is_continuous) {
             rtol * (scale + 1.0));
 }
 
+// The shortwave particular solution resonates at lambda * mu0 = 1. With g = 0,
+// lambda = sqrt(3 (1 - w0)), so w0 = 2/3 resonates with an overhead sun. The
+// fluxes are smooth there and must match the neighbouring values.
+TEST_P(DeviceTest, shortwave_resonance_is_continuous) {
+  double constexpr w0 = 2.0 / 3.0;
+  double const relative_offset = dtype == torch::kFloat64 ? 1.0e-4 : 1.0e-2;
+
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({200.0});
+  op->wave_upper({500.0});
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  auto solve = [&](double scattering_albedo) {
+    auto prop = torch::zeros({1, 1, 4, 3}, torch::device(device).dtype(dtype));
+    prop.select(-1, 0).fill_(0.5);
+    prop.select(-1, 1).fill_(scattering_albedo);
+    std::map<std::string, torch::Tensor> bc;
+    bc["fbeam"] = torch::ones({1, 1}, prop.options());
+    bc["umu0"] = torch::ones({1}, prop.options());
+    bc["albedo"] = torch::full({1, 1}, 0.1, prop.options());
+    return toon(prop, &bc);
+  };
+
+  auto exact = solve(w0);
+  auto below = solve(w0 * (1.0 - relative_offset));
+  auto above = solve(w0 * (1.0 + relative_offset));
+  auto reference = 0.5 * (below + above);
+
+  EXPECT_TRUE(torch::all(torch::isfinite(exact.cpu())).item<bool>());
+  double rtol = dtype == torch::kFloat64 ? 1.0e-6 : 2.0e-3;
+  double scale = torch::abs(reference).max().item<double>();
+  EXPECT_LT(torch::abs(exact - reference).max().item<double>(), rtol * scale);
+}
+
 TEST_P(DeviceTest, longwave_uncapped_ratio_avoids_overflow) {
   auto op = harp::ToonMcKay89OptionsImpl::create();
   op->wave_lower({1.0});
