@@ -24,9 +24,8 @@ TEST_P(DeviceTest, HenyeyGreensteinMatchesCumprod) {
     // differently: on the CPU it accumulates float32 in double, and a CUDA
     // scan may group a long product differently from repeated
     // multiplication.
-    bool bitwise =
-        nmom <= 2 || (dtype == torch::kFloat64 &&
-                      (nmom <= 3 || device.type() == torch::kCPU));
+    bool bitwise = nmom <= 2 || (dtype == torch::kFloat64 &&
+                                 (nmom <= 3 || device.type() == torch::kCPU));
     if (bitwise) {
       EXPECT_TRUE(torch::equal(result, expected)) << "nmom = " << nmom;
     } else {
