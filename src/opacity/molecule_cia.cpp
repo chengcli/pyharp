@@ -156,15 +156,17 @@ torch::Tensor MoleculeCIAImpl::forward(
                                  warned_temperature_anomaly_bounds);
   }
 
+  // Leave each query at the shape its values actually vary over and let
+  // interpn broadcast them, as MoleculeLine does. Expanding all three to
+  // (nwave, ncol, nlyr) first made the pressure and temperature searches
+  // repeat once per wavenumber, and the wavenumber search repeat once per
+  // (column, layer).
   int const nwave = wave_query.size(0);
-  auto wave =
-      wave_query.unsqueeze(-1).unsqueeze(-1).expand({nwave, ncol, nlyr});
-  auto lnp_grid = lnp.unsqueeze(0).expand({nwave, ncol, nlyr});
-  auto temp_grid = del_temp.unsqueeze(0).expand({nwave, ncol, nlyr});
+  auto wave = wave_query.view({nwave, 1, 1});
 
   // Clamp queries to the tabulated bounds. Extrapolating logarithmic CIA
   // coefficients can produce nonphysical opacity outside the table coverage.
-  auto coeff = interpn({wave, lnp_grid, temp_grid},
+  auto coeff = interpn({wave, lnp.unsqueeze(0), del_temp.unsqueeze(0)},
                        {wavenumber, ln_pressure, temperature_anomaly},
                        ln_sigma_binary, false)
                    .exp();
