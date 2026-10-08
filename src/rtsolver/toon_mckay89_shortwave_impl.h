@@ -1,8 +1,9 @@
 // C/C++
-#include <limits>
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+#include <limits>
 
 // base
 #include <configure.h>
