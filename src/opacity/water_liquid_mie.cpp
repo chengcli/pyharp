@@ -107,48 +107,86 @@ int mie_max_order(double max_x) {
 
 }  // namespace
 
-void call_water_liquid_mie_cpu(at::TensorIterator& iter,
-                               double molecular_weight, int max_order) {
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "call_water_liquid_mie_cpu", [&] {
-    int const grain_size = iter.numel() / at::get_num_threads();
-    using ComplexScalar = Complex<scalar_t>;
-    iter.for_each(
-        [&](char** data, const int64_t* strides, int64_t n) {
-          std::vector<ComplexScalar> work(
-              static_cast<std::size_t>(3 * max_order));
-          auto* work_ptr = work.data();
-          for (int64_t i = 0; i < n; ++i) {
-            auto extinction =
-                reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
-            auto single_scattering_albedo =
-                reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
-            auto g = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
-            auto conc = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
-            auto wave = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
-            auto re = reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
-            auto density =
-                reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
-            auto real = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
-            auto imag = reinterpret_cast<scalar_t*>(data[8] + i * strides[8]);
-            auto const properties = water_liquid_mie_properties(
-                *conc, *wave, *re, *density, *real, *imag,
-                static_cast<scalar_t>(molecular_weight), work_ptr, max_order);
-            *extinction = properties.extinction;
-            *single_scattering_albedo = properties.single_scattering_albedo;
-            *g = properties.g;
-          }
-        },
-        grain_size);
-  });
+void call_water_liquid_mie_efficiency_cpu(at::TensorIterator& iter,
+                                          int max_order) {
+  AT_DISPATCH_FLOATING_TYPES(
+      iter.dtype(), "call_water_liquid_mie_efficiency_cpu", [&] {
+        int const grain_size = iter.numel() / at::get_num_threads();
+        using ComplexScalar = Complex<scalar_t>;
+        iter.for_each(
+            [&](char** data, const int64_t* strides, int64_t n) {
+              std::vector<ComplexScalar> work(
+                  static_cast<std::size_t>(3 * max_order));
+              auto* work_ptr = work.data();
+              for (int64_t i = 0; i < n; ++i) {
+                auto qext = reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
+                auto qsca = reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
+                auto g = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
+                auto status =
+                    reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
+                auto wave = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
+                auto re = reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
+                auto real = reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
+                auto imag = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
+                auto const mie = mie_efficiency_device(
+                    *real, *imag, mie_size_parameter(*re, *wave), work_ptr,
+                    max_order);
+                *qext = mie.qext;
+                *qsca = mie.qsca;
+                *g = mie.g;
+                *status = static_cast<scalar_t>(mie.status);
+              }
+            },
+            grain_size);
+      });
+}
+
+void call_water_liquid_mie_assemble_cpu(at::TensorIterator& iter,
+                                        double molecular_weight) {
+  AT_DISPATCH_FLOATING_TYPES(
+      iter.dtype(), "call_water_liquid_mie_assemble_cpu", [&] {
+        int const grain_size = iter.numel() / at::get_num_threads();
+        iter.for_each(
+            [&](char** data, const int64_t* strides, int64_t n) {
+              for (int64_t i = 0; i < n; ++i) {
+                auto extinction =
+                    reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
+                auto single_scattering_albedo =
+                    reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
+                auto g = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
+                auto conc = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
+                auto re = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
+                auto density =
+                    reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
+                auto qext = reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
+                auto qsca = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
+                auto gq = reinterpret_cast<scalar_t*>(data[8] + i * strides[8]);
+                auto status =
+                    reinterpret_cast<scalar_t*>(data[9] + i * strides[9]);
+                MieEfficiencyDevice<scalar_t> const mie{
+                    *qext, *qsca, *gq, static_cast<int>(*status)};
+                auto const properties = water_liquid_mie_properties_from(
+                    *conc, *re, *density,
+                    static_cast<scalar_t>(molecular_weight), mie);
+                *extinction = properties.extinction;
+                *single_scattering_albedo = properties.single_scattering_albedo;
+                *g = properties.g;
+              }
+            },
+            grain_size);
+      });
 }
 
 }  // namespace harp
 
 namespace at::native {
 
-DEFINE_DISPATCH(call_water_liquid_mie);
-REGISTER_ALL_CPU_DISPATCH(call_water_liquid_mie,
-                          &harp::call_water_liquid_mie_cpu);
+DEFINE_DISPATCH(call_water_liquid_mie_efficiency);
+DEFINE_DISPATCH(call_water_liquid_mie_assemble);
+REGISTER_ALL_CPU_DISPATCH(call_water_liquid_mie_efficiency,
+                          &harp::call_water_liquid_mie_efficiency_cpu);
+REGISTER_ALL_CPU_DISPATCH(call_water_liquid_mie_assemble,
+                          &harp::call_water_liquid_mie_assemble_cpu);
 
 }  // namespace at::native
 
@@ -266,35 +304,72 @@ torch::Tensor MieWaterLiquidImpl::forward(
   int64_t const nwave = wavelength.size(0);
   double const molecular_weight = species_weights.at(species_id);  // kg/mol
 
-  auto max_x =
-      (2.0 * kPi * re.max() / wavelength.min()).to(torch::kCPU).item<double>();
+  // The Mie efficiencies depend only on wavelength and droplet radius, so
+  // compute them once per (wavelength, distinct radius) and spread them to
+  // the cells, instead of once per cell.
+  auto const unique = at::_unique(re.reshape({-1}), /*sorted=*/true,
+                                  /*return_inverse=*/true);
+  auto const re_unique = std::get<0>(unique).contiguous();
+  auto const re_index = std::get<1>(unique).reshape({-1});
+  int64_t const nre = re_unique.size(0);
+
+  auto max_x = (2.0 * kPi * re_unique.max() / wavelength.min())
+                   .to(torch::kCPU)
+                   .item<double>();
   int const max_order = mie_max_order(max_x);
 
+  auto const eshape = std::vector<int64_t>{nwave, nre};
+  auto qext = torch::empty(eshape, conc.options());
+  auto qsca = torch::empty(eshape, conc.options());
+  auto gq = torch::empty(eshape, conc.options());
+  auto status = torch::empty(eshape, conc.options());
+  auto const wave_e = wavelength.view({nwave, 1}).expand(eshape);
+  auto const re_e = re_unique.view({1, nre}).expand(eshape);
+  auto const real_e = ref_real.view({nwave, 1}).expand(eshape);
+  auto const imag_e = ref_imag.view({nwave, 1}).expand(eshape);
+  auto efficiency_iter = at::TensorIteratorConfig()
+                             .add_output(qext)
+                             .add_output(qsca)
+                             .add_output(gq)
+                             .add_output(status)
+                             .add_input(wave_e)
+                             .add_input(re_e)
+                             .add_input(real_e)
+                             .add_input(imag_e)
+                             .check_all_same_dtype(false)
+                             .build();
+  at::native::call_water_liquid_mie_efficiency(efficiency_iter.device_type(),
+                                               efficiency_iter, max_order);
+
   auto const shape = std::vector<int64_t>{nwave, ncol, nlyr};
+  auto spread = [&](torch::Tensor const& q) {
+    return q.index_select(1, re_index).view(shape);
+  };
   auto extinction = torch::empty(shape, conc.options());
   auto single_scattering_albedo = torch::empty(shape, conc.options());
   auto g = torch::empty(shape, conc.options());
-  auto conc_view = liquid_conc.view({1, ncol, nlyr}).expand(shape);
-  auto wave_view = wavelength.view({nwave, 1, 1}).expand(shape);
-  auto re_view = re.view({1, ncol, nlyr}).expand(shape);
-  auto density_view = density.view({1, ncol, nlyr}).expand(shape);
-  auto real_view = ref_real.view({nwave, 1, 1}).expand(shape);
-  auto imag_view = ref_imag.view({nwave, 1, 1}).expand(shape);
-
+  auto const conc_view = liquid_conc.view({1, ncol, nlyr}).expand(shape);
+  auto const re_view = re.view({1, ncol, nlyr}).expand(shape);
+  auto const density_view = density.view({1, ncol, nlyr}).expand(shape);
+  auto const qext_cell = spread(qext);
+  auto const qsca_cell = spread(qsca);
+  auto const g_cell = spread(gq);
+  auto const status_cell = spread(status);
   auto iter = at::TensorIteratorConfig()
                   .add_output(extinction)
                   .add_output(single_scattering_albedo)
                   .add_output(g)
                   .add_input(conc_view)
-                  .add_input(wave_view)
                   .add_input(re_view)
                   .add_input(density_view)
-                  .add_input(real_view)
-                  .add_input(imag_view)
+                  .add_input(qext_cell)
+                  .add_input(qsca_cell)
+                  .add_input(g_cell)
+                  .add_input(status_cell)
                   .check_all_same_dtype(false)
                   .build();
-  at::native::call_water_liquid_mie(iter.device_type(), iter, molecular_weight,
-                                    max_order);
+  at::native::call_water_liquid_mie_assemble(iter.device_type(), iter,
+                                             molecular_weight);
 
   auto result =
       torch::empty({nwave, ncol, nlyr, 2 + options->nmom()}, conc.options());
