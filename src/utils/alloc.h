@@ -64,6 +64,28 @@ size_t toon89_sw_space(int nlay) {
   return bytes;
 }
 
+// Element i of a thread's array sits i * stride elements after element 0.
+// When the threads of a chunk get consecutive base addresses and a stride
+// equal to the chunk size, a warp touching the same element reads one
+// contiguous run instead of 32 scattered words. With stride 1 this is the
+// plain contiguous layout.
+template <typename T>
+struct StridedArray {
+  T* data;
+  int stride;
+  DISPATCH_MACRO T& operator[](int i) const {
+    return data[static_cast<ptrdiff_t>(i) * stride];
+  }
+};
+
+template <typename U>
+DISPATCH_MACRO inline StridedArray<U> alloc_strided(char*& cursor,
+                                                    size_t count, int stride) {
+  U* out = reinterpret_cast<U*>(cursor);
+  cursor += count * static_cast<size_t>(stride) * sizeof(U);
+  return StridedArray<U>{out, stride};
+}
+
 template <typename T>
 size_t toon89_lw_space(int nlay) {
   size_t bytes = 0;

@@ -20,7 +20,7 @@ void call_water_liquid_mie_cuda(at::TensorIterator& iter,
     using ComplexScalar = Complex<scalar_t>;
     size_t const work_size = 3 * static_cast<size_t>(max_order) *
                              sizeof(ComplexScalar);
-    native::gpu_chunk_kernel<8, 9>(
+    native::gpu_chunk_kernel<9>(
         iter, work_size,
         [=] GPU_LAMBDA(char* const data[9], unsigned int strides[9],
                        char* work) {
