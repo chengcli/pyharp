@@ -79,8 +79,8 @@ struct StridedArray {
 };
 
 template <typename U>
-DISPATCH_MACRO inline StridedArray<U> alloc_strided(char*& cursor,
-                                                    size_t count, int stride) {
+DISPATCH_MACRO inline StridedArray<U> alloc_strided(char*& cursor, size_t count,
+                                                    int stride) {
   U* out = reinterpret_cast<U*>(cursor);
   cursor += count * static_cast<size_t>(stride) * sizeof(U);
   return StridedArray<U>{out, stride};

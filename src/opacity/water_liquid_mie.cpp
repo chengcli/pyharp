@@ -119,15 +119,20 @@ void call_water_liquid_mie_efficiency_cpu(at::TensorIterator& iter,
                   static_cast<std::size_t>(3 * max_order));
               auto* work_ptr = work.data();
               for (int64_t i = 0; i < n; ++i) {
-                auto qext = reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
-                auto qsca = reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
+                auto qext =
+                    reinterpret_cast<scalar_t*>(data[0] + i * strides[0]);
+                auto qsca =
+                    reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
                 auto g = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
                 auto status =
                     reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
-                auto wave = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
+                auto wave =
+                    reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
                 auto re = reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
-                auto real = reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
-                auto imag = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
+                auto real =
+                    reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
+                auto imag =
+                    reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
                 auto const mie = mie_efficiency_device(
                     *real, *imag, mie_size_parameter(*re, *wave), work_ptr,
                     max_order);
@@ -154,12 +159,15 @@ void call_water_liquid_mie_assemble_cpu(at::TensorIterator& iter,
                 auto single_scattering_albedo =
                     reinterpret_cast<scalar_t*>(data[1] + i * strides[1]);
                 auto g = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
-                auto conc = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
+                auto conc =
+                    reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
                 auto re = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
                 auto density =
                     reinterpret_cast<scalar_t*>(data[5] + i * strides[5]);
-                auto qext = reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
-                auto qsca = reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
+                auto qext =
+                    reinterpret_cast<scalar_t*>(data[6] + i * strides[6]);
+                auto qsca =
+                    reinterpret_cast<scalar_t*>(data[7] + i * strides[7]);
                 auto gq = reinterpret_cast<scalar_t*>(data[8] + i * strides[8]);
                 auto status =
                     reinterpret_cast<scalar_t*>(data[9] + i * strides[9]);
