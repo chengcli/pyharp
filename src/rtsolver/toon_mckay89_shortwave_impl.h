@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <limits>
+
 // base
 #include <configure.h>
 
@@ -146,12 +148,22 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
       T g1 = sqrt3d2 * (2.0 - w0[i] * (1.0 + hg[i]));
       T g2 = (sqrt3d2 * w0[i]) * (1.0 - hg[i]);
       if (g2 == 0.0) g2 = 1.0e-10;
-      T g3 = (1.0 - sqrt3 * hg[i] * mu_zm[i]) / 2.0;
-      T g4 = 1.0 - g3;
       T lam = sqrt(g1 * g1 - g2 * g2);
       gam[i] = (g1 - lam) / g2;
+      // The particular solution resonates at lam * mu0 = 1. The fluxes stay
+      // finite there, but A+- blow up as 1 / (lam * mu0 - 1) and the
+      // tridiagonal solve cancels them, losing eps / |lam * mu0 - 1| relative
+      // accuracy. Within sqrt(eps) of resonance, move this layer's mu0 to
+      // lam * mu0 = 1 +- sqrt(eps): the fluxes are smooth in mu0, so the
+      // perturbation costs O(sqrt(eps)) as well (cf. TWOSTR, Kylling 1995).
+      T const res_tol = sqrt(std::numeric_limits<T>::epsilon());
+      T res = lam * mu_zm[i] - 1.0;
+      if (fabs(res) < res_tol) {
+        mu_zm[i] = (1.0 + (res < 0.0 ? -res_tol : res_tol)) / lam;
+      }
+      T g3 = (1.0 - sqrt3 * hg[i] * mu_zm[i]) / 2.0;
+      T g4 = 1.0 - g3;
       T denom = (lam * lam) - 1.0 / (mu_zm[i] * mu_zm[i]);
-      if (denom == 0.0) denom = 1.0e-10;
       Ap[i] = F0_in * w0[i] * (g3 * (g1 - 1.0 / mu_zm[i]) + g2 * g4) / denom;
       Am[i] = F0_in * w0[i] * (g4 * (g1 + 1.0 / mu_zm[i]) + g2 * g3) / denom;
       Cpm1[i] = Ap[i] * exp(-tau[i] / mu_zm[i]);
