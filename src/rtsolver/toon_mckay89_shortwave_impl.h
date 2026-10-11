@@ -17,10 +17,9 @@
 #define W_IN(i) prop[(nlay - (i) - 1) * len1 + 1]
 #define G_IN(i) prop[(nlay - (i) - 1) * len1 + 2]
 // 4 channels per level: [0]=level up, [1]=level down,
-// [2]=layer-midpoint up, [3]=layer-midpoint down. Shortwave is smooth and (in
-// the RCE solve) frozen, so it is not the source of the period-2 null mode;
-// the midpoint channels are set equal to the level channels (good to O(dtau))
-// at the end of this routine. Level channels [0,1] are unchanged.
+// [2]=layer-midpoint up, [3]=layer-midpoint down. The midpoint channels are
+// the layer solution at half its optical depth, filled at the end of this
+// routine. Level channels [0,1] are unchanged.
 #define FLX_UP(i) flx[4 * (nlev - (i) - 1)]
 #define FLX_DN(i) flx[4 * (nlev - (i) - 1) + 1]
 #define MU_IN(i) mu_in[nlev - (i) - 1]
@@ -244,8 +243,9 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
     }*/
   }
 
-  // Midpoint channels [2]=mid up, [3]=mid down. Start from the level value: the
-  // diffuse up/down are smooth (O(dtau) accurate at the midpoint).
+  // Midpoint channels [2]=mid up, [3]=mid down. Start from the level value;
+  // the loop below replaces every layer's midpoint (the bottom level, which
+  // tops no layer, keeps it).
   for (int j = 0; j < nlev; j++) {
     flx[4 * j + 2] = flx[4 * j];
     flx[4 * j + 3] = flx[4 * j + 1];
@@ -258,8 +258,8 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
   // FLX_DN_MID(k) makes the SW layer-midpoint net flux match PICASO's
   // flux_net_v_layer to leading order. Without it the combined LW+SW midpoint
   // residual is INCONSISTENT (true LW midpoint + level-approx SW) and the RCE
-  // Newton drifts off irradiated (inversion) fixed points. UP is unaffected
-  // (the beam is downward only). all_zero_w case: FLX_DN itself IS the beam.
+  // Newton drifts off irradiated (inversion) fixed points. all_zero_w case:
+  // FLX_DN itself IS the beam and there is no diffuse flux.
   // FLX_DN_MID(k)=flx[4*(nlev-k-1)+3].
   for (int k = 0; k < nlay; k++) {
     T dir_k, dir_kp1;
@@ -271,7 +271,25 @@ DISPATCH_MACRO void toon_mckay89_shortwave(int nlay, T F0_in, T const* mu_in,
       dir_kp1 = dir[k + 1];
     }
     T dir_mid = sqrt(fmax(dir_k * dir_kp1, (T)0.0));
-    flx[4 * (nlev - k - 1) + 3] = flx[4 * (nlev - k - 1) + 1] - dir_k + dir_mid;
+    if (all_zero_w) {
+      flx[4 * (nlev - k - 1) + 3] =
+          flx[4 * (nlev - k - 1) + 1] - dir_k + dir_mid;
+      continue;
+    }
+    // Diffuse fluxes at the midpoint from the layer's own solution at
+    // t = dtau / 2 (t measured down from the layer top), the same expressions
+    // that give FLX_UP / FLX_DN at t = 0 and t = dtau. Keeping the top-of-layer
+    // diffuse values while moving the beam to the midpoint is not O(dtau) in
+    // an optically thick layer: under a thick cloud the beam is gone by the
+    // midpoint but the cloud-top reflection is still counted, and the net
+    // flux comes out upward.
+    T Epm = sqrt(Ep[k]);
+    T Emm = 1.0 / Epm;
+    T Cmid = exp(-(tau[k] + 0.5 * dtau[k]) / mu_zm[k]);
+    flx[4 * (nlev - k - 1) + 2] =
+        xk1[k] * Epm + gam[k] * xk2[k] * Emm + Ap[k] * Cmid;
+    flx[4 * (nlev - k - 1) + 3] =
+        gam[k] * xk1[k] * Epm + xk2[k] * Emm + Am[k] * Cmid + dir_mid;
   }
 }
 
