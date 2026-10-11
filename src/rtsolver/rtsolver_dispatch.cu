@@ -26,15 +26,17 @@ void call_toon89_sw_cuda(at::TensorIterator& iter,
     int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
     int mem_size = toon89_sw_space<scalar_t>(nlay);
 
-    native::gpu_chunk_kernel<8, 5>(
-        iter, mem_size, [=] GPU_LAMBDA(
-          char* const data[5], unsigned int strides[5], char *work) {
+    native::gpu_chunk_kernel_interleaved<5>(
+        iter, mem_size, sizeof(scalar_t), [=] GPU_LAMBDA(
+          char* const data[5], unsigned int strides[5], char *work,
+          int wstride) {
           auto out = reinterpret_cast<scalar_t*>(data[0] + strides[0]);
           auto prop = reinterpret_cast<scalar_t*>(data[1] + strides[1]);
           auto umu0 = reinterpret_cast<scalar_t*>(data[2] + strides[2]);
           auto fbeam = reinterpret_cast<scalar_t*>(data[3] + strides[3]);
           auto albedo = reinterpret_cast<scalar_t*>(data[4] + strides[4]);
-          toon_mckay89_shortwave(nlay, *fbeam, umu0, prop, *albedo, out, len1, work);
+          toon_mckay89_shortwave(nlay, *fbeam, umu0, prop, *albedo, out, len1,
+                                 work, wstride);
         });
   });
 }
@@ -52,16 +54,18 @@ void call_toon89_lw_cuda(at::TensorIterator& iter,
     int len1 = at::native::ensure_nonempty_size(iter.input(0), -1);
     int mem_size = toon89_lw_space<scalar_t>(nlay);
 
-    native::gpu_chunk_kernel<8, 4>(
-        iter, mem_size, [=] GPU_LAMBDA(
-          char* const data[4], unsigned int strides[4], char *work) {
+    native::gpu_chunk_kernel_interleaved<4>(
+        iter, mem_size, sizeof(scalar_t), [=] GPU_LAMBDA(
+          char* const data[4], unsigned int strides[4], char *work,
+          int wstride) {
           auto out = reinterpret_cast<scalar_t*>(data[0] + strides[0]);
           auto prop = reinterpret_cast<scalar_t*>(data[1] + strides[1]);
           auto be = reinterpret_cast<scalar_t*>(data[2] + strides[2]);
           auto albedo = reinterpret_cast<scalar_t*>(data[3] + strides[3]);
           toon_mckay89_longwave(nlay, be, prop, *albedo, top_emission_flag,
                                 static_cast<scalar_t>(btop_factor),
-                                hard_surface, delta_eddington_lw, out, len1, work);
+                                hard_surface, delta_eddington_lw, out, len1,
+                                work, wstride);
         });
   });
 }

@@ -251,14 +251,19 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
 }
 
 template <typename T>
-DISPATCH_MACRO WaterLiquidMieProperties<T> water_liquid_mie_properties(
-    T molar_conc, T wavelength, T radius_um, T density, T ref_real, T ref_imag,
-    T molecular_weight, Complex<T>* work, int max_order) {
-  if (molar_conc == static_cast<T>(0)) return {0, 0, 0};
+DISPATCH_MACRO T mie_size_parameter(T radius_um, T wavelength) {
   T const pi = static_cast<T>(3.141592653589793238462643383279502884);
-  T const x = static_cast<T>(2) * pi * radius_um / wavelength;
-  auto const mie =
-      mie_efficiency_device(ref_real, ref_imag, x, work, max_order);
+  return static_cast<T>(2) * pi * radius_um / wavelength;
+}
+
+// Optical properties of one cell from the Mie efficiencies of its droplet
+// radius at this wavelength. The efficiencies do not depend on the cell, so
+// they can be computed once per (wavelength, radius) and shared.
+template <typename T>
+DISPATCH_MACRO WaterLiquidMieProperties<T> water_liquid_mie_properties_from(
+    T molar_conc, T radius_um, T density, T molecular_weight,
+    MieEfficiencyDevice<T> const& mie) {
+  if (molar_conc == static_cast<T>(0)) return {0, 0, 0};
   if (mie.status != 0) {
     T const nan = static_cast<T>(NAN);
     return {nan, nan, nan};
@@ -279,6 +284,18 @@ DISPATCH_MACRO WaterLiquidMieProperties<T> water_liquid_mie_properties(
                         static_cast<T>(1))
           : static_cast<T>(0);
   return {extinction, single_scattering_albedo, mie.g};
+}
+
+template <typename T>
+DISPATCH_MACRO WaterLiquidMieProperties<T> water_liquid_mie_properties(
+    T molar_conc, T wavelength, T radius_um, T density, T ref_real, T ref_imag,
+    T molecular_weight, Complex<T>* work, int max_order) {
+  if (molar_conc == static_cast<T>(0)) return {0, 0, 0};
+  auto const mie = mie_efficiency_device(
+      ref_real, ref_imag, mie_size_parameter(radius_um, wavelength), work,
+      max_order);
+  return water_liquid_mie_properties_from(molar_conc, radius_um, density,
+                                          molecular_weight, mie);
 }
 
 }  // namespace harp

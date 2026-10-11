@@ -56,7 +56,8 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
                                           T a_surf_in, int top_emission_flag,
                                           T btop_factor, bool hard_surface,
                                           bool delta_eddington_lw, T* flx,
-                                          int len1, char* work) {
+                                          int len1, char* work,
+                                          int wstride = 1) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
   int lm2 = l - 2;
@@ -73,49 +74,49 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
                      0.0967815902};
 
   // --- Work Variables Allocation ---
-  T* dtau = alloc_from<T>(work, nlay);
-  T* tau = alloc_from<T>(work, nlev);
-  T* w0 = alloc_from<T>(work, nlay);
-  T* hg = alloc_from<T>(work, nlay);
-  T* B0 = alloc_from<T>(work, nlay);
-  T* B1 = alloc_from<T>(work, nlay);
-  T* lam = alloc_from<T>(work, nlay);
-  T* gam = alloc_from<T>(work, nlay);
-  T* alp = alloc_from<T>(work, nlay);
-  T* term = alloc_from<T>(work, nlay);
+  auto dtau = alloc_strided<T>(work, nlay, wstride);
+  auto tau = alloc_strided<T>(work, nlev, wstride);
+  auto w0 = alloc_strided<T>(work, nlay, wstride);
+  auto hg = alloc_strided<T>(work, nlay, wstride);
+  auto B0 = alloc_strided<T>(work, nlay, wstride);
+  auto B1 = alloc_strided<T>(work, nlay, wstride);
+  auto lam = alloc_strided<T>(work, nlay, wstride);
+  auto gam = alloc_strided<T>(work, nlay, wstride);
+  auto alp = alloc_strided<T>(work, nlay, wstride);
+  auto term = alloc_strided<T>(work, nlay, wstride);
 
-  T* Cpm1 = alloc_from<T>(work, nlay);
-  T* Cmm1 = alloc_from<T>(work, nlay);
-  T* Cp = alloc_from<T>(work, nlay);
-  T* Cm = alloc_from<T>(work, nlay);
+  auto Cpm1 = alloc_strided<T>(work, nlay, wstride);
+  auto Cmm1 = alloc_strided<T>(work, nlay, wstride);
+  auto Cp = alloc_strided<T>(work, nlay, wstride);
+  auto Cm = alloc_strided<T>(work, nlay, wstride);
 
-  T* Ep = alloc_from<T>(work, nlay);
-  T* Em = alloc_from<T>(work, nlay);
-  T* E1 = alloc_from<T>(work, nlay);
-  T* E2 = alloc_from<T>(work, nlay);
-  T* E3 = alloc_from<T>(work, nlay);
-  T* E4 = alloc_from<T>(work, nlay);
+  auto Ep = alloc_strided<T>(work, nlay, wstride);
+  auto Em = alloc_strided<T>(work, nlay, wstride);
+  auto E1 = alloc_strided<T>(work, nlay, wstride);
+  auto E2 = alloc_strided<T>(work, nlay, wstride);
+  auto E3 = alloc_strided<T>(work, nlay, wstride);
+  auto E4 = alloc_strided<T>(work, nlay, wstride);
 
-  T* Af = alloc_from<T>(work, l);
-  T* Bf = alloc_from<T>(work, l);
-  T* Cf = alloc_from<T>(work, l);
-  T* Df = alloc_from<T>(work, l);
-  T* xkk = alloc_from<T>(work, l);
-  T* xk1 = alloc_from<T>(work, nlay);
-  T* xk2 = alloc_from<T>(work, nlay);
+  auto Af = alloc_strided<T>(work, l, wstride);
+  auto Bf = alloc_strided<T>(work, l, wstride);
+  auto Cf = alloc_strided<T>(work, l, wstride);
+  auto Df = alloc_strided<T>(work, l, wstride);
+  auto xkk = alloc_strided<T>(work, l, wstride);
+  auto xk1 = alloc_strided<T>(work, nlay, wstride);
+  auto xk2 = alloc_strided<T>(work, nlay, wstride);
 
-  T* g = alloc_from<T>(work, nlay);
-  T* h = alloc_from<T>(work, nlay);
-  T* xj = alloc_from<T>(work, nlay);
-  T* xk = alloc_from<T>(work, nlay);
-  T* alpha1 = alloc_from<T>(work, nlay);
-  T* alpha2 = alloc_from<T>(work, nlay);
-  T* sigma1 = alloc_from<T>(work, nlay);
-  T* sigma2 = alloc_from<T>(work, nlay);
+  auto g = alloc_strided<T>(work, nlay, wstride);
+  auto h = alloc_strided<T>(work, nlay, wstride);
+  auto xj = alloc_strided<T>(work, nlay, wstride);
+  auto xk = alloc_strided<T>(work, nlay, wstride);
+  auto alpha1 = alloc_strided<T>(work, nlay, wstride);
+  auto alpha2 = alloc_strided<T>(work, nlay, wstride);
+  auto sigma1 = alloc_strided<T>(work, nlay, wstride);
+  auto sigma2 = alloc_strided<T>(work, nlay, wstride);
 
-  T* em1 = alloc_from<T>(work, nlay);
-  T* lw_up_g = alloc_from<T>(work, nlev);
-  T* lw_down_g = alloc_from<T>(work, nlev);
+  auto em1 = alloc_strided<T>(work, nlay, wstride);
+  auto lw_up_g = alloc_strided<T>(work, nlev, wstride);
+  auto lw_down_g = alloc_strided<T>(work, nlev, wstride);
 
   // Delta-Eddington scaling for longwave: configurable.
   // When enabled (delta_eddington_lw=true), rescale w0, dtau, g as in FMS.

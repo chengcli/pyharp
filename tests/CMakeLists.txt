@@ -17,6 +17,7 @@ setup_test(test_water_cloud_temperature)
 #setup_test(test_yaml_input)
 setup_test(test_tridiag)
 setup_test(test_toon)
+setup_test(test_scattering_functions)
 
 # Python tests
 
