@@ -194,6 +194,63 @@ TEST_P(DeviceTest, shortwave_surface_albedo_reflection) {
   }
 }
 
+// The midpoint channels must be the flux at half the layer's optical depth.
+// Splitting every layer into two identical halves puts a level exactly at each
+// original midpoint and leaves the two-stream solution unchanged, so the
+// midpoint channels of the original column must match those levels. The column
+// carries an optically thick, strongly scattering layer: there the beam is gone
+// by the midpoint while the cloud-top reflection is not, and top-of-layer
+// diffuse fluxes with a midpoint beam gave a net upward shortwave flux.
+TEST_P(DeviceTest, shortwave_midpoint_matches_split_layers) {
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({200., 500.});
+  op->wave_upper({500., 1000.});
+
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  int nwave = 2, ncol = 2, nlyr = 8, cloud = 5;  // layer index 0 is the bottom
+  auto prop =
+      torch::zeros({nwave, ncol, nlyr, 3}, torch::device(device).dtype(dtype));
+  prop.select(-1, 0).fill_(0.05);
+  prop.select(-1, 1).fill_(0.3);
+  prop.select(-1, 2).fill_(0.2);
+  prop.select(2, cloud).select(-1, 0).fill_(40.0);
+  prop.select(2, cloud).select(-1, 1).fill_(0.999);
+  prop.select(2, cloud).select(-1, 2).fill_(0.85);
+
+  auto split = prop.repeat_interleave(2, /*dim=*/2).clone();
+  split.select(-1, 0).mul_(0.5);
+
+  std::map<std::string, torch::Tensor> bc;
+  bc["fbeam"] = torch::full({nwave, ncol}, 1000.0, prop.options());
+  bc["umu0"] = torch::tensor({1.0, 0.4}, prop.options());
+  bc["albedo"] = torch::full({nwave, ncol}, 0.1, prop.options());
+  auto bc_split = bc;
+
+  auto flx = toon(prop, &bc);               // (nwave, ncol, nlyr + 1, 4)
+  auto flx_split = toon(split, &bc_split);  // (nwave, ncol, 2 nlyr + 1, 4)
+
+  // Output level j (bottom first) holds the midpoint of the layer below it,
+  // which is level 2 j - 1 of the split column.
+  auto j = torch::arange(1, nlyr + 1, torch::kLong).to(flx.device());
+  auto mid = flx.index_select(2, j).narrow(-1, 2, 2);
+  auto ref = flx_split.index_select(2, 2 * j - 1).narrow(-1, 0, 2);
+
+  double tol = (dtype == torch::kFloat64 ? 1e-9 : 2e-3) * 1000.0;
+  double err = (mid - ref).abs().max().item<double>();
+  EXPECT_LT(err, tol) << "midpoint vs split-layer level, max |diff| = " << err;
+
+  // and the net flux at the cloud's midpoint lies between its two levels
+  auto net = flx.select(-1, 0) - flx.select(-1, 1);
+  auto net_mid = flx.select(-1, 2) - flx.select(-1, 3);
+  auto lo = torch::minimum(net.select(2, cloud), net.select(2, cloud + 1));
+  auto hi = torch::maximum(net.select(2, cloud), net.select(2, cloud + 1));
+  auto m = net_mid.select(2, cloud + 1);
+  EXPECT_TRUE(torch::all(m >= lo - tol).item<bool>());
+  EXPECT_TRUE(torch::all(m <= hi + tol).item<bool>());
+}
+
 // A hard surface of longwave albedo 1 is a mirror: over an isothermal,
 // non-scattering column it reflects all the downwelling, so the net flux at the
 // surface (output level 0) is zero. A surface that only emits (1 - albedo) B
