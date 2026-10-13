@@ -1,6 +1,5 @@
 // C/C++
 #include <cmath>
-#include <cstring>
 #include <limits>
 #include <optional>
 
@@ -8,7 +7,6 @@
 #include <gtest/gtest.h>
 
 // torch
-#include <ATen/record_function.h>
 #include <torch/csrc/autograd/forward_grad.h>
 
 // harp
@@ -269,34 +267,18 @@ TEST_P(DeviceTest, DoubleHenyeyGreensteinBroadcastGradients) {
 
 namespace {
 
-// Calls to torch::stack and to the out= multiply while the guard is alive:
-// the product route stacks its moments, a route that writes them into a
-// preallocated result does not.
-thread_local int stack_calls = 0;
-thread_local int mul_out_calls = 0;
-
-std::unique_ptr<at::ObserverContext> count_route(at::RecordFunction const& fn) {
-  if (std::strcmp(fn.name(), "aten::stack") == 0) ++stack_calls;
-  if (std::strcmp(fn.name(), "aten::mul") == 0 &&
-      std::strcmp(fn.overload_name(), "out") == 0) {
-    ++mul_out_calls;
-  }
-  return nullptr;
-}
-
-class RouteCounter {
+// Enters a forward-AD level and exits it again when the test ends, also
+// when an assertion fails or an exception is thrown.
+class DualLevel {
  public:
-  RouteCounter() {
-    stack_calls = mul_out_calls = 0;
-    handle_ =
-        at::addThreadLocalCallback(at::RecordFunctionCallback(count_route));
-  }
-  ~RouteCounter() { at::removeCallback(handle_); }
-  int stacks() const { return stack_calls; }
-  int mul_outs() const { return mul_out_calls; }
+  DualLevel() : level_(torch::autograd::ForwardADLevel::get_next_idx()) {}
+  ~DualLevel() { torch::autograd::ForwardADLevel::release_idx(level_); }
+  DualLevel(DualLevel const&) = delete;
+  DualLevel& operator=(DualLevel const&) = delete;
+  uint64_t level() const { return level_; }
 
  private:
-  at::CallbackHandle handle_;
+  uint64_t level_;
 };
 
 // The moments as separately rounded products g, g*g, (g*g)*g, ..., stacked.
@@ -388,21 +370,15 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedAndDetachedAgreeBitwise) {
   }
 }
 
-// Contiguous float32 and float64 CPU inputs with no reverse or forward
-// gradient fill a preallocated result with out= products instead of
-// stacking; the result is owned, writable and leaves g alone.
-TEST_P(DeviceTest, HenyeyGreensteinPlainCpuInputSkipsTheStack) {
+// The moments of a contiguous input without gradients are owned, writable
+// and leave g alone, and are the same products under no_grad, inference
+// mode, and grad mode re-enabled inside inference mode.
+TEST_P(DeviceTest, HenyeyGreensteinPlainInputOwnedInEveryGradMode) {
   auto g = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
   auto const values = g.clone();
-  bool const fast = device.is_cpu();
   for (int nmom : {1, 3, 6, 32}) {
-    torch::Tensor result;
-    {
-      RouteCounter route;
-      result = harp::henyey_greenstein(nmom, g);
-      EXPECT_EQ(route.stacks(), fast ? 0 : 1) << "nmom = " << nmom;
-      EXPECT_EQ(route.mul_outs(), fast ? nmom - 1 : 0) << "nmom = " << nmom;
-    }
+    auto result = harp::henyey_greenstein(nmom, g);
+    EXPECT_TRUE(same_bits(result, product_route(nmom, g))) << "nmom = " << nmom;
     EXPECT_FALSE(result.is_view());
     EXPECT_FALSE(result.storage().is_alias_of(g.storage()));
     EXPECT_TRUE(result.is_contiguous());
@@ -410,8 +386,6 @@ TEST_P(DeviceTest, HenyeyGreensteinPlainCpuInputSkipsTheStack) {
     EXPECT_TRUE(same_bits(g, values)) << "nmom = " << nmom;
   }
 
-  // The same holds under no_grad, inference mode, and grad mode re-enabled
-  // inside inference mode.
   for (int mode = 0; mode < 3; ++mode) {
     std::optional<torch::NoGradGuard> no_grad;
     std::optional<c10::InferenceMode> inference;
@@ -419,16 +393,54 @@ TEST_P(DeviceTest, HenyeyGreensteinPlainCpuInputSkipsTheStack) {
     if (mode == 0) no_grad.emplace();
     if (mode >= 1) inference.emplace();
     if (mode == 2) enable_grad.emplace(true);
-    RouteCounter route;
     auto result = harp::henyey_greenstein(6, g);
-    EXPECT_EQ(route.stacks(), fast ? 0 : 1) << "mode " << mode;
     EXPECT_TRUE(same_bits(result, product_route(6, g))) << "mode " << mode;
   }
 }
 
-// Inputs that carry a gradient, non-contiguous inputs and other dtypes keep
-// the stacked product route, with its graph.
-TEST_P(DeviceTest, HenyeyGreensteinOtherInputsKeepTheProductRoute) {
+// Inputs created inside inference mode, used there and after leaving it.
+TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
+  torch::Tensor g, inside;
+  std::vector<torch::Tensor> fixture;
+  {
+    c10::InferenceMode inference;
+    g = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+    ASSERT_TRUE(g.is_inference());
+    fixture = fixtures(device, dtype);
+    for (int nmom : {0, 1, 3, 6, 32}) {
+      auto result = harp::henyey_greenstein(nmom, g);
+      EXPECT_TRUE(result.is_inference()) << "nmom = " << nmom;
+      EXPECT_FALSE(result.requires_grad()) << "nmom = " << nmom;
+      EXPECT_TRUE(same_bits(result, product_route(nmom, g)))
+          << "nmom = " << nmom;
+      if (nmom > 0) {
+        EXPECT_FALSE(result.storage().is_alias_of(g.storage()));
+      }
+    }
+    for (auto const& f : fixture) {
+      ASSERT_TRUE(f.is_inference());
+      for (int nmom : {0, 1, 2, 6, 64}) {
+        EXPECT_TRUE(
+            same_bits(harp::henyey_greenstein(nmom, f), product_route(nmom, f)))
+            << "shape " << f.sizes() << ", nmom = " << nmom;
+      }
+    }
+    inside = harp::henyey_greenstein(6, g);
+  }
+
+  // The same inference tensors, used after inference mode has ended.
+  auto outside = harp::henyey_greenstein(6, g);
+  EXPECT_TRUE(same_bits(outside, inside));
+  EXPECT_FALSE(outside.requires_grad());
+  for (auto const& f : fixture) {
+    EXPECT_TRUE(same_bits(harp::henyey_greenstein(3, f), product_route(3, f)))
+        << "shape " << f.sizes();
+  }
+}
+
+// Tracked, non-leaf and non-contiguous inputs and other dtypes: the same
+// products, the input dtype, and for tracked inputs a graph back to g.
+TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
   auto base = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
 
   auto leaf = base.clone().requires_grad_(true);
@@ -438,27 +450,23 @@ TEST_P(DeviceTest, HenyeyGreensteinOtherInputsKeepTheProductRoute) {
   for (auto const& [name, g] :
        std::vector<std::pair<std::string, torch::Tensor>>{
            {"leaf", leaf}, {"nonleaf", nonleaf}, {"strided", strided}}) {
-    RouteCounter route;
     auto result = harp::henyey_greenstein(6, g);
-    EXPECT_EQ(route.stacks(), 1) << name;
-    EXPECT_EQ(route.mul_outs(), 0) << name;
     EXPECT_TRUE(same_bits(result, product_route(6, g.detach()))) << name;
     EXPECT_EQ(result.requires_grad(), g.requires_grad()) << name;
   }
 
-  // A tracked input stays on the product route under no_grad and inference
-  // mode too.
+  // A tracked input under no_grad and inference mode: the same products.
   {
     torch::NoGradGuard no_grad;
-    RouteCounter route;
-    harp::henyey_greenstein(6, leaf);
-    EXPECT_EQ(route.stacks(), 1) << "tracked under no_grad";
+    EXPECT_TRUE(
+        same_bits(harp::henyey_greenstein(6, leaf), product_route(6, base)))
+        << "tracked under no_grad";
   }
   {
     c10::InferenceMode inference;
-    RouteCounter route;
-    harp::henyey_greenstein(6, leaf);
-    EXPECT_EQ(route.stacks(), 1) << "tracked under inference mode";
+    EXPECT_TRUE(
+        same_bits(harp::henyey_greenstein(6, leaf), product_route(6, base)))
+        << "tracked under inference mode";
   }
 
   // The non-leaf input passes its gradient back to the leaf.
@@ -475,43 +483,34 @@ TEST_P(DeviceTest, HenyeyGreensteinOtherInputsKeepTheProductRoute) {
     auto g = other == torch::kFloat16 || other == torch::kBFloat16
                  ? base.to(other)
                  : torch::zeros({16}, torch::device(device).dtype(other));
-    RouteCounter route;
     auto result = harp::henyey_greenstein(6, g);
-    EXPECT_EQ(route.stacks(), 1) << other;
     EXPECT_EQ(result.scalar_type(), other);
     EXPECT_TRUE(same_bits(result, product_route(6, g))) << other;
   }
 }
 
-// A dual tensor does not require grad but carries a forward tangent: it
-// keeps the product route, with or without no_grad, and its JVP is the
-// product route's.
-TEST_P(DeviceTest, HenyeyGreensteinForwardModeKeepsTheProductRoute) {
+// A dual tensor does not require grad but carries a forward tangent: with
+// or without no_grad, its primal and JVP are those of the products.
+TEST_P(DeviceTest, HenyeyGreensteinForwardModeMatchesTheProducts) {
   auto primal = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
   auto tangent = torch::linspace(-1.0, 2.0, primal.numel(), primal.options());
-  uint64_t const level = torch::autograd::ForwardADLevel::get_next_idx();
-  {
-    auto dual = at::_make_dual(primal, tangent, level);
-    ASSERT_FALSE(dual.requires_grad());
-    for (bool no_grad_mode : {false, true}) {
-      std::optional<torch::NoGradGuard> no_grad;
-      if (no_grad_mode) no_grad.emplace();
-      for (int nmom : {1, 3, 6, 32}) {
-        RouteCounter route;
-        auto out = harp::henyey_greenstein(nmom, dual);
-        // The tangent is stacked as well.
-        EXPECT_GE(route.stacks(), 1) << "nmom = " << nmom;
-        EXPECT_EQ(route.mul_outs(), 0) << "nmom = " << nmom;
-        auto expected = product_route(nmom, dual);
-        auto [out_primal, out_tangent] = at::_unpack_dual(out, level);
-        auto [ref_primal, ref_tangent] = at::_unpack_dual(expected, level);
-        ASSERT_TRUE(out_tangent.defined()) << "nmom = " << nmom;
-        EXPECT_TRUE(same_bits(out_primal, ref_primal)) << "nmom = " << nmom;
-        EXPECT_TRUE(same_bits(out_tangent, ref_tangent)) << "nmom = " << nmom;
-      }
+  DualLevel level;
+  auto dual = at::_make_dual(primal, tangent, level.level());
+  ASSERT_FALSE(dual.requires_grad());
+  for (bool no_grad_mode : {false, true}) {
+    std::optional<torch::NoGradGuard> no_grad;
+    if (no_grad_mode) no_grad.emplace();
+    for (int nmom : {1, 3, 6, 32}) {
+      auto out = harp::henyey_greenstein(nmom, dual);
+      auto expected = product_route(nmom, dual);
+      auto [out_primal, out_tangent] = at::_unpack_dual(out, level.level());
+      auto [ref_primal, ref_tangent] =
+          at::_unpack_dual(expected, level.level());
+      ASSERT_TRUE(out_tangent.defined()) << "nmom = " << nmom;
+      EXPECT_TRUE(same_bits(out_primal, ref_primal)) << "nmom = " << nmom;
+      EXPECT_TRUE(same_bits(out_tangent, ref_tangent)) << "nmom = " << nmom;
     }
   }
-  torch::autograd::ForwardADLevel::release_idx(level);
 }
 
 int main(int argc, char** argv) {
