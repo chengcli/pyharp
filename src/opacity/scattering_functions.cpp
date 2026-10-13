@@ -8,14 +8,8 @@ torch::Tensor henyey_greenstein(int nmom, torch::Tensor const& g) {
               "henyey_greenstein::bad input variable g");
   TORCH_CHECK(nmom >= 0, "henyey_greenstein::nmom must be nonnegative");
 
-  // Moment k is g^k. Build them by repeated multiplication rather than
-  // torch::cumprod: a scan over a trailing dimension of a few elements runs
-  // orders of magnitude slower on CUDA than the same number of elementwise
-  // products.
   if (nmom == 0) {
-    auto vec = g.sizes().vec();
-    vec.push_back(0);
-    return torch::empty(vec, g.options());
+    return g.unsqueeze(-1).narrow(-1, 0, 0).clone();
   }
 
   std::vector<torch::Tensor> moments;
