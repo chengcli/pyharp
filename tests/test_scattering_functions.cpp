@@ -1,9 +1,15 @@
 // C/C++
 #include <cmath>
+#include <cstring>
 #include <limits>
+#include <optional>
 
 // external
 #include <gtest/gtest.h>
+
+// torch
+#include <ATen/record_function.h>
+#include <torch/csrc/autograd/forward_grad.h>
 
 // harp
 #include <harp/opacity/scattering_functions.hpp>
@@ -259,6 +265,253 @@ TEST_P(DeviceTest, DoubleHenyeyGreensteinBroadcastGradients) {
     EXPECT_TRUE(
         torch::allclose(grads[2], expected_g2, rtol(dtype), atol(dtype)));
   }
+}
+
+namespace {
+
+// Calls to torch::stack and to the out= multiply while the guard is alive:
+// the product route stacks its moments, a route that writes them into a
+// preallocated result does not.
+thread_local int stack_calls = 0;
+thread_local int mul_out_calls = 0;
+
+std::unique_ptr<at::ObserverContext> count_route(at::RecordFunction const& fn) {
+  if (std::strcmp(fn.name(), "aten::stack") == 0) ++stack_calls;
+  if (std::strcmp(fn.name(), "aten::mul") == 0 &&
+      std::strcmp(fn.overload_name(), "out") == 0) {
+    ++mul_out_calls;
+  }
+  return nullptr;
+}
+
+class RouteCounter {
+ public:
+  RouteCounter() {
+    stack_calls = mul_out_calls = 0;
+    handle_ =
+        at::addThreadLocalCallback(at::RecordFunctionCallback(count_route));
+  }
+  ~RouteCounter() { at::removeCallback(handle_); }
+  int stacks() const { return stack_calls; }
+  int mul_outs() const { return mul_out_calls; }
+
+ private:
+  at::CallbackHandle handle_;
+};
+
+// The moments as separately rounded products g, g*g, (g*g)*g, ..., stacked.
+torch::Tensor product_route(int nmom, torch::Tensor const& g) {
+  if (nmom == 0) return g.unsqueeze(-1).narrow(-1, 0, 0).clone();
+  std::vector<torch::Tensor> moments = {g};
+  for (int k = 1; k < nmom; ++k) moments.push_back(moments.back() * g);
+  return torch::stack(moments, -1);
+}
+
+// Bitwise comparison, so that -0 differs from +0.
+bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
+  if (a.sizes() != b.sizes() || a.scalar_type() != b.scalar_type()) {
+    return false;
+  }
+  auto bits = [](torch::Tensor t) {
+    t = t.detach().contiguous().cpu();
+    switch (t.scalar_type()) {
+      case torch::kFloat64:
+        return t.view(torch::kInt64);
+      case torch::kFloat32:
+        return t.view(torch::kInt32);
+      case torch::kFloat16:
+      case torch::kBFloat16:
+        return t.view(torch::kInt16);
+      default:
+        return t;
+    }
+  };
+  return torch::equal(bits(a), bits(b));
+}
+
+// The 8192 values of the audit HG fixture, linspace(-0.8, 0.8) in float64.
+std::vector<double> audit_g() {
+  std::vector<double> out(8192);
+  double const step = 1.6 / 8191;
+  for (int i = 0; i < 8192; ++i) out[i] = i * step - 0.8;
+  out.back() = 0.8;
+  return out;
+}
+
+// Signed zeros, subnormals, the smallest normal and the values next to +-1
+// in the given floating dtype.
+std::vector<double> special_g(torch::Dtype dtype) {
+  bool const f32 = dtype == torch::kFloat32;
+  double const tiny = f32 ? double(std::numeric_limits<float>::denorm_min())
+                          : std::numeric_limits<double>::denorm_min();
+  double const normal = f32 ? double(std::numeric_limits<float>::min())
+                            : std::numeric_limits<double>::min();
+  double const below_one =
+      f32 ? double(std::nextafterf(1.0f, 0.0f)) : std::nextafter(1.0, 0.0);
+  return {0.0,       -0.0,       tiny, -tiny, 3 * tiny, normal, -normal,
+          below_one, -below_one, 0.5,  -0.5,  0.3,      -0.7};
+}
+
+std::vector<torch::Tensor> fixtures(torch::Device device, torch::Dtype dtype) {
+  auto opt = torch::TensorOptions().device(device).dtype(dtype);
+  auto f64 = torch::kFloat64;
+  torch::manual_seed(169);
+  return {
+      torch::tensor(audit_g(), f64).to(opt),
+      torch::tensor(special_g(dtype), f64).to(opt),
+      (1.98 * torch::rand({37, 11, 5}, torch::kFloat64) - 0.99).to(opt),
+      torch::tensor(0.3, f64).to(opt),
+      torch::tensor(-0.0, f64).to(opt),
+      torch::zeros({0}, opt),
+      torch::zeros({2, 0}, opt),
+  };
+}
+
+}  // namespace
+
+// Every moment is the same sequence of rounded products whether g is
+// tracked or not: detached and tracked calls agree bit for bit with each
+// other and with g, g*g, (g*g)*g, ... stacked.
+TEST_P(DeviceTest, HenyeyGreensteinTrackedAndDetachedAgreeBitwise) {
+  for (auto const& g : fixtures(device, dtype)) {
+    for (int nmom : {0, 1, 2, 3, 6, 32, 64}) {
+      auto expected = product_route(nmom, g);
+      auto detached = harp::henyey_greenstein(nmom, g);
+      auto tracked =
+          harp::henyey_greenstein(nmom, g.clone().requires_grad_(true));
+      EXPECT_EQ(detached.device(), g.device());
+      EXPECT_TRUE(same_bits(detached, expected))
+          << "detached, shape " << g.sizes() << ", nmom = " << nmom;
+      EXPECT_TRUE(same_bits(tracked, expected))
+          << "tracked, shape " << g.sizes() << ", nmom = " << nmom;
+    }
+  }
+}
+
+// Contiguous float32 and float64 CPU inputs with no reverse or forward
+// gradient fill a preallocated result with out= products instead of
+// stacking; the result is owned, writable and leaves g alone.
+TEST_P(DeviceTest, HenyeyGreensteinPlainCpuInputSkipsTheStack) {
+  auto g = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+  auto const values = g.clone();
+  bool const fast = device.is_cpu();
+  for (int nmom : {1, 3, 6, 32}) {
+    torch::Tensor result;
+    {
+      RouteCounter route;
+      result = harp::henyey_greenstein(nmom, g);
+      EXPECT_EQ(route.stacks(), fast ? 0 : 1) << "nmom = " << nmom;
+      EXPECT_EQ(route.mul_outs(), fast ? nmom - 1 : 0) << "nmom = " << nmom;
+    }
+    EXPECT_FALSE(result.is_view());
+    EXPECT_FALSE(result.storage().is_alias_of(g.storage()));
+    EXPECT_TRUE(result.is_contiguous());
+    result.fill_(0.125);
+    EXPECT_TRUE(same_bits(g, values)) << "nmom = " << nmom;
+  }
+
+  // The same holds under no_grad, inference mode, and grad mode re-enabled
+  // inside inference mode.
+  for (int mode = 0; mode < 3; ++mode) {
+    std::optional<torch::NoGradGuard> no_grad;
+    std::optional<c10::InferenceMode> inference;
+    std::optional<torch::AutoGradMode> enable_grad;
+    if (mode == 0) no_grad.emplace();
+    if (mode >= 1) inference.emplace();
+    if (mode == 2) enable_grad.emplace(true);
+    RouteCounter route;
+    auto result = harp::henyey_greenstein(6, g);
+    EXPECT_EQ(route.stacks(), fast ? 0 : 1) << "mode " << mode;
+    EXPECT_TRUE(same_bits(result, product_route(6, g))) << "mode " << mode;
+  }
+}
+
+// Inputs that carry a gradient, non-contiguous inputs and other dtypes keep
+// the stacked product route, with its graph.
+TEST_P(DeviceTest, HenyeyGreensteinOtherInputsKeepTheProductRoute) {
+  auto base = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+
+  auto leaf = base.clone().requires_grad_(true);
+  auto nonleaf = leaf * 1.0;
+  auto strided = base.view({-1, 2}).select(-1, 0);  // stride 2
+  ASSERT_FALSE(strided.is_contiguous());
+  for (auto const& [name, g] :
+       std::vector<std::pair<std::string, torch::Tensor>>{
+           {"leaf", leaf}, {"nonleaf", nonleaf}, {"strided", strided}}) {
+    RouteCounter route;
+    auto result = harp::henyey_greenstein(6, g);
+    EXPECT_EQ(route.stacks(), 1) << name;
+    EXPECT_EQ(route.mul_outs(), 0) << name;
+    EXPECT_TRUE(same_bits(result, product_route(6, g.detach()))) << name;
+    EXPECT_EQ(result.requires_grad(), g.requires_grad()) << name;
+  }
+
+  // A tracked input stays on the product route under no_grad and inference
+  // mode too.
+  {
+    torch::NoGradGuard no_grad;
+    RouteCounter route;
+    harp::henyey_greenstein(6, leaf);
+    EXPECT_EQ(route.stacks(), 1) << "tracked under no_grad";
+  }
+  {
+    c10::InferenceMode inference;
+    RouteCounter route;
+    harp::henyey_greenstein(6, leaf);
+    EXPECT_EQ(route.stacks(), 1) << "tracked under inference mode";
+  }
+
+  // The non-leaf input passes its gradient back to the leaf.
+  auto out = harp::henyey_greenstein(3, nonleaf);
+  auto grad = torch::autograd::grad({out.sum()}, {leaf})[0];
+  auto x = base.to(torch::kFloat64);
+  auto expected = 1.0 + 2.0 * x + 3.0 * x * x;
+  EXPECT_TRUE(torch::allclose(grad.to(torch::kFloat64), expected,
+                              dtype == torch::kFloat64 ? 1e-12 : 1e-5, 1e-6));
+
+  // Reduced precision, integer and bool inputs.
+  for (auto other : {torch::kFloat16, torch::kBFloat16, torch::kInt32,
+                     torch::kInt64, torch::kBool}) {
+    auto g = other == torch::kFloat16 || other == torch::kBFloat16
+                 ? base.to(other)
+                 : torch::zeros({16}, torch::device(device).dtype(other));
+    RouteCounter route;
+    auto result = harp::henyey_greenstein(6, g);
+    EXPECT_EQ(route.stacks(), 1) << other;
+    EXPECT_EQ(result.scalar_type(), other);
+    EXPECT_TRUE(same_bits(result, product_route(6, g))) << other;
+  }
+}
+
+// A dual tensor does not require grad but carries a forward tangent: it
+// keeps the product route, with or without no_grad, and its JVP is the
+// product route's.
+TEST_P(DeviceTest, HenyeyGreensteinForwardModeKeepsTheProductRoute) {
+  auto primal = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+  auto tangent = torch::linspace(-1.0, 2.0, primal.numel(), primal.options());
+  uint64_t const level = torch::autograd::ForwardADLevel::get_next_idx();
+  {
+    auto dual = at::_make_dual(primal, tangent, level);
+    ASSERT_FALSE(dual.requires_grad());
+    for (bool no_grad_mode : {false, true}) {
+      std::optional<torch::NoGradGuard> no_grad;
+      if (no_grad_mode) no_grad.emplace();
+      for (int nmom : {1, 3, 6, 32}) {
+        RouteCounter route;
+        auto out = harp::henyey_greenstein(nmom, dual);
+        // The tangent is stacked as well.
+        EXPECT_GE(route.stacks(), 1) << "nmom = " << nmom;
+        EXPECT_EQ(route.mul_outs(), 0) << "nmom = " << nmom;
+        auto expected = product_route(nmom, dual);
+        auto [out_primal, out_tangent] = at::_unpack_dual(out, level);
+        auto [ref_primal, ref_tangent] = at::_unpack_dual(expected, level);
+        ASSERT_TRUE(out_tangent.defined()) << "nmom = " << nmom;
+        EXPECT_TRUE(same_bits(out_primal, ref_primal)) << "nmom = " << nmom;
+        EXPECT_TRUE(same_bits(out_tangent, ref_tangent)) << "nmom = " << nmom;
+      }
+    }
+  }
+  torch::autograd::ForwardADLevel::release_idx(level);
 }
 
 int main(int argc, char** argv) {
