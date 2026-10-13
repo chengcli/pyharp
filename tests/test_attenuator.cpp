@@ -13,6 +13,7 @@
 
 // harp
 #include <harp/constants.h>
+#include <harp/math/interpolation.hpp>
 
 #include <harp/opacity/molecule_cia.hpp>
 #include <harp/opacity/molecule_line.hpp>
@@ -712,6 +713,200 @@ TEST(TestOpacity, CIAFloat32TemperatureGradientVaryingCUDA) {
   GTEST_SKIP() << "NetCDF support is disabled";
 #else
   expect_cia_float32_temperature_gradient(torch::kCUDA, true);
+#endif
+}
+
+#ifdef NETCDFOUTPUT
+// numpy.linspace and numpy.geomspace in float64, operation for operation, so
+// that the float32 inputs below are the bytes of the original audit fixture.
+std::vector<double> numpy_linspace(double start, double stop, int num) {
+  std::vector<double> out(num);
+  double const step = (stop - start) / (num - 1);
+  for (int i = 0; i < num; ++i) out[i] = i * step + start;
+  out[num - 1] = stop;
+  return out;
+}
+
+std::vector<double> numpy_geomspace(double start, double stop, int num) {
+  auto out = numpy_linspace(std::log10(start), std::log10(stop), num);
+  for (auto& x : out) x = std::pow(10.0, x);
+  out[0] = start;
+  out[num - 1] = stop;
+  return out;
+}
+
+// The H2O-H2O table of the post-#165 audit: 32 wavenumbers, 8 pressures, 9
+// temperature anomalies, base temperature 300 K and
+// sigma = exp(-20 + a_wave + b_pres + c_temp) m^5 mol^-2.
+fs::path write_audit_cia_dataset() {
+  auto path = fs::temp_directory_path() / "pyharp_test_cia_audit.nc";
+  auto wave = numpy_linspace(100.0, 1000.0, 32);
+  auto pres = numpy_geomspace(1.0e4, 1.0e6, 8);
+  auto del_temp = numpy_linspace(-100.0, 100.0, 9);
+  std::vector<double> temp(8, 300.0);
+  auto a = numpy_linspace(0.0, 1.0, 32);
+  auto b = numpy_linspace(0.0, 0.3, 8);
+  auto c = numpy_linspace(-0.2, 0.2, 9);
+  std::vector<double> sigma(32 * 8 * 9);
+  for (int i = 0; i < 32; ++i) {
+    for (int j = 0; j < 8; ++j) {
+      for (int k = 0; k < 9; ++k) {
+        sigma[(i * 8 + j) * 9 + k] = std::exp(-20.0 + a[i] + b[j] + c[k]);
+      }
+    }
+  }
+
+  int fileid = -1;
+  check_nc(nc_create(path.c_str(), NC_CLOBBER, &fileid));
+  int dims[3], var_wave = -1, var_pres = -1, var_del_temp = -1;
+  int var_temp = -1, var_cia = -1;
+  check_nc(nc_def_dim(fileid, "wavenumber", 32, &dims[0]));
+  check_nc(nc_def_var(fileid, "wavenumber", NC_DOUBLE, 1, &dims[0], &var_wave));
+  put_text_attr(fileid, var_wave, "units", "cm^-1");
+  check_nc(nc_def_dim(fileid, "pressure", 8, &dims[1]));
+  check_nc(nc_def_var(fileid, "pressure", NC_DOUBLE, 1, &dims[1], &var_pres));
+  put_text_attr(fileid, var_pres, "units", "Pa");
+  check_nc(nc_def_dim(fileid, "del_temperature", 9, &dims[2]));
+  check_nc(nc_def_var(fileid, "del_temperature", NC_DOUBLE, 1, &dims[2],
+                      &var_del_temp));
+  put_text_attr(fileid, var_del_temp, "units", "K");
+  check_nc(
+      nc_def_var(fileid, "temperature", NC_DOUBLE, 1, &dims[1], &var_temp));
+  put_text_attr(fileid, var_temp, "units", "K");
+  check_nc(nc_def_var(fileid, "binary_absorption_coefficient_h2o_h2o",
+                      NC_DOUBLE, 3, dims, &var_cia));
+  put_text_attr(fileid, var_cia, "units", "m^5 mol^-2");
+  check_nc(nc_enddef(fileid));
+  check_nc(nc_put_var_double(fileid, var_wave, wave.data()));
+  check_nc(nc_put_var_double(fileid, var_pres, pres.data()));
+  check_nc(nc_put_var_double(fileid, var_del_temp, del_temp.data()));
+  check_nc(nc_put_var_double(fileid, var_temp, temp.data()));
+  check_nc(nc_put_var_double(fileid, var_cia, sigma.data()));
+  check_nc(nc_close(fileid));
+  return path;
+}
+
+// The four float32 temperature-gradient gates of the post-#165 audit: the
+// summed CIA opacity on 64 wavenumbers x 8 columns x 32 layers, one thread,
+// compared entry by entry with the graph that expands all three queries to
+// (nwave, ncol, nlyr), as MoleculeCIA did before #165. Each of the 256
+// entries must satisfy |reference - candidate| <= 1e-14 + 3e-5 |candidate|.
+void expect_audit_cia_temperature_gradient(torch::Device device, bool varying) {
+  if (device.is_cuda() && !torch::cuda::is_available()) {
+    GTEST_SKIP() << "CUDA is not available";
+  }
+  auto dataset = write_audit_cia_dataset();
+  harp::species_names = {"H2O"};
+  harp::species_weights = {18.0e-3};
+
+  int const threads = torch::get_num_threads();
+  torch::set_num_threads(1);
+
+  auto options = harp::OpacityOptionsImpl::create();
+  options->type("molecule-cia")
+      .species_ids({0})
+      .opacity_files({dataset.string()})
+      .warn_out_of_bounds(false);
+  harp::MoleculeCIA cia(options);
+  cia->to(device, torch::kFloat32);
+
+  auto f32 = [&](std::vector<double> const& x) {
+    return torch::tensor(x, torch::kFloat64).to(torch::kFloat32).to(device);
+  };
+  auto conc = f32(numpy_linspace(0.1, 1.0, 256)).view({8, 32, 1});
+  auto wave = f32(numpy_linspace(150.0, 950.0, 64));
+  torch::Tensor pres, temp;
+  if (varying) {
+    pres = f32(numpy_geomspace(2.0e4, 8.0e5, 256)).view({8, 32});
+    temp = f32(numpy_linspace(270.0, 340.0, 256)).view({8, 32});
+  } else {
+    // Zero-stride inputs; each of the 256 entries is its own gradient.
+    pres = f32({3.0e4}).expand({8, 32});
+    temp = f32({305.0}).expand({8, 32});
+  }
+
+  auto expanded_forward = [&](torch::Tensor const& conc_d,
+                              torch::Tensor const& pres_d,
+                              torch::Tensor const& temp_d) {
+    auto lnp = pres_d.log();
+    auto temperature_base =
+        harp::interpn({lnp}, {cia->ln_pressure}, cia->ln_temperature_base)
+            .squeeze(-1)
+            .exp();
+    auto del_temp = temp_d - temperature_base;
+    auto coeff =
+        harp::interpn(
+            {wave.unsqueeze(-1).unsqueeze(-1).expand({64, 8, 32}),
+             lnp.unsqueeze(0).expand({64, 8, 32}),
+             del_temp.unsqueeze(0).expand({64, 8, 32})},
+            {cia->wavenumber, cia->ln_pressure, cia->temperature_anomaly},
+            cia->ln_sigma_binary, false)
+            .exp();
+    auto species = conc_d.select(-1, 0).unsqueeze(0).unsqueeze(-1);
+    return coeff * species * species;
+  };
+
+  auto temperature_gradient = [&](bool reference) {
+    auto conc_d = conc.clone().requires_grad_(true);
+    auto pres_d = pres.detach().requires_grad_(true);
+    auto temp_d = temp.detach().requires_grad_(true);
+    torch::Tensor out;
+    if (reference) {
+      out = expanded_forward(conc_d, pres_d, temp_d);
+    } else {
+      std::map<std::string, torch::Tensor> atm;
+      atm["pres"] = pres_d;
+      atm["temp"] = temp_d;
+      atm["wavenumber"] = wave;
+      out = cia->forward(conc_d, atm);
+    }
+    EXPECT_TRUE(torch::all(torch::isfinite(out)).item<bool>());
+    auto grads = torch::autograd::grad({out.sum()}, {conc_d, pres_d, temp_d});
+    return grads[2].to(torch::kCPU, torch::kFloat64);
+  };
+
+  auto reference = temperature_gradient(true);
+  auto candidate = temperature_gradient(false);
+  torch::set_num_threads(threads);
+
+  auto bound = 1.0e-14 + 3.0e-5 * candidate.abs();
+  auto failed = (reference - candidate).abs() > bound;
+  ::testing::Test::RecordProperty("exceedances", failed.sum().item<int64_t>());
+  EXPECT_EQ(failed.sum().item<int64_t>(), 0)
+      << failed.sum().item<int64_t>() << "/256 entries exceed the bound at "
+      << failed.nonzero();
+}
+#endif
+
+TEST(TestOpacity, CIAAuditTemperatureGradientBroadcastCPU) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  expect_audit_cia_temperature_gradient(torch::kCPU, false);
+#endif
+}
+
+TEST(TestOpacity, CIAAuditTemperatureGradientVaryingCPU) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  expect_audit_cia_temperature_gradient(torch::kCPU, true);
+#endif
+}
+
+TEST(TestOpacity, CIAAuditTemperatureGradientBroadcastCUDA) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  expect_audit_cia_temperature_gradient(torch::kCUDA, false);
+#endif
+}
+
+TEST(TestOpacity, CIAAuditTemperatureGradientVaryingCUDA) {
+#ifndef NETCDFOUTPUT
+  GTEST_SKIP() << "NetCDF support is disabled";
+#else
+  expect_audit_cia_temperature_gradient(torch::kCUDA, true);
 #endif
 }
 
