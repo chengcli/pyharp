@@ -13,8 +13,8 @@
 
 // harp
 #include <harp/constants.h>
-#include <harp/math/interpolation.hpp>
 
+#include <harp/math/interpolation.hpp>
 #include <harp/opacity/molecule_cia.hpp>
 #include <harp/opacity/molecule_line.hpp>
 #include <harp/opacity/opacity_options.hpp>

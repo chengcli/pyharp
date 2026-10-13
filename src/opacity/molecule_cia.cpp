@@ -3,10 +3,10 @@
 #include <c10/core/InferenceMode.h>
 
 // harp
-#include "molecule_cia.hpp"
-
 #include <harp/math/interpolation.hpp>
 #include <harp/utils/netcdf_opacity_utils.hpp>
+
+#include "molecule_cia.hpp"
 
 namespace harp {
 
