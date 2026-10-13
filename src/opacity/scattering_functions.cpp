@@ -19,15 +19,7 @@ torch::Tensor henyey_greenstein(int nmom, torch::Tensor const& g) {
       !g.requires_grad() && !g._fw_grad(0).defined()) {
     auto shape = g.sizes().vec();
     shape.push_back(nmom);
-    auto result = torch::empty(shape, g.options());
-    auto previous = result.select(-1, 0);
-    previous.copy_(g);
-    for (int k = 1; k < nmom; ++k) {
-      auto next = result.select(-1, k);
-      at::mul_out(next, previous, g);
-      previous = next;
-    }
-    return result;
+    return torch::cumprod(g.unsqueeze(-1).expand(shape), -1);
   }
 
   std::vector<torch::Tensor> moments;
