@@ -112,6 +112,20 @@ double atol(torch::Dtype dtype) {
   return dtype == torch::kFloat64 ? 1.0e-12 : 1.0e-6;
 }
 
+// HG's original tolerance, the torch::allclose defaults (rtol 1e-5,
+// atol 1e-8) used by HenyeyGreensteinMatchesCumprod since #165: results may
+// differ in the last bits. Integer and bool results must match exactly.
+bool within_tolerance(torch::Tensor const& a, torch::Tensor const& b) {
+  if (a.sizes() != b.sizes() || a.scalar_type() != b.scalar_type() ||
+      a.device() != b.device()) {
+    return false;
+  }
+  auto x = a.detach().cpu();
+  auto y = b.detach().cpu();
+  if (!x.is_floating_point()) return torch::equal(x, y);
+  return torch::allclose(x, y);
+}
+
 }  // namespace
 
 // Moments and their gradients from zero up to the largest g below one, for
@@ -140,7 +154,7 @@ TEST_P(DeviceTest, HenyeyGreensteinEdgeValuesAndGradients) {
     // Odd moments change sign with g, even ones do not, exactly.
     auto mirrored = harp::henyey_greenstein(nmom, -g.detach());
     auto parity = torch::pow(-1.0, k).to(device, dtype);
-    EXPECT_TRUE(torch::equal(mirrored, result.detach() * parity))
+    EXPECT_TRUE(within_tolerance(mirrored, result.detach() * parity))
         << "nmom = " << nmom;
 
     auto w = torch::linspace(1.0, 2.0, nmom, torch::kFloat64);
@@ -289,7 +303,8 @@ torch::Tensor product_route(int nmom, torch::Tensor const& g) {
   return torch::stack(moments, -1);
 }
 
-// Bitwise comparison, so that -0 differs from +0.
+// Bitwise comparison, so that -0 differs from +0; used to check that g is
+// left untouched.
 bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
   if (a.sizes() != b.sizes() || a.scalar_type() != b.scalar_type()) {
     return false;
@@ -351,10 +366,9 @@ std::vector<torch::Tensor> fixtures(torch::Device device, torch::Dtype dtype) {
 
 }  // namespace
 
-// Every moment is the same sequence of rounded products whether g is
-// tracked or not: detached and tracked calls agree bit for bit with each
-// other and with g, g*g, (g*g)*g, ... stacked.
-TEST_P(DeviceTest, HenyeyGreensteinTrackedAndDetachedAgreeBitwise) {
+// Detached and tracked calls agree with g, g*g, (g*g)*g, ... stacked, to
+// HG's original tolerance.
+TEST_P(DeviceTest, HenyeyGreensteinTrackedAndDetachedAgree) {
   for (auto const& g : fixtures(device, dtype)) {
     for (int nmom : {0, 1, 2, 3, 6, 32, 64}) {
       auto expected = product_route(nmom, g);
@@ -362,9 +376,9 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedAndDetachedAgreeBitwise) {
       auto tracked =
           harp::henyey_greenstein(nmom, g.clone().requires_grad_(true));
       EXPECT_EQ(detached.device(), g.device());
-      EXPECT_TRUE(same_bits(detached, expected))
+      EXPECT_TRUE(within_tolerance(detached, expected))
           << "detached, shape " << g.sizes() << ", nmom = " << nmom;
-      EXPECT_TRUE(same_bits(tracked, expected))
+      EXPECT_TRUE(within_tolerance(tracked, expected))
           << "tracked, shape " << g.sizes() << ", nmom = " << nmom;
     }
   }
@@ -378,7 +392,8 @@ TEST_P(DeviceTest, HenyeyGreensteinPlainInputOwnedInEveryGradMode) {
   auto const values = g.clone();
   for (int nmom : {1, 3, 6, 32}) {
     auto result = harp::henyey_greenstein(nmom, g);
-    EXPECT_TRUE(same_bits(result, product_route(nmom, g))) << "nmom = " << nmom;
+    EXPECT_TRUE(within_tolerance(result, product_route(nmom, g)))
+        << "nmom = " << nmom;
     EXPECT_FALSE(result.is_view());
     EXPECT_FALSE(result.storage().is_alias_of(g.storage()));
     EXPECT_TRUE(result.is_contiguous());
@@ -394,7 +409,8 @@ TEST_P(DeviceTest, HenyeyGreensteinPlainInputOwnedInEveryGradMode) {
     if (mode >= 1) inference.emplace();
     if (mode == 2) enable_grad.emplace(true);
     auto result = harp::henyey_greenstein(6, g);
-    EXPECT_TRUE(same_bits(result, product_route(6, g))) << "mode " << mode;
+    EXPECT_TRUE(within_tolerance(result, product_route(6, g)))
+        << "mode " << mode;
   }
 }
 
@@ -411,7 +427,7 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
       auto result = harp::henyey_greenstein(nmom, g);
       EXPECT_TRUE(result.is_inference()) << "nmom = " << nmom;
       EXPECT_FALSE(result.requires_grad()) << "nmom = " << nmom;
-      EXPECT_TRUE(same_bits(result, product_route(nmom, g)))
+      EXPECT_TRUE(within_tolerance(result, product_route(nmom, g)))
           << "nmom = " << nmom;
       if (nmom > 0) {
         EXPECT_FALSE(result.storage().is_alias_of(g.storage()));
@@ -420,8 +436,8 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
     for (auto const& f : fixture) {
       ASSERT_TRUE(f.is_inference());
       for (int nmom : {0, 1, 2, 6, 64}) {
-        EXPECT_TRUE(
-            same_bits(harp::henyey_greenstein(nmom, f), product_route(nmom, f)))
+        EXPECT_TRUE(within_tolerance(harp::henyey_greenstein(nmom, f),
+                                     product_route(nmom, f)))
             << "shape " << f.sizes() << ", nmom = " << nmom;
       }
     }
@@ -430,10 +446,11 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
 
   // The same inference tensors, used after inference mode has ended.
   auto outside = harp::henyey_greenstein(6, g);
-  EXPECT_TRUE(same_bits(outside, inside));
+  EXPECT_TRUE(within_tolerance(outside, inside));
   EXPECT_FALSE(outside.requires_grad());
   for (auto const& f : fixture) {
-    EXPECT_TRUE(same_bits(harp::henyey_greenstein(3, f), product_route(3, f)))
+    EXPECT_TRUE(
+        within_tolerance(harp::henyey_greenstein(3, f), product_route(3, f)))
         << "shape " << f.sizes();
   }
 }
@@ -451,21 +468,21 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
        std::vector<std::pair<std::string, torch::Tensor>>{
            {"leaf", leaf}, {"nonleaf", nonleaf}, {"strided", strided}}) {
     auto result = harp::henyey_greenstein(6, g);
-    EXPECT_TRUE(same_bits(result, product_route(6, g.detach()))) << name;
+    EXPECT_TRUE(within_tolerance(result, product_route(6, g.detach()))) << name;
     EXPECT_EQ(result.requires_grad(), g.requires_grad()) << name;
   }
 
   // A tracked input under no_grad and inference mode: the same products.
   {
     torch::NoGradGuard no_grad;
-    EXPECT_TRUE(
-        same_bits(harp::henyey_greenstein(6, leaf), product_route(6, base)))
+    EXPECT_TRUE(within_tolerance(harp::henyey_greenstein(6, leaf),
+                                 product_route(6, base)))
         << "tracked under no_grad";
   }
   {
     c10::InferenceMode inference;
-    EXPECT_TRUE(
-        same_bits(harp::henyey_greenstein(6, leaf), product_route(6, base)))
+    EXPECT_TRUE(within_tolerance(harp::henyey_greenstein(6, leaf),
+                                 product_route(6, base)))
         << "tracked under inference mode";
   }
 
@@ -485,7 +502,7 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
                  : torch::zeros({16}, torch::device(device).dtype(other));
     auto result = harp::henyey_greenstein(6, g);
     EXPECT_EQ(result.scalar_type(), other);
-    EXPECT_TRUE(same_bits(result, product_route(6, g))) << other;
+    EXPECT_TRUE(within_tolerance(result, product_route(6, g))) << other;
   }
 }
 
@@ -507,8 +524,10 @@ TEST_P(DeviceTest, HenyeyGreensteinForwardModeMatchesTheProducts) {
       auto [ref_primal, ref_tangent] =
           at::_unpack_dual(expected, level.level());
       ASSERT_TRUE(out_tangent.defined()) << "nmom = " << nmom;
-      EXPECT_TRUE(same_bits(out_primal, ref_primal)) << "nmom = " << nmom;
-      EXPECT_TRUE(same_bits(out_tangent, ref_tangent)) << "nmom = " << nmom;
+      EXPECT_TRUE(within_tolerance(out_primal, ref_primal))
+          << "nmom = " << nmom;
+      EXPECT_TRUE(within_tolerance(out_tangent, ref_tangent))
+          << "nmom = " << nmom;
     }
   }
 }
