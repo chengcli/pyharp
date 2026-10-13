@@ -12,6 +12,24 @@ torch::Tensor henyey_greenstein(int nmom, torch::Tensor const& g) {
     return g.unsqueeze(-1).narrow(-1, 0, 0).clone();
   }
 
+  const auto dtype = g.scalar_type();
+  if (g.device().is_cpu() && g.layout() == torch::kStrided &&
+      g.is_contiguous() &&
+      (dtype == torch::kFloat32 || dtype == torch::kFloat64) &&
+      !g.requires_grad() && !g._fw_grad(0).defined()) {
+    auto shape = g.sizes().vec();
+    shape.push_back(nmom);
+    auto result = torch::empty(shape, g.options());
+    auto previous = result.select(-1, 0);
+    previous.copy_(g);
+    for (int k = 1; k < nmom; ++k) {
+      auto next = result.select(-1, k);
+      at::mul_out(next, previous, g);
+      previous = next;
+    }
+    return result;
+  }
+
   std::vector<torch::Tensor> moments;
   moments.reserve(nmom);
   moments.push_back(g);
