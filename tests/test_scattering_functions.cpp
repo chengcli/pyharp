@@ -420,7 +420,7 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
     g = torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
     ASSERT_TRUE(g.is_inference());
     fixture = fixtures(device, dtype);
-    for (int nmom : {0, 6}) {
+    for (int nmom : {0, 6, 32}) {
       auto result = harp::henyey_greenstein(nmom, g);
       EXPECT_TRUE(result.is_inference()) << "nmom = " << nmom;
       EXPECT_FALSE(result.requires_grad()) << "nmom = " << nmom;
@@ -438,13 +438,19 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
             << "shape " << f.sizes() << ", nmom = " << nmom;
       }
     }
-    inside = harp::henyey_greenstein(6, g);
+    auto special = torch::tensor(special_g(dtype), torch::kFloat64)
+                       .to(device, dtype);
+    auto special_out = harp::henyey_greenstein(64, special);
+    EXPECT_TRUE(within_tolerance(special_out, product_route(64, special)));
+    EXPECT_FALSE(special_out.storage().is_alias_of(special.storage()));
+    inside = harp::henyey_greenstein(32, g);
   }
 
   // The same inference tensors, used after inference mode has ended.
-  auto outside = harp::henyey_greenstein(6, g);
+  auto outside = harp::henyey_greenstein(32, g);
   EXPECT_TRUE(within_tolerance(outside, inside));
   EXPECT_FALSE(outside.requires_grad());
+  EXPECT_FALSE(outside.storage().is_alias_of(g.storage()));
   for (auto const& f : fixture) {
     EXPECT_TRUE(
         within_tolerance(harp::henyey_greenstein(3, f), product_route(3, f)))
@@ -455,7 +461,8 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
 // Tracked, non-leaf and non-contiguous inputs and other dtypes: the same
 // products, the input dtype, and for tracked inputs a graph back to g.
 TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
-  auto base = torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
+  auto base =
+      torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
 
   auto leaf = base.clone().requires_grad_(true);
   auto nonleaf = leaf * 1.0;
@@ -503,7 +510,8 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
 // A dual tensor does not require grad but carries a forward tangent: with
 // or without no_grad, its primal and JVP are those of the products.
 TEST_P(DeviceTest, HenyeyGreensteinForwardModeMatchesTheProducts) {
-  auto primal = torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
+  auto primal =
+      torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
   auto tangent = torch::linspace(-1.0, 2.0, primal.numel(), primal.options());
   DualLevel level;
   auto dual = at::_make_dual(primal, tangent, level.level());
@@ -511,7 +519,7 @@ TEST_P(DeviceTest, HenyeyGreensteinForwardModeMatchesTheProducts) {
   for (bool no_grad_mode : {false, true}) {
     std::optional<torch::NoGradGuard> no_grad;
     if (no_grad_mode) no_grad.emplace();
-    for (int nmom : {1, 6}) {
+    for (int nmom : {1, 6, 32}) {
       auto out = harp::henyey_greenstein(nmom, dual);
       auto expected = product_route(nmom, dual);
       auto [out_primal, out_tangent] = at::_unpack_dual(out, level.level());

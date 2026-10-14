@@ -14,6 +14,7 @@
 #include <torch/torch.h>
 
 // harp
+#include <harp/math/interpolation.hpp>
 #include <harp/opacity/molecule_cia.hpp>
 #include <harp/opacity/opacity_options.hpp>
 
@@ -25,6 +26,7 @@ extern "C" {
 #endif
 
 #include "device_testing.hpp"
+#include "cia_gradient_gate.hpp"
 
 namespace fs = std::filesystem;
 
@@ -421,6 +423,102 @@ TEST_P(DeviceTest, CIASecondDerivatives) {
         << (which == 0 ? "d2/dT2" : "d2/dT dc");
   }
 }
+
+// One active dependency at a time, compared with the expanded reference used
+// by the CIA temperature gates. The remaining inputs stay detached.
+class CIAIndependentGradient
+    : public testing::TestWithParam<std::tuple<Parameters, std::string>> {};
+
+TEST_P(CIAIndependentGradient, MatchesExpandedReference) {
+  auto const param = std::get<0>(GetParam());
+  auto const name = std::get<1>(GetParam());
+  auto device = torch::Device(param.device_type);
+  if (device.is_cuda() && !torch::cuda::is_available()) {
+    GTEST_SKIP() << "CUDA is not available";
+  }
+  CIASetup s{device, param.dtype};
+  auto evaluate = [&](bool reference) {
+    auto cia = s.make_cia();
+    auto a = s.atm();
+    auto conc = s.conc();
+    torch::Tensor leaf;
+    if (name == "nonleaf_temperature") {
+      leaf = s.temp().requires_grad_(true);
+      a["temp"] = leaf * 1.0;
+      EXPECT_FALSE(a["temp"].is_leaf());
+    } else if (name == "wavelength") {
+      a.erase("wavenumber");
+      leaf = (1.0e4 / s.wavenumber()).requires_grad_(true);
+      a[name] = leaf;
+    } else if (name == "temp" || name == "pres" || name == "wavenumber") {
+      leaf = a[name].requires_grad_(true);
+    } else {
+      auto key = name == "coordinate_wavenumber" ? "wavenumber" : name;
+      leaf = cia->named_buffers()[key].requires_grad_(true);
+    }
+    int active = 0;
+    for (auto const& item : a) active += item.second.requires_grad();
+    for (auto const& item : cia->named_buffers()) {
+      active += item.value().requires_grad();
+    }
+    EXPECT_EQ(active, 1);
+    torch::Tensor out;
+    if (reference) {
+      auto wave = a.count("wavenumber") ? a.at("wavenumber")
+                                        : 1.0e4 / a.at("wavelength");
+      auto lnp = a.at("pres").log();
+      auto base =
+          harp::interpn({lnp}, {cia->ln_pressure}, cia->ln_temperature_base)
+              .squeeze(-1)
+              .exp();
+      auto delta = a.at("temp") - base;
+      auto coeff =
+          harp::interpn(
+              {wave.view({kWave, 1, 1}).expand({kWave, kCol, kLyr}),
+               lnp.unsqueeze(0).expand({kWave, kCol, kLyr}),
+               delta.unsqueeze(0).expand({kWave, kCol, kLyr})},
+              {cia->wavenumber, cia->ln_pressure, cia->temperature_anomaly},
+              cia->ln_sigma_binary, false)
+              .exp();
+      auto species = conc.select(-1, 0).unsqueeze(0).unsqueeze(-1);
+      out = coeff * species * species;
+    } else {
+      out = cia->forward(conc, a);
+    }
+    EXPECT_TRUE(out.requires_grad());
+    EXPECT_TRUE(torch::isfinite(out).all().item<bool>());
+    EXPECT_FALSE(out.storage().is_alias_of(leaf.storage()));
+    auto grad =
+        torch::autograd::grad({(out * s.weights(out)).sum()}, {leaf})[0];
+    EXPECT_TRUE(grad.defined());
+    EXPECT_TRUE(torch::isfinite(grad).all().item<bool>());
+    return std::make_pair(out.detach(), grad);
+  };
+  auto candidate = evaluate(false);
+  auto reference = evaluate(true);
+  EXPECT_TRUE(torch::allclose(candidate.first, reference.first));
+  EXPECT_EQ(cia_gradient_failures(reference.second, candidate.second)
+                .sum()
+                .item<int64_t>(),
+            0);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    SingleDependency, CIAIndependentGradient,
+    testing::Combine(testing::Values(Parameters{torch::kCPU, torch::kFloat32},
+                                     Parameters{torch::kCPU, torch::kFloat64},
+                                     Parameters{torch::kCUDA, torch::kFloat32},
+                                     Parameters{torch::kCUDA, torch::kFloat64}),
+                     testing::Values("temp", "pres", "wavenumber", "wavelength",
+                                     "nonleaf_temperature",
+                                     "coordinate_wavenumber", "ln_pressure",
+                                     "temperature_anomaly",
+                                     "ln_temperature_base", "ln_sigma_binary")),
+    [](const testing::TestParamInfo<CIAIndependentGradient::ParamType>& info) {
+      auto const p = std::get<0>(info.param);
+      return torch::Device(p.device_type).str() + "_" +
+             torch::toString(p.dtype) + "_" + std::get<1>(info.param);
+    });
 
 #endif
 
