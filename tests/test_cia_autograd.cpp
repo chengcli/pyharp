@@ -177,9 +177,19 @@ TEST_P(DeviceTest, CIAValuesUnderNoGradAndInferenceMode) {
     EXPECT_TRUE(torch::equal(out, expected));
     EXPECT_FALSE(out.requires_grad());
   };
-  { torch::NoGradGuard guard; check(); }
-  { c10::InferenceMode guard; check(); }
-  { c10::InferenceMode guard; torch::AutoGradMode enable(true); check(); }
+  {
+    torch::NoGradGuard guard;
+    check();
+  }
+  {
+    c10::InferenceMode guard;
+    check();
+  }
+  {
+    c10::InferenceMode guard;
+    torch::AutoGradMode enable(true);
+    check();
+  }
 }
 
 // Wavelength is the distinct converted spectral dependency. Other query,

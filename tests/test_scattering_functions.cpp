@@ -328,8 +328,8 @@ bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
 
 // Small asymmetric fixture for mode, ownership, stride and forward AD checks.
 std::vector<double> representative_g() {
-  return {-0.8, -0.7, -0.5, -0.3, -0.1, -0.0, 0.0, 0.1,
-          0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8};
+  return {-0.8, -0.7, -0.5, -0.3, -0.1, -0.0, 0.0,  0.1,
+          0.2,  0.3,  0.4,  0.5,  0.6,  0.7,  0.75, 0.8};
 }
 
 // Signed zeros, subnormals, the smallest normal and the values next to +-1

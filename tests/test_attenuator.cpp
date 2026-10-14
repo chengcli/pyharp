@@ -1,4 +1,3 @@
-#include "cia_gradient_gate.hpp"
 // C/C++
 #include <cmath>
 #include <cstring>
@@ -29,6 +28,8 @@ extern "C" {
 #include <netcdf.h>
 }
 #endif
+
+#include "cia_gradient_gate.hpp"
 
 namespace fs = std::filesystem;
 
@@ -912,8 +913,10 @@ TEST(TestOpacity, CIAAuditTemperatureGradientVaryingCUDA) {
 }  // namespace
 
 TEST(TestOpacity, CIAGradientGateRejectsNonfinite) {
-  auto reference = torch::tensor({1.0, double(NAN), double(INFINITY), 2.0}, torch::kFloat64);
-  auto candidate = torch::tensor({double(NAN), 1.0, double(INFINITY), 2.0}, torch::kFloat64);
+  auto reference =
+      torch::tensor({1.0, double(NAN), double(INFINITY), 2.0}, torch::kFloat64);
+  auto candidate =
+      torch::tensor({double(NAN), 1.0, double(INFINITY), 2.0}, torch::kFloat64);
   auto failed = cia_gradient_failures(reference, candidate);
   EXPECT_TRUE(failed[0].item<bool>()) << "candidate NaN";
   EXPECT_TRUE(failed[1].item<bool>()) << "reference NaN";
