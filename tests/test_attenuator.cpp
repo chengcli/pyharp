@@ -29,6 +29,8 @@ extern "C" {
 }
 #endif
 
+#include "cia_gradient_gate.hpp"
+
 namespace fs = std::filesystem;
 
 namespace harp {
@@ -670,8 +672,7 @@ void expect_cia_float32_temperature_gradient(torch::Device device,
   auto reference = temperature_gradient(torch::kFloat64);
   auto candidate = temperature_gradient(torch::kFloat32);
 
-  auto bound = 1.0e-14 + 3.0e-5 * candidate.abs();
-  auto failed = (reference - candidate).abs() > bound;
+  auto failed = cia_gradient_failures(reference, candidate);
   auto relative = ((reference - candidate) / reference).abs();
   ::testing::Test::RecordProperty("exceedances", failed.sum().item<int64_t>());
   std::ostringstream max_relative;
@@ -869,8 +870,7 @@ void expect_audit_cia_temperature_gradient(torch::Device device, bool varying) {
   auto candidate = temperature_gradient(false);
   torch::set_num_threads(threads);
 
-  auto bound = 1.0e-14 + 3.0e-5 * candidate.abs();
-  auto failed = (reference - candidate).abs() > bound;
+  auto failed = cia_gradient_failures(reference, candidate);
   ::testing::Test::RecordProperty("exceedances", failed.sum().item<int64_t>());
   EXPECT_EQ(failed.sum().item<int64_t>(), 0)
       << failed.sum().item<int64_t>() << "/256 entries exceed the bound at "
@@ -911,6 +911,18 @@ TEST(TestOpacity, CIAAuditTemperatureGradientVaryingCUDA) {
 }
 
 }  // namespace
+
+TEST(TestOpacity, CIAGradientGateRejectsNonfinite) {
+  auto reference =
+      torch::tensor({1.0, double(NAN), double(INFINITY), 2.0}, torch::kFloat64);
+  auto candidate =
+      torch::tensor({double(NAN), 1.0, double(INFINITY), 2.0}, torch::kFloat64);
+  auto failed = cia_gradient_failures(reference, candidate);
+  EXPECT_TRUE(failed[0].item<bool>()) << "candidate NaN";
+  EXPECT_TRUE(failed[1].item<bool>()) << "reference NaN";
+  EXPECT_TRUE(failed[2].item<bool>()) << "matching infinity";
+  EXPECT_FALSE(failed[3].item<bool>()) << "equal finite values";
+}
 
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);

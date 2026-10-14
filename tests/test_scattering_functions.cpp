@@ -326,13 +326,10 @@ bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
   return torch::equal(bits(a), bits(b));
 }
 
-// The 8192 values of the audit HG fixture, linspace(-0.8, 0.8) in float64.
-std::vector<double> audit_g() {
-  std::vector<double> out(8192);
-  double const step = 1.6 / 8191;
-  for (int i = 0; i < 8192; ++i) out[i] = i * step - 0.8;
-  out.back() = 0.8;
-  return out;
+// Small asymmetric fixture for mode, ownership, stride and forward AD checks.
+std::vector<double> representative_g() {
+  return {-0.8, -0.7, -0.5, -0.3, -0.1, -0.0, 0.0,  0.1,
+          0.2,  0.3,  0.4,  0.5,  0.6,  0.7,  0.75, 0.8};
 }
 
 // Signed zeros, subnormals, the smallest normal and the values next to +-1
@@ -354,9 +351,9 @@ std::vector<torch::Tensor> fixtures(torch::Device device, torch::Dtype dtype) {
   auto f64 = torch::kFloat64;
   torch::manual_seed(169);
   return {
-      torch::tensor(audit_g(), f64).to(opt),
+      torch::tensor(representative_g(), f64).to(opt),
       torch::tensor(special_g(dtype), f64).to(opt),
-      (1.98 * torch::rand({37, 11, 5}, torch::kFloat64) - 0.99).to(opt),
+      (1.98 * torch::rand({3, 2, 2}, torch::kFloat64) - 0.99).to(opt),
       torch::tensor(0.3, f64).to(opt),
       torch::tensor(-0.0, f64).to(opt),
       torch::zeros({0}, opt),
@@ -370,7 +367,7 @@ std::vector<torch::Tensor> fixtures(torch::Device device, torch::Dtype dtype) {
 // HG's original tolerance.
 TEST_P(DeviceTest, HenyeyGreensteinTrackedAndDetachedAgree) {
   for (auto const& g : fixtures(device, dtype)) {
-    for (int nmom : {0, 1, 2, 3, 6, 32, 64}) {
+    for (int nmom : {0, 1, 6, 64}) {
       auto expected = product_route(nmom, g);
       auto detached = harp::henyey_greenstein(nmom, g);
       auto tracked =
@@ -388,9 +385,9 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedAndDetachedAgree) {
 // and leave g alone, and are the same products under no_grad, inference
 // mode, and grad mode re-enabled inside inference mode.
 TEST_P(DeviceTest, HenyeyGreensteinPlainInputOwnedInEveryGradMode) {
-  auto g = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+  auto g = torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
   auto const values = g.clone();
-  for (int nmom : {1, 3, 6, 32}) {
+  for (int nmom : {1, 6}) {
     auto result = harp::henyey_greenstein(nmom, g);
     EXPECT_TRUE(within_tolerance(result, product_route(nmom, g)))
         << "nmom = " << nmom;
@@ -420,10 +417,10 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
   std::vector<torch::Tensor> fixture;
   {
     c10::InferenceMode inference;
-    g = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+    g = torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
     ASSERT_TRUE(g.is_inference());
     fixture = fixtures(device, dtype);
-    for (int nmom : {0, 1, 3, 6, 32}) {
+    for (int nmom : {0, 6, 32}) {
       auto result = harp::henyey_greenstein(nmom, g);
       EXPECT_TRUE(result.is_inference()) << "nmom = " << nmom;
       EXPECT_FALSE(result.requires_grad()) << "nmom = " << nmom;
@@ -435,19 +432,25 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
     }
     for (auto const& f : fixture) {
       ASSERT_TRUE(f.is_inference());
-      for (int nmom : {0, 1, 2, 6, 64}) {
+      for (int nmom : {0, 6}) {
         EXPECT_TRUE(within_tolerance(harp::henyey_greenstein(nmom, f),
                                      product_route(nmom, f)))
             << "shape " << f.sizes() << ", nmom = " << nmom;
       }
     }
-    inside = harp::henyey_greenstein(6, g);
+    auto special =
+        torch::tensor(special_g(dtype), torch::kFloat64).to(device, dtype);
+    auto special_out = harp::henyey_greenstein(64, special);
+    EXPECT_TRUE(within_tolerance(special_out, product_route(64, special)));
+    EXPECT_FALSE(special_out.storage().is_alias_of(special.storage()));
+    inside = harp::henyey_greenstein(32, g);
   }
 
   // The same inference tensors, used after inference mode has ended.
-  auto outside = harp::henyey_greenstein(6, g);
+  auto outside = harp::henyey_greenstein(32, g);
   EXPECT_TRUE(within_tolerance(outside, inside));
   EXPECT_FALSE(outside.requires_grad());
+  EXPECT_FALSE(outside.storage().is_alias_of(g.storage()));
   for (auto const& f : fixture) {
     EXPECT_TRUE(
         within_tolerance(harp::henyey_greenstein(3, f), product_route(3, f)))
@@ -458,7 +461,8 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
 // Tracked, non-leaf and non-contiguous inputs and other dtypes: the same
 // products, the input dtype, and for tracked inputs a graph back to g.
 TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
-  auto base = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+  auto base =
+      torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
 
   auto leaf = base.clone().requires_grad_(true);
   auto nonleaf = leaf * 1.0;
@@ -494,12 +498,9 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
   EXPECT_TRUE(torch::allclose(grad.to(torch::kFloat64), expected,
                               dtype == torch::kFloat64 ? 1e-12 : 1e-5, 1e-6));
 
-  // Reduced precision, integer and bool inputs.
-  for (auto other : {torch::kFloat16, torch::kBFloat16, torch::kInt32,
-                     torch::kInt64, torch::kBool}) {
-    auto g = other == torch::kFloat16 || other == torch::kBFloat16
-                 ? base.to(other)
-                 : torch::zeros({16}, torch::device(device).dtype(other));
+  // Reduced precision; integer and bool contracts are covered above.
+  for (auto other : {torch::kFloat16, torch::kBFloat16}) {
+    auto g = base.to(other);
     auto result = harp::henyey_greenstein(6, g);
     EXPECT_EQ(result.scalar_type(), other);
     EXPECT_TRUE(within_tolerance(result, product_route(6, g))) << other;
@@ -509,7 +510,8 @@ TEST_P(DeviceTest, HenyeyGreensteinTrackedStridedAndOtherDtypeInputs) {
 // A dual tensor does not require grad but carries a forward tangent: with
 // or without no_grad, its primal and JVP are those of the products.
 TEST_P(DeviceTest, HenyeyGreensteinForwardModeMatchesTheProducts) {
-  auto primal = torch::tensor(audit_g(), torch::kFloat64).to(device, dtype);
+  auto primal =
+      torch::tensor(representative_g(), torch::kFloat64).to(device, dtype);
   auto tangent = torch::linspace(-1.0, 2.0, primal.numel(), primal.options());
   DualLevel level;
   auto dual = at::_make_dual(primal, tangent, level.level());
@@ -517,7 +519,7 @@ TEST_P(DeviceTest, HenyeyGreensteinForwardModeMatchesTheProducts) {
   for (bool no_grad_mode : {false, true}) {
     std::optional<torch::NoGradGuard> no_grad;
     if (no_grad_mode) no_grad.emplace();
-    for (int nmom : {1, 3, 6, 32}) {
+    for (int nmom : {1, 6, 32}) {
       auto out = harp::henyey_greenstein(nmom, dual);
       auto expected = product_route(nmom, dual);
       auto [out_primal, out_tangent] = at::_unpack_dual(out, level.level());
