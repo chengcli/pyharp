@@ -25,8 +25,8 @@ extern "C" {
 }
 #endif
 
-#include "device_testing.hpp"
 #include "cia_gradient_gate.hpp"
+#include "device_testing.hpp"
 
 namespace fs = std::filesystem;
 

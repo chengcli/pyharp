@@ -438,8 +438,8 @@ TEST_P(DeviceTest, HenyeyGreensteinInputsCreatedInInferenceMode) {
             << "shape " << f.sizes() << ", nmom = " << nmom;
       }
     }
-    auto special = torch::tensor(special_g(dtype), torch::kFloat64)
-                       .to(device, dtype);
+    auto special =
+        torch::tensor(special_g(dtype), torch::kFloat64).to(device, dtype);
     auto special_out = harp::henyey_greenstein(64, special);
     EXPECT_TRUE(within_tolerance(special_out, product_route(64, special)));
     EXPECT_FALSE(special_out.storage().is_alias_of(special.storage()));
