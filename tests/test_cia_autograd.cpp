@@ -1,10 +1,3 @@
-// RecordFunction::inputs() asserts in translation units built without
-// NDEBUG even though the release libtorch records the inputs, so define it
-// before any include. These tests use gtest assertions, not assert().
-#ifndef NDEBUG
-#define NDEBUG
-#endif
-
 // C/C++
 #include <cmath>
 #include <cstring>
@@ -17,7 +10,6 @@
 #include <gtest/gtest.h>
 
 // torch
-#include <ATen/record_function.h>
 #include <c10/core/InferenceMode.h>
 #include <torch/torch.h>
 
@@ -100,49 +92,7 @@ fs::path write_table() {
   return path;
 }
 
-// Query shapes that reach torch::searchsorted while the guard is alive.
-thread_local std::vector<std::vector<int64_t>> searched_shapes;
-
-std::unique_ptr<at::ObserverContext> record_search(
-    at::RecordFunction const& fn) {
-  if (std::strcmp(fn.name(), "aten::searchsorted") == 0) {
-    auto inputs = fn.inputs();
-    if (inputs.size() > 1 && inputs[1].isTensor()) {
-      searched_shapes.push_back(inputs[1].toTensor().sizes().vec());
-    }
-  }
-  return nullptr;
-}
-
-class SearchShapes {
- public:
-  SearchShapes() {
-    searched_shapes.clear();
-    handle_ = at::addThreadLocalCallback(
-        at::RecordFunctionCallback(record_search).needsInputs(true));
-  }
-  ~SearchShapes() { at::removeCallback(handle_); }
-
-  // Shapes of the three coefficient queries; the base-temperature lookup on
-  // (ncol, nlyr) comes first and is left out.
-  std::vector<std::vector<int64_t>> coefficient() const {
-    std::vector<std::vector<int64_t>> out;
-    for (auto const& s : searched_shapes) {
-      if (s.size() == 3) out.push_back(s);
-    }
-    return out;
-  }
-
- private:
-  at::CallbackHandle handle_;
-};
-
 int constexpr kWave = 3, kCol = 2, kLyr = 3;
-
-std::vector<std::vector<int64_t>> const kCompact = {
-    {kWave, 1, 1}, {1, kCol, kLyr}, {1, kCol, kLyr}};
-std::vector<std::vector<int64_t>> const kExpanded = {
-    {kWave, kCol, kLyr}, {kWave, kCol, kLyr}, {kWave, kCol, kLyr}};
 #endif
 
 }  // namespace
@@ -195,95 +145,59 @@ struct CIASetup {
   }
 };
 
-// Gradient mode alone, or a gradient that only reaches the concentration,
-// does not track the interpolation: the queries stay compact.
-TEST_P(DeviceTest, CIAQueriesStayCompactWithoutInterpolationGradients) {
+// Concentration-only gradients and ignored inputs are observable API behavior.
+TEST_P(DeviceTest, CIAConcentrationGradientAndIgnoredInputs) {
   CIASetup s{device, dtype};
   auto cia = s.make_cia();
-  {
-    SearchShapes shapes;
-    cia->forward(s.conc(), s.atm());
-    EXPECT_EQ(shapes.coefficient(), kCompact) << "no gradient";
-  }
-  {
-    auto c = s.conc().requires_grad_(true);
-    SearchShapes shapes;
-    auto out = cia->forward(c, s.atm());
-    EXPECT_EQ(shapes.coefficient(), kCompact) << "concentration only";
-    out.sum().backward();
-    EXPECT_TRUE(c.grad().defined());
-  }
-  {
-    // A wavelength next to a wavenumber is not used, and neither is an extra
-    // atmosphere variable, so their gradients do not count.
-    auto a = s.atm();
-    a["wavelength"] = (1.0e4 / s.wavenumber()).requires_grad_(true);
-    a["unused"] = s.temp().requires_grad_(true);
-    SearchShapes shapes;
-    cia->forward(s.conc(), a);
-    EXPECT_EQ(shapes.coefficient(), kCompact) << "unused inputs";
-  }
+  auto expected = cia->forward(s.conc(), s.atm());
+  auto c = s.conc().requires_grad_(true);
+  auto out = cia->forward(c, s.atm());
+  EXPECT_TRUE(torch::equal(out, expected));
+  out.sum().backward();
+  EXPECT_TRUE(torch::isfinite(c.grad()).all().item<bool>());
+  auto a = s.atm();
+  a["wavelength"] = (1.0e4 / s.wavenumber()).requires_grad_(true);
+  a["unused"] = s.temp().requires_grad_(true);
+  auto ignored = cia->forward(s.conc(), a);
+  EXPECT_TRUE(torch::equal(ignored, expected));
+  EXPECT_FALSE(ignored.requires_grad());
 }
 
-// no_grad and inference mode record no graph, whatever requires grad.
-TEST_P(DeviceTest, CIAQueriesStayCompactUnderNoGradAndInferenceMode) {
+// no_grad and inference mode preserve values without recording a graph.
+TEST_P(DeviceTest, CIAValuesUnderNoGradAndInferenceMode) {
   CIASetup s{device, dtype};
   auto cia = s.make_cia();
+  auto expected = cia->forward(s.conc(), s.atm());
   cia->ln_sigma_binary.requires_grad_(true);
   auto a = s.atm();
   a["temp"].requires_grad_(true);
   a["pres"].requires_grad_(true);
-  {
-    torch::NoGradGuard no_grad;
-    SearchShapes shapes;
-    cia->forward(s.conc(), a);
-    EXPECT_EQ(shapes.coefficient(), kCompact) << "no_grad";
-  }
-  {
-    c10::InferenceMode inference;
-    SearchShapes shapes;
-    cia->forward(s.conc(), a);
-    EXPECT_EQ(shapes.coefficient(), kCompact) << "inference mode";
-  }
-  {
-    c10::InferenceMode inference;
-    torch::AutoGradMode enable_grad(true);
-    SearchShapes shapes;
-    cia->forward(s.conc(), a);
-    EXPECT_EQ(shapes.coefficient(), kCompact)
-        << "grad mode inside inference mode";
-  }
+  auto check = [&]() {
+    auto out = cia->forward(s.conc(), a);
+    EXPECT_TRUE(torch::equal(out, expected));
+    EXPECT_FALSE(out.requires_grad());
+  };
+  { torch::NoGradGuard guard; check(); }
+  { c10::InferenceMode guard; check(); }
+  { c10::InferenceMode guard; torch::AutoGradMode enable(true); check(); }
 }
 
-// Any input of the interpolation that requires grad expands the queries.
-TEST_P(DeviceTest, CIAQueriesExpandForInterpolationGradients) {
+// Wavelength is the distinct converted spectral dependency. Other query,
+// coordinate, table and nonleaf dependencies are checked numerically below.
+TEST_P(DeviceTest, CIAWavelengthGradient) {
   CIASetup s{device, dtype};
-  for (std::string input :
-       {"temp", "pres", "wavenumber", "wavelength", "nonleaf temp"}) {
-    auto cia = s.make_cia();
-    auto a = s.atm();
-    if (input == "wavelength") {
-      a.erase("wavenumber");
-      a["wavelength"] = (1.0e4 / s.wavenumber()).requires_grad_(true);
-    } else if (input == "nonleaf temp") {
-      auto leaf = s.temp().requires_grad_(true);
-      a["temp"] = leaf * 1.0;
-    } else {
-      a[input].requires_grad_(true);
-    }
-    SearchShapes shapes;
-    cia->forward(s.conc(), a);
-    EXPECT_EQ(shapes.coefficient(), kExpanded) << input;
-  }
-
-  for (std::string buffer : {"wavenumber", "ln_pressure", "temperature_anomaly",
-                             "ln_temperature_base", "ln_sigma_binary"}) {
-    auto cia = s.make_cia();
-    cia->named_buffers()[buffer].requires_grad_(true);
-    SearchShapes shapes;
-    cia->forward(s.conc(), s.atm());
-    EXPECT_EQ(shapes.coefficient(), kExpanded) << buffer;
-  }
+  auto cia = s.make_cia();
+  auto a = s.atm();
+  a.erase("wavenumber");
+  auto wavelength = (1.0e4 / s.wavenumber()).requires_grad_(true);
+  a["wavelength"] = wavelength;
+  auto out = cia->forward(s.conc(), a);
+  auto actual = torch::autograd::grad({out.sum()}, {wavelength})[0];
+  auto wave = s.wavenumber().requires_grad_(true);
+  a.erase("wavelength");
+  a["wavenumber"] = wave;
+  auto dw = torch::autograd::grad({cia->forward(s.conc(), a).sum()}, {wave})[0];
+  EXPECT_TRUE(torch::allclose(actual, dw * (-1.0e4 / wavelength.square())));
 }
 
 // A wavenumber takes precedence over a wavelength; a wavelength alone is
