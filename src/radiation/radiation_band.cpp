@@ -25,6 +25,7 @@
 #include <harp/utils/read_var_pt.hpp>
 #include <harp/utils/strings.hpp>
 
+#include "band_accumulate.hpp"
 #include "disort_config.hpp"
 #include "flux_utils.hpp"
 #include "get_direction_grids.hpp"
@@ -36,18 +37,6 @@
 namespace harp {
 
 namespace {
-
-torch::Tensor divide_where_positive(torch::Tensor numerator,
-                                    torch::Tensor denominator) {
-  while (denominator.dim() < numerator.dim()) {
-    denominator = denominator.unsqueeze(-1);
-  }
-  auto const positive = denominator > 0.0;
-  auto const safe_denominator =
-      torch::where(positive, denominator, torch::ones_like(denominator));
-  return torch::where(positive, numerator / safe_denominator,
-                      torch::zeros_like(numerator));
-}
 
 std::vector<double> to_vector(torch::Tensor const& tensor) {
   auto data = tensor.to(torch::kCPU, torch::kFloat64).contiguous();
@@ -343,61 +332,19 @@ torch::Tensor RadiationBandImpl::forward(
 
   prop.zero_();
 
+  // Sum the attenuation, the attenuation-weighted single scattering albedo
+  // and the attenuation- and albedo-weighted phase moments over the sources.
   for (auto& [aname, a] : opacities) {
-    auto kdata = a.forward(conc, *kwargs);
-    int nprop = kdata.size(-1);
-
-    // attenuation coefficients
-    prop.select(-1, disort::IEX) += kdata.select(-1, disort::IEX);
-
-    // attenuation weighted single scattering albedo
-    if (nprop > 1) {
-      prop.select(-1, disort::ISS) +=
-          kdata.select(-1, disort::ISS) * kdata.select(-1, disort::IEX);
-    }
-
-    // attenuation + single scattering albedo weighted phase moments
-    if (nprop > 2) {
-      prop.narrow(-1, disort::IPM, nprop - 2) +=
-          kdata.narrow(-1, disort::IPM, nprop - 2) *
-          (kdata.select(-1, disort::ISS) * kdata.select(-1, disort::IEX))
-              .unsqueeze(-1);
-    }
-
+    accumulate_opacity(prop, a.forward(conc, *kwargs));
     if (options->verbose()) {
       std::cout << "  Calculating opacity contribution from: " << aname
                 << std::endl;
     }
   }
 
-  // average phase moments
-  int nprop = prop.size(-1);
-  if (nprop > 2) {
-    auto scattering = prop.select(-1, disort::ISS);
-    auto moments = prop.narrow(-1, disort::IPM, nprop - 2);
-    moments.copy_(divide_where_positive(moments, scattering));
-    if (options->verbose()) {
-      std::cout << "  Averaging phase moments." << std::endl;
-    }
-  }
-
-  // average single scattering albedo
-  if (nprop > 1) {
-    auto extinction = prop.select(-1, disort::IEX);
-    auto scattering = prop.select(-1, disort::ISS);
-    scattering.copy_(divide_where_positive(scattering, extinction));
-    if (options->verbose()) {
-      std::cout << "  Averaging single scattering albedo." << std::endl;
-    }
-  }
-
-  // attenuation coefficients -> optical thickness
-  prop.select(-1, disort::IEX) *= dz.unsqueeze(0);
-  if (options->verbose()) {
-    std::cout << "  Converting attenuation coefficients to optical thickness."
-              << std::endl;
-  }
-
+  // Average the phase moments and the single scattering albedo, and turn the
+  // attenuation coefficients into optical thickness.
+  //
   // Conservative scattering is degenerate for both solvers: it makes
   // cDISORT's eigenproblem singular, and it makes Toon form g1 == g2, which
   // returns NaN for every level of the column once the layer is also
@@ -405,10 +352,13 @@ torch::Tensor RadiationBandImpl::forward(
   // absorption in a bin underflows. Keep the physical opacity source
   // conservative, but regularize the solver input by a dtype-appropriate
   // distance from unity.
-  if (nprop > 1) {
-    auto const ssa_margin =
-        prop.scalar_type() == torch::kFloat64 ? 1.0e-12 : 1.0e-6;
-    prop.select(-1, disort::ISS).clamp_max_(1.0 - ssa_margin);
+  auto const ssa_margin =
+      prop.scalar_type() == torch::kFloat64 ? 1.0e-12 : 1.0e-6;
+  finish_band_properties(prop, dz, 1.0 - ssa_margin);
+  if (options->verbose()) {
+    std::cout << "  Averaged the optical properties and converted attenuation "
+                 "coefficients to optical thickness."
+              << std::endl;
   }
 
   // run rt solver
