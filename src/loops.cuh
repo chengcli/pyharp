@@ -26,6 +26,15 @@ template <int Arity, typename func_t>
 void gpu_kernel(at::TensorIterator& iter, const func_t& f) {
   TORCH_CHECK(iter.ninputs() + iter.noutputs() == Arity);
 
+  // The offset calculator and the launch index are 32-bit, as in ATen's own
+  // gpu_kernel, which splits larger iterators the same way.
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      gpu_kernel<Arity>(sub_iter, f);
+    }
+    return;
+  }
+
   std::array<char*, Arity> data;
   for (int i = 0; i < Arity; i++) {
     data[i] = reinterpret_cast<char*>(iter.data_ptr(i));
