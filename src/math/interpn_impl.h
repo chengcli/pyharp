@@ -47,8 +47,8 @@ DISPATCH_MACRO T interpn_corners(T const* table, int64_t offset,
   if constexpr (D == NDIM) {
     return table[offset];
   } else {
-    T const vlow = interpn_corners<T, NDIM, D + 1>(
-        table, offset + low[D], low, high, wl, wh, on_nodes);
+    T const vlow = interpn_corners<T, NDIM, D + 1>(table, offset + low[D], low,
+                                                   high, wl, wh, on_nodes);
     if (on_nodes & (1u << D)) return vlow;
     T const vhigh = interpn_corners<T, NDIM, D + 1>(
         table, offset + high[D], low, high, wl, wh, on_nodes);

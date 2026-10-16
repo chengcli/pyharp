@@ -227,9 +227,8 @@ torch::Tensor interpn_fused(std::vector<AxisWeights> const& axes,
 
   auto table = lookup.contiguous();
   auto value_index =
-      torch::arange(nval, torch::TensorOptions()
-                              .dtype(torch::kLong)
-                              .device(device))
+      torch::arange(nval,
+                    torch::TensorOptions().dtype(torch::kLong).device(device))
           .view(value_shape);
 
   at::TensorIteratorConfig config;

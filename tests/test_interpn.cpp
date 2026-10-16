@@ -17,7 +17,8 @@ bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
   if (a.sizes() != b.sizes() || a.scalar_type() != b.scalar_type()) {
     return false;
   }
-  auto bits = a.scalar_type() == torch::kFloat64 ? torch::kInt64 : torch::kInt32;
+  auto bits =
+      a.scalar_type() == torch::kFloat64 ? torch::kInt64 : torch::kInt32;
   return torch::equal(a.contiguous().view(bits), b.contiguous().view(bits));
 }
 

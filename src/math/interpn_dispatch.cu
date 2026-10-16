@@ -13,8 +13,8 @@
 namespace harp {
 
 template <int NDIM>
-void interpn_fused_cuda_impl(at::TensorIterator& iter,
-                             at::Tensor const& lookup, unsigned on_nodes) {
+void interpn_fused_cuda_impl(at::TensorIterator& iter, at::Tensor const& lookup,
+                             unsigned on_nodes) {
   constexpr int Arity = 2 + 4 * NDIM;
   InterpnTable geom{};
   for (int d = 0; d < NDIM; ++d) geom.stride[d] = lookup.stride(d);
@@ -22,8 +22,8 @@ void interpn_fused_cuda_impl(at::TensorIterator& iter,
   AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "interpn_fused_cuda", [&] {
     auto table = lookup.data_ptr<scalar_t>();
     native::gpu_kernel<Arity>(
-        iter, [=] GPU_LAMBDA(char* const data[Arity],
-                             unsigned int strides[Arity]) {
+        iter,
+        [=] GPU_LAMBDA(char* const data[Arity], unsigned int strides[Arity]) {
           char* ptr[Arity];
           for (int k = 0; k < Arity; ++k) ptr[k] = data[k] + strides[k];
           interpn_element<scalar_t, NDIM>(ptr, table, geom, on_nodes);
@@ -31,9 +31,8 @@ void interpn_fused_cuda_impl(at::TensorIterator& iter,
   });
 }
 
-void call_interpn_fused_cuda(at::TensorIterator& iter,
-                             at::Tensor const& lookup, int ndim,
-                             unsigned on_nodes) {
+void call_interpn_fused_cuda(at::TensorIterator& iter, at::Tensor const& lookup,
+                             int ndim, unsigned on_nodes) {
   at::cuda::CUDAGuard device_guard(iter.device());
 
   switch (ndim) {
