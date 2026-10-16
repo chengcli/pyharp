@@ -2,6 +2,7 @@
 #include <disort/index.h>
 
 // harp
+#include "cloud_kernels.hpp"
 #include "water_cloud_temperature.hpp"
 
 namespace harp {
@@ -122,6 +123,12 @@ torch::Tensor TemperatureSwitchWaterCloudImpl::forward(
   // Combine the two populations as independent optical constituents.
   // Extinction adds directly; SSA is extinction weighted; phase moments are
   // scattering weighted.
+  if (cloud_kernels_apply({ice_result, liquid_result})) {
+    auto result = torch::empty_like(ice_result);
+    cloud_switch_fill(result, ice_result, liquid_result);
+    return result;
+  }
+
   auto const ice_extinction = ice_result.select(-1, disort::IEX);
   auto const liquid_extinction = liquid_result.select(-1, disort::IEX);
   auto const extinction = ice_extinction + liquid_extinction;
