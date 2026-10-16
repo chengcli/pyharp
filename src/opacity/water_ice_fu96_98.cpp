@@ -8,6 +8,8 @@
 #include <harp/utils/find_resource.hpp>
 #include <harp/utils/read_data_tensor.hpp>
 
+#include "cloud_kernels.hpp"
+#include "cloud_kernels_impl.h"
 #include "scattering_functions.hpp"
 #include "water_ice_fu96_98.hpp"
 
@@ -242,21 +244,20 @@ torch::Tensor FuWaterIceImpl::forward(
                 "check temp and IWC");
   }
 
-  if (torch::any(iwc > 0.0).item<bool>()) {
-    auto const active = (iwc > 0.0).unsqueeze(0);
-    auto const d = dge.unsqueeze(0);
-    auto const fu96 = use_fu96.view({-1, 1, 1});
-    auto const invalid96 =
-        active & fu96 & ((d < kFu96MinDge) | (d > kFu96MaxDge));
-    auto const fu98 = use_fu98.view({-1, 1, 1});
-    auto const invalid98 =
-        active & fu98 & ((d < kFu98MinDge) | (d > kFu98MaxDge));
-    TORCH_CHECK(!torch::any(invalid96).item<bool>(),
-                "Fu96 Dge must be in [18.63, 130.24] um (equivalent re "
-                "[12.1005, 84.5934] um) where IWC > 0");
-    TORCH_CHECK(!torch::any(invalid98).item<bool>(),
-                "Fu98 Dge must be in [11.0, 129.6] um (equivalent re "
-                "[7.14471, 84.1777] um) where IWC > 0");
+  // Every cell with ice must have Dge inside the range of each
+  // parameterization the spectrum uses.
+  auto const active = iwc > 0.0;
+  if (torch::any(active).item<bool>()) {
+    auto const bad96 = active & ((dge < kFu96MinDge) | (dge > kFu96MaxDge));
+    auto const bad98 = active & ((dge < kFu98MinDge) | (dge > kFu98MaxDge));
+    TORCH_CHECK(
+        !(torch::any(use_fu96).item<bool>() && torch::any(bad96).item<bool>()),
+        "Fu96 Dge must be in [18.63, 130.24] um (equivalent re "
+        "[12.1005, 84.5934] um) where IWC > 0");
+    TORCH_CHECK(
+        !(torch::any(use_fu98).item<bool>() && torch::any(bad98).item<bool>()),
+        "Fu98 Dge must be in [11.0, 129.6] um (equivalent re "
+        "[7.14471, 84.1777] um) where IWC > 0");
   }
 
   auto const d = dge.unsqueeze(0);
@@ -278,9 +279,6 @@ torch::Tensor FuWaterIceImpl::forward(
   auto const c96 =
       fu96_asymmetry_coeff.to(conc.options()).index_select(0, rows96);
   auto const q96 = fu96_delta_coeff.to(conc.options()).index_select(0, rows96);
-  auto extinction96 = fu96_extinction(a96, d);
-  auto ssa96 = 1.0 - fu96_coalbedo(b96, d);
-  auto g96 = fu96_asymmetry(c96, d);
 
   bool delta_scale = false;
   if (kwargs.count("fu_delta_scale") > 0) {
@@ -289,6 +287,59 @@ torch::Tensor FuWaterIceImpl::forward(
                 "fu_delta_scale must be a scalar boolean tensor");
     delta_scale = flag.item<bool>();
   }
+
+  // Fu98: the surrounding wavelength nodes and the weight of the upper one.
+  auto lower98 = torch::zeros_like(rows96);
+  auto upper98 = torch::ones_like(rows96);
+  auto const nodes98 = fu98_wavelength.to(conc.options());
+  for (int node = 0; node < 35; ++node) {
+    auto const mask = (lookup_wavelength >= nodes98[node]) &
+                      (node == 34 ? lookup_wavelength <= nodes98[node + 1]
+                                  : lookup_wavelength < nodes98[node + 1]);
+    lower98.masked_fill_(mask, node);
+    upper98.masked_fill_(mask, node + 1);
+  }
+  auto const wave_lower = nodes98.index_select(0, lower98);
+  auto const wave_upper = nodes98.index_select(0, upper98);
+  auto const interp_wave =
+      (lookup_wavelength - wave_lower) / (wave_upper - wave_lower);
+
+  auto const a98 = fu98_extinction_coeff.to(conc.options());
+  auto const b98 = fu98_absorption_coeff.to(conc.options());
+  auto const c98 = fu98_asymmetry_coeff.to(conc.options());
+  auto const a98_lower = a98.index_select(0, lower98);
+  auto const a98_upper = a98.index_select(0, upper98);
+  auto const b98_lower = b98.index_select(0, lower98);
+  auto const b98_upper = b98.index_select(0, upper98);
+  auto const c98_lower = c98.index_select(0, lower98);
+  auto const c98_upper = c98.index_select(0, upper98);
+
+  int const nmom = options->nmom();
+  if (cloud_kernels_apply({conc, dge, iwc, wavelength})) {
+    // One coefficient row per wavelength; every cell then evaluates only
+    // the parameterization its wavelength uses, in one pass.
+    auto const table =
+        torch::cat({a96, b96, c96, q96, a98_lower, a98_upper, b98_lower,
+                    b98_upper, c98_lower, c98_upper, interp_wave.unsqueeze(-1),
+                    lookup_fu96.to(conc.options()).unsqueeze(-1),
+                    supported.to(conc.options()).unsqueeze(-1)},
+                   1);
+    TORCH_CHECK(table.size(1) == fu::kWidth, "Fu coefficient row has ",
+                table.size(1), " entries, expected ", fu::kWidth);
+    auto result =
+        torch::empty({wavelength.size(0), conc.size(0), conc.size(1), 2 + nmom},
+                     conc.options());
+    auto const invalid = fu_ice_fill(result, table, dge, iwc, delta_scale);
+    TORCH_CHECK(!torch::any(invalid).item<bool>(),
+                "Fu water-ice optical properties are unphysical: extinction "
+                "non-finite or negative, single-scattering albedo outside "
+                "[0, 1], or asymmetry parameter outside (-1, 1)");
+    return result;
+  }
+
+  auto extinction96 = fu96_extinction(a96, d);
+  auto ssa96 = 1.0 - fu96_coalbedo(b96, d);
+  auto g96 = fu96_asymmetry(c96, d);
   if (delta_scale) {
     // Fu (1996), Eq. (3.8): f = 1 / (2 omega) + f_delta. The subsequent
     // scaling follows Appendix A, including computing fw before limiting f
@@ -303,33 +354,15 @@ torch::Tensor FuWaterIceImpl::forward(
 
   // Fu98: evaluate at surrounding wavelength nodes and interpolate the
   // optical properties linearly.
-  auto lower98 = torch::zeros_like(rows96);
-  auto upper98 = torch::ones_like(rows96);
-  auto const nodes98 = fu98_wavelength.to(conc.options());
-  for (int node = 0; node < 35; ++node) {
-    auto const mask = (lookup_wavelength >= nodes98[node]) &
-                      (node == 34 ? lookup_wavelength <= nodes98[node + 1]
-                                  : lookup_wavelength < nodes98[node + 1]);
-    lower98.masked_fill_(mask, node);
-    upper98.masked_fill_(mask, node + 1);
-  }
-  auto const wave_lower = nodes98.index_select(0, lower98);
-  auto const wave_upper = nodes98.index_select(0, upper98);
-  auto const interp =
-      ((lookup_wavelength - wave_lower) / (wave_upper - wave_lower))
-          .view({-1, 1, 1});
-
-  auto const a98 = fu98_extinction_coeff.to(conc.options());
-  auto const b98 = fu98_absorption_coeff.to(conc.options());
-  auto const c98 = fu98_asymmetry_coeff.to(conc.options());
-  auto const ext_lower = fu98_extinction(a98.index_select(0, lower98), d);
-  auto const ext_upper = fu98_extinction(a98.index_select(0, upper98), d);
+  auto const interp = interp_wave.view({-1, 1, 1});
+  auto const ext_lower = fu98_extinction(a98_lower, d);
+  auto const ext_upper = fu98_extinction(a98_upper, d);
   auto const extinction98 = ext_lower + interp * (ext_upper - ext_lower);
-  auto const abs_lower = fu98_absorption(b98.index_select(0, lower98), d);
-  auto const abs_upper = fu98_absorption(b98.index_select(0, upper98), d);
+  auto const abs_lower = fu98_absorption(b98_lower, d);
+  auto const abs_upper = fu98_absorption(b98_upper, d);
   auto const absorption98 = abs_lower + interp * (abs_upper - abs_lower);
-  auto const g_lower = fu98_asymmetry(c98.index_select(0, lower98), d);
-  auto const g_upper = fu98_asymmetry(c98.index_select(0, upper98), d);
+  auto const g_lower = fu98_asymmetry(c98_lower, d);
+  auto const g_upper = fu98_asymmetry(c98_upper, d);
   auto const g98 = g_lower + interp * (g_upper - g_lower);
   auto const ssa98 = (extinction98 - absorption98) / extinction98;
 
@@ -354,13 +387,12 @@ torch::Tensor FuWaterIceImpl::forward(
   TORCH_CHECK(torch::all((g > -1.0) & (g < 1.0)).item<bool>(),
               "Fu water-ice asymmetry parameter is outside (-1, 1)");
 
-  auto result = torch::zeros(
-      {wavelength.size(0), conc.size(0), conc.size(1), 2 + options->nmom()},
-      conc.options());
+  auto result =
+      torch::zeros({wavelength.size(0), conc.size(0), conc.size(1), 2 + nmom},
+                   conc.options());
   result.select(-1, disort::IEX).copy_(extinction * iwc.unsqueeze(0));
   result.select(-1, disort::ISS).copy_(ssa);
-  result.narrow(-1, disort::IPM, options->nmom())
-      .copy_(henyey_greenstein(options->nmom(), g));
+  result.narrow(-1, disort::IPM, nmom).copy_(henyey_greenstein(nmom, g));
   return result;
 }
 
