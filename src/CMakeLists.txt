@@ -67,6 +67,7 @@ if (CUDAToolkit_FOUND)
       integrator/*.cu
       math/*.cu
       opacity/*.cu
+      radiation/*.cu
       rtsolver/*.cu
       )
 
