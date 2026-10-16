@@ -7,6 +7,32 @@
 // harp
 #include <harp/math/interpolation.hpp>
 
+#include "device_testing.hpp"
+
+namespace {
+
+// Equal including the sign of zero and NaN, which torch::equal treats as
+// unequal to itself.
+bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
+  if (a.sizes() != b.sizes() || a.scalar_type() != b.scalar_type()) {
+    return false;
+  }
+  auto bits = a.scalar_type() == torch::kFloat64 ? torch::kInt64 : torch::kInt32;
+  return torch::equal(a.contiguous().view(bits), b.contiguous().view(bits));
+}
+
+// The recursion over tensors is kept for tables that carry gradients, so a
+// tracked copy of the table routes the same query through it.
+torch::Tensor reference_interpn(std::vector<torch::Tensor> const& query,
+                                std::vector<torch::Tensor> const& coords,
+                                torch::Tensor const& lookup,
+                                bool extrapolate = false) {
+  auto tracked = lookup.detach().clone().set_requires_grad(true);
+  return harp::interpn(query, coords, tracked, extrapolate).detach();
+}
+
+}  // namespace
+
 TEST(TestInterpolation, test1DIncreasing) {
   // Coordinate arrays
   std::vector<torch::Tensor> coords = {
@@ -215,6 +241,80 @@ TEST(TestInterpolation, testClampsOutsideTheTable) {
   EXPECT_NEAR(result[0][0].item<double>(), 5.0, 1e-12);
   EXPECT_NEAR(result[1][0].item<double>(), 5.5, 1e-12);
   EXPECT_NEAR(result[2][0].item<double>(), 7.0, 1e-12);
+}
+
+TEST_P(DeviceTest, FusedMatchesTensorPathOnOpacityQueries) {
+  // The shapes an opacity table is queried with: wavenumber over the
+  // spectral axis only, pressure and temperature over (column, layer). The
+  // table holds -inf where a cross section is zero, as the log tables do.
+  torch::manual_seed(0);
+  auto opt = torch::TensorOptions().dtype(dtype).device(device);
+  const int nwave = 11, ncol = 3, nlyr = 5, nval = 2;
+
+  auto kwave = torch::linspace(100.0, 800.0, nwave, opt);
+  auto klnp = torch::linspace(0.0, 6.0, 7, opt);
+  auto ktemp = torch::linspace(-40.0, 40.0, 4, opt);
+  auto lookup = torch::randn({nwave, 7, 4, nval}, opt);
+  lookup[2][3][1][0].fill_(-std::numeric_limits<double>::infinity());
+  lookup[5][0][0][1].fill_(-std::numeric_limits<double>::infinity());
+
+  // Pressure runs past both table ends; one temperature lands on a node.
+  auto lnp = (torch::rand({ncol, nlyr}, opt) * 8.0 - 1.0).unsqueeze(0);
+  auto tempa = torch::rand({ncol, nlyr}, opt) * 100.0 - 50.0;
+  tempa[1][2] = ktemp[1];
+  tempa = tempa.unsqueeze(0);
+
+  std::vector<torch::Tensor> coords = {kwave, klnp, ktemp};
+  for (bool extrapolate : {false, true}) {
+    // Wavenumber on its own nodes takes the branch that skips the zero
+    // weight; shifted off them, every corner is read.
+    for (auto wave :
+         {kwave.view({nwave, 1, 1}), (kwave + 7.0).view({nwave, 1, 1})}) {
+      std::vector<torch::Tensor> query = {wave, lnp, tempa};
+      auto fused = harp::interpn(query, coords, lookup, extrapolate);
+      auto reference = reference_interpn(query, coords, lookup, extrapolate);
+      ASSERT_EQ(fused.sizes(), torch::IntArrayRef({nwave, ncol, nlyr, nval}));
+      EXPECT_FALSE(fused.requires_grad());
+      EXPECT_TRUE(same_bits(fused, reference))
+          << "extrapolate = " << extrapolate;
+    }
+  }
+}
+
+TEST_P(DeviceTest, FusedMatchesTensorPathInOneAndTwoDimensions) {
+  torch::manual_seed(1);
+  auto opt = torch::TensorOptions().dtype(dtype).device(device);
+
+  // One dimension, decreasing axis, queries past both ends.
+  auto x = torch::tensor({5.0, 4.0, 3.0, 2.0, 1.0}, opt);
+  auto table1 = torch::randn({5, 3}, opt);
+  auto q1 = torch::linspace(0.0, 6.0, 13, opt);
+  EXPECT_TRUE(same_bits(harp::interpn({q1}, {x}, table1),
+                        reference_interpn({q1}, {x}, table1)));
+
+  // Two dimensions, fully expanded queries.
+  auto y = torch::tensor({10.0, 20.0, 35.0}, opt);
+  auto table2 = torch::randn({5, 3, 1}, opt);
+  auto qx = torch::rand({4, 6}, opt) * 6.0;
+  auto qy = torch::rand({4, 6}, opt) * 30.0 + 5.0;
+  EXPECT_TRUE(same_bits(harp::interpn({qx, qy}, {x, y}, table2),
+                        reference_interpn({qx, qy}, {x, y}, table2)));
+}
+
+TEST_P(DeviceTest, FusedLeavesTrackedQueriesToTensorPath) {
+  // A query that is being differentiated must still reach the autograd
+  // graph, whatever device it lives on.
+  auto opt = torch::TensorOptions().dtype(dtype).device(device);
+  auto x = torch::tensor({0.0, 1.0, 2.0}, opt);
+  auto lookup = torch::tensor({{1.0}, {3.0}, {2.0}}, opt);
+  auto query = torch::tensor({0.25, 1.5}, opt).set_requires_grad(true);
+
+  auto result = harp::interpn({query}, {x}, lookup);
+  ASSERT_TRUE(result.requires_grad());
+  result.sum().backward();
+  ASSERT_TRUE(query.grad().defined());
+  EXPECT_TRUE(torch::allclose(query.grad().to(torch::kCPU, torch::kFloat64),
+                              torch::tensor({2.0, -1.0}, torch::kFloat64)));
 }
 
 int main(int argc, char** argv) {
