@@ -5,6 +5,7 @@
 enable_testing()
 
 setup_test(test_attenuator)
+setup_test(test_band_accumulate)
 setup_test(test_cia_autograd)
 setup_test(test_interpn)
 setup_test(test_hypsometric)
