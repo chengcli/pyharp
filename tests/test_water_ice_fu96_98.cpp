@@ -97,6 +97,28 @@ TEST_P(DeviceTest, FuWaterIceKernelMatchesTensorPath) {
   }
 }
 
+TEST_P(DeviceTest, FuWaterIceTrackedCoefficientsKeepTheGraph) {
+  // A coefficient buffer that requires grad must route the forward through
+  // the tensor expressions, so that its gradient is defined.
+  harp::species_weights = {18.01528e-3};
+  auto opt = torch::TensorOptions().dtype(dtype).device(device);
+  harp::FuWaterIce ice(fu_options(2));
+  ice->to(device, dtype);
+  ice->fu96_extinction_coeff.set_requires_grad(true);
+
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] = torch::tensor({0.5, 10.0}, opt);
+  atm["re"] = torch::tensor(re_from_dge(50.0), opt);
+  auto conc = torch::full({1, 2, 1}, 0.01, opt);
+
+  auto result = ice->forward(conc, atm);
+  ASSERT_TRUE(result.requires_grad());
+  result.select(-1, 0).sum().backward();
+  auto const& grad = ice->fu96_extinction_coeff.grad();
+  ASSERT_TRUE(grad.defined());
+  EXPECT_TRUE(torch::any(grad != 0.0).item<bool>());
+}
+
 TEST(TestFuWaterIce, UsesFu96AndFu98Bands) {
   harp::species_weights = {18.01528e-3};
   harp::FuWaterIce ice(fu_options());
