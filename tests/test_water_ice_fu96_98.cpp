@@ -10,6 +10,7 @@
 
 // harp
 #include <harp/opacity/opacity_options.hpp>
+#include <harp/opacity/scattering_functions.hpp>
 #include <harp/opacity/water_ice_fu96_98.hpp>
 
 #include "device_testing.hpp"
@@ -35,7 +36,88 @@ double sun_rikus_dge(double temp_k, double iwc_g_m3) {
   return factor * (a + b * (temp_k - 83.15));
 }
 
+// Equal including the sign of zero and NaN, which torch::equal treats as
+// unequal to itself.
+bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
+  if (a.sizes() != b.sizes() || a.scalar_type() != b.scalar_type()) {
+    return false;
+  }
+  auto bits =
+      a.scalar_type() == torch::kFloat64 ? torch::kInt64 : torch::kInt32;
+  return torch::equal(a.contiguous().view(bits), b.contiguous().view(bits));
+}
+
 }  // namespace
+
+TEST_P(DeviceTest, FuWaterIceKernelMatchesTensorPath) {
+  // The kernel evaluates each cell in one pass; a tracked concentration
+  // routes the same inputs through the tensor expressions.
+  harp::species_weights = {18.01528e-3};
+  torch::manual_seed(0);
+  auto opt = torch::TensorOptions().dtype(dtype).device(device);
+  harp::FuWaterIce ice(fu_options(3));
+  ice->to(device, dtype);
+
+  // Below Fu96, inside it, at the Fu98 boundary, inside Fu98, at its upper
+  // end, and beyond.
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] =
+      torch::tensor({0.2, 0.5, 2.0, 3.99, 4.0, 10.0, 70.0, 100.0, 150.0}, opt);
+  // Two columns, three layers, one of them ice free.
+  auto conc = torch::rand({2, 3, 1}, opt) * 0.05;
+  conc[1][1][0] = 0.0;
+  auto re =
+      torch::tensor({{re_from_dge(20.0), re_from_dge(50.0), re_from_dge(125.0)},
+                     {re_from_dge(30.0), re_from_dge(60.0), re_from_dge(90.0)}},
+                    opt);
+
+  for (bool delta_scale : {false, true}) {
+    for (bool diagnose_dge : {false, true}) {
+      auto kwargs = atm;
+      if (delta_scale) kwargs["fu_delta_scale"] = torch::tensor(true);
+      if (diagnose_dge) {
+        kwargs["temp"] = torch::full({2, 3}, 233.15, opt);
+      } else {
+        kwargs["re"] = re;
+      }
+      auto fused = ice->forward(conc, kwargs);
+      auto tracked = conc.clone().set_requires_grad(true);
+      auto reference = ice->forward(tracked, kwargs).detach();
+      // When Dge is diagnosed, the tracked concentration also tracks g,
+      // which routes henyey_greenstein differently from an untracked g. The
+      // kernel follows the untracked route, so take the moments from it.
+      reference.narrow(-1, 2, 3).copy_(
+          harp::henyey_greenstein(3, reference.select(-1, 2).contiguous()));
+      ASSERT_EQ(fused.sizes(), torch::IntArrayRef({9, 2, 3, 5}));
+      EXPECT_FALSE(fused.requires_grad());
+      EXPECT_TRUE(same_bits(fused, reference))
+          << "delta_scale = " << delta_scale
+          << ", diagnose_dge = " << diagnose_dge;
+    }
+  }
+}
+
+TEST_P(DeviceTest, FuWaterIceTrackedCoefficientsKeepTheGraph) {
+  // A coefficient buffer that requires grad must route the forward through
+  // the tensor expressions, so that its gradient is defined.
+  harp::species_weights = {18.01528e-3};
+  auto opt = torch::TensorOptions().dtype(dtype).device(device);
+  harp::FuWaterIce ice(fu_options(2));
+  ice->to(device, dtype);
+  ice->fu96_extinction_coeff.set_requires_grad(true);
+
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] = torch::tensor({0.5, 10.0}, opt);
+  atm["re"] = torch::tensor(re_from_dge(50.0), opt);
+  auto conc = torch::full({1, 2, 1}, 0.01, opt);
+
+  auto result = ice->forward(conc, atm);
+  ASSERT_TRUE(result.requires_grad());
+  result.select(-1, 0).sum().backward();
+  auto const& grad = ice->fu96_extinction_coeff.grad();
+  ASSERT_TRUE(grad.defined());
+  EXPECT_TRUE(torch::any(grad != 0.0).item<bool>());
+}
 
 TEST(TestFuWaterIce, UsesFu96AndFu98Bands) {
   harp::species_weights = {18.01528e-3};
