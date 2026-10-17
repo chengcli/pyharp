@@ -315,17 +315,19 @@ torch::Tensor FuWaterIceImpl::forward(
   auto const c98_upper = c98.index_select(0, upper98);
 
   int const nmom = options->nmom();
-  if (cloud_kernels_apply({conc, dge, iwc, wavelength})) {
-    // One coefficient row per wavelength; every cell then evaluates only
-    // the parameterization its wavelength uses, in one pass.
-    auto const table =
-        torch::cat({a96, b96, c96, q96, a98_lower, a98_upper, b98_lower,
-                    b98_upper, c98_lower, c98_upper, interp_wave.unsqueeze(-1),
-                    lookup_fu96.to(conc.options()).unsqueeze(-1),
-                    supported.to(conc.options()).unsqueeze(-1)},
-                   1);
-    TORCH_CHECK(table.size(1) == fu::kWidth, "Fu coefficient row has ",
-                table.size(1), " entries, expected ", fu::kWidth);
+  // One coefficient row per wavelength. It carries the coefficient buffers'
+  // autograd state, so a tracked buffer keeps the tensor expressions below.
+  auto const table =
+      torch::cat({a96, b96, c96, q96, a98_lower, a98_upper, b98_lower,
+                  b98_upper, c98_lower, c98_upper, interp_wave.unsqueeze(-1),
+                  lookup_fu96.to(conc.options()).unsqueeze(-1),
+                  supported.to(conc.options()).unsqueeze(-1)},
+                 1);
+  TORCH_CHECK(table.size(1) == fu::kWidth, "Fu coefficient row has ",
+              table.size(1), " entries, expected ", fu::kWidth);
+  if (cloud_kernels_apply({conc, dge, iwc, wavelength, table})) {
+    // Every cell evaluates only the parameterization its wavelength uses, in
+    // one pass.
     auto result =
         torch::empty({wavelength.size(0), conc.size(0), conc.size(1), 2 + nmom},
                      conc.options());
