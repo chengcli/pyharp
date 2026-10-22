@@ -33,7 +33,48 @@ harp::OpacityOptions cloud_options(std::string const& type, int nmom = 2) {
 
 double re_from_dge(double dge) { return 3.0 * std::sqrt(3.0) * dge / 8.0; }
 
+// Equal including the sign of zero and NaN, which torch::equal treats as
+// unequal to itself.
+bool same_bits(torch::Tensor const& a, torch::Tensor const& b) {
+  if (a.sizes() != b.sizes() || a.scalar_type() != b.scalar_type()) {
+    return false;
+  }
+  auto bits =
+      a.scalar_type() == torch::kFloat64 ? torch::kInt64 : torch::kInt32;
+  return torch::equal(a.contiguous().view(bits), b.contiguous().view(bits));
+}
+
 }  // namespace
+
+TEST_P(DeviceTest, TemperatureSwitchKernelMatchesTensorPath) {
+  // Pure ice, mixed and pure liquid layers, one of them condensate free. A
+  // tracked concentration routes the same inputs through the tensor
+  // expressions of the switch and of the Fu ice model.
+  harp::species_weights = {18.01528e-3};
+  torch::manual_seed(0);
+  auto opt = torch::TensorOptions().dtype(dtype).device(device);
+  harp::TemperatureSwitchWaterCloud cloud(
+      cloud_options("water-cloud-temperature-switch", 3));
+  cloud->to(device, dtype);
+
+  auto conc = torch::rand({3, 4, 1}, opt) * 0.02;
+  conc[0][1][0] = 0.0;
+  std::map<std::string, torch::Tensor> atm;
+  atm["wavelength"] = torch::tensor({0.5, 2.0, 10.0, 50.0}, opt);
+  atm["ice_re"] = torch::tensor(re_from_dge(50.0), opt);
+  atm["liquid_re"] = torch::tensor(10.0, opt);
+  atm["temp"] = torch::tensor({{240.0, 253.15, 260.0, 268.0},
+                               {273.15, 280.0, 250.0, 263.0},
+                               {255.0, 265.0, 275.0, 245.0}},
+                              opt);
+
+  auto fused = cloud->forward(conc, atm);
+  auto reference =
+      cloud->forward(conc.clone().set_requires_grad(true), atm).detach();
+  ASSERT_EQ(fused.sizes(), torch::IntArrayRef({4, 3, 4, 5}));
+  EXPECT_FALSE(fused.requires_grad());
+  EXPECT_TRUE(same_bits(fused, reference));
+}
 
 TEST(TestTemperatureSwitchWaterCloud, UsesPurePhasesOutsideMixedPhaseRange) {
   harp::species_weights = {18.01528e-3};
