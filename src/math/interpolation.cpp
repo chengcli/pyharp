@@ -2,7 +2,15 @@
 #include <iostream>
 #include <vector>
 
+// torch
+#include <ATen/Dispatch.h>
+#include <ATen/ExpandUtils.h>
+#include <ATen/TensorIterator.h>
+#include <ATen/native/DispatchStub.h>
+
 // harp
+#include "interpn_dispatch.hpp"
+#include "interpn_impl.h"
 #include "interpolation.hpp"
 
 namespace harp {
@@ -120,6 +128,129 @@ torch::Tensor interpn_recur(
   return interp_low * axis.weight_low + interp_high * axis.weight_high;
 }
 
+bool tracks_gradient(torch::Tensor const& t) {
+  return (torch::GradMode::is_enabled() && t.requires_grad()) ||
+         t._fw_grad(/*level=*/0).defined();
+}
+
+template <int NDIM>
+void interpn_fused_cpu_impl(at::TensorIterator& iter,
+                            torch::Tensor const& lookup, unsigned on_nodes) {
+  constexpr int Arity = 2 + 4 * NDIM;
+  InterpnTable geom{};
+  for (int d = 0; d < NDIM; ++d) geom.stride[d] = lookup.stride(d);
+
+  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "interpn_fused_cpu", [&] {
+    auto table = lookup.data_ptr<scalar_t>();
+    iter.for_each([&](char** data, const int64_t* strides, int64_t n) {
+      char* ptr[Arity];
+      for (int64_t i = 0; i < n; ++i) {
+        for (int k = 0; k < Arity; ++k) ptr[k] = data[k] + i * strides[k];
+        interpn_element<scalar_t, NDIM>(ptr, table, geom, on_nodes);
+      }
+    });
+  });
+}
+
+void call_interpn_fused_cpu(at::TensorIterator& iter,
+                            torch::Tensor const& lookup, int ndim,
+                            unsigned on_nodes) {
+  switch (ndim) {
+    case 1:
+      interpn_fused_cpu_impl<1>(iter, lookup, on_nodes);
+      break;
+    case 2:
+      interpn_fused_cpu_impl<2>(iter, lookup, on_nodes);
+      break;
+    case 3:
+      interpn_fused_cpu_impl<3>(iter, lookup, on_nodes);
+      break;
+    case 4:
+      interpn_fused_cpu_impl<4>(iter, lookup, on_nodes);
+      break;
+    default:
+      TORCH_CHECK(false, "interpn: fused kernel takes 1 to 4 dimensions, got ",
+                  ndim);
+  }
+}
+
+// Gather and blend every query's table corners in one kernel.
+/*
+ * The recursion over tensors materializes each of the 2^ndim corner gathers
+ * at the full output size and then combines them with one multiply and add
+ * per level, each a pass over the whole output. The fused kernel reads the
+ * corners and writes the result once. It produces the same bits as the
+ * recursion but carries no autograd graph, so it is used only when nothing
+ * it reads is being differentiated; the returned tensor is undefined when the
+ * recursion has to be used instead.
+ */
+torch::Tensor interpn_fused(std::vector<AxisWeights> const& axes,
+                            std::vector<torch::Tensor> const& query_coords,
+                            std::vector<torch::Tensor> const& coords,
+                            torch::Tensor const& lookup) {
+  int const ndim = axes.size();
+  if (ndim < 1 || ndim > 4 || lookup.dim() != ndim + 1) return {};
+
+  auto const device = lookup.device();
+  if (!device.is_cpu() && !device.is_cuda()) return {};
+
+  auto const dtype = lookup.scalar_type();
+  if (dtype != torch::kFloat32 && dtype != torch::kFloat64) return {};
+
+  if (tracks_gradient(lookup)) return {};
+  for (auto const& t : query_coords) {
+    if (tracks_gradient(t) || t.device() != device) return {};
+  }
+  for (auto const& t : coords) {
+    if (tracks_gradient(t) || t.device() != device) return {};
+  }
+  for (auto const& axis : axes) {
+    if (axis.weight_low.scalar_type() != dtype ||
+        axis.weight_high.scalar_type() != dtype ||
+        axis.index_low.scalar_type() != torch::kLong ||
+        axis.index_high.scalar_type() != torch::kLong) {
+      return {};
+    }
+  }
+
+  std::vector<int64_t> shape;
+  for (auto const& axis : axes) {
+    shape = at::infer_size(shape, axis.index_low.sizes());
+  }
+  int64_t const nval = lookup.size(-1);
+  std::vector<int64_t> value_shape(shape.size(), 1);
+  value_shape.push_back(nval);
+  shape.push_back(nval);
+
+  auto out = torch::empty(shape, lookup.options());
+  if (out.numel() == 0) return out;
+
+  auto table = lookup.contiguous();
+  auto value_index =
+      torch::arange(nval,
+                    torch::TensorOptions().dtype(torch::kLong).device(device))
+          .view(value_shape);
+
+  at::TensorIteratorConfig config;
+  config.check_all_same_dtype(false)
+      .resize_outputs(false)
+      .add_output(out)
+      .add_owned_input(value_index);
+  unsigned on_nodes = 0;
+  for (int d = 0; d < ndim; ++d) {
+    config.add_owned_input(axes[d].index_low.unsqueeze(-1))
+        .add_owned_input(axes[d].index_high.unsqueeze(-1))
+        .add_owned_input(axes[d].weight_low)
+        .add_owned_input(axes[d].weight_high);
+    if (axes[d].on_nodes) on_nodes |= 1u << d;
+  }
+  auto iter = config.build();
+
+  at::native::call_interpn_fused(iter.device_type(), iter, table, ndim,
+                                 on_nodes);
+  return out;
+}
+
 }  // namespace
 
 // Wrapper function for interpolation
@@ -148,8 +279,18 @@ torch::Tensor interpn(std::vector<torch::Tensor> const& query_coords,
     axes.push_back(locate_on_axis(coords[dim], query_coords[dim], extrapolate));
   }
 
+  auto fused = interpn_fused(axes, query_coords, coords, lookup);
+  if (fused.defined()) return fused;
+
   // Perform recursive interpolation
   return interpn_recur(axes, lookup, {});
 }
 
 }  // namespace harp
+
+namespace at::native {
+
+DEFINE_DISPATCH(call_interpn_fused);
+REGISTER_ALL_CPU_DISPATCH(call_interpn_fused, &harp::call_interpn_fused_cpu);
+
+}  // namespace at::native
