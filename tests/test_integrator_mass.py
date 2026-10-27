@@ -34,23 +34,23 @@ def per_step_mass_change(kind, exchange_rate, n=200_000, steps=10, seed=0):
     return changes
 
 
-@pytest.mark.parametrize("kind", ["rk1", "rk2", "rk3"])
+@pytest.mark.parametrize("kind", ["rk1", "rk2", "rk3", "rk3s4"])
 def test_closed_box_at_rest_keeps_its_mass(kind):
-    # nothing moves: only the state weights act on the total (rk3 before the fix: up to 3.7e-17 per step)
+    # nothing moves: only the state weights act on the total (rk3 and rk3s4 before the fix: up to 3.7e-17 per step)
     worst = max(abs(c) for c in per_step_mass_change(kind, 0.0))
     assert worst <= 2e-18, f"{kind}: per-step relative mass change up to {worst:.2e}"
 
 
-@pytest.mark.parametrize("kind", ["rk1", "rk2", "rk3"])
+@pytest.mark.parametrize("kind", ["rk1", "rk2", "rk3", "rk3s4"])
 def test_closed_box_with_exchange_keeps_its_mass(kind):
     # a conservative exchange between cells: what remains is the round-off of the exchange term itself, a few
-    # 1e-18 for any weights that sum to 1 (rk3 before the fix: mean -5.8e-17 per step)
+    # 1e-18 for any weights that sum to 1 (rk3 and rk3s4 before the fix: mean -5.8e-17 per step)
     changes = per_step_mass_change(kind, 1e-3)
     mean = sum(changes) / len(changes)
     assert abs(mean) <= 5e-18, f"{kind}: mean per-step relative mass change {mean:+.2e}"
 
 
-@pytest.mark.parametrize("kind", ["rk1", "rk2", "rk3"])
+@pytest.mark.parametrize("kind", ["rk1", "rk2", "rk3", "rk3s4"])
 def test_state_weights_sum_to_exactly_one(kind):
     for s, w in enumerate(integrator(kind).stages):
         assert Fraction(w.wght0()) + Fraction(w.wght1()) == 1, f"{kind} stage {s}: {w.wght0()!r} + {w.wght1()!r}"

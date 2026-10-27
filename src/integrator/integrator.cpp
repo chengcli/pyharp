@@ -72,8 +72,9 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[1].wght1(1.0);
     stages[1].wght2(0.5);
 
+    // w1 is computed as 1. - 2./3., exact in double, as in rk3 above
     stages[2].wght0(2. / 3.);
-    stages[2].wght1(1. / 3.);
+    stages[2].wght1(1. - 2. / 3.);
     stages[2].wght2(1. / 6.);
 
     stages[3].wght0(0.);
