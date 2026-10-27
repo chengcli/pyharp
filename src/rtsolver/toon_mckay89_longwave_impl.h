@@ -241,10 +241,15 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     n_idx++;
   }
 
-  Af[l - 1] = E1[nlay - 1] - a_surf_in * E3[nlay - 1];
-  Bf[l - 1] = E2[nlay - 1] - a_surf_in * E4[nlay - 1];
+  // The bottom boundary reflects only off a hard surface. Below a gas giant's
+  // column (hard_surface = false) the boundary is the Planck + gradient source
+  // above and the angular sweep below, neither of which reflects, so the
+  // surface albedo must not enter this row either.
+  T const a_row = hard_surface ? a_surf_in : static_cast<T>(0);
+  Af[l - 1] = E1[nlay - 1] - a_row * E3[nlay - 1];
+  Bf[l - 1] = E2[nlay - 1] - a_row * E4[nlay - 1];
   Cf[l - 1] = 0.0;
-  Df[l - 1] = bsurf_flux - Cp[nlay - 1] + a_surf_in * Cm[nlay - 1];
+  Df[l - 1] = bsurf_flux - Cp[nlay - 1] + a_row * Cm[nlay - 1];
 
   dtridgl(l, Af, Bf, Cf, Df, xkk);
 
