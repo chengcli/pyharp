@@ -5,7 +5,10 @@ requires = [
   "wheel",
   "build",
   "ninja",
-  "pydisort>=1.7.1",
+  # <1.8: with pydisort 1.8.13 the DISORT test of tests/test_rayleigh.py passes and the process then aborts
+  # with "double free or corruption" (3 of 3 runs; 1.7.1 is clean); pydisort 1.8 changed the size of the
+  # DisortImpl object pyharp allocates. Lift the bound once that is fixed.
+  "pydisort>=1.7.1,<1.8",
   "cmake>=3.20",
   "torch==2.10.0",
 ]
@@ -26,7 +29,7 @@ dependencies = [
   "matplotlib",
   "netCDF4",
   "numpy",
-  "pydisort>=1.7.1",
+  "pydisort>=1.7.1,<1.8",  # see build-system.requires: aborts with 1.8.13
   "scipy",
   "xarray",
 ]
