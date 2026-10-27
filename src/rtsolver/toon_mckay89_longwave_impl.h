@@ -63,7 +63,8 @@ DISPATCH_MACRO T longwave_midpoint_up_resonant_ratio(T delta, T half_a) {
 
 template <typename T>
 DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
-                                          T a_surf_in, int top_emission_flag,
+                                          T a_surf_in, T bsurf_in,
+                                          int top_emission_flag,
                                           T btop_factor, bool hard_surface,
                                           bool delta_eddington_lw, T* flx,
                                           int len1, char* work,
@@ -201,7 +202,9 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   } else {
     Btop = top_emission_flag * BE_IN(0);
   }
-  T Bsurf = BE_IN(nlev - 1);
+  // Planck function of the surface: of bc "btemp" when given, else of the
+  // bottom level (the caller passes it either way)
+  T Bsurf = bsurf_in;
 
   // Bottom boundary condition depends on surface type:
   // Gas giant (hard_surface=false): Planck + gradient extrapolation below
