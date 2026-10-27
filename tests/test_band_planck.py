@@ -357,3 +357,16 @@ def test_transparent_column_carries_the_beam_unchanged(tmp_path, solver, nu1, nu
     print(f"{solver} {nu1}-{nu2} cm-1, nwave {nwave}: downward at TOA {toa:.15g}, at the surface {surface:.15g}")
     assert abs(toa - 1.0) < 1e-12
     assert abs(surface - 1.0) < 1e-12
+
+
+def test_beam_only_band_400_600_returns_fbeam(tmp_path):
+    """Convention: fbeam is in W/m^2 and a wavenumber grid without weights
+    averages its points, so a beam of 1 W/m^2 over the 400-600 cm^-1 band
+    returns 1 W/m^2 through Toon (main returned the band width, 200)."""
+    nwave = 17
+    band, nlyr = make_band(tmp_path, "toon", 400.0, 600.0, nwave, thermal=False)
+    bc = {"B/albedo": torch.zeros(nwave, 1), "B/fbeam": torch.ones(nwave, 1), "B/umu0": torch.ones(1)}
+    flux = band.forward(torch.zeros(1, nlyr, 1), torch.ones(nlyr), bc, {})
+    toa, surface = flux[0, -1, 1].item(), flux[0, 0, 1].item()
+    print(f"toon beam-only 400-600 cm-1, fbeam 1 W/m^2: downward at TOA {toa:.15g}, at the surface {surface:.15g}")
+    assert abs(toa - 1.0) < 1e-12 and abs(surface - 1.0) < 1e-12
