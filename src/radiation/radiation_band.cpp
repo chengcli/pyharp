@@ -416,15 +416,18 @@ torch::Tensor RadiationBandImpl::forward(
     // Every spectral point solves the band with its own optical properties
     // and the Planck source integrated over the band (wave_lower and
     // wave_upper are the band limits), so each point's flux is already a band
-    // flux. Average them over the wavenumber grid, with the trapezoid weights
-    // normalized to 1 as the weights of a weighted band are; integrating them
-    // over wavenumber would multiply the band flux by the band width.
+    // flux. Average them over the wavenumber grid: the trapezoid weights
+    // divided by their signed sum, the last minus the first wavenumber, sum to
+    // 1 for an ascending and a descending grid alike, as the weights of a
+    // weighted band do. Integrating them over wavenumber would multiply the
+    // band flux by the band width.
     auto wave = torch::tensor(options->wavenumber(), spectrum.options());
-    auto width = wave.max() - wave.min();
-    if (wave.size(0) == 1) {
+    int npoint = wave.size(0);
+    double span = npoint > 1 ? (wave[npoint - 1] - wave[0]).item<double>() : 0.;
+    if (npoint == 1) {
       result = spectrum[0];
-    } else if (width.item<double>() > 0.) {
-      result = sum_spectrum(spectrum, wave, "wavenumber") / width;
+    } else if (span != 0.) {
+      result = sum_spectrum(spectrum, wave, "wavenumber") / span;
     } else {
       result = spectrum.mean(0);
     }

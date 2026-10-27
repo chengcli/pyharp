@@ -100,10 +100,12 @@ def reference(solver, nu1, nu2, temp):
     return band_planck_flux(nu1, nu2, temp)
 
 
-def make_band(tmp_path, solver, nu1, nu2, nwave, nlyr=4, thermal=True):
+def make_band(tmp_path, solver, nu1, nu2, nwave, nlyr=4, thermal=True, descending=False):
     """A grey, purely absorbing band (fourcolumn table, constant extinction)
-    on a wavenumber grid of nwave points between the band limits; without
-    thermal, the solver has no Planck source (a beam-only band)."""
+    on a wavenumber grid of nwave points between the band limits, ascending
+    or descending; without thermal, the solver has no Planck source (a
+    beam-only band)."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / "grey.txt").write_text("1. 1. 0. 0.\n100000. 1. 0. 0.\n")
     if thermal:
         flags = "planck,hard_surface" if solver == "toon" else "lamber,quiet,onlyfl,planck"
@@ -131,7 +133,8 @@ bands:
     if nwave == 1:
         band.wavenumber([nu1])
     else:
-        band.wavenumber(torch.linspace(nu1, nu2, nwave).tolist())
+        grid = torch.linspace(nu1, nu2, nwave)
+        band.wavenumber((grid.flip(0) if descending else grid).tolist())
     if solver == "disort":
         pyharp.disort_config(band.disort(), 4, nlyr, 1, nwave)
     return pyharp.RadiationBand(band), nlyr
@@ -291,3 +294,25 @@ def test_beam_irradiance_is_per_point_band_irradiance(tmp_path, solver, nu1, nu2
     print(f"{solver} {nu1}-{nu2} cm-1, fbeam {fbeam} at every point: TOA downward {flux:.12e}, "
           f"umu0 * fbeam {UMU0 * fbeam}")
     assert abs(flux / (UMU0 * fbeam) - 1.0) < 1e-12
+
+
+@pytest.mark.parametrize("solver", ["toon", "disort"])
+@pytest.mark.parametrize("thermal", [True, False], ids=["thermal", "beam"])
+def test_descending_wavenumber_grid_gives_the_same_band_flux(tmp_path, solver, thermal):
+    """The same band on an ascending and a descending wavenumber grid gives the
+    same positive band flux."""
+    nu1, nu2, nwave = BANDS[1][0], BANDS[1][1], 17
+    flux = {}
+    for order in ("ascending", "descending"):
+        band, nlyr = make_band(tmp_path / order, solver, nu1, nu2, nwave, thermal=thermal,
+                               descending=order == "descending")
+        if thermal:
+            flux[order] = toa_upward_flux(band, nlyr, nwave, TEMP)
+        else:
+            flux[order] = toa_downward_beam_flux(band, nlyr, nwave, 1.0)
+    ref = reference(solver, nu1, nu2, TEMP) if thermal else UMU0
+    print(f"{solver} {'thermal' if thermal else 'beam'} {nu1}-{nu2} cm-1: ascending {flux['ascending']:.12e}, "
+          f"descending {flux['descending']:.12e}, reference {ref:.12e}")
+    assert flux["descending"] > 0.0
+    assert abs(flux["descending"] / flux["ascending"] - 1.0) < 1e-12
+    assert abs(flux["ascending"] / ref - 1.0) < RTOL
