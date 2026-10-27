@@ -162,3 +162,51 @@ def test_wavenumber_grid_band_flux_is_the_planck_integral(tmp_path, solver, nu1,
     print(f"{solver} {nu1}-{nu2} cm-1: flux {flux:.9e}, reference {ref:.9e}, rel {rel:+.3e}; "
           f"rel to the integral {flux / exact - 1.0:+.3e}")
     assert abs(rel) < RTOL
+
+
+def planck_radiance(nu, temp):
+    """B_nu [W m^-2 sr^-1 (cm^-1)^-1], nu in cm^-1, exact SI constants"""
+    nu, temp = mp.mpf(nu), mp.mpf(temp)
+    return float(2 * H * C**2 * 1e8 * nu**3 / mp.expm1(C2 * nu / temp))
+
+
+MONO = [10.0, 200.0, 1000.0]  # cm^-1
+
+
+@pytest.mark.parametrize("nu", MONO, ids=["10cm-1", "200cm-1", "1000cm-1"])
+def test_monochromatic_planck_radiance(nu):
+    """P2: with equal edges bbflux_wavenumber returns the radiance per
+    wavenumber at that wavenumber, and so does the point overload."""
+    temp = torch.tensor([TEMP])
+    ref = planck_radiance(nu, TEMP)
+    got = {
+        "scalar edges": pyharp.bbflux_wavenumber(nu, nu, temp).item(),
+        "tensor edges": pyharp.bbflux_wavenumber(torch.tensor([nu]), torch.tensor([nu]), temp).item(),
+        "point": pyharp.bbflux_wavenumber(torch.tensor([nu]), TEMP).item(),
+    }
+    for name, value in got.items():
+        print(f"{name} {nu} cm-1: {value:.9e}, reference {ref:.9e}, rel {value / ref - 1.0:+.3e}")
+    for value in got.values():
+        assert abs(value / ref - 1.0) < RTOL
+
+    # equal and unequal edges in one call: each element gets its own branch
+    wn1, wn2 = torch.tensor([nu, nu]), torch.tensor([nu, nu + 10.0])
+    mixed = pyharp.bbflux_wavenumber(wn1, wn2, temp)
+    band = band_planck_flux(nu, nu + 10.0, TEMP) / math.pi
+    assert abs(mixed[0].item() / ref - 1.0) < RTOL
+    assert abs(mixed[1].item() / band - 1.0) < RTOL
+
+
+@pytest.mark.parametrize("solver", ["toon", "disort"])
+@pytest.mark.parametrize("nu", MONO, ids=["10cm-1", "200cm-1", "1000cm-1"])
+def test_single_wavenumber_band_flux_is_pi_b_nu(tmp_path, solver, nu):
+    """P2: a band whose range is one wavenumber gives the flux per wavenumber
+    pi B_nu at the top of the isothermal column."""
+    band, nlyr = make_band(tmp_path, solver, nu, nu, 1)
+    flux = toa_upward_flux(band, nlyr, 1, TEMP)
+    exact = math.pi * planck_radiance(nu, TEMP)
+    ref = math.pi * cdisort_planck_band(nu, nu, TEMP) if solver == "disort" else exact
+    rel = flux / ref - 1.0
+    print(f"{solver} {nu} cm-1: flux {flux:.9e}, reference {ref:.9e}, rel {rel:+.3e}; "
+          f"rel to pi B_nu {flux / exact - 1.0:+.3e}")
+    assert abs(rel) < RTOL
