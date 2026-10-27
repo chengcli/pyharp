@@ -151,6 +151,11 @@ def test_overview_products_reuses_downloaded_line_database(monkeypatch, tmp_path
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.download_hitran_lines", fake_download)
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.load_hitran_line_list", fake_load_line_list)
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.load_requested_cia_dataset", lambda args, config: None)
+    # compute_overview_products (in hitran_molecule_plot) calls the names it imported there: patch them there too,
+    # or the real functions download from HITRAN
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.download_hitran_lines", fake_download)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.load_hitran_line_list", fake_load_line_list)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.load_requested_cia_dataset", lambda args, config: None)
     monkeypatch.setattr(
         "pyharp.spectra.hitran_molecule_utils.build_line_provider",
         lambda config, line_db: SimpleNamespace(broadening_summary=lambda: "requested=self:1.000 -> effective=self:1.000"),

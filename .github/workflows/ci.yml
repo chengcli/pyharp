@@ -93,14 +93,12 @@ jobs:
       - name: Install the project
         run: pip install --no-build-isolation --no-deps .
 
-      - name: Run C++ tests and pyharp smoke test
+      - name: Run C++ and Python tests
         run: |
           python -c "import pyharp"
           cd ${{ github.workspace }}/build/tests
           ctest --output-on-failure
 
-      - name: Run offline spectra regressions
+      - name: Run offline spectra tests
         run: |
-          python -m pytest -q tests/spectra/test_hitemp_lines.py \
-            tests/spectra/test_line_kernel.py \
-            tests/spectra/test_hitran_lines.py
+          python -m pytest -q tests/spectra

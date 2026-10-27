@@ -81,7 +81,7 @@ def test_compute_mixture_overview_reports_broadening_fallback(monkeypatch, tmp_p
     )
     monkeypatch.setattr(
         "pyharp.spectra.atm_overview.load_hitran_line_list",
-        lambda config, band: type(
+        lambda config, band, line_db=None: type(
             "LineList",
             (),
             {"wavenumber_cm1": np.array([20.0]), "line_intensity": np.array([1.0e-25])},
@@ -102,8 +102,8 @@ def test_compute_mixture_overview_reports_broadening_fallback(monkeypatch, tmp_p
         lambda *args, **kwargs: type("Cia", (), {"source_path": tmp_path / "cia", "pair": "CO2-CO2", "interpolate_to_grid": lambda self, temperature_k, grid: np.zeros_like(grid)})(),
     )
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview.compute_mt_ckd_h2o_continuum_cross_section",
-        lambda **kwargs: np.zeros_like(kwargs["wavenumber_grid_cm1"]),
+        "pyharp.spectra.atm_overview.compute_mt_ckd_h2o_continuum_components",
+        lambda **kwargs: (np.zeros_like(kwargs["wavenumber_grid_cm1"]), np.zeros_like(kwargs["wavenumber_grid_cm1"])),
     )
 
     compute_mixture_overview_products(args, wn_range=(20.0, 22.0))
@@ -136,7 +136,7 @@ def test_compute_mixture_overview_weights_h2o_continuum_by_h2o_fraction(monkeypa
     )
     monkeypatch.setattr(
         "pyharp.spectra.atm_overview.load_hitran_line_list",
-        lambda config, band: type(
+        lambda config, band, line_db=None: type(
             "LineList",
             (),
             {"wavenumber_cm1": np.array([20.0]), "line_intensity": np.array([1.0e-25])},
@@ -156,15 +156,20 @@ def test_compute_mixture_overview_weights_h2o_continuum_by_h2o_fraction(monkeypa
         "pyharp.spectra.atm_overview.load_cia_dataset",
         lambda *args, **kwargs: type("Cia", (), {"source_path": tmp_path / "cia", "pair": "H2-H2", "interpolate_to_grid": lambda self, temperature_k, grid: np.zeros_like(grid)})(),
     )
+    # self and foreign unit-VMR cross sections both 10: the mixture continuum is 10 per H2O molecule
     monkeypatch.setattr(
-        "pyharp.spectra.atm_overview.compute_mt_ckd_h2o_continuum_cross_section",
-        lambda **kwargs: np.full_like(np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64), 10.0),
+        "pyharp.spectra.atm_overview.compute_mt_ckd_h2o_continuum_components",
+        lambda **kwargs: (
+            np.full_like(np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64), 10.0),
+            np.full_like(np.asarray(kwargs["wavenumber_grid_cm1"], dtype=np.float64), 10.0),
+        ),
     )
 
     products = compute_mixture_overview_products(args, wn_range=(20.0, 22.0))
 
     continuum = next(source for source in products.secondary_sources if source.kind == "continuum")
-    expected_sigma = np.array([2.0, 2.0], dtype=np.float64)
+    # 0.2 x 10 at every grid point (the grid includes both endpoints)
+    expected_sigma = np.full(len(products.spectrum.wavenumber_cm1), 2.0, dtype=np.float64)
     expected_attenuation = expected_sigma * products.spectrum.number_density_cm3 * 100.0
     assert np.allclose(continuum.sigma_cm2_molecule, expected_sigma)
     assert np.allclose(products.spectrum.sigma_cia_cm2_molecule, expected_sigma)
@@ -286,8 +291,11 @@ def test_parallel_mixture_overview_products_uses_selected_process_context(monkey
 
 
 def test_parallel_mixture_overview_products_falls_back_to_subprocess_workers_when_process_pool_locks_are_unavailable(monkeypatch) -> None:
+    created = {}
+
     class FailingExecutor:
         def __init__(self, *args, **kwargs):
+            created.update(kwargs)
             raise PermissionError(13, "Permission denied")
 
     monkeypatch.setattr("pyharp.spectra.atm_overview.process_pool_context", lambda: "ctx-token")
