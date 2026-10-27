@@ -100,11 +100,15 @@ def reference(solver, nu1, nu2, temp):
     return band_planck_flux(nu1, nu2, temp)
 
 
-def make_band(tmp_path, solver, nu1, nu2, nwave, nlyr=4):
+def make_band(tmp_path, solver, nu1, nu2, nwave, nlyr=4, thermal=True):
     """A grey, purely absorbing band (fourcolumn table, constant extinction)
-    on a wavenumber grid of nwave points between the band limits."""
+    on a wavenumber grid of nwave points between the band limits; without
+    thermal, the solver has no Planck source (a beam-only band)."""
     (tmp_path / "grey.txt").write_text("1. 1. 0. 0.\n100000. 1. 0. 0.\n")
-    flags = "planck,hard_surface" if solver == "toon" else "lamber,quiet,onlyfl,planck"
+    if thermal:
+        flags = "planck,hard_surface" if solver == "toon" else "lamber,quiet,onlyfl,planck"
+    else:
+        flags = '""' if solver == "toon" else "lamber,quiet,onlyfl"
     (tmp_path / "band.yaml").write_text(f"""
 species:
   - name: dust
@@ -252,3 +256,38 @@ def test_band_flux_with_an_edge_at_the_series_switch(tmp_path, solver, nu1, nu2)
     print(f"{solver} {nu1}-{nu2} cm-1 at T_switch: flux {flux:.9e}, reference {ref:.9e}, rel {rel:+.3e}; "
           f"rel to the integral {flux / exact - 1.0:+.3e}")
     assert abs(rel) < RTOL
+
+
+UMU0 = 0.5
+
+
+def toa_downward_beam_flux(band, nlyr, nwave, fbeam):
+    """Downward flux at the top of a beam-only band: umu0 times the beam
+    irradiance, whatever the column below."""
+    conc = torch.full((1, nlyr, 1), 0.1 / 12.011e-3)  # optical depth 0.1 per layer
+    dz = torch.ones(nlyr)
+    bc = {
+        "B/albedo": torch.zeros(nwave, 1),
+        "B/fbeam": torch.full((nwave, 1), fbeam),
+        "B/umu0": torch.full((1,), UMU0),
+    }
+    # level temperatures only because RadiationBand calls DISORT with them;
+    # without the planck flag the solvers do not use them
+    atm = {"tempf": torch.full((1, nlyr + 1), 250.0)}
+    return band.forward(conc, dz, bc, atm)[0, -1, 1].item()
+
+
+@pytest.mark.parametrize("solver", ["toon", "disort"])
+@pytest.mark.parametrize("nu1,nu2", BANDS[:2], ids=["10cm-1", "200cm-1"])
+def test_beam_irradiance_is_per_point_band_irradiance(tmp_path, solver, nu1, nu2):
+    """fbeam at each spectral point is the band's beam irradiance [W m^-2],
+    in the units of the band-integrated Planck source the solver adds to it
+    (DISORT: FBEAM in the units of PLKAVG), not a density per wavenumber. A
+    beam-only band on an unweighted wavenumber grid then delivers umu0 * fbeam
+    at the top, not the band width times it."""
+    nwave, fbeam = 17, 1.0
+    band, nlyr = make_band(tmp_path, solver, nu1, nu2, nwave, thermal=False)
+    flux = toa_downward_beam_flux(band, nlyr, nwave, fbeam)
+    print(f"{solver} {nu1}-{nu2} cm-1, fbeam {fbeam} at every point: TOA downward {flux:.12e}, "
+          f"umu0 * fbeam {UMU0 * fbeam}")
+    assert abs(flux / (UMU0 * fbeam) - 1.0) < 1e-12
