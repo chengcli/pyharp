@@ -131,7 +131,9 @@ class RadiationImpl : public torch::nn::Cloneable<RadiationImpl> {
    * \param dz layer thickness (nlyr) or (ncol, nlyr)
    *
    * \param bc boundary conditions, may contain the following fields:
-   *        <band> + "fbeam": solar beam irradiance [W/m^2], (nwave, ncol)
+   *        <band> + "fbeam": solar beam irradiance of the band [W/m^2],
+   *                 (nwave, ncol), at each spectral point (see
+   *                 RadiationBandImpl::forward)
    *        <band> + "umu0": cosine of the solar zenith angle, (nwave, ncol)
    *        <band> + "albedo": surface albedo, (nwave, ncol)
    *        "btemp": bottom temperature
