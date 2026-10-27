@@ -73,16 +73,19 @@ torch::Tensor planck_fraction_above(torch::Tensor const& v) {
 //! units of sigma T^4 / pi
 torch::Tensor planck_band_fraction(torch::Tensor const& v1,
                                    torch::Tensor const& v2) {
-  auto small1 = v1 < kVcut;
-  auto small2 = v2 < kVcut;
+  // Every edge is in exactly one series: v <= kVcut takes the power series,
+  // v > kVcut the exponential one. With two strict tests an edge at kVcut was
+  // in neither and counted as 0 in both.
+  auto small1 = v1 <= kVcut;
+  auto small2 = v2 <= kVcut;
   auto p1 =
       torch::where(small1, planck_fraction_below(v1), torch::zeros_like(v1));
   auto p2 =
       torch::where(small2, planck_fraction_below(v2), torch::zeros_like(v2));
-  auto d1 = torch::where(v1 > kVcut, planck_fraction_above(v1),
-                         torch::zeros_like(v1));
-  auto d2 = torch::where(v2 > kVcut, planck_fraction_above(v2),
-                         torch::zeros_like(v2));
+  auto d1 =
+      torch::where(small1, torch::zeros_like(v1), planck_fraction_above(v1));
+  auto d2 =
+      torch::where(small2, torch::zeros_like(v2), planck_fraction_above(v2));
 
   return torch::where(small1 & small2, p2 - p1,
                       torch::where(small1, 1.0 - p1 - d2, d1 - d2));
