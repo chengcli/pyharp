@@ -7,6 +7,85 @@
 
 namespace harp {
 
+namespace {
+
+// Exact SI constants (CODATA 2018): second radiation constant h c / k [cm K]
+// and Stefan-Boltzmann constant [W m^-2 K^-4]. The band value must equal the
+// Planck integral to 1e-6; the rounded constants used before (1.438786,
+// 5.67032e-8) alone moved it by up to 5e-5.
+constexpr double kC2 = 1.438776877503933;
+constexpr double kSigma = 5.670374419184429e-8;
+
+// Switch between the two series of the band Planck function, in v = c2 nu / T
+constexpr double kVcut = 1.5;
+
+// Terms kept of the exponential series; the first neglected one is below
+// 1e-12 of sigma T^4 / pi at the switch
+constexpr int kNexp = 16;
+
+//! Fraction of sigma T^4 / pi emitted below v, power series (Bernoulli
+//! numbers up to B14, first neglected term 6e-12 at v = 1.5)
+torch::Tensor planck_fraction_below(torch::Tensor const& v) {
+  const double conc = 15.0 / std::pow(M_PI, 4);
+  const double A1 = 1.0 / 3.0;
+  const double A2 = -1.0 / 8.0;
+  const double A3 = 1.0 / 60.0;
+  const double A4 = -1.0 / 5040.0;
+  const double A5 = 1.0 / 272160.0;
+  const double A6 = -1.0 / 13305600.0;
+  const double A7 = 1.0 / 622702080.0;
+  const double A8 = -691.0 / 19615115520000.0;
+  const double A9 = 1.0 / 1270312243200.0;
+
+  auto vsq = v * v;
+  return conc * vsq * v *
+         (A1 +
+          v * (A2 +
+               v * (A3 +
+                    vsq *
+                        (A4 +
+                         vsq * (A5 +
+                                vsq * (A6 +
+                                       vsq * (A7 + vsq * (A8 + vsq * A9))))))));
+}
+
+//! Fraction of sigma T^4 / pi emitted above v, exponential series
+torch::Tensor planck_fraction_above(torch::Tensor const& v) {
+  const double conc = 15.0 / std::pow(M_PI, 4);
+
+  auto ex = torch::exp(-v);
+  auto exm = torch::ones_like(v);
+  auto d = torch::zeros_like(v);
+  for (int m = 1; m <= kNexp; ++m) {
+    auto mv = static_cast<double>(m) * v;
+    exm = exm * ex;
+    double m4 = static_cast<double>(m) * m * m * m;
+    d = d + exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / m4;
+  }
+  return conc * d;
+}
+
+//! Planck radiance integrated between v1 = c2 nu1 / T and v2 = c2 nu2 / T, in
+//! units of sigma T^4 / pi
+torch::Tensor planck_band_fraction(torch::Tensor const& v1,
+                                   torch::Tensor const& v2) {
+  auto small1 = v1 < kVcut;
+  auto small2 = v2 < kVcut;
+  auto p1 =
+      torch::where(small1, planck_fraction_below(v1), torch::zeros_like(v1));
+  auto p2 =
+      torch::where(small2, planck_fraction_below(v2), torch::zeros_like(v2));
+  auto d1 = torch::where(v1 > kVcut, planck_fraction_above(v1),
+                         torch::zeros_like(v1));
+  auto d2 = torch::where(v2 > kVcut, planck_fraction_above(v2),
+                         torch::zeros_like(v2));
+
+  return torch::where(small1 & small2, p2 - p1,
+                      torch::where(small1, 1.0 - p1 - d2, d1 - d2));
+}
+
+}  // namespace
+
 torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol) {
   // Check if wave is a 1D tensor
   TORCH_CHECK(wave.dim() == 1, "wavenumber must be a 1D tensor");
@@ -28,66 +107,17 @@ torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp) {
   TORCH_CHECK(temp.min().item<double>() > 0.0,
               "bbflux_wavenumber: Temperature must be positive");
 
-  const double C2 = 1.438786;       // h * c / k in units cm * K
-  const double SIGMA = 5.67032e-8;  // Stefan-Boltzmann constant in W/m²K⁴
-  const double VCUT = 1.5;
-  const double sigdpi = SIGMA / M_PI;
-  const double vmax = std::log(DBL_MAX);
-  const double conc = 15.0 / std::pow(M_PI, 4);  // Now computed at runtime
-  const double c1 = 1.1911e-18;  // h * c^2, in units W/(m² * sr * cm⁻⁴)
-  const double A1 = 1.0 / 3.0;
-  const double A2 = -1.0 / 8.0;
-  const double A3 = 1.0 / 60.0;
-  const double A4 = -1.0 / 5040.0;
-  const double A5 = 1.0 / 272160.0;
-  const double A6 = -1.0 / 13305600.0;
-
   // Handle the case where wn1 == wn2
   if (wn1 == wn2) {
+    const double C2 = 1.438786;    // h * c / k in units cm * K
+    const double c1 = 1.1911e-18;  // h * c^2, in units W/(m² * sr * cm⁻⁴)
     double wn = wn1;
     auto arg = torch::exp(-C2 * wn / temp);
     return c1 * std::pow(wn, 3) * arg / (1.0 - arg);
   }
 
-  torch::Tensor v[2] = {C2 * wn1 / temp, C2 * wn2 / temp};
-  torch::Tensor smallv = torch::zeros_like(temp);
-  torch::Tensor p[2];
-  torch::Tensor d[2];
-
-  // Handle different cases for wavenumbers
-  for (int i = 0; i <= 1; ++i) {
-    smallv += torch::where(v[i] < VCUT, torch::ones_like(temp),
-                           torch::zeros_like(temp));
-
-    auto vsq = v[i] * v[i];
-    p[i] =
-        conc * vsq * v[i] *
-        (A1 + v[i] * (A2 + v[i] * (A3 + vsq * (A4 + vsq * (A5 + vsq * A6)))));
-    p[i] = torch::where(v[i] < VCUT, p[i], torch::zeros_like(temp));
-
-    // Use exponential series expansion
-    const double vcp[7] = {10.25, 5.7, 3.9, 2.9, 2.3, 1.9, 0.0};
-
-    auto ex = torch::exp(-v[i]);
-    auto exm = torch::ones_like(temp);
-    d[i] = torch::zeros_like(temp);
-
-    for (int m = 1; m <= 6; ++m) {
-      auto mv = static_cast<double>(m) * v[i];
-      exm *= ex;
-      double m4 = static_cast<double>(m) * m * m * m;
-      d[i] += exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / m4;
-    }
-    d[i] *= conc;
-
-    d[i] = torch::where(v[i] > VCUT, d[i], torch::zeros_like(temp));
-  }
-
-  auto ans =
-      torch::where(smallv == 2, p[1] - p[0],
-                   torch::where(smallv == 1, 1.0 - p[0] - d[1], d[0] - d[1]));
-
-  return ans * sigdpi * torch::pow(temp, 4);
+  auto ans = planck_band_fraction(kC2 * wn1 / temp, kC2 * wn2 / temp);
+  return ans * (kSigma / M_PI) * torch::pow(temp, 4);
 }
 
 torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
@@ -99,66 +129,17 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
   TORCH_CHECK(temp.min().item<double>() > 0.0,
               "bbflux_wavenumber: Temperature must be positive");
 
-  const double C2 = 1.438786;       // h * c / k in units cm * K
-  const double SIGMA = 5.67032e-8;  // Stefan-Boltzmann constant in W/m²K⁴
-  const double VCUT = 1.5;
-  const double sigdpi = SIGMA / M_PI;
-  const double vmax = std::log(DBL_MAX);
-  const double conc = 15.0 / std::pow(M_PI, 4);  // Now computed at runtime
-  const double c1 = 1.1911e-18;  // h * c^2, in units W/(m² * sr * cm⁻⁴)
-  const double A1 = 1.0 / 3.0;
-  const double A2 = -1.0 / 8.0;
-  const double A3 = 1.0 / 60.0;
-  const double A4 = -1.0 / 5040.0;
-  const double A5 = 1.0 / 272160.0;
-  const double A6 = -1.0 / 13305600.0;
-
   // Handle the case where wn1 == wn2
   if ((wn1 == wn2).all().item<bool>()) {
+    const double C2 = 1.438786;    // h * c / k in units cm * K
+    const double c1 = 1.1911e-18;  // h * c^2, in units W/(m² * sr * cm⁻⁴)
     auto wn = wn1;
     auto arg = torch::exp(-C2 * wn / temp);
     return c1 * wn.pow(3) * arg / (1.0 - arg);
   }
 
-  torch::Tensor v[2] = {C2 * wn1 / temp, C2 * wn2 / temp};
-  torch::Tensor smallv = torch::zeros_like(temp);
-  torch::Tensor p[2];
-  torch::Tensor d[2];
-
-  // Handle different cases for wavenumbers
-  for (int i = 0; i <= 1; ++i) {
-    smallv = smallv + torch::where(v[i] < VCUT, torch::ones_like(temp),
-                                   torch::zeros_like(temp));
-
-    auto vsq = v[i] * v[i];
-    p[i] =
-        conc * vsq * v[i] *
-        (A1 + v[i] * (A2 + v[i] * (A3 + vsq * (A4 + vsq * (A5 + vsq * A6)))));
-    p[i] = torch::where(v[i] < VCUT, p[i], torch::zeros_like(temp));
-
-    // Use exponential series expansion
-    const double vcp[7] = {10.25, 5.7, 3.9, 2.9, 2.3, 1.9, 0.0};
-
-    auto ex = torch::exp(-v[i]);
-    auto exm = torch::ones_like(temp);
-    d[i] = torch::zeros_like(temp);
-
-    for (int m = 1; m <= 6; ++m) {
-      auto mv = static_cast<double>(m) * v[i];
-      exm = exm * ex;
-      double m4 = static_cast<double>(m) * m * m * m;
-      d[i] = d[i] + exm * (6.0 + mv * (6.0 + mv * (3.0 + mv))) / m4;
-    }
-    d[i] *= conc;
-
-    d[i] = torch::where(v[i] > VCUT, d[i], torch::zeros_like(temp));
-  }
-
-  auto ans =
-      torch::where(smallv == 2, p[1] - p[0],
-                   torch::where(smallv == 1, 1.0 - p[0] - d[1], d[0] - d[1]));
-
-  return ans * sigdpi * torch::pow(temp, 4);
+  auto ans = planck_band_fraction(kC2 * wn1 / temp, kC2 * wn2 / temp);
+  return ans * (kSigma / M_PI) * torch::pow(temp, 4);
 }
 
 torch::Tensor bbflux_wavelength(torch::Tensor wave, double temp, int ncol) {

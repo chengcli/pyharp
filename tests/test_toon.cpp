@@ -337,8 +337,12 @@ TEST_P(DeviceTest, longwave_lambertian_partial_albedo) {
   for (double w : wuarr) wsum += w;
   const double twopi = 2.0 * M_PI;
 
+  // in double: torch::tensor(t) would take the default dtype, float32, whose
+  // rounding of the Planck value alone is above the double tolerance below
   auto b_of = [](double t) {
-    return harp::bbflux_wavenumber(1.0, 1.0e5, torch::tensor(t)).item<double>();
+    return harp::bbflux_wavenumber(1.0, 1.0e5,
+                                   torch::tensor(t, torch::kFloat64))
+        .item<double>();
   };
   // BE_IN(0) is the top of the atmosphere, stored last in temf.
   const double b_top = b_of(t_top);
