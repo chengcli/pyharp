@@ -16,6 +16,10 @@ namespace {
 constexpr double kC2 = 1.438776877503933;
 constexpr double kSigma = 5.670374419184429e-8;
 
+// First radiation constant for a radiance per wavenumber, 2 h c^2 in
+// W m^-2 sr^-1 (cm^-1)^-4: 2 h c^2 [W m^2 sr^-1] times 1e8
+constexpr double kC1 = 1.1910429723971884e-8;
+
 // Switch between the two series of the band Planck function, in v = c2 nu / T
 constexpr double kVcut = 1.5;
 
@@ -84,18 +88,20 @@ torch::Tensor planck_band_fraction(torch::Tensor const& v1,
                       torch::where(small1, 1.0 - p1 - d2, d1 - d2));
 }
 
+//! Planck radiance per wavenumber at wavenumber wn [W m^-2 sr^-1 (cm^-1)^-1]
+template <typename W, typename T>
+torch::Tensor planck_radiance(W const& wn, T const& temp) {
+  return kC1 * wn * wn * wn / torch::expm1(kC2 * wn / temp);
+}
+
 }  // namespace
 
 torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol) {
   // Check if wave is a 1D tensor
   TORCH_CHECK(wave.dim() == 1, "wavenumber must be a 1D tensor");
 
-  // Physical constants
-  constexpr double c1 = 1.19144e-5 * 1e-3;
-  constexpr double c2 = 1.4388;
-
   int nwave = wave.size(0);
-  auto result = c1 * wave.pow(3) / ((c2 * wave / temp).exp() - 1.);
+  auto result = planck_radiance(wave, temp);
   return result.unsqueeze(-1).expand({nwave, ncol}).contiguous();
 }
 
@@ -107,13 +113,9 @@ torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp) {
   TORCH_CHECK(temp.min().item<double>() > 0.0,
               "bbflux_wavenumber: Temperature must be positive");
 
-  // Handle the case where wn1 == wn2
+  // Equal edges: the radiance per wavenumber at that wavenumber
   if (wn1 == wn2) {
-    const double C2 = 1.438786;    // h * c / k in units cm * K
-    const double c1 = 1.1911e-18;  // h * c^2, in units W/(m² * sr * cm⁻⁴)
-    double wn = wn1;
-    auto arg = torch::exp(-C2 * wn / temp);
-    return c1 * std::pow(wn, 3) * arg / (1.0 - arg);
+    return planck_radiance(torch::full_like(temp, wn1), temp);
   }
 
   auto ans = planck_band_fraction(kC2 * wn1 / temp, kC2 * wn2 / temp);
@@ -129,17 +131,13 @@ torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
   TORCH_CHECK(temp.min().item<double>() > 0.0,
               "bbflux_wavenumber: Temperature must be positive");
 
-  // Handle the case where wn1 == wn2
-  if ((wn1 == wn2).all().item<bool>()) {
-    const double C2 = 1.438786;    // h * c / k in units cm * K
-    const double c1 = 1.1911e-18;  // h * c^2, in units W/(m² * sr * cm⁻⁴)
-    auto wn = wn1;
-    auto arg = torch::exp(-C2 * wn / temp);
-    return c1 * wn.pow(3) * arg / (1.0 - arg);
-  }
-
-  auto ans = planck_band_fraction(kC2 * wn1 / temp, kC2 * wn2 / temp);
-  return ans * (kSigma / M_PI) * torch::pow(temp, 4);
+  // Equal edges give the radiance per wavenumber at that wavenumber, element
+  // by element
+  auto band = planck_band_fraction(kC2 * wn1 / temp, kC2 * wn2 / temp) *
+              (kSigma / M_PI) * torch::pow(temp, 4);
+  auto equal = wn1 == wn2;
+  if (!equal.any().item<bool>()) return band;
+  return torch::where(equal, planck_radiance(wn1, temp), band);
 }
 
 torch::Tensor bbflux_wavelength(torch::Tensor wave, double temp, int ncol) {
