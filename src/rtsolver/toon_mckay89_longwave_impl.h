@@ -55,13 +55,10 @@ DISPATCH_MACRO T longwave_resonant_ratio(T delta, T a, T exp_neg_a) {
 }
 
 template <typename T>
-DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
-                                          T a_surf_in, T bsurf_in,
-                                          int top_emission_flag,
-                                          T btop_factor, bool hard_surface,
-                                          bool delta_eddington_lw, T* flx,
-                                          int len1, char* work,
-                                          int wstride = 1) {
+DISPATCH_MACRO void toon_mckay89_longwave(
+    int nlay, const T* be, const T* prop, T a_surf_in, T bsurf_in,
+    int top_emission_flag, T btop_factor, bool hard_surface,
+    bool delta_eddington_lw, T* flx, int len1, char* work, int wstride = 1) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
 
@@ -377,7 +374,8 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       T l_u_m1 = lam[k] * u - 1.0;
       T l_u_p1 = lam[k] * u + 1.0;
 
-      // the growing mode: g (e^-a - e^-(lam dtau)) / (lam mu - 1), g at the bottom
+      // the growing mode: g (e^-a - e^-(lam dtau)) / (lam mu - 1), g at the
+      // bottom
       T up_ratio = longwave_resonant_ratio(l_u_m1, dtau[k] / u, em2);
       T lw_next = lw_up * em2 + g[k] * up_ratio +
                   (h[k] / l_u_p1) * (1.0 - em3) + alpha1[k] * (1.0 - em2) +

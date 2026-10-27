@@ -15,23 +15,26 @@
 // each function uses (c2 = 1.4388 cm K for wavenumbers; h c / k with c = 3.0e8
 // m/s for wavelengths), and within 1% with the CODATA value, which those
 // constants differ from by 1.6e-5 and 6.9e-4.
-static double const c2_codata = 1.438776877;               // [cm K]
-static double const c2_wavenumber = 1.4388;                // bbflux_wavenumber(wave, ...)
-static double const c2_wavelength = 6.62607015e-34 * 3.0e8 / 1.380649e-23 * 100.0;  // bbflux_wavelength
+static double const c2_codata = 1.438776877;  // [cm K]
+static double const c2_wavenumber = 1.4388;   // bbflux_wavenumber(wave, ...)
+static double const c2_wavelength =
+    6.62607015e-34 * 3.0e8 / 1.380649e-23 * 100.0;  // bbflux_wavelength
 
 // Planck shape in wavenumber: F(nu) ~ nu^3 / (exp(c2 nu / T) - 1)
 static double planck_nu_shape(double nu, double T, double c2) {
   return nu * nu * nu / std::expm1(c2 * nu / T);
 }
 
-// Planck shape in wavelength [um]: F(lambda) ~ lambda^-5 / (exp(c2 / lambda / T) - 1)
+// Planck shape in wavelength [um]: F(lambda) ~ lambda^-5 / (exp(c2 / lambda /
+// T) - 1)
 static double planck_lambda_shape(double lam_um, double T, double c2) {
   double lam_cm = lam_um * 1e-4;
   return std::pow(lam_cm, -5) / std::expm1(c2 / (lam_cm * T));
 }
 
 TEST(BBFluxTest, Wavenumber1) {
-  torch::Tensor wave = torch::tensor({100.0, 500.0, 1000.0, 2000.0}, torch::kFloat64);
+  torch::Tensor wave =
+      torch::tensor({100.0, 500.0, 1000.0, 2000.0}, torch::kFloat64);
   double temp = 300.0;
   int ncol = 2;
 
@@ -43,8 +46,10 @@ TEST(BBFluxTest, Wavenumber1) {
   for (int i = 1; i < 4; ++i) {
     double nu = wave[i].item<double>(), nu0 = wave[0].item<double>();
     double ratio = result[i][0].item<double>() / result[0][0].item<double>();
-    double exact = planck_nu_shape(nu, temp, c2_wavenumber) / planck_nu_shape(nu0, temp, c2_wavenumber);
-    double codata = planck_nu_shape(nu, temp, c2_codata) / planck_nu_shape(nu0, temp, c2_codata);
+    double exact = planck_nu_shape(nu, temp, c2_wavenumber) /
+                   planck_nu_shape(nu0, temp, c2_wavenumber);
+    double codata = planck_nu_shape(nu, temp, c2_codata) /
+                    planck_nu_shape(nu0, temp, c2_codata);
     EXPECT_NEAR(ratio, exact, 1e-9 * exact) << "nu = " << nu;
     EXPECT_NEAR(ratio, codata, 1e-2 * codata) << "nu = " << nu;
   }
@@ -89,7 +94,8 @@ TEST(BBFluxTest, Wavelength) {
     double ratio = result[i][0].item<double>() / result[0][0].item<double>();
     double exact = planck_lambda_shape(lam, temp, c2_wavelength) /
                    planck_lambda_shape(lam0, temp, c2_wavelength);
-    double codata = planck_lambda_shape(lam, temp, c2_codata) / planck_lambda_shape(lam0, temp, c2_codata);
+    double codata = planck_lambda_shape(lam, temp, c2_codata) /
+                    planck_lambda_shape(lam0, temp, c2_codata);
     EXPECT_NEAR(ratio, exact, 1e-9 * exact) << "lambda = " << lam;
     EXPECT_NEAR(ratio, codata, 1e-2 * codata) << "lambda = " << lam;
   }

@@ -59,11 +59,10 @@ void call_toon89_lw_cpu(at::TensorIterator& iter, bool /*zenith_correction*/,
             auto be = reinterpret_cast<scalar_t*>(data[2] + i * strides[2]);
             auto albedo = reinterpret_cast<scalar_t*>(data[3] + i * strides[3]);
             auto bsurf = reinterpret_cast<scalar_t*>(data[4] + i * strides[4]);
-            toon_mckay89_longwave(nlay, be, prop, *albedo, *bsurf,
-                                  top_emission_flag,
-                                  static_cast<scalar_t>(btop_factor),
-                                  hard_surface, delta_eddington_lw, out, len1,
-                                  work.get());
+            toon_mckay89_longwave(
+                nlay, be, prop, *albedo, *bsurf, top_emission_flag,
+                static_cast<scalar_t>(btop_factor), hard_surface,
+                delta_eddington_lw, out, len1, work.get());
           }
         },
         grain_size);

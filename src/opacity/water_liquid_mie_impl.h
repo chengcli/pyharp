@@ -96,22 +96,31 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_small_particle_device(Complex<T> m,
   T const x2 = x * x;
   T const x3 = x2 * x;
   T const x4 = x2 * x2;
-  auto denom = m2 + static_cast<T>(2) + (static_cast<T>(1) - static_cast<T>(0.7) * m2) * x2 -
-               (static_cast<T>(8) * m4 - static_cast<T>(385) * m2 + static_cast<T>(350)) * x4 /
-                   static_cast<T>(1400) +
+  auto denom = m2 + static_cast<T>(2) +
+               (static_cast<T>(1) - static_cast<T>(0.7) * m2) * x2 -
+               (static_cast<T>(8) * m4 - static_cast<T>(385) * m2 +
+                static_cast<T>(350)) *
+                   x4 / static_cast<T>(1400) +
                static_cast<T>(2) * I * (m2 - static_cast<T>(1)) * x3 *
-                   (static_cast<T>(1) - static_cast<T>(0.1) * x2) / static_cast<T>(3);
-  auto const ahat1 = static_cast<T>(2) * I * (m2 - static_cast<T>(1)) / static_cast<T>(3) *
+                   (static_cast<T>(1) - static_cast<T>(0.1) * x2) /
+                   static_cast<T>(3);
+  auto const ahat1 = static_cast<T>(2) * I * (m2 - static_cast<T>(1)) /
+                     static_cast<T>(3) *
                      (static_cast<T>(1) - static_cast<T>(0.1) * x2 +
-                      (static_cast<T>(4) * m2 + static_cast<T>(5)) * x4 / static_cast<T>(1400)) /
+                      (static_cast<T>(4) * m2 + static_cast<T>(5)) * x4 /
+                          static_cast<T>(1400)) /
                      denom;
-  auto const bhat1 = I * x2 * (m2 - static_cast<T>(1)) / static_cast<T>(45) *
-                     (static_cast<T>(1) + (static_cast<T>(2) * m2 - static_cast<T>(5)) / static_cast<T>(70) * x2) /
-                     (static_cast<T>(1) - (static_cast<T>(2) * m2 - static_cast<T>(5)) / static_cast<T>(30) * x2);
-  auto const ahat2 = I * x2 * (m2 - static_cast<T>(1)) / static_cast<T>(15) *
-                     (static_cast<T>(1) - x2 / static_cast<T>(14)) /
-                     (static_cast<T>(2) * m2 + static_cast<T>(3) -
-                      (static_cast<T>(2) * m2 - static_cast<T>(7)) / static_cast<T>(14) * x2);
+  auto const bhat1 =
+      I * x2 * (m2 - static_cast<T>(1)) / static_cast<T>(45) *
+      (static_cast<T>(1) +
+       (static_cast<T>(2) * m2 - static_cast<T>(5)) / static_cast<T>(70) * x2) /
+      (static_cast<T>(1) -
+       (static_cast<T>(2) * m2 - static_cast<T>(5)) / static_cast<T>(30) * x2);
+  auto const ahat2 =
+      I * x2 * (m2 - static_cast<T>(1)) / static_cast<T>(15) *
+      (static_cast<T>(1) - x2 / static_cast<T>(14)) /
+      (static_cast<T>(2) * m2 + static_cast<T>(3) -
+       (static_cast<T>(2) * m2 - static_cast<T>(7)) / static_cast<T>(14) * x2);
   T const tsum = complex_norm(ahat1) + complex_norm(bhat1) +
                  static_cast<T>(5.0 / 3.0) * complex_norm(ahat2);
   out.qsca = static_cast<T>(6) * x4 * tsum;
@@ -149,7 +158,8 @@ DISPATCH_MACRO MieEfficiencyDevice<T> mie_efficiency_device(T nreal, T kimag,
   if (complex_abs(m) * x <= static_cast<T>(0.1)) {
     if constexpr (std::is_same<T, float>::value) {
       auto const p = mie_small_particle_device(
-          Complex<double>(static_cast<double>(nreal), -static_cast<double>(kimag)),
+          Complex<double>(static_cast<double>(nreal),
+                          -static_cast<double>(kimag)),
           static_cast<double>(x));
       out.qext = static_cast<T>(p.qext);
       out.qsca = static_cast<T>(p.qsca);

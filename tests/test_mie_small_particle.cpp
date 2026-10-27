@@ -1,8 +1,8 @@
 // Lorenz-Mie efficiencies of small spheres against an exact reference.
 //
-// Reference: the exact Lorenz-Mie series (Bohren and Huffman 1983) evaluated with
-// mpmath at 60 significant digits by tests/reference/mie_reference.py, printed to 20 digits
-// below. Each row: n, k (m = n - i k), x, Q_ext, Q_sca.
+// Reference: the exact Lorenz-Mie series (Bohren and Huffman 1983) evaluated
+// with mpmath at 60 significant digits by tests/reference/mie_reference.py,
+// printed to 20 digits below. Each row: n, k (m = n - i k), x, Q_ext, Q_sca.
 //
 // Tolerance: Q_ext and the single-scattering albedo Q_sca / Q_ext within 1e-6
 // relative in double precision, 1e-4 in single precision.
@@ -82,8 +82,10 @@ static void check_cases(double tol) {
   constexpr int max_order = 64;
   harp::Complex<T> work[3 * max_order];
   for (auto const& c : kCases) {
-    auto out = harp::mie_efficiency_device<T>(T(c.n), T(c.k), T(c.x), work, max_order);
-    ASSERT_EQ(out.status, 0) << "m = " << c.n << " - " << c.k << "i, x = " << c.x;
+    auto out =
+        harp::mie_efficiency_device<T>(T(c.n), T(c.k), T(c.x), work, max_order);
+    ASSERT_EQ(out.status, 0)
+        << "m = " << c.n << " - " << c.k << "i, x = " << c.x;
     double qext = out.qext, qsca = out.qsca;
     EXPECT_NEAR(qext, c.qext, tol * c.qext)
         << "Q_ext, m = " << c.n << " - " << c.k << "i, x = " << c.x;

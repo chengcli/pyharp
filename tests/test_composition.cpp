@@ -19,8 +19,8 @@ TEST(Composition, molecular_weight) {
   EXPECT_NEAR(weight, 0.180156, 1e-6);
 
   // water: 2 x 1.008 + 15.999 g/mol
-  EXPECT_NEAR(harp::get_compound_weight(harp::get_composition("H2O")),
-              0.018015, 1e-6);
+  EXPECT_NEAR(harp::get_compound_weight(harp::get_composition("H2O")), 0.018015,
+              1e-6);
 }
 
 int main(int argc, char** argv) {
