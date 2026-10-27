@@ -23,6 +23,7 @@ setup_test(test_scattering_functions)
 setup_test(test_composition)
 setup_test(test_read_stellar_flux)
 setup_test(test_read_yaml)
+setup_test(test_mie_small_particle)
 
 # fixtures of the C++ tests
 configure_file(rayleigh_test.yaml rayleigh_test.yaml COPYONLY)
