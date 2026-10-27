@@ -147,20 +147,17 @@ torch::Tensor bbflux_wavelength(torch::Tensor wave, double temp, int ncol) {
   // Check if wave is a 1D tensor
   TORCH_CHECK(wave.dim() == 1, "wavelength must be a 1D tensor");
 
-  // Physical constants
-  constexpr double h = 6.62607015e-34;  // Planck's constant (J·s)
-  constexpr double c = 3.0e8;           // Speed of light (m/s)
-  constexpr double kB = 1.380649e-23;   // Boltzmann constant (J/K)
+  // Exact SI constants, as in the wavenumber overloads: 2 h c^2 [W m^2 sr^-1]
+  // and h c / k [m K]
+  constexpr double c1 = kC1 * 1e-8;
+  constexpr double c2 = kC2 * 1e-2;
 
   // Convert wavelength from micrometers to meters
   torch::Tensor wavelength_m = wave * 1e-6;
 
-  // Compute the exponent: hc / (lambda kB T)
-  torch::Tensor exponent = (h * c) / (wavelength_m * kB * temp);
-
-  // Compute Planck's law
+  // Planck's law, radiance per meter of wavelength
   torch::Tensor B_lambda =
-      2.0 * h * c * c / (wavelength_m.pow(5) * (exponent.exp() - 1.0));
+      c1 / (wavelength_m.pow(5) * torch::expm1(c2 / (wavelength_m * temp)));
 
   // Convert flux to per micrometer
   return (B_lambda * 1e-6)
