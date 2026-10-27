@@ -335,3 +335,25 @@ def test_wavelength_planck_radiance(temp):
         rel = value / ref - 1.0
         print(f"{lam} um, {temp} K: {value:.12e}, reference {ref:.12e}, rel {rel:+.3e}")
         assert abs(rel) < 1e-12
+
+
+@pytest.mark.parametrize("solver", ["toon", "disort"])
+@pytest.mark.parametrize("nwave", [5, 17, 33])
+@pytest.mark.parametrize("nu1,nu2", BANDS, ids=["10cm-1", "200cm-1", "1000cm-1"])
+def test_transparent_column_carries_the_beam_unchanged(tmp_path, solver, nu1, nu2, nwave):
+    """fbeam is a beam irradiance in W/m^2 at each spectral point. Through a
+    transparent column with umu0 = 1 and a black surface, fbeam = 1 W/m^2 at
+    every point arrives as 1 W/m^2 of downward flux at the top and at the
+    surface, whatever the band width and the number of points."""
+    band, nlyr = make_band(tmp_path, solver, nu1, nu2, nwave, thermal=False)
+    bc = {
+        "B/albedo": torch.zeros(nwave, 1),
+        "B/fbeam": torch.ones(nwave, 1),
+        "B/umu0": torch.ones(1),
+    }
+    atm = {"tempf": torch.full((1, nlyr + 1), 250.0)}  # unused without the planck flag
+    flux = band.forward(torch.zeros(1, nlyr, 1), torch.ones(nlyr), bc, atm)
+    toa, surface = flux[0, -1, 1].item(), flux[0, 0, 1].item()
+    print(f"{solver} {nu1}-{nu2} cm-1, nwave {nwave}: downward at TOA {toa:.15g}, at the surface {surface:.15g}")
+    assert abs(toa - 1.0) < 1e-12
+    assert abs(surface - 1.0) < 1e-12
