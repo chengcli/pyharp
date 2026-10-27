@@ -210,3 +210,45 @@ def test_single_wavenumber_band_flux_is_pi_b_nu(tmp_path, solver, nu):
     print(f"{solver} {nu} cm-1: flux {flux:.9e}, reference {ref:.9e}, rel {rel:+.3e}; "
           f"rel to pi B_nu {flux / exact - 1.0:+.3e}")
     assert abs(rel) < RTOL
+
+
+# P11: the temperature that puts the edge 300 cm^-1 at v = c2 nu / T = 1.5
+# exactly in double precision, with c2 as the code writes it
+CODE_C2 = 1.438776877503933
+T_SWITCH = CODE_C2 * 300.0 / 1.5
+SWITCH_BANDS = [(300.0, 600.0), (150.0, 300.0)]  # lower and upper edge at v = 1.5
+AROUND = [0.0, -1e-12, 1e-12, -1e-6, 1e-6, -1e-3, 1e-3]
+
+
+def test_switch_temperature_puts_the_edge_at_v_one_and_a_half():
+    assert CODE_C2 * 300.0 / T_SWITCH == 1.5
+
+
+@pytest.mark.parametrize("nu1,nu2", SWITCH_BANDS, ids=["lower-edge", "upper-edge"])
+def test_band_planck_at_and_around_the_series_switch(nu1, nu2):
+    """P11: a band edge with v = 1.5 exactly is in one of the two series, and
+    the band radiance is continuous across it."""
+    temps = [T_SWITCH * (1.0 + e) for e in AROUND]
+    tensor = pyharp.bbflux_wavenumber(torch.tensor([nu1]), torch.tensor([nu2]), torch.tensor(temps))
+    for k, (e, t) in enumerate(zip(AROUND, temps)):
+        ref = band_planck_flux(nu1, nu2, t) / math.pi
+        scalar = pyharp.bbflux_wavenumber(nu1, nu2, torch.tensor([t])).item()
+        print(f"{nu1}-{nu2} cm-1, T = T_switch (1 {e:+.0e}): scalar rel {scalar / ref - 1.0:+.3e}, "
+              f"tensor rel {tensor[k].item() / ref - 1.0:+.3e}")
+        assert abs(scalar / ref - 1.0) < RTOL
+        assert abs(tensor[k].item() / ref - 1.0) < RTOL
+
+
+@pytest.mark.parametrize("solver", ["toon", "disort"])
+@pytest.mark.parametrize("nu1,nu2", SWITCH_BANDS, ids=["lower-edge", "upper-edge"])
+def test_band_flux_with_an_edge_at_the_series_switch(tmp_path, solver, nu1, nu2):
+    """P11: band flux of the isothermal column at T_switch."""
+    nwave = 17
+    band, nlyr = make_band(tmp_path, solver, nu1, nu2, nwave)
+    flux = toa_upward_flux(band, nlyr, nwave, T_SWITCH)
+    ref = reference(solver, nu1, nu2, T_SWITCH)
+    rel = flux / ref - 1.0
+    exact = band_planck_flux(nu1, nu2, T_SWITCH)
+    print(f"{solver} {nu1}-{nu2} cm-1 at T_switch: flux {flux:.9e}, reference {ref:.9e}, rel {rel:+.3e}; "
+          f"rel to the integral {flux / exact - 1.0:+.3e}")
+    assert abs(rel) < RTOL
