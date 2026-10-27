@@ -316,3 +316,22 @@ def test_descending_wavenumber_grid_gives_the_same_band_flux(tmp_path, solver, t
     assert flux["descending"] > 0.0
     assert abs(flux["descending"] / flux["ascending"] - 1.0) < 1e-12
     assert abs(flux["ascending"] / ref - 1.0) < RTOL
+
+
+def planck_radiance_wavelength(lam_um, temp):
+    """B_lambda [W m^-2 sr^-1 um^-1], lambda in um, exact SI constants"""
+    lam, temp = mp.mpf(lam_um) * mp.mpf("1e-6"), mp.mpf(temp)
+    return float(2 * H * C**2 / lam**5 / mp.expm1(H * C / (lam * K * temp)) * mp.mpf("1e-6"))
+
+
+@pytest.mark.parametrize("temp", [250.0, 1000.0, 5800.0])
+def test_wavelength_planck_radiance(temp):
+    """P13: bbflux_wavelength equals B_lambda with the exact SI constants
+    (it used c = 3.0e8 m/s, 7e-4 relative off c)."""
+    lams = [0.5, 10.0, 100.0]
+    got = pyharp.bbflux_wavelength(torch.tensor(lams), temp)[:, 0]
+    for lam, value in zip(lams, got.tolist()):
+        ref = planck_radiance_wavelength(lam, temp)
+        rel = value / ref - 1.0
+        print(f"{lam} um, {temp} K: {value:.12e}, reference {ref:.12e}, rel {rel:+.3e}")
+        assert abs(rel) < 1e-12
