@@ -163,7 +163,8 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
     op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
     op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
   } else if (op->solver_name() == "twostr") {
-    TORCH_CHECK(false, "twostr solver not implemented");
+    TORCH_CHECK_NOT_IMPLEMENTED(
+        false, "solver 'twostr' is not implemented; use 'disort' or 'toon'");
   } else {
     TORCH_CHECK(false, "unknown solver: ", op->solver_name());
   }
@@ -274,6 +275,9 @@ void RadiationBandImpl::reset() {
     rtsolver = torch::nn::AnyModule(ToonMcKay89(options->toon()));
     register_module("solver", rtsolver.ptr());
   } else {
+    TORCH_CHECK_NOT_IMPLEMENTED(
+        options->solver_name() != "twostr",
+        "solver 'twostr' is not implemented; use 'disort' or 'toon'");
     TORCH_CHECK(false, "Unknown solver: ", options->solver_name());
   }
 

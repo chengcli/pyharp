@@ -28,6 +28,7 @@ void bind_rtsolver(py::module& m) {
       .ADD_OPTION(std::vector<double>, harp::ToonMcKay89OptionsImpl, wave_upper)
       .ADD_OPTION(std::string, harp::ToonMcKay89OptionsImpl, flags)
       .ADD_OPTION(int, harp::ToonMcKay89OptionsImpl, top_emission_flag)
+      .ADD_OPTION(double, harp::ToonMcKay89OptionsImpl, btop_factor)
       .def("planck", &harp::ToonMcKay89OptionsImpl::planck)
       .def("zenith_correction",
            &harp::ToonMcKay89OptionsImpl::zenith_correction)

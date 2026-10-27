@@ -5,7 +5,7 @@ This module provides Python bindings to the C++ HARP library for
 atmospheric radiation calculations.
 """
 
-from typing import overload
+from typing import Optional, overload
 import torch
 
 # Index constants for optical properties
@@ -285,6 +285,132 @@ def interpn(
     ...
 
 # Radiation classes
+class ToonMcKay89Options:
+    """
+    Options of the Toon et al. (1989) two-stream solver.
+
+    Example:
+        >>> from pyharp import ToonMcKay89Options, ToonMcKay89
+        >>> op = ToonMcKay89Options()
+        >>> op.wave_lower([300.0]).wave_upper([600.0]).flags("planck")
+        >>> solver = ToonMcKay89(op)
+    """
+
+    def __init__(self) -> None:
+        """Initialize ToonMcKay89Options with default values."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+    @overload
+    def wave_lower(self) -> list[float]:
+        """Get the lower wavenumbers of the bands [cm^-1]."""
+        ...
+
+    @overload
+    def wave_lower(self, value: list[float]) -> "ToonMcKay89Options":
+        """Set the lower wavenumbers of the bands [cm^-1]."""
+        ...
+
+    @overload
+    def wave_upper(self) -> list[float]:
+        """Get the upper wavenumbers of the bands [cm^-1]."""
+        ...
+
+    @overload
+    def wave_upper(self, value: list[float]) -> "ToonMcKay89Options":
+        """Set the upper wavenumbers of the bands [cm^-1]."""
+        ...
+
+    @overload
+    def flags(self) -> str:
+        """Get the comma-separated flags ("planck", "hard_surface", "delta_eddington_lw", ...)."""
+        ...
+
+    @overload
+    def flags(self, value: str) -> "ToonMcKay89Options":
+        """Set the comma-separated flags ("planck", "hard_surface", "delta_eddington_lw", ...)."""
+        ...
+
+    @overload
+    def top_emission_flag(self) -> int:
+        """Get the top boundary: 0 none, 1 isothermal, -1 from the first layer with btop_factor."""
+        ...
+
+    @overload
+    def top_emission_flag(self, value: int) -> "ToonMcKay89Options":
+        """Set the top boundary: 0 none, 1 isothermal, -1 from the first layer with btop_factor."""
+        ...
+
+    @overload
+    def btop_factor(self) -> float:
+        """Get tau_top = dtau[0] * btop_factor when top_emission_flag is -1 (default exp(-1))."""
+        ...
+
+    @overload
+    def btop_factor(self, value: float) -> "ToonMcKay89Options":
+        """Set tau_top = dtau[0] * btop_factor when top_emission_flag is -1 (default exp(-1))."""
+        ...
+
+    def planck(self) -> bool:
+        """Whether the thermal (Planck) source is on."""
+        ...
+
+    def zenith_correction(self) -> bool:
+        """Whether the zenith_correction flag is set."""
+        ...
+
+    def hard_surface(self) -> bool:
+        """Whether the bottom boundary is a hard (terrestrial) surface."""
+        ...
+
+    def delta_eddington_lw(self) -> bool:
+        """Whether the longwave uses the delta-Eddington scaling."""
+        ...
+
+    def has_flag(self, flag: str) -> bool:
+        """Whether a flag is set."""
+        ...
+
+class ToonMcKay89:
+    """
+    Toon et al. (1989) two-stream solver, shortwave (beam) or longwave (planck flag).
+
+    Example:
+        >>> import torch
+        >>> from pyharp import ToonMcKay89Options, ToonMcKay89
+        >>> op = ToonMcKay89Options().wave_lower([300.0]).wave_upper([600.0]).flags("planck")
+        >>> prop = torch.zeros(1, 1, 4, 3)  # (nwave, ncol, nlyr, [tau, ssa, g]), layer 0 at the bottom
+        >>> flux = ToonMcKay89(op)(prop, temf=torch.full((1, 5), 250.0))
+    """
+
+    @overload
+    def __init__(self) -> None:
+        """Construct a new default module."""
+        ...
+
+    @overload
+    def __init__(self, options: ToonMcKay89Options) -> None:
+        """Construct a ToonMcKay89 module."""
+        ...
+
+    options: ToonMcKay89Options
+
+    def forward(self, prop: torch.Tensor, temf: Optional[torch.Tensor] = None, **kwargs: torch.Tensor) -> torch.Tensor:
+        """
+        Fluxes (nwave, ncol, nlyr + 1, 4): upward, downward, and the midpoint upward and downward fluxes.
+
+        Args:
+            prop: optical properties (nwave, ncol, nlyr, nprop), tau, single-scattering albedo, asymmetry
+            temf: level temperatures (ncol, nlyr + 1), required with the planck flag
+            **kwargs: boundary conditions: albedo (nwave, ncol), umu0 (ncol), fbeam (nwave, ncol),
+                btemp (ncol), area_scale (nlyr + 1) or (ncol, nlyr + 1)
+        """
+        ...
+
+    def __call__(self, prop: torch.Tensor, temf: Optional[torch.Tensor] = None, **kwargs: torch.Tensor) -> torch.Tensor:
+        ...
+
 class RadiationBandOptions:
     """
     Options for radiation band configuration.
