@@ -30,7 +30,7 @@ bands:
     range: [200., 2000.]
     opacities: [scatterer]
     solver: toon
-    flags: planck,zenith_correction,hard_surface,delta_eddington_lw
+    flags: planck,hard_surface,delta_eddington_lw
     integration: wavenumber
     nwave: 3
     toon:

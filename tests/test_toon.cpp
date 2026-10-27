@@ -26,10 +26,9 @@ TEST(ToonConfig, from_yaml_reads_toon_options) {
 
   ASSERT_EQ(op->solver_name(), "toon");
   ASSERT_NE(op->toon(), nullptr);
-  EXPECT_EQ(op->toon()->flags(),
-            "planck,zenith_correction,hard_surface,delta_eddington_lw");
+  EXPECT_EQ(op->toon()->flags(), "planck,hard_surface,delta_eddington_lw");
   EXPECT_TRUE(op->toon()->planck());
-  EXPECT_TRUE(op->toon()->zenith_correction());
+  EXPECT_FALSE(op->toon()->zenith_correction());
   EXPECT_EQ(op->toon()->top_emission_flag(), -1);
   EXPECT_TRUE(op->toon()->hard_surface());
   EXPECT_TRUE(op->toon()->delta_eddington_lw());
@@ -37,6 +36,17 @@ TEST(ToonConfig, from_yaml_reads_toon_options) {
             (std::vector<double>{200.0, 200.0, 200.0}));
   EXPECT_EQ(op->toon()->wave_upper(),
             (std::vector<double>{2000.0, 2000.0, 2000.0}));
+}
+
+// zenith_correction is not implemented: the solver refuses it rather than
+// ignoring it
+TEST(ToonConfig, zenith_correction_is_not_implemented) {
+  auto op = ToonMcKay89OptionsImpl::create();
+  op->flags("planck,zenith_correction");
+  EXPECT_THROW(ToonMcKay89{op}, c10::NotImplementedError);
+
+  op->flags("planck");
+  EXPECT_NO_THROW(ToonMcKay89{op});
 }
 
 TEST(ToonConfig, radiation_band_registers_solver_module) {

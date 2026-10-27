@@ -13,6 +13,10 @@ ToonMcKay89Impl::ToonMcKay89Impl(ToonMcKay89Options const& options)
 }
 
 void ToonMcKay89Impl::reset() {
+  TORCH_CHECK_NOT_IMPLEMENTED(!options->zenith_correction(),
+      "ToonMcKay89 option 'zenith_correction' is not implemented: the "
+      "solver uses one umu0 per column, without a per-level spherical "
+      "correction; remove it from the flags");
   // No parameters to initialize
 }
 

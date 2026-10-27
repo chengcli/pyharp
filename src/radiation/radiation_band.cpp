@@ -160,6 +160,10 @@ RadiationBandOptions RadiationBandOptionsImpl::from_yaml(
         op->toon()->flags(flags);
       }
     }
+    TORCH_CHECK_NOT_IMPLEMENTED(!op->toon()->zenith_correction(),
+        "ToonMcKay89 option 'zenith_correction' is not implemented: the "
+        "solver uses one umu0 per column, without a per-level spherical "
+        "correction; remove it from the flags");
     op->set_wave_lower(std::vector<double>(op->nwave(), wmin));
     op->set_wave_upper(std::vector<double>(op->nwave(), wmax));
   } else if (op->solver_name() == "twostr") {

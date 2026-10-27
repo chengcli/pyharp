@@ -357,7 +357,8 @@ class ToonMcKay89Options:
         ...
 
     def zenith_correction(self) -> bool:
-        """Whether the zenith_correction flag is set."""
+        """Whether the zenith_correction flag is set. The option is not implemented: ToonMcKay89 raises
+        NotImplementedError when it is set."""
         ...
 
     def hard_surface(self) -> bool:
