@@ -272,8 +272,10 @@ def test_run_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
         sigma_total_cm2_molecule=np.ones(3),
     )
 
+    # run_xsection calls the name it imported into hitran_molecule_plot: patch it there,
+    # or the real function downloads from HITRAN
     monkeypatch.setattr(
-        "pyharp.spectra.hitran_molecule_utils.compute_requested_absorption_spectrum",
+        "pyharp.spectra.hitran_molecule_plot.compute_requested_absorption_spectrum",
         lambda *call_args, **call_kwargs: (None, None, fake_spectrum, fake_provider),
     )
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.plot_absorption_spectrum", lambda spectrum, figure: None)
