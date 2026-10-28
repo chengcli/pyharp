@@ -17,24 +17,30 @@ endif()
 set(CMAKE_CUDA_FLAGS
     "${CMAKE_CUDA_FLAGS} --extended-lambda --expt-relaxed-constexpr")
 
+# -ffp-contract=off: no a*b+c contracted into a fused multiply-add, so the
+# fused CPU kernels round each operation once, as the tensor path does, on
+# any target (GCC contracts by default once the target has FMA; so does Clang
+# on arm64). The CUDA kernels get the same through the rn intrinsics.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   set(CMAKE_CXX_FLAGS_RELEASE
-      "-O3 -funroll-loops -funroll-all-loops -fstrict-aliasing")
+      "-O3 -funroll-loops -funroll-all-loops -fstrict-aliasing -ffp-contract=off")
   set(CMAKE_C_FLAGS_RELEASE
-      "-O3 -funroll-loops -funroll-all-loops -fstrict-aliasing")
+      "-O3 -funroll-loops -funroll-all-loops -fstrict-aliasing -ffp-contract=off")
 
-  set(CMAKE_CXX_FLAGS_DEBUG "-g3")
-  set(CMAKE_C_FLAGS_DEBUG "-g3")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g3 -ffp-contract=off")
+  set(CMAKE_C_FLAGS_DEBUG "-g3 -ffp-contract=off")
 
   set(KNOWN_COMPILER TRUE)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -funroll-loops -fstrict-aliasing")
-  set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops -fstrict-aliasing")
+  set(CMAKE_CXX_FLAGS_RELEASE
+      "-O3 -funroll-loops -fstrict-aliasing -ffp-contract=off")
+  set(CMAKE_C_FLAGS_RELEASE
+      "-O3 -funroll-loops -fstrict-aliasing -ffp-contract=off")
 
-  set(CMAKE_CXX_FLAGS_DEBUG "-g3")
-  set(CMAKE_C_FLAGS_DEBUG "-g3")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g3 -ffp-contract=off")
+  set(CMAKE_C_FLAGS_DEBUG "-g3 -ffp-contract=off")
 
   set(KNOWN_COMPILER TRUE)
 endif()
