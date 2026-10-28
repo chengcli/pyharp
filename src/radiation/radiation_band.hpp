@@ -201,6 +201,12 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
    * defined on wavenumber or wavelength grids or on a grid of correlated-k
    * points with weights.
    *
+   * Convention: fbeam is in W/m^2, the band's beam irradiance at each
+   * spectral point. On a wavenumber grid without weights the band flux is the
+   * average over the points (trapezoid weights normalized by their signed
+   * sum), so a beam of 1 W/m^2 returns 1 W/m^2 for any band width. With
+   * weights, the points are summed with the weights as given.
+   *
    * The last dimension of the returned flux tensor is 2, where the first
    * element is the upward flux and the second element is the downward flux.
    *
@@ -211,7 +217,12 @@ class RadiationBandImpl : public torch::nn::Cloneable<RadiationBandImpl> {
    * \param dz layer thickness (nlyr) or (ncol, nlyr)
    *
    * \param bc boundary conditions, may contain the following fields:
-   *        "fbeam": solar beam irradiance [W/m^2], (nwave, ncol)
+   *        "fbeam": solar beam irradiance of the band [W/m^2], (nwave, ncol):
+   *                 at each spectral point the band's irradiance, in the
+   *                 units of the band-integrated Planck source the solver
+   *                 adds to it, not a density per wavenumber. The band flux
+   *                 is the weighted sum over the points or, on a wavenumber
+   *                 grid without weights, their average.
    *        "umu0": cosine of the solar zenith angle, (nwave, ncol)
    *        "albedo": surface albedo, (nwave, ncol)
    *

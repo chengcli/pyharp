@@ -165,7 +165,7 @@ def write_spectral_profile(
 @overload
 def bbflux_wavenumber(wave: torch.Tensor, temp: float, ncol: int = 1) -> torch.Tensor:
     """
-    Calculate blackbody flux using wavenumber.
+    Calculate blackbody radiance per wavenumber (pi times it is the flux).
 
     Args:
         wave (torch.Tensor): wavenumber [cm^-1]
@@ -173,7 +173,7 @@ def bbflux_wavenumber(wave: torch.Tensor, temp: float, ncol: int = 1) -> torch.T
         ncol (int, optional): number of columns, default to 1
 
     Returns:
-        torch.Tensor: blackbody flux [w/(m^2 cm^-1)]
+        torch.Tensor: blackbody radiance [W/(m^2 sr cm^-1)]
 
     Examples:
         >>> import torch
@@ -188,7 +188,8 @@ def bbflux_wavenumber(wave: torch.Tensor, temp: float, ncol: int = 1) -> torch.T
 @overload
 def bbflux_wavenumber(wn1: float, wn2: float, temp: torch.Tensor) -> torch.Tensor:
     """
-    Calculate blackbody flux using wavenumber.
+    Calculate blackbody radiance integrated from wn1 to wn2 (pi times it is
+    the flux); with wn1 == wn2, the radiance per wavenumber at wn1.
 
     Args:
         wn1 (float): wavenumber [cm^-1]
@@ -196,7 +197,8 @@ def bbflux_wavenumber(wn1: float, wn2: float, temp: torch.Tensor) -> torch.Tenso
         temp (torch.Tensor): temperature [K]
 
     Returns:
-        torch.Tensor: blackbody flux [w/(m^2 cm^-1)]
+        torch.Tensor: blackbody radiance [W/(m^2 sr)], or [W/(m^2 sr cm^-1)]
+        when wn1 == wn2
 
     Examples:
         >>> import torch

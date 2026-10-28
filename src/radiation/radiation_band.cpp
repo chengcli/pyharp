@@ -409,13 +409,34 @@ torch::Tensor RadiationBandImpl::forward(
   // accumulate flux from flux spectrum
   torch::Tensor result;
   if (options->weight().size() > 0) {
+    // A weighted band sums the points with the weights as given. They are not
+    // normalized here and need not sum to 1: the examples use g-point weights
+    // that sum to 1 within each sub-band (example_sonora_2020_flux.py) and
+    // bin widths in cm^-1 (jupiter_1d_rt.cpp, run_sub_neptune_rt.py), so
+    // their meaning must match the wave_lower and wave_upper of the points.
     result = sum_spectrum(spectrum,
                           torch::tensor(options->weight(), spectrum.options()),
                           "weight");
   } else {
-    result = sum_spectrum(
-        spectrum, torch::tensor(options->wavenumber(), spectrum.options()),
-        "wavenumber");
+    // Every spectral point solves the band with its own optical properties
+    // and the Planck source integrated over the band (wave_lower and
+    // wave_upper are the band limits), so each point's flux is already a band
+    // flux, and fbeam [W/m^2] is the band's beam irradiance at each point.
+    // Average them over the wavenumber grid: the trapezoid weights divided by
+    // their signed sum, the last minus the first wavenumber, sum to 1 for an
+    // ascending and a descending grid alike, so a beam of 1 W/m^2 returns
+    // 1 W/m^2. Integrating them over wavenumber would multiply the band flux
+    // by the band width.
+    auto wave = torch::tensor(options->wavenumber(), spectrum.options());
+    int npoint = wave.size(0);
+    double span = npoint > 1 ? (wave[npoint - 1] - wave[0]).item<double>() : 0.;
+    if (npoint == 1) {
+      result = spectrum[0];
+    } else if (span != 0.) {
+      result = sum_spectrum(spectrum, wave, "wavenumber") / span;
+    } else {
+      result = spectrum.mean(0);
+    }
   }
   // Ensure a uniform 4-channel layout [up, down, mid_up, mid_down] across all
   // bands so band fluxes can be summed regardless of solver. The Toon solver
