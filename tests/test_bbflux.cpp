@@ -12,13 +12,13 @@
 // the additivity of band integrals.
 //
 // The shape is checked twice: exactly (1e-9) with the second radiation constant
-// each function uses (c2 = 1.4388 cm K for wavenumbers; h c / k with c = 3.0e8
-// m/s for wavelengths), and within 1% with the CODATA value, which those
-// constants differ from by 1.6e-5 and 6.9e-4.
+// each function uses (the exact SI value h c / k for both wavenumbers and
+// wavelengths), and within 1% with the CODATA value.
 static double const c2_codata = 1.438776877;  // [cm K]
-static double const c2_wavenumber = 1.4388;   // bbflux_wavenumber(wave, ...)
+static double const c2_wavenumber =
+    1.438776877503933;  // bbflux_wavenumber(wave, ...)
 static double const c2_wavelength =
-    6.62607015e-34 * 3.0e8 / 1.380649e-23 * 100.0;  // bbflux_wavelength
+    6.62607015e-34 * 299792458.0 / 1.380649e-23 * 100.0;  // bbflux_wavelength
 
 // Planck shape in wavenumber: F(nu) ~ nu^3 / (exp(c2 nu / T) - 1)
 static double planck_nu_shape(double nu, double T, double c2) {
