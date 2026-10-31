@@ -108,12 +108,7 @@ size_t toon89_lw_space(int nlay) {
   bump(alignof(T), nlay * sizeof(T));        // Cmm1
   bump(alignof(T), nlay * sizeof(T));        // Cp
   bump(alignof(T), nlay * sizeof(T));        // Cm
-  bump(alignof(T), nlay * sizeof(T));        // Ep
   bump(alignof(T), nlay * sizeof(T));        // Em
-  bump(alignof(T), nlay * sizeof(T));        // E1
-  bump(alignof(T), nlay * sizeof(T));        // E2
-  bump(alignof(T), nlay * sizeof(T));        // E3
-  bump(alignof(T), nlay * sizeof(T));        // E4
   bump(alignof(T), (2 * nlay) * sizeof(T));  // Af
   bump(alignof(T), (2 * nlay) * sizeof(T));  // Bf
   bump(alignof(T), (2 * nlay) * sizeof(T));  // Cf
@@ -129,8 +124,6 @@ size_t toon89_lw_space(int nlay) {
   bump(alignof(T), nlay * sizeof(T));        // alpha2
   bump(alignof(T), nlay * sizeof(T));        // sigma1
   bump(alignof(T), nlay * sizeof(T));        // sigma2
-  bump(alignof(T), nlay * sizeof(T));        // em1
-  bump(alignof(T), nlay * sizeof(T));        // Ep_mid
   bump(alignof(T), nlay * sizeof(T));        // em1_mid
   bump(alignof(T), nlev * sizeof(T));        // facc
   bump(alignof(T), nlay * sizeof(T));        // facc_mid

@@ -151,6 +151,11 @@ def test_overview_products_reuses_downloaded_line_database(monkeypatch, tmp_path
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.download_hitran_lines", fake_download)
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.load_hitran_line_list", fake_load_line_list)
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_utils.load_requested_cia_dataset", lambda args, config: None)
+    # compute_overview_products (in hitran_molecule_plot) calls the names it imported there: patch them there too,
+    # or the real functions download from HITRAN
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.download_hitran_lines", fake_download)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.load_hitran_line_list", fake_load_line_list)
+    monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.load_requested_cia_dataset", lambda args, config: None)
     monkeypatch.setattr(
         "pyharp.spectra.hitran_molecule_utils.build_line_provider",
         lambda config, line_db: SimpleNamespace(broadening_summary=lambda: "requested=self:1.000 -> effective=self:1.000"),
@@ -267,8 +272,10 @@ def test_run_xsection_reports_broadening_summary(monkeypatch, tmp_path, capsys) 
         sigma_total_cm2_molecule=np.ones(3),
     )
 
+    # run_xsection calls the name it imported into hitran_molecule_plot: patch it there,
+    # or the real function downloads from HITRAN
     monkeypatch.setattr(
-        "pyharp.spectra.hitran_molecule_utils.compute_requested_absorption_spectrum",
+        "pyharp.spectra.hitran_molecule_plot.compute_requested_absorption_spectrum",
         lambda *call_args, **call_kwargs: (None, None, fake_spectrum, fake_provider),
     )
     monkeypatch.setattr("pyharp.spectra.hitran_molecule_plot.plot_absorption_spectrum", lambda spectrum, figure: None)

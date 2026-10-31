@@ -34,8 +34,12 @@ DISPATCH_MACRO T longwave_exprel(T x) {
   return x == static_cast<T>(0) ? static_cast<T>(1) : expm1(x) / x;
 }
 
+// a (e^-a - e^-b) / (b - a) with b = (1 + delta) a, i.e. (e^-a - e^-b) /
+// delta: evaluated as a e^-min(a, b) (1 - e^-|b - a|) / |b - a| through
+// expm1, so only decaying exponentials appear, any a and b are safe, and the
+// resonance b = a (lambda mu = 1) has its finite limit a e^-a.
 template <typename T>
-DISPATCH_MACRO T longwave_down_resonant_ratio(T delta, T a) {
+DISPATCH_MACRO T longwave_resonant_ratio(T delta, T a) {
   T const b = (static_cast<T>(1) + delta) * a;
   return a * exp(-fmin(a, b)) * longwave_exprel(-fabs(delta * a));
 }
@@ -44,34 +48,19 @@ DISPATCH_MACRO T longwave_down_resonant_ratio(T delta, T a) {
 // whenever fmin picks a, which is half of the angles in a weakly scattering
 // layer.
 template <typename T>
-DISPATCH_MACRO T longwave_down_resonant_ratio(T delta, T a, T exp_neg_a) {
+DISPATCH_MACRO T longwave_resonant_ratio(T delta, T a, T exp_neg_a) {
   T const b = (static_cast<T>(1) + delta) * a;
   T const m = fmin(a, b);
   return a * (m == a ? exp_neg_a : exp(-m)) * longwave_exprel(-fabs(delta * a));
 }
 
 template <typename T>
-DISPATCH_MACRO T longwave_up_resonant_ratio(T delta, T a) {
-  return a * longwave_exprel(delta * a);
-}
-
-template <typename T>
-DISPATCH_MACRO T longwave_midpoint_up_resonant_ratio(T delta, T half_a) {
-  return exp((static_cast<T>(1) + delta) * half_a) * half_a *
-         longwave_exprel(delta * half_a);
-}
-
-template <typename T>
-DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
-                                          T a_surf_in, int top_emission_flag,
-                                          T btop_factor, bool hard_surface,
-                                          bool delta_eddington_lw, T* flx,
-                                          int len1, char* work,
-                                          int wstride = 1) {
+DISPATCH_MACRO void toon_mckay89_longwave(
+    int nlay, const T* be, const T* prop, T a_surf_in, T bsurf_in,
+    int top_emission_flag, T btop_factor, bool hard_surface,
+    bool delta_eddington_lw, T* flx, int len1, char* work, int wstride = 1) {
   int nlev = nlay + 1;
   int l = 2 * nlay;
-  int lm2 = l - 2;
-  int lm1 = l - 1;
 
   // Constants
   const int nmu = 5;
@@ -100,12 +89,7 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   auto Cp = alloc_strided<T>(work, nlay, wstride);
   auto Cm = alloc_strided<T>(work, nlay, wstride);
 
-  auto Ep = alloc_strided<T>(work, nlay, wstride);
   auto Em = alloc_strided<T>(work, nlay, wstride);
-  auto E1 = alloc_strided<T>(work, nlay, wstride);
-  auto E2 = alloc_strided<T>(work, nlay, wstride);
-  auto E3 = alloc_strided<T>(work, nlay, wstride);
-  auto E4 = alloc_strided<T>(work, nlay, wstride);
 
   auto Af = alloc_strided<T>(work, l, wstride);
   auto Bf = alloc_strided<T>(work, l, wstride);
@@ -124,8 +108,6 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   auto sigma1 = alloc_strided<T>(work, nlay, wstride);
   auto sigma2 = alloc_strided<T>(work, nlay, wstride);
 
-  auto em1 = alloc_strided<T>(work, nlay, wstride);
-  auto Ep_mid = alloc_strided<T>(work, nlay, wstride);
   auto em1_mid = alloc_strided<T>(work, nlay, wstride);
   // Angle-summed fluxes at the levels and the layer midpoints. The sweeps
   // accumulate here and write flx once, rather than adding every angle into
@@ -179,13 +161,10 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     Cp[k] = B0[k] + B1[k] * dtau[k] + B1[k] * term[k];
     Cm[k] = B0[k] + B1[k] * dtau[k] - B1[k] * term[k];
 
-    T exptrm = fmin(lam[k] * dtau[k], 35.0);
-    Ep[k] = exp(exptrm);
-    Em[k] = 1.0 / Ep[k];
-    E1[k] = Ep[k] + gam[k] * Em[k];
-    E2[k] = Ep[k] - gam[k] * Em[k];
-    E3[k] = gam[k] * Ep[k] + Em[k];
-    E4[k] = gam[k] * Ep[k] - Em[k];
+    // e^-(lam dtau): the only exponential of the layer solution, for any
+    // optical thickness (no clip). The growing mode is carried by its value at
+    // the layer bottom, K = k1 e^(lam dtau), so nothing grows.
+    Em[k] = exp(-lam[k] * dtau[k]);
   }
 
   // Top boundary: controlled by top_emission_flag
@@ -201,7 +180,9 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
   } else {
     Btop = top_emission_flag * BE_IN(0);
   }
-  T Bsurf = BE_IN(nlev - 1);
+  // Planck function of the surface: of bc "btemp" when given, else of the
+  // bottom level (the caller passes it either way)
+  T Bsurf = bsurf_in;
 
   // Bottom boundary condition depends on surface type:
   // Gas giant (hard_surface=false): Planck + gradient extrapolation below
@@ -215,40 +196,66 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     bsurf_flux = Bsurf + B1[nlay - 1] * ubari;
   }
 
-  // --- Matrix Construction (1-based indices for solver) ---
+  // --- Matrix Construction ---
+  // Unknowns per layer Y1, Y2 with K = Y1 + Y2 (the growing mode at the layer
+  // bottom) and k2 = Y1 - Y2 (the decaying mode at the layer top). With
+  // e = e^-(lam dtau) the fluxes at the layer edges are
+  //   bottom: F+ = P1 Y1 + P2 Y2, F- = P3 Y1 + P4 Y2,
+  //           P1 = 1 + gam e, P2 = 1 - gam e, P3 = gam + e, P4 = gam - e;
+  //   top:    F+ = Q1 Y1 + Q2 Y2, F- = Q3 Y1 + Q4 Y2,
+  //           Q1 = e + gam, Q2 = e - gam, Q3 = gam e + 1, Q4 = gam e - 1;
+  // plus the particular solution C+-. Continuity of F+ and F- at each
+  // interface, combined to remove one unknown at either end (as in Toon et al.
+  // 1989), keeps the system tridiagonal, and only e appears in it.
   Af[0] = 0.0;
-  Bf[0] = gam[0] + 1.0;
-  Cf[0] = gam[0] - 1.0;
+  Bf[0] = gam[0] * Em[0] + 1.0;
+  Cf[0] = gam[0] * Em[0] - 1.0;
   Df[0] = Btop - Cmm1[0];
 
-  int n_idx = 0;
-  for (int i = 1; i < lm2; i += 2) {
-    Af[i] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
-    Bf[i] = (E2[n_idx] + E4[n_idx]) * (gam[n_idx + 1] - 1.0);
-    Cf[i] = 2.0 * (1.0 - gam[n_idx + 1] * gam[n_idx + 1]);
-    Df[i] = (gam[n_idx + 1] - 1.0) * (Cpm1[n_idx + 1] - Cp[n_idx]) +
-            (1.0 - gam[n_idx + 1]) * (Cm[n_idx] - Cmm1[n_idx + 1]);
-    n_idx++;
+  for (int j = 0; j < nlay - 1; j++) {
+    T const P1 = 1.0 + gam[j] * Em[j], P2 = 1.0 - gam[j] * Em[j];
+    T const P3 = gam[j] + Em[j], P4 = gam[j] - Em[j];
+    T const Q1 = Em[j + 1] + gam[j + 1], Q2 = Em[j + 1] - gam[j + 1];
+    T const Q3 = gam[j + 1] * Em[j + 1] + 1.0;
+    T const Q4 = gam[j + 1] * Em[j + 1] - 1.0;
+    T const r1 = Cpm1[j + 1] - Cp[j];
+    T const r2 = Cmm1[j + 1] - Cm[j];
+
+    // F+ and F- continuity without Y2 of layer j + 1
+    int i = 2 * j + 1;
+    Af[i] = Q4 * P1 - Q2 * P3;
+    Bf[i] = Q4 * P2 - Q2 * P4;
+    Cf[i] = Q2 * Q3 - Q4 * Q1;
+    Df[i] = Q4 * r1 - Q2 * r2;
+
+    // ... and without Y1 of layer j
+    i = 2 * j + 2;
+    Af[i] = P3 * P2 - P1 * P4;
+    Bf[i] = P1 * Q3 - P3 * Q1;
+    Cf[i] = P1 * Q4 - P3 * Q2;
+    Df[i] = P3 * r1 - P1 * r2;
   }
 
-  n_idx = 0;
-  for (int i = 2; i < lm1; i += 2) {
-    Af[i] = 2.0 * (1.0 - gam[n_idx] * gam[n_idx]);
-    Bf[i] = (E1[n_idx] - E3[n_idx]) * (1.0 + gam[n_idx + 1]);
-    Cf[i] = (E1[n_idx] + E3[n_idx]) * (gam[n_idx + 1] - 1.0);
-    Df[i] = E3[n_idx] * (Cpm1[n_idx + 1] - Cp[n_idx]) +
-            E1[n_idx] * (Cm[n_idx] - Cmm1[n_idx + 1]);
-    n_idx++;
+  // The bottom boundary reflects only off a hard surface. Below a gas giant's
+  // column (hard_surface = false) the boundary is the Planck + gradient source
+  // above and the angular sweep below, neither of which reflects, so the
+  // surface albedo must not enter this row either.
+  T const a_row = hard_surface ? a_surf_in : static_cast<T>(0);
+  {
+    int const j = nlay - 1;
+    T const P1 = 1.0 + gam[j] * Em[j], P2 = 1.0 - gam[j] * Em[j];
+    T const P3 = gam[j] + Em[j], P4 = gam[j] - Em[j];
+    Af[l - 1] = P1 - a_row * P3;
+    Bf[l - 1] = P2 - a_row * P4;
+    Cf[l - 1] = 0.0;
+    Df[l - 1] = bsurf_flux - Cp[j] + a_row * Cm[j];
   }
-
-  Af[l - 1] = E1[nlay - 1] - a_surf_in * E3[nlay - 1];
-  Bf[l - 1] = E2[nlay - 1] - a_surf_in * E4[nlay - 1];
-  Cf[l - 1] = 0.0;
-  Df[l - 1] = bsurf_flux - Cp[nlay - 1] + a_surf_in * Cm[nlay - 1];
 
   dtridgl(l, Af, Bf, Cf, Df, xkk);
 
   for (int n = 0; n < nlay; n++) {
+    // xk1: K, the growing mode at the layer bottom; xk2: the decaying mode at
+    // the layer top. g and xj below are therefore bottom amplitudes.
     xk1[n] = xkk[2 * n] + xkk[2 * n + 1];
     xk2[n] = xkk[2 * n] - xkk[2 * n + 1];
     if (fabs(xk2[n]) < 1e-30 * fabs(xkk[2 * n + 1])) xk2[n] = 0.0;
@@ -274,12 +281,9 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       sigma1[n] = twopi * (B0[n] - B1[n] * term_val);
       sigma2[n] = alpha2[n];
     }
-    em1[n] = 1.0 / exp(fmin(lam[n] * dtau[n], 35.0));
-    // Half-layer terms of the midpoint fluxes; they do not depend on the
-    // angle, so evaluate them once per layer rather than per angle and sweep.
-    T exptrm_h = fmin(0.5 * lam[n] * dtau[n], 35.0);
-    Ep_mid[n] = exp(exptrm_h);     // exptrm_positive_mdpt
-    em1_mid[n] = 1.0 / Ep_mid[n];  // exptrm_minus_mdpt
+    // The sweep below uses decaying exponentials only: e^-(lam dtau) (Em) and
+    // e^-(lam dtau / 2).
+    em1_mid[n] = exp(-0.5 * lam[n] * dtau[n]);
   }
 
   // --- Gaussian Quadrature Mu Loop ---
@@ -315,11 +319,10 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       T em2 = exp(-a);
       T l_u_p1 = lam[k] * u + 1.0;
       T l_u_m1 = lam[k] * u - 1.0;
-      T down_ratio = lam[k] * dtau[k] < 35.0
-                         ? longwave_down_resonant_ratio(l_u_m1, a, em2)
-                         : (em2 - em1[k]) / l_u_m1;
+      // (e^-a - e^-(lam dtau)) / (lam mu - 1), finite at resonance
+      T down_ratio = longwave_resonant_ratio(l_u_m1, a, em2);
 
-      T lw_next = lw_down * em2 + (xj[k] / l_u_p1) * (Ep[k] - em2) +
+      T lw_next = lw_down * em2 + (xj[k] / l_u_p1) * (1.0 - em2 * Em[k]) +
                   xk[k] * down_ratio + sigma1[k] * (1.0 - em2) +
                   sigma2[k] * (u * em2 + dtau[k] - u);
 
@@ -327,11 +330,10 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       // same source-function form as the level update but to tau_k + dtau/2.
       // (PICASO get_thermal_1d flux_minus_mdpt; vars: xj=J, xk=K.)
       T em2_mid = exp(-0.5 * dtau[k] / u);
-      T down_mid_ratio = 0.5 * lam[k] * dtau[k] < 35.0
-                             ? longwave_down_resonant_ratio(
-                                   l_u_m1, static_cast<T>(0.5) * dtau[k] / u)
-                             : (em2_mid - em1_mid[k]) / l_u_m1;
-      T mid_dn = lw_down * em2_mid + (xj[k] / l_u_p1) * (Ep_mid[k] - em2_mid) +
+      T down_mid_ratio =
+          longwave_resonant_ratio(l_u_m1, static_cast<T>(0.5) * dtau[k] / u);
+      T mid_dn = lw_down * em2_mid +
+                 (xj[k] / l_u_p1) * (em1_mid[k] - em2_mid * Em[k]) +
                  xk[k] * down_mid_ratio + sigma1[k] * (1.0 - em2_mid) +
                  sigma2[k] * (u * em2_mid + 0.5 * dtau[k] - u);
       facc_mid[k] += mid_dn * wuarr[m];
@@ -368,13 +370,13 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
     facc[nlev - 1] += lw_up * wuarr[m];
     for (int k = nlay - 1; k >= 0; k--) {
       T em2 = exp(-dtau[k] / u);
-      T em3 = em1[k] * em2;
+      T em3 = Em[k] * em2;
       T l_u_m1 = lam[k] * u - 1.0;
       T l_u_p1 = lam[k] * u + 1.0;
 
-      T up_ratio = lam[k] * dtau[k] < 35.0
-                       ? longwave_up_resonant_ratio(l_u_m1, dtau[k] / u)
-                       : (Ep[k] * em2 - 1.0) / l_u_m1;
+      // the growing mode: g (e^-a - e^-(lam dtau)) / (lam mu - 1), g at the
+      // bottom
+      T up_ratio = longwave_resonant_ratio(l_u_m1, dtau[k] / u, em2);
       T lw_next = lw_up * em2 + g[k] * up_ratio +
                   (h[k] / l_u_p1) * (1.0 - em3) + alpha1[k] * (1.0 - em2) +
                   alpha2[k] * (u - (dtau[k] + u) * em2);
@@ -383,12 +385,11 @@ DISPATCH_MACRO void toon_mckay89_longwave(int nlay, const T* be, const T* prop,
       // propagated up from the lower-interface level intensity lw_up.
       // (PICASO get_thermal_1d flux_plus_mdpt; vars: g=G, h=H.)
       T em2_mid = exp(-0.5 * dtau[k] / u);
-      T up_mid_ratio = lam[k] * dtau[k] < 35.0
-                           ? longwave_midpoint_up_resonant_ratio(
-                                 l_u_m1, static_cast<T>(0.5) * dtau[k] / u)
-                           : (Ep[k] * em2_mid - Ep_mid[k]) / l_u_m1;
+      // ... and to the midpoint: g (e^-a/2 - e^-(lam dtau / 2)) / (lam mu - 1)
+      T up_mid_ratio =
+          longwave_resonant_ratio(l_u_m1, static_cast<T>(0.5) * dtau[k] / u);
       T mid_up = lw_up * em2_mid + g[k] * up_mid_ratio +
-                 (h[k] / l_u_p1) * (em1_mid[k] - em1[k] * em2_mid) +
+                 (h[k] / l_u_p1) * (em1_mid[k] - Em[k] * em2_mid) +
                  alpha1[k] * (1.0 - em2_mid) +
                  alpha2[k] * (u + 0.5 * dtau[k] - (dtau[k] + u) * em2_mid);
       facc_mid[k] += mid_up * wuarr[m];

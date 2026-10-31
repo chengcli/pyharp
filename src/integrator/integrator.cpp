@@ -56,7 +56,10 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[1].wght1(1. / 4.);
     stages[1].wght2(1. / 4.);
 
-    stages[2].wght0(1. / 3.);
+    // w0 is computed as 1. - 2./3., which is exact in double, so that the
+    // state weights sum to exactly 1; the doubles 1./3. and 2./3. sum to
+    // 1 - 2^-54 and changed a conserved total by 5.6e-17 per step
+    stages[2].wght0(1. - 2. / 3.);
     stages[2].wght1(2. / 3.);
     stages[2].wght2(2. / 3.);
   } else if (options->type() == "rk3s4") {
@@ -69,8 +72,9 @@ IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     stages[1].wght1(1.0);
     stages[1].wght2(0.5);
 
+    // w1 is computed as 1. - 2./3., exact in double, as in rk3 above
     stages[2].wght0(2. / 3.);
-    stages[2].wght1(1. / 3.);
+    stages[2].wght1(1. - 2. / 3.);
     stages[2].wght2(1. / 6.);
 
     stages[3].wght0(0.);

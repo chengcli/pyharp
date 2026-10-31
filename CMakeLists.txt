@@ -114,10 +114,19 @@ if (CUDAToolkit_FOUND)
     endif()
 
     if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0")
-      list(APPEND _cuda_arch_list 90 120)
+      list(APPEND _cuda_arch_list 90)
+    endif()
+
+    # sm_120 (RTX 50xx) only from 12.8: nvcc 12.0-12.7 reject it
+    # ("Unsupported gpu architecture 'compute_120'")
+    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.8")
+      list(APPEND _cuda_arch_list 120)
     endif()
   elseif(DEFINED TORCH_CUDA_VERSION AND TORCH_CUDA_VERSION VERSION_GREATER_EQUAL "12.0")
-    list(APPEND _cuda_arch_list 90 120)
+    list(APPEND _cuda_arch_list 90)
+    if(TORCH_CUDA_VERSION VERSION_GREATER_EQUAL "12.8")
+      list(APPEND _cuda_arch_list 120)
+    endif()
   endif()
 
   set(CMAKE_CUDA_ARCHITECTURES ${_cuda_arch_list})

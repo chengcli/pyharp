@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import pytest
 import torch
 import numpy as np
 from pyharp import constants as const
@@ -9,6 +10,7 @@ from pyharp.sonora import (
         load_sonora_atm,
         )
 from pyharp.opacity import MultiBand, OpacityOptions
+from pyharp import find_resource as pyharp_find_resource
 from matplotlib import pyplot as plt
 
 def setup_sonora_opacity():
@@ -104,8 +106,22 @@ def plot_opacity(case: str='kcross'):
     else:
         raise ValueError(f"Unknown case: {case}")
 
+SONORA_FILE = "sonora_2020_feh+000_co_100.data.196.pt"
+
+
+def _sonora_file_available():
+    try:
+        pyharp_find_resource(SONORA_FILE)
+        return True
+    except RuntimeError:
+        return False
+
+
+@pytest.mark.skipif(not _sonora_file_available(),
+                    reason=f"needs the Sonora 2020 opacity file {SONORA_FILE}, which is not in the repository and is "
+                           "not downloaded in CI; put it on pyharp's resource search path to run this test")
 def test_sonora2020():
-    fname = "sonora_2020_feh+000_co_100.data.196.pt"
+    fname = SONORA_FILE
     op = OpacityOptions().type("multiband-ck")
     op.opacity_files([fname])
     op.species_ids([0])

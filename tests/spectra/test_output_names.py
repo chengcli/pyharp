@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from pyharp.spectra.utils import default_output_path
+from pyharp.spectra.utils import default_output_path, project_root
+
+OUT = project_root() / "output"
 
 
 def test_default_output_path_uses_requested_pattern() -> None:
@@ -13,7 +15,7 @@ def test_default_output_path_uses_requested_pattern() -> None:
         suffix=".png",
     )
 
-    assert path == Path("output/co2_xsection_300K_1bar_20_2500cm1.png")
+    assert path == OUT / "co2_xsection_300K_1bar_20_2500cm1.png"
 
 
 def test_default_output_path_sanitizes_cia_and_composition_names() -> None:
@@ -34,5 +36,10 @@ def test_default_output_path_sanitizes_cia_and_composition_names() -> None:
         suffix=".pdf",
     )
 
-    assert cia_path == Path("output/h2_he_attenuation_275p5K_0p25bar_25_30p5cm1.png")
-    assert composition_path == Path("output/h2o_0p1_h2_0p9_overview_300K_1bar_25_2500cm1.pdf")
+    assert cia_path == OUT / "h2_he_attenuation_275p5K_0p25bar_25_30p5cm1.png"
+    assert composition_path == OUT / "h2o_0p1_h2_0p9_overview_300K_1bar_25_2500cm1.pdf"
+
+
+def test_default_output_path_honours_an_explicit_directory() -> None:
+    path = default_output_path(target_name="CO2", plot_type="xsection", suffix=".nc", output_dir=Path("results"))
+    assert path == Path("results/co2_xsection_300K_1bar_20_2500cm1.nc")

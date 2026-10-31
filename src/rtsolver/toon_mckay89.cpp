@@ -13,6 +13,11 @@ ToonMcKay89Impl::ToonMcKay89Impl(ToonMcKay89Options const& options)
 }
 
 void ToonMcKay89Impl::reset() {
+  TORCH_CHECK_NOT_IMPLEMENTED(
+      !options->zenith_correction(),
+      "ToonMcKay89 option 'zenith_correction' is not implemented: the "
+      "solver uses one umu0 per column, without a per-level spherical "
+      "correction; remove it from the flags");
   // No parameters to initialize
 }
 
@@ -128,6 +133,19 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
 
     auto be = bbflux_wavenumber(wave_lo, wave_hi, temf.value());
 
+    // Surface temperature: bc "btemp" (ncol), the key DISORT reads, else the
+    // bottom level (level 0) as before. Only the surface emission uses it.
+    torch::Tensor bsurf;
+    if (bc->find("btemp") != bc->end()) {
+      auto btemp = bc->at("btemp");
+      TORCH_CHECK(btemp.dim() == 1 && btemp.size(0) == ncol,
+                  "ToonMcKay89::forward: bc->btemp must have shape (ncol)");
+      bsurf = bbflux_wavenumber(wave_lo, wave_hi,
+                                btemp.to(prop.dtype()).unsqueeze(-1));
+    } else {
+      bsurf = be.narrow(-1, 0, 1);
+    }
+
     // Optional area_scale = (r/r_ref)^2 per level, shape (nlyr + 1) or
     // (ncol, nlyr + 1), multiplies the Planck source: the solution is then the
     // r^2-weighted flux (Zhang et al. 2023, Inhomogeneity III, App. A), and the
@@ -147,6 +165,7 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
             "ToonMcKay89::forward: bc->area_scale shape is not (ncol, nlyr+1)");
       }
       be = be * ascale;
+      bsurf = bsurf * ascale.narrow(-1, 0, 1);
     }
 
     auto iter = at::TensorIteratorConfig()
@@ -160,6 +179,9 @@ torch::Tensor ToonMcKay89Impl::forward(torch::Tensor prop,
                     // strides()[3]), contiguous as `prop` is above
                     .add_owned_input(be.unsqueeze(-1).contiguous())
                     .add_owned_input(bc->at("albedo").view({nwave, ncol, 1, 1}))
+                    .add_owned_input(bsurf.expand({nwave, ncol, 1})
+                                         .reshape({nwave, ncol, 1, 1})
+                                         .contiguous())
                     .build();
 
     at::native::call_toon89_lw(

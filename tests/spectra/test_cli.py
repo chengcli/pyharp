@@ -930,7 +930,8 @@ def test_xsection_dataset_adds_binary_cia_field_for_species_dump() -> None:
 def test_pair_xsection_dataset_uses_binary_absorption_units(monkeypatch, tmp_path) -> None:
     class FakeCia:
         def interpolate_to_grid(self, *, temperature_k, wavenumber_grid_cm1):
-            return np.array([1.0e-46, 2.0e-46], dtype=np.float64)
+            # one value per grid point (the grid includes both endpoints)
+            return np.linspace(1.0e-46, 2.0e-46, len(wavenumber_grid_cm1), dtype=np.float64)
 
     monkeypatch.setattr("pyharp.spectra.dump_cli.load_cia_dataset", lambda **kwargs: FakeCia())
     args = build_parser().parse_args(
@@ -998,6 +999,7 @@ def test_composition_xsection_dataset_splits_h2o_continuum(monkeypatch, tmp_path
                         "weight": 0.2,
                         "source_name": "MT_CKD_H2O",
                         "sigma_cm2_molecule": np.array([0.5, 0.6]),
+                        "continuum_components": None,
                     },
                 )(),
             ),

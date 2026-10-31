@@ -8,7 +8,7 @@
 
 class YamlReadTests : public ::testing::Test {
  protected:
-  std::string filename = "example_infrared.yaml";  // The name of your YAML file
+  std::string filename = "example_infrared.yaml";  // in-repo fixture (tests/)
   YAML::Node node;
 
   virtual void SetUp() {
