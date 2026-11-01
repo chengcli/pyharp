@@ -3,38 +3,46 @@
 
 namespace harp {
 
-//! \brief calculate blackbody flux using wavenumber
+//! \brief calculate blackbody radiance per wavenumber
 /*!
- * Formula:
+ * Formula, with \f$\nu\f$ the wavenumber:
  * \f[
- *    F_\nu = \frac{2 h \nu^3}{c^2} \frac{1}{\exp(\frac{h \nu}{k_B T}) - 1}
+ *    B_\nu = \frac{2 h c^2 \nu^3}{\exp(\frac{h c \nu}{k_B T}) - 1}
  * \f]
  *
+ * This is a radiance, per steradian; the hemispheric flux of a blackbody is
+ * \f$\pi B_\nu\f$.
  * Input wavenumber is in cm^-1 and must be a 1D tensor.
- * The output flux is a 2D tensor with shape (nwave, ncol), where nwave is the
+ * The output is a 2D tensor with shape (nwave, ncol), where nwave is the
  * number of wavenumbers and ncol is the number of columns.
  *
  * \param wavenumber [cm^-1]
  * \param temp [K]
  * \param ncol number of columns
- * \return blackbody flux [w/(m^2 cm^-1)]
+ * \return blackbody radiance [W/(m^2 sr cm^-1)]
  */
 torch::Tensor bbflux_wavenumber(torch::Tensor wave, double temp, int ncol = 1);
 
-//! \brief calculate integrated blackbody flux using wavenumber
+//! \brief calculate blackbody radiance integrated over a wavenumber band
 /*!
- * Calculate the integrated blackbody flux between two wavenumbers
- * for a tensor of temperatures.
- * If wn1 == wn2, return the flux at that wavenumber.
+ * Calculate the blackbody radiance integrated between two wavenumbers
+ * for a tensor of temperatures. This is a radiance, per steradian; the
+ * hemispheric flux is pi times it.
+ * If wn1 == wn2, return the radiance per wavenumber at that wavenumber
+ * [W/(m^2 sr cm^-1)] instead.
  *
  * \param wn1 small wavenumber [cm^-1]
  * \param wn2 large wavenumber [cm^-1]
  * \param temp [K]
- * \return blackbody flux [w/(m^2)]
+ * \return blackbody radiance [W/(m^2 sr)]
  */
 torch::Tensor bbflux_wavenumber(double wn1, double wn2, torch::Tensor temp);
 
-//! \brief calculate integrated blackbody flux using wavenumber
+//! \brief calculate blackbody radiance integrated over wavenumber bands
+/*!
+ * As above, element by element; an element with wn1 == wn2 gets the radiance
+ * per wavenumber at that wavenumber.
+ */
 torch::Tensor bbflux_wavenumber(torch::Tensor wn1, torch::Tensor wn2,
                                 torch::Tensor temp);
 

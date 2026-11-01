@@ -16,6 +16,7 @@ Requires pyharp >= 1.9.0 and pydisort >= 1.5.0.
 
 import json
 import math
+import mpmath as mp
 import subprocess
 import sys
 import torch
@@ -341,8 +342,23 @@ def test_toon_lw_isothermal_profile_matches_disort():
         f"{float(torch.max(torch.abs(disort_up - torch.mean(disort_up))) / disort_scale):.3e}"
     )
 
+    # Toon's band Planck function uses the exact SI constants, so its flux is
+    # pi * int B_nu dnu; DISORT's (c_planck_func2 of pydisort, C2 = 1.438786,
+    # sigma = 5.67032e-8) is 7.8e-6 below it in this band.
+    mp.mp.dps = 30
+    h, c, k = mp.mpf("6.62607015e-34"), mp.mpf(299792458), mp.mpf("1.380649e-23")
+
+    def planck(nu):  # B_nu per cm^-1, nu in cm^-1
+        return 2 * h * c**2 * (100 * nu)**3 * 100 / mp.expm1(h * c * 100 * nu / (k * temp_K))
+
+    exact = float(mp.pi * mp.quad(planck, [wave_lo[0], wave_hi[0]]))
+    assert torch.max(torch.abs(toon_up - exact)) / exact < 1.5e-6, (
+        f"Toon isothermal LW upward profile differs from pi * int B dnu: "
+        f"{float(torch.max(torch.abs(toon_up - exact)) / exact):.3e}"
+    )
+
     up_profile_scale = max(float(torch.max(torch.abs(disort_up))), 1e-30)
-    assert torch.max(torch.abs(toon_up - disort_up)) / up_profile_scale < 1.5e-6, (
+    assert torch.max(torch.abs(toon_up - disort_up)) / up_profile_scale < 1.5e-5, (
         f"Toon/DISORT isothermal LW upward profile mismatch too large: "
         f"{float(torch.max(torch.abs(toon_up - disort_up)) / up_profile_scale):.3e}"
     )
