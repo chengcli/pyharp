@@ -228,7 +228,7 @@ def bbflux_wavelength(wave: torch.Tensor, temp: float, ncol: int = 1) -> torch.T
     """
     ...
 
-def calc_dz_hypsometric(pres: torch.Tensor, temp: torch.Tensor, g_ov_R: torch.Tensor) -> torch.Tensor:
+def calc_dz_hypsometric(pres: torch.Tensor, temp: torch.Tensor, g_ov_R: torch.Tensor, zf: torch.Tensor | None = None) -> torch.Tensor:
     """
     Calculate the height between pressure levels using the hypsometric equation.
 
@@ -243,6 +243,7 @@ def calc_dz_hypsometric(pres: torch.Tensor, temp: torch.Tensor, g_ov_R: torch.Te
         pres (torch.Tensor): pressure [pa] at layers
         temp (torch.Tensor): temperature [K] at layers
         g_ov_R (torch.Tensor): gravity over specific gas constant [K/m] at layers
+        zf (torch.Tensor, optional): face positions (nlyr + 1); with centre pressures, ln p is interpolated in position
 
     Returns:
         torch.Tensor: height between pressure levels [m]

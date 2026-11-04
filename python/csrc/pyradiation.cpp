@@ -31,7 +31,7 @@ void bind_radiation(py::module& m) {
         py::arg("temp"), py::arg("ncol") = 1);
 
   m.def("calc_dz_hypsometric", &harp::calc_dz_hypsometric, py::arg("pres"),
-        py::arg("temp"), py::arg("g_ov_R"));
+        py::arg("temp"), py::arg("g_ov_R"), py::arg("zf") = py::none());
 
   auto pyRadiationBandOptions =
       py::class_<harp::RadiationBandOptionsImpl, harp::RadiationBandOptions>(
