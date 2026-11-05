@@ -1,5 +1,8 @@
 #pragma once
 
+// C/C++
+#include <optional>
+
 // torch
 #include <torch/torch.h>
 
@@ -29,8 +32,11 @@ namespace harp {
  * \param pres pressure [pa] at layers
  * \param temp temperature [K] at layers
  * \param g_ov_R gravity over specific gas constant [K/m] at layers
+ * \param zf optional face positions (nlyr + 1); with centre pressures, ln p is
+ *        interpolated to the faces in position instead of by index
  */
-torch::Tensor calc_dz_hypsometric(torch::Tensor pres, torch::Tensor temp,
-                                  torch::Tensor g_ov_R);
+torch::Tensor calc_dz_hypsometric(
+    torch::Tensor pres, torch::Tensor temp, torch::Tensor g_ov_R,
+    std::optional<torch::Tensor> zf = std::nullopt);
 
 }  // namespace harp
