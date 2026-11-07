@@ -31,7 +31,7 @@ def test_wheel_pins_pydisort_exactly():
 
 def test_extension_itself_refuses_a_different_pydisort():
     # report a different pydisort, then load the extension directly: the package __init__ is skipped, as it
-    # is for a leftover sys.modules["pyharp.pyharp"], so the extension must refuse it on its own
+    # is for any direct load of the .so, so the extension's module init must refuse the version on its own
     code = ("import glob, importlib.metadata as m, importlib.util, os, torch\n"
             "real = m.version\n"
             "m.version = lambda n: '0.0.0' if n == 'pydisort' else real(n)\n"
