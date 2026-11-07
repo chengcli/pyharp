@@ -7,6 +7,7 @@ from pathlib import Path
 from setuptools import setup
 from torch.utils import cpp_extension
 import sysconfig
+from importlib.metadata import version
 
 def parse_library_names(libdir):
     library_names = []
@@ -75,6 +76,9 @@ else:
     ]
     extra_link_args += cuda_linker
 
+# pyharp's library allocates pydisort objects, so it runs only with the pydisort it is built against
+pydisort_version = version("pydisort")
+
 ext_module = cpp_extension.CppExtension(
     name='pyharp.pyharp',
     sources=glob.glob('python/csrc/*.cpp'),
@@ -82,11 +86,14 @@ ext_module = cpp_extension.CppExtension(
     library_dirs=lib_dirs,
     libraries=libraries,
     extra_compile_args=['-Wno-attributes'],
+    define_macros=[("PYDISORT_BUILD_VERSION", f'"{pydisort_version}"')],
     extra_link_args=extra_link_args,
     )
 
 setup(
     package_dir={"pyharp": "python"},
+    install_requires=["hitran-api", "matplotlib", "netCDF4", "numpy", f"pydisort=={pydisort_version}", "scipy",
+                      "xarray"],
     ext_modules=[ext_module],
     cmdclass={"build_ext": cpp_extension.BuildExtension},
 )
