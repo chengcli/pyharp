@@ -22,6 +22,9 @@ void bind_rtsolver(py::module&);
 
 PYBIND11_MODULE(pyharp, m) {
   m.attr("__name__") = "pyharp";
+#ifdef PYDISORT_BUILD_VERSION
+  m.attr("pydisort_build_version") = PYDISORT_BUILD_VERSION;
+#endif
 
   m.attr("kIEX") = (int)disort::PropertyIndex::IEX;
   m.attr("kISS") = (int)disort::PropertyIndex::ISS;

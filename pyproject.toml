@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyharp"
-dynamic = ["version"]
+dynamic = ["version", "dependencies"]
 description = "High-performance Atmospheric Radiation Package"
 authors = [
   { name="Cheng Li", email="chengcli@umich.edu" }
@@ -24,15 +24,6 @@ authors = [
 license = { text="LICENSE" }
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-  "hitran-api",
-  "matplotlib",
-  "netCDF4",
-  "numpy",
-  "pydisort>=1.7.1,<1.8",  # see build-system.requires: aborts with 1.8.13
-  "scipy",
-  "xarray",
-]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
