@@ -76,8 +76,11 @@ else:
     ]
     extra_link_args += cuda_linker
 
-# pyharp's library allocates pydisort objects, so it runs only with the pydisort it is built against
-pydisort_version = version("pydisort")
+# pyharp's library allocates pydisort objects, so it runs only with the pydisort CMake built it against
+pydisort_version = Path(f"{current_dir}/build/pydisort_version.txt").read_text().strip()
+if version("pydisort") != pydisort_version:
+    sys.exit(f"pyharp: libharp was built against pydisort {pydisort_version}, but this build environment has "
+             f"pydisort {version('pydisort')}; build with pydisort=={pydisort_version} (--no-build-isolation)")
 
 ext_module = cpp_extension.CppExtension(
     name='pyharp.pyharp',

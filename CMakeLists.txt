@@ -89,6 +89,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/parameters.cmake)
 
 message(STATUS "${Blue}${PROJECT_NAME}-3. Setting up system libraries ...${ColorReset}")
 find_package(Disort REQUIRED)
+file(WRITE ${CMAKE_BINARY_DIR}/pydisort_version.txt "${DISORT_PEP440_VERSION}")  # read by setup.py
 find_package(Torch REQUIRED)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fmt.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gtest.cmake)
