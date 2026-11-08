@@ -1,9 +1,9 @@
-"""pyharp declares the pydisort versions it runs with: 1.7.x. With pydisort 1.8.13 the DISORT test of
-test_rayleigh.py passes its assertions and then the process aborts with "double free or corruption" (pydisort 1.8
-changed the layout of DisortImpl, which pyharp's library allocates), so the requirement excludes 1.8 until that is
-fixed."""
+"""pyharp builds with pydisort 1.7.x only, and its wheel pins the pydisort its library was built against."""
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -27,3 +27,11 @@ def pydisort_requirements():
 def test_requirement_excludes_pydisort_1_8(version, allowed):
     for req in pydisort_requirements():
         assert req.specifier.contains(version) == allowed, f"{req} and pydisort {version}"
+
+
+def test_setup_refuses_a_pydisort_other_than_the_cmake_build(tmp_path):
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "pydisort_version.txt").write_text("0.0.0")  # what CMake built libharp against
+    run = subprocess.run([sys.executable, "setup.py", "--version"], cwd=ROOT, capture_output=True, text=True,
+                         env={**os.environ, "WORKSPACE": str(tmp_path)})
+    assert run.returncode != 0 and "built against pydisort 0.0.0" in run.stderr, (run.returncode, run.stderr[-500:])
