@@ -1,6 +1,5 @@
 // torch
 #include <torch/extension.h>
-#include <torch/nn/modules/container/any.h>
 
 // harp
 #include <harp/integrator/integrator.hpp>
@@ -49,7 +48,8 @@ void bind_integrator(py::module& m) {
       .ADD_OPTION(int, harp::IntegratorOptionsImpl, max_redo);
 
   ADD_HARP_MODULE(Integrator, IntegratorOptions, py::arg("stage"),
-                  py::arg("u0"), py::arg("u1"), py::arg("u2"))
+                  py::arg("u0"), py::arg("u1"), py::arg("u2"),
+                  py::arg("out") = py::none())
       .def_readonly("stages", &harp::IntegratorImpl::stages)
       .def_readwrite("current_redo", &harp::IntegratorImpl::current_redo)
       .def("stop", &harp::IntegratorImpl::stop, py::arg("steps"),
