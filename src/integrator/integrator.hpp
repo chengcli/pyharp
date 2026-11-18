@@ -62,16 +62,7 @@ using IntegratorOptions = std::shared_ptr<IntegratorOptionsImpl>;
 
 class IntegratorImpl : public torch::nn::Cloneable<IntegratorImpl> {
  public:
-  //! Create and register an `Integrator` module
-  /*!
-   * This function registers the created module as a submodule
-   * of the given parent module `p`.
-   *
-   * \param[in] opts  options for creating the `Integrator` module
-   * \param[in] p     parent module for registering the created module
-   * \param[in] name  name for registering the created module
-   * \return          created `Integrator` module
-   */
+  //! Create an `Integrator` from `opts`, registered as submodule `name` of `p`
   static std::shared_ptr<IntegratorImpl> create(
       IntegratorOptions const& opts, torch::nn::Module* p,
       std::string const& name = "intg");
@@ -91,9 +82,10 @@ class IntegratorImpl : public torch::nn::Cloneable<IntegratorImpl> {
   //! \brief check if the integration should stop
   bool stop(int steps, double current_time);
 
-  //! \brief compute the average of the three input tensors
+  //! \brief w0*u0 + w1*u1 + w2*u2, into `out` if given (may alias u1 only)
   torch::Tensor forward(int stage, torch::Tensor u0, torch::Tensor u1,
-                        torch::Tensor u2);
+                        torch::Tensor u2,
+                        std::optional<torch::Tensor> out = std::nullopt);
 };
 TORCH_MODULE(Integrator);
 

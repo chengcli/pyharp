@@ -1,9 +1,11 @@
+// C/C++
+#include <map>
+
 // yaml
 #include <yaml-cpp/yaml.h>
 
 // harp
 #include "integrator.hpp"
-#include "integrator_dispatch.hpp"
 
 namespace harp {
 
@@ -32,97 +34,53 @@ IntegratorOptions IntegratorOptionsImpl::from_yaml(YAML::Node const& node,
 
 IntegratorImpl::IntegratorImpl(IntegratorOptions const& options_)
     : options(options_), current_redo(0) {
-  if (options->type() == "rk1" || options->type() == "euler") {
-    stages.resize(1);
-    stages[0].wght0(0.0);
-    stages[0].wght1(1.0);
-    stages[0].wght2(1.0);
-  } else if (options->type() == "rk2") {
-    stages.resize(2);
-    stages[0].wght0(0.0);
-    stages[0].wght1(1.0);
-    stages[0].wght2(1.0);
-
-    stages[1].wght0(0.5);
-    stages[1].wght1(0.5);
-    stages[1].wght2(0.5);
-  } else if (options->type() == "rk3") {
-    stages.resize(3);
-    stages[0].wght0(0.0);
-    stages[0].wght1(1.0);
-    stages[0].wght2(1.0);
-
-    stages[1].wght0(3. / 4.);
-    stages[1].wght1(1. / 4.);
-    stages[1].wght2(1. / 4.);
-
-    // w0 is computed as 1. - 2./3., which is exact in double, so that the
-    // state weights sum to exactly 1; the doubles 1./3. and 2./3. sum to
-    // 1 - 2^-54 and changed a conserved total by 5.6e-17 per step
-    stages[2].wght0(1. - 2. / 3.);
-    stages[2].wght1(2. / 3.);
-    stages[2].wght2(2. / 3.);
-  } else if (options->type() == "rk3s4") {
-    stages.resize(4);
-    stages[0].wght0(0.5);
-    stages[0].wght1(0.5);
-    stages[0].wght2(0.5);
-
-    stages[1].wght0(0.0);
-    stages[1].wght1(1.0);
-    stages[1].wght2(0.5);
-
-    // w1 is computed as 1. - 2./3., exact in double, as in rk3 above
-    stages[2].wght0(2. / 3.);
-    stages[2].wght1(1. - 2. / 3.);
-    stages[2].wght2(1. / 6.);
-
-    stages[3].wght0(0.);
-    stages[3].wght1(1.);
-    stages[3].wght2(1. / 2.);
-  } else {
+  // {w0, w1, w2} per stage. 1. - 2. / 3. is exact, so state weights sum to 1;
+  // 1./3. + 2./3. is 1 - 2^-54 and drifted a conserved total 5.6e-17 per step
+  static std::map<std::string, std::vector<std::vector<double>>> const table = {
+      {"rk1", {{0.0, 1.0, 1.0}}},
+      {"rk2", {{0.0, 1.0, 1.0}, {0.5, 0.5, 0.5}}},
+      {"rk3",
+       {{0.0, 1.0, 1.0},
+        {3. / 4., 1. / 4., 1. / 4.},
+        {1. - 2. / 3., 2. / 3., 2. / 3.}}},
+      {"rk3s4",
+       {{0.5, 0.5, 0.5},
+        {0.0, 1.0, 0.5},
+        {2. / 3., 1. - 2. / 3., 1. / 6.},
+        {0., 1., 1. / 2.}}}};
+  auto it = table.find(options->type() == "euler" ? "rk1" : options->type());
+  if (it == table.end()) {
     throw std::runtime_error("Integrator not implemented: requested type '" +
                              options->type() + "'");
   }
-
+  for (auto const& w : it->second)
+    stages.push_back(IntegratorWeight().wght0(w[0]).wght1(w[1]).wght2(w[2]));
   reset();
 }
 
 void IntegratorImpl::reset() {}
 
 bool IntegratorImpl::stop(int steps, double current_time) {
-  if (options->nlim() >= 0 && steps >= options->nlim()) {
-    return true;  // stop if number of steps exceeds nlim
-  }
-
-  if (options->tlim() >= 0 && current_time >= options->tlim()) {
-    return true;  // stop if time exceeds tlim
-  }
-
-  return false;  // otherwise, continue integration
+  return (options->nlim() >= 0 && steps >= options->nlim()) ||
+         (options->tlim() >= 0 && current_time >= options->tlim());
 }
 
 torch::Tensor IntegratorImpl::forward(int s, torch::Tensor u0, torch::Tensor u1,
-                                      torch::Tensor u2) {
+                                      torch::Tensor u2,
+                                      std::optional<torch::Tensor> out) {
   if (s < 0 || s >= stages.size()) {
     throw std::runtime_error("Invalid stage: s = " + std::to_string(s) +
                              ", valid range = [0, " +
                              std::to_string(stages.size()) + ")");
   }
 
-  /*auto out = torch::empty_like(u0);
-  auto iter = at::TensorIteratorConfig()
-                  .add_output(out)
-                  .add_input(u0)
-                  .add_input(u1)
-                  .add_input(u2)
-                  .build();
-
-  at::native::call_average3(out.device().type(), iter, stages[s].wght0(),
-                            stages[s].wght1(), stages[s].wght2());*/
-  auto out =
-      stages[s].wght0() * u0 + stages[s].wght1() * u1 + stages[s].wght2() * u2;
-  return out;
+  auto const& w = stages[s];
+  if (!out) return w.wght0() * u0 + w.wght1() * u1 + w.wght2() * u2;
+  for (auto const& t : {u0, u1, u2})
+    TORCH_CHECK(t.dtype() == out->dtype() && t.device() == out->device(),
+                "[Integrator] out, u0, u1 and u2 must share dtype and device");
+  at::add_out(*out, w.wght0() * u0, w.wght1() * u1);
+  return out->add_(w.wght2() * u2);
 }
 
 std::shared_ptr<IntegratorImpl> IntegratorImpl::create(
