@@ -63,7 +63,7 @@ jobs:
           else
             pip install 'torch==2.10.0'
           fi
-          pip install --no-deps 'pydisort==1.7.1'
+          pip install --no-deps 'pydisort==1.8.13'
 
       - name: Install NetCDF
         run: |
