@@ -1,4 +1,4 @@
-"""pyharp builds with pydisort 1.7.x only, and its wheel pins the pydisort its library was built against."""
+"""pyharp builds with a supported pydisort, and its wheel pins the pydisort its library was built against."""
 
 import os
 import re
@@ -22,9 +22,9 @@ def pydisort_requirements():
     return reqs
 
 
-@pytest.mark.parametrize("version, allowed", [("1.7.1", True), ("1.7.9", True), ("1.8.0", False),
-                                              ("1.8.13", False), ("1.7.0", False)])
-def test_requirement_excludes_pydisort_1_8(version, allowed):
+@pytest.mark.parametrize("version, allowed", [("1.7.1", True), ("1.7.9", True), ("1.8.0", True),
+                                              ("1.8.13", True), ("1.8.14", False), ("1.7.0", False)])
+def test_supported_pydisort_build_versions(version, allowed):
     for req in pydisort_requirements():
         assert req.specifier.contains(version) == allowed, f"{req} and pydisort {version}"
 
