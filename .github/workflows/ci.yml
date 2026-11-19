@@ -58,12 +58,8 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install build ninja setuptools-scm wheel numpy pytest hitran-api scipy netCDF4 matplotlib xarray
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            pip install 'torch==2.10.0' --index-url https://download.pytorch.org/whl/cpu
-          else
-            pip install 'torch==2.10.0'
-          fi
-          pip install --no-deps 'pydisort==1.8.13'
+          # The Linux pydisort wheel links against the CUDA-enabled PyTorch distribution.
+          pip install --no-cache-dir 'torch==2.10.0' 'pydisort==1.8.13'
 
       - name: Install NetCDF
         run: |
