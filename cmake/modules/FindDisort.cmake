@@ -41,9 +41,10 @@ if(Python3_Interpreter_FOUND)
   execute_process(
     COMMAND ${Python3_EXECUTABLE} -c "import pydisort; print(pydisort.__file__)"
     OUTPUT_VARIABLE disort_init_file
-    OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
 
-  cmake_path(CONVERT ${disort_init_file} TO_CMAKE_PATH_LIST disort_init_file
+  cmake_path(CONVERT "${disort_init_file}" TO_CMAKE_PATH_LIST disort_init_file
              NORMALIZE)
 
   cmake_path(REPLACE_FILENAME disort_init_file lib OUTPUT_VARIABLE disort_lib_dir)
