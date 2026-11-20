@@ -23,7 +23,7 @@ def pydisort_requirements():
 
 
 @pytest.mark.parametrize("version, allowed", [("1.7.1", True), ("1.7.9", True), ("1.8.0", True),
-                                              ("1.8.13", True), ("1.8.14", False), ("1.7.0", False)])
+                                              ("1.8.13", True), ("1.8.16", True), ("1.7.0", False)])
 def test_supported_pydisort_build_versions(version, allowed):
     for req in pydisort_requirements():
         assert req.specifier.contains(version) == allowed, f"{req} and pydisort {version}"
