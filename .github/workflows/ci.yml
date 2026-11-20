@@ -59,7 +59,7 @@ jobs:
         run: |
           pip install build ninja setuptools-scm wheel numpy pytest hitran-api scipy netCDF4 matplotlib xarray
           # The Linux pydisort wheel links against the CUDA-enabled PyTorch distribution.
-          pip install --no-cache-dir 'torch==2.10.0' 'pydisort==1.8.13'
+          pip install --no-cache-dir 'torch==2.10.0' 'pydisort>=1.7.1'
 
       - name: Install NetCDF
         run: |

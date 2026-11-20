@@ -5,8 +5,8 @@ requires = [
   "wheel",
   "build",
   "ninja",
-  # Keep the upper bound aligned with the pydisort used to build release wheels.
-  "pydisort>=1.7.1,<=1.8.13",
+  # setup.py pins each wheel to the exact pydisort used by CMake.
+  "pydisort>=1.7.1",
   "cmake>=3.20",
   "torch==2.10.0",
 ]
