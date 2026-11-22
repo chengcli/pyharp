@@ -33,6 +33,8 @@ from .dataset_io import (
 from .hitemp_lines import HITEMP_FILE_PATTERN
 from .hitran_cia_utils import load_cia_dataset
 from .hitran_molecule_utils import build_line_provider, download_hitran_lines
+from .hitran_molecule_utils import selected_pressure_bars as _selected_pressure_bars
+from .hitran_molecule_utils import selected_temperatures as _selected_base_temperatures
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_components
 from .orton_xiz_cia import load_orton_xiz_cia_dataset, resolve_orton_xiz_cia_filename
 from .utils import (
@@ -45,6 +47,7 @@ from .utils import (
     parse_wn_range,
     process_pool_context,
 )
+from .utils import parse_float_list as _parse_float_list
 from .spectrum import (
     _resolve_continuum_sources,
     compute_absorption_spectrum_from_sources,
@@ -86,16 +89,6 @@ class DumpArgumentParser(argparse.ArgumentParser):
 
     def parse_known_args(self, args=None, namespace=None):
         return super().parse_known_args(self._normalize_list_option_tokens(args), namespace)
-
-
-def _parse_float_list(value: str) -> list[float]:
-    parts = [part.strip() for part in str(value).split(",")]
-    if not parts or any(part == "" for part in parts):
-        raise argparse.ArgumentTypeError("value must be a number or comma-separated list of numbers")
-    try:
-        return [float(part) for part in parts]
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("value must contain numeric values") from exc
 
 
 def _add_selector_arguments(parser: argparse.ArgumentParser) -> None:
@@ -156,20 +149,6 @@ def _selected_target(args: argparse.Namespace) -> tuple[str, object]:
     if args.composition:
         return "composition", args.composition
     return "species", args.species or "CO2"
-
-
-def _selected_base_temperatures(args: argparse.Namespace) -> list[float]:
-    values = getattr(args, "temperature_k", [300.0])
-    if isinstance(values, (list, tuple)):
-        return [float(value) for value in values]
-    return [float(values)]
-
-
-def _selected_pressure_bars(args: argparse.Namespace) -> list[float]:
-    values = getattr(args, "pressure_bar", [1.0])
-    if isinstance(values, (list, tuple)):
-        return [float(value) for value in values]
-    return [float(values)]
 
 
 def _selected_del_temperatures(args: argparse.Namespace) -> list[float]:

@@ -45,6 +45,8 @@ from .hitran_molecule_utils import (
     download_hitran_lines,
     load_hitran_line_list,
 )
+from .hitran_molecule_utils import selected_pressure_bars as _selected_pressure_bars
+from .hitran_molecule_utils import selected_temperatures as _selected_temperatures
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_components
 from .utils import build_band_from_range, default_hitran_dir, parse_wn_range, process_pool_context
 from .spectrum import AbsorptionSpectrum, number_density_cm3_from_pressure_temperature
@@ -552,20 +554,6 @@ def _page_manifest(products: MixtureOverviewProducts) -> dict[str, object]:
         "line_species": [term.species_name for term in products.species_terms],
         "opacity_sources": list(products.manifest_sources),
     }
-
-
-def _selected_temperatures(args: argparse.Namespace) -> list[float]:
-    values = getattr(args, "temperature_k", [300.0])
-    if isinstance(values, (list, tuple)):
-        return [float(value) for value in values]
-    return [float(values)]
-
-
-def _selected_pressure_bars(args: argparse.Namespace) -> list[float]:
-    values = getattr(args, "pressure_bar", [1.0])
-    if isinstance(values, (list, tuple)):
-        return [float(value) for value in values]
-    return [float(values)]
 
 
 def _state_pairs(args: argparse.Namespace) -> list[tuple[float, float]]:

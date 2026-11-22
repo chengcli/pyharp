@@ -7,6 +7,8 @@
 #include <disort/index.h>
 
 // harp
+#include <harp/utils/divide_where_positive.hpp>
+
 #include "band_accumulate.hpp"
 #include "band_accumulate_dispatch.hpp"
 #include "band_accumulate_impl.h"
@@ -32,18 +34,6 @@ bool kernel_applies(torch::Tensor const& prop, torch::Tensor const& other) {
          other.scalar_type() == dtype && prop.dim() == 4 &&
          prop.is_contiguous() && !tracks_gradient(prop) &&
          !tracks_gradient(other);
-}
-
-torch::Tensor divide_where_positive(torch::Tensor numerator,
-                                    torch::Tensor denominator) {
-  while (denominator.dim() < numerator.dim()) {
-    denominator = denominator.unsqueeze(-1);
-  }
-  auto const positive = denominator > 0.0;
-  auto const safe_denominator =
-      torch::where(positive, denominator, torch::ones_like(denominator));
-  return torch::where(positive, numerator / safe_denominator,
-                      torch::zeros_like(numerator));
 }
 
 void call_accumulate_opacity_cpu(at::TensorIterator& iter, int nprop) {

@@ -2,6 +2,8 @@
 #include <disort/index.h>
 
 // harp
+#include <harp/utils/divide_where_positive.hpp>
+
 #include "cloud_kernels.hpp"
 #include "water_cloud_temperature.hpp"
 
@@ -21,18 +23,6 @@ torch::Tensor layer_temperature(torch::Tensor value,
               "(ncol, nlyr) or a scalar; got ",
               value.sizes());
   return value;
-}
-
-torch::Tensor divide_where_positive(torch::Tensor numerator,
-                                    torch::Tensor denominator) {
-  while (denominator.dim() < numerator.dim()) {
-    denominator = denominator.unsqueeze(-1);
-  }
-  auto const positive = denominator > 0.0;
-  auto const safe_denominator =
-      torch::where(positive, denominator, torch::ones_like(denominator));
-  return torch::where(positive, numerator / safe_denominator,
-                      torch::zeros_like(numerator));
 }
 
 }  // namespace

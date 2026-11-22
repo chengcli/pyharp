@@ -6,6 +6,8 @@
 #include <harp/math/interpolation.hpp>
 #include <harp/utils/netcdf_opacity_utils.hpp>
 
+#include "opacity_kwargs.hpp"
+
 namespace harp {
 
 extern std::vector<std::string> species_names;
@@ -159,18 +161,9 @@ torch::Tensor MoleculeLineImpl::forward(
   int ncol = conc.size(0);
   int nlyr = conc.size(1);
 
-  TORCH_CHECK(kwargs.count("pres") > 0, "pres is required in kwargs");
-  TORCH_CHECK(kwargs.count("temp") > 0, "temp is required in kwargs");
-
-  auto const& pres = kwargs.at("pres");
-  auto const& temp = kwargs.at("temp");
-
-  TORCH_CHECK(pres.size(0) == ncol && pres.size(1) == nlyr,
-              "Invalid pres shape: ", pres.sizes(),
-              "; needs to be (ncol, nlyr)");
-  TORCH_CHECK(temp.size(0) == ncol && temp.size(1) == nlyr,
-              "Invalid temp shape: ", temp.sizes(),
-              "; needs to be (ncol, nlyr)");
+  auto const pres_temp = pres_temp_from_kwargs(conc, kwargs);
+  auto const& pres = pres_temp.first;
+  auto const& temp = pres_temp.second;
 
   torch::Tensor wave_query;
   if (kwargs.count("wavenumber") > 0) {

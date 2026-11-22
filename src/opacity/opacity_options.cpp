@@ -6,7 +6,6 @@
 
 // harp
 #include <harp/utils/parse_yaml_input.hpp>
-#include <harp/utils/read_dimvar_netcdf.hpp>
 #include <harp/utils/read_var_pt.hpp>
 
 #include "opacity_options.hpp"

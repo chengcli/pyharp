@@ -11,7 +11,7 @@ def _get_legacy_data_1460(self):
     run this function. Each specific line is accounted for.
     """
     data = pd.read_csv(self.ck_file,
-              sep='\s+',header=None,
+              sep=r'\s+',header=None,
               names=list(range(9)),dtype=str)
 
     num_species = int(data.iloc[0,0])
