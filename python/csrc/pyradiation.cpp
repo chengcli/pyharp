@@ -20,7 +20,7 @@ void bind_radiation(py::module& m) {
   m.def("bbflux_wavenumber",
         py::overload_cast<double, double, torch::Tensor>(
             &harp::bbflux_wavenumber),
-        py::arg("wn1"), py::arg("wn2"), py::arg("temp") = 1);
+        py::arg("wn1"), py::arg("wn2"), py::arg("temp"));
 
   m.def("bbflux_wavenumber",
         py::overload_cast<torch::Tensor, torch::Tensor, torch::Tensor>(
