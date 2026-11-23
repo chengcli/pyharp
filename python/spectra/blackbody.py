@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 
-H_PLANCK = 6.62607015e-34
-C_LIGHT = 2.99792458e8
-K_BOLTZMANN = 1.380649e-23
+from ..pyharp import constants as _constants
+
+# the one home is src/constants.h (exact SI), bound as pyharp.constants
+H_PLANCK = _constants.hPlanck
+C_LIGHT = _constants.cLight
+K_BOLTZMANN = _constants.kBoltz
 
 
 def compute_normalized_blackbody_curve(

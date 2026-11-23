@@ -24,6 +24,17 @@ class HelpFormatter(argparse.RawDescriptionHelpFormatter):
         return help_text
 
 
+def parse_float_list(value: str) -> list[float]:
+    """Parse "a" or "a,b,..." into floats for an argparse type."""
+    parts = [part.strip() for part in str(value).split(",")]
+    if not parts or any(part == "" for part in parts):
+        raise argparse.ArgumentTypeError("value must be a number or comma-separated list of numbers")
+    try:
+        return [float(part) for part in parts]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must contain numeric values") from exc
+
+
 def project_root() -> Path:
     """Return the repository root."""
     return Path(__file__).resolve().parents[2]

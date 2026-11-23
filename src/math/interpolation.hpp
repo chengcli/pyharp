@@ -22,12 +22,4 @@ torch::Tensor interpn(std::vector<torch::Tensor> const& query_coords,
                       std::vector<torch::Tensor> const& coords,
                       torch::Tensor const& lookup, bool extrapolate = false);
 
-template <int N>
-void call_interpn_cpu(at::TensorIterator& iter, at::Tensor kdata,
-                      at::Tensor axis, at::Tensor dims, int nval);
-
-template <int N>
-void call_interpn_cuda(at::TensorIterator& iter, at::Tensor kdata,
-                       at::Tensor axis, at::Tensor dims, int nval);
-
 }  // namespace harp

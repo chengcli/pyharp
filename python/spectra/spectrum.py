@@ -20,8 +20,7 @@ from .dataset_io import write_dataset
 from .hitran_cia_utils import CiaDataset, download_cia_file, parse_cia_file
 from .hitran_molecule_utils import HapiLineProvider, LineDatabase, build_line_provider, download_hitran_lines
 from .mt_ckd_h2o import compute_mt_ckd_h2o_continuum_cross_section
-
-K_BOLTZMANN = 1.380649e-23
+from .hitran_cia_utils import K_BOLTZMANN
 
 
 @dataclass(frozen=True)

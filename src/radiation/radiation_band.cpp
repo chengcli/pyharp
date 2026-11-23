@@ -21,7 +21,6 @@
 #include <harp/opacity/wavetemp.hpp>
 #include <harp/utils/layer2level.hpp>
 #include <harp/utils/parse_yaml_input.hpp>
-#include <harp/utils/read_dimvar_netcdf.hpp>
 #include <harp/utils/read_var_pt.hpp>
 #include <harp/utils/strings.hpp>
 

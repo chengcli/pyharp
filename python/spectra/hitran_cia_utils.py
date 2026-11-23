@@ -10,9 +10,10 @@ from urllib.request import Request, urlopen
 
 import numpy as np
 
+from ..pyharp import constants as _constants
 from .config import SpectroscopyConfig
 
-K_BOLTZMANN = 1.380649e-23
+K_BOLTZMANN = _constants.kBoltz  # src/constants.h, exact SI
 HITRAN_CIA_INDEX_URL = "https://hitran.org/cia/"
 
 

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import argparse, datetime, os, sys
 import numpy as np
 
+from .pyharp import constants as _harp_constants
+
 
 @dataclass
 class __Constants:
@@ -21,7 +23,7 @@ class __Constants:
         A dictionary of unit conversion factors
     """
 
-    kRgas: float = 8.31446261815324
+    kRgas: float = _harp_constants.Rgas  # src/constants.h, exact SI
 
     # Define conversion factors
     kUnitConversions = {

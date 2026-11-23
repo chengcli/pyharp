@@ -14,38 +14,11 @@ from textwrap import dedent
 
 from . import atm_overview, hitran_cia_plot, hitran_molecule_plot
 from .utils import _format_value, default_hitran_dir, default_output_path, parse_wn_range, process_pool_context
-
-
-class _SplitSpeciesAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None) -> None:
-        species: list[str] = []
-        for value in values:
-            species.extend(part.strip() for part in str(value).split(",") if part.strip())
-        setattr(namespace, self.dest, species)
-
-
-class _HelpFormatter(argparse.RawDescriptionHelpFormatter):
-    """Show defaults while preserving example formatting."""
-
-    def _get_help_string(self, action: argparse.Action) -> str:
-        help_text = action.help
-        if not help_text:
-            return ""
-        if "%(default)" in help_text:
-            return help_text
-        if action.option_strings and action.default not in (None, False, argparse.SUPPRESS):
-            return f"{help_text} (default: %(default)s)"
-        return help_text
-
-
-def _parse_float_list(value: str) -> list[float]:
-    parts = [part.strip() for part in str(value).split(",")]
-    if not parts or any(part == "" for part in parts):
-        raise argparse.ArgumentTypeError("value must be a number or comma-separated list of numbers")
-    try:
-        return [float(part) for part in parts]
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("value must contain numeric values") from exc
+from .hitran_molecule_plot import _SplitSpeciesAction
+from .hitran_molecule_utils import selected_pressure_bars as _selected_pressure_bars
+from .hitran_molecule_utils import selected_temperatures as _selected_temperatures
+from .utils import HelpFormatter as _HelpFormatter
+from .utils import parse_float_list as _parse_float_list
 
 
 def _add_state_arguments(parser: argparse.ArgumentParser) -> None:
@@ -98,20 +71,6 @@ def _validate_single_selector(args: argparse.Namespace, parser: argparse.Argumen
     selectors = [bool(getattr(args, "pair", None)), bool(getattr(args, "species", None)), bool(getattr(args, "composition", None))]
     if sum(selectors) > 1:
         parser.error("choose only one of --pair, --species, or --composition")
-
-
-def _selected_temperatures(args: argparse.Namespace) -> list[float]:
-    values = getattr(args, "temperature_k", [300.0])
-    if isinstance(values, (list, tuple)):
-        return [float(value) for value in values]
-    return [float(values)]
-
-
-def _selected_pressure_bars(args: argparse.Namespace) -> list[float]:
-    values = getattr(args, "pressure_bar", [1.0])
-    if isinstance(values, (list, tuple)):
-        return [float(value) for value in values]
-    return [float(values)]
 
 
 def _validate_state_grid(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
