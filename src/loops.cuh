@@ -103,6 +103,18 @@ void gpu_chunk_kernel_impl(at::TensorIterator& iter, size_t work_size,
                 "interleaved workspace must hold whole elements");
   }
 
+  // The offset calculator and the thread index are 32-bit. An iterator whose
+  // operands span more than 2^31 bytes is split, as in gpu_kernel above, or
+  // the offsets wrap and the kernel touches the wrong memory without error.
+  // Each piece sizes its own chunks and workspace below.
+  if (!iter.can_use_32bit_indexing()) {
+    for (auto& sub_iter : iter.with_32bit_indexing()) {
+      gpu_chunk_kernel_impl<Arity, Interleaved>(sub_iter, work_size, elem_size,
+                                                f);
+    }
+    return;
+  }
+
   std::array<char*, Arity> data;
   for (int i = 0; i < Arity; i++) {
     data[i] = reinterpret_cast<char*>(iter.data_ptr(i));
