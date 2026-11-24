@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 // C/C++
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 
@@ -495,6 +496,72 @@ TEST_P(DeviceTest, longwave_uncapped_ratio_avoids_overflow) {
   auto result = toon(prop, &bc, /*band=*/"", temf);
 
   EXPECT_TRUE(torch::all(torch::isfinite(result.cpu())).item<bool>());
+}
+
+// The CUDA chunk kernel has 32-bit offsets, so an iterator whose operands span
+// more than 2^31 bytes must be split, or past 2^32 bytes the offsets wrap and
+// part of the output lands in the wrong place (issue #186). Here the flux
+// output is about 4.4 GB: a batch of a few distinct columns repeated must give
+// each column the same answer as the small batch. Needs a GPU with about 12 GB
+// free; skipped when the allocation fails.
+TEST_P(DeviceTest, shortwave_batch_over_4gib_matches_small_batch) {
+  if (device.type() != torch::kCUDA || dtype != torch::kFloat64) {
+    GTEST_SKIP() << "large-batch check runs on CUDA float64 only";
+  }
+
+  auto op = harp::ToonMcKay89OptionsImpl::create();
+  op->wave_lower({500.});
+  op->wave_upper({1000.});
+  harp::ToonMcKay89 toon(op);
+  toon->to(device, dtype);
+
+  int64_t const npat = 7;  // distinct columns, prime so they never line up
+  int64_t const nrep = 6500000;
+  int64_t const ncol = npat * nrep;  // flux: ncol * 3 levels * 4 * 8 B
+  int const nlyr = 2;
+  auto opts = torch::device(device).dtype(dtype);
+
+  auto prop_pat = torch::zeros({1, npat, nlyr, 3}, opts);
+  prop_pat.select(-1, 0) =
+      torch::linspace(0.05, 2.0, npat * nlyr, opts).view({1, npat, nlyr});
+  prop_pat.select(-1, 1) =
+      torch::linspace(0.1, 0.9, npat, opts).view({1, npat, 1});
+  prop_pat.select(-1, 2) = 0.3;
+  auto umu0_pat = torch::linspace(0.2, 1.0, npat, opts);
+  auto alb_pat = torch::linspace(0.05, 0.6, npat, opts).view({1, npat});
+
+  std::map<std::string, torch::Tensor> bc_pat;
+  bc_pat["fbeam"] = torch::full({1, npat}, 100.0, opts);
+  bc_pat["umu0"] = umu0_pat;
+  bc_pat["albedo"] = alb_pat;
+  auto ref = toon(prop_pat, &bc_pat);  // (1, npat, nlyr + 1, 4)
+
+  torch::Tensor flx;
+  try {
+    auto prop = prop_pat.repeat({1, nrep, 1, 1});
+    std::map<std::string, torch::Tensor> bc;
+    bc["fbeam"] = torch::full({1, ncol}, 100.0, opts);
+    bc["umu0"] = umu0_pat.repeat({nrep});
+    bc["albedo"] = alb_pat.repeat({1, nrep});
+    flx = toon(prop, &bc);
+    torch::cuda::synchronize();
+  } catch (c10::OutOfMemoryError const&) {
+    GTEST_SKIP() << "not enough GPU memory for the large-batch check";
+  }
+  ASSERT_GT(flx.numel() * flx.element_size(), int64_t(1) << 32);
+
+  // compare in slices to keep the extra memory small
+  auto flx_rep = flx.view({nrep, npat, nlyr + 1, 4});
+  auto ref_rep = ref.view({1, npat, nlyr + 1, 4});
+  double worst = 0.;
+  int64_t const step = 250000;
+  for (int64_t r = 0; r < nrep; r += step) {
+    int64_t len = std::min(step, nrep - r);
+    double d = (flx_rep.narrow(0, r, len) - ref_rep).abs().max().item<double>();
+    worst = std::max(worst, d);
+  }
+  EXPECT_LT(worst, 1e-10) << "large batch differs from small batch by "
+                          << worst;
 }
 
 int main(int argc, char** argv) {
